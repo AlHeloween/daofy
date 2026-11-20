@@ -1,143 +1,143 @@
-# Daofy Update — Daofy 自身更新管理
+# Daofy Update — Daofy Self-Update Management
 
-> 版本：v1.1 | 最后更新：2026-07-05
-
----
-
-## 目录
-
-1. [概述](#1-概述)
-2. [Action 速查](#2-action-速查)
-3. [使用说明](#3-使用说明)
-4. [工作流场景](#4-工作流场景)
-5. [故障排除](#5-故障排除)
+> Version: v1.1 | Last updated: 2026-07-05
 
 ---
 
-## 1. 概述
+## Table of Contents
 
-`daofy_update` 管理 Daofy MCP Server 自身的版本检查和更新。支持两种安装模式的更新：
+1. [Overview](#1-overview)
+2. [Action Quick Reference](#2-action-quick-reference)
+3. [Usage](#3-usage)
+4. [Workflow Scenarios](#4-workflow-scenarios)
+5. [Troubleshooting](#5-troubleshooting)
 
-| 安装方式 | 更新方式 |
+---
+
+## 1. Overview
+
+`daofy_update` manages version checking and updating for the Daofy MCP Server itself. It supports updates for two installation modes:
+
+| Installation Method | Update Method |
 |---------|---------|
-| **git clone** 源码安装 | `git pull` 拉取最新代码 |
-| **pip install** 安装 | 提示使用 `pip install --upgrade daofy-for-delphi` |
+| **git clone** source installation | `git pull` to fetch the latest code |
+| **pip install** installation | Prompts to use `pip install --upgrade daofy-for-delphi` |
 
-### 自动检查机制
+### Automatic Check Mechanism
 
-Daofy 启动时会在后台自动检查 GitHub 最新 Release，有新版本时会通过工具响应智能提示通知 AI。
+When Daofy starts, it automatically checks the latest GitHub Release in the background. When a new version is available, it intelligently notifies the AI through tool responses.
 
-> AI 看到更新提示后应主动询问用户是否需要更新。
+> After the AI sees an update notification, it should proactively ask the user whether they want to update.
 
-### 硬约束
+### Hard Constraints
 
-- 更新完成后需要**重启 Daofy 或 AI Agent** 使新版本生效
+- After the update is complete, you need to **restart Daofy or the AI Agent** for the new version to take effect
 
 ---
 
-## 2. Action 速查
+## 2. Action Quick Reference
 
-| Action | 用途 | 必需参数 |
+| Action | Purpose | Required Parameters |
 |--------|------|---------|
-| `check` | 检查 GitHub 最新 Release | — |
-| `check_retry` | 失败后强制后台重试检查（返回 task_id） | — |
-| `update` | 执行 git pull 更新代码 | — |
-| `update_retry` | 执行 git pull 带自动重试（失败后间隔 retry_interval 秒重试，最多 max_retries 次） | — |
-| `version` | 显示当前版本号和安装方式 | — |
+| `check` | Check the latest GitHub Release | — |
+| `check_retry` | Force background retry check after failure (returns task_id) | — |
+| `update` | Execute git pull to update code | — |
+| `update_retry` | Execute git pull with automatic retry (after failure, retry every retry_interval seconds, up to max_retries times) | — |
+| `version` | Display current version number and installation method | — |
 
 ---
 
-## 3. 使用说明
+## 3. Usage
 
-### 3.1 `check` — 检查更新
+### 3.1 `check` — Check for Updates
 
-检查 GitHub 最新 Release，返回当前版本/最新版本/是否有更新。
+Checks the latest GitHub Release and returns current version/latest version/whether an update is available.
 
 ```python
 daofy_update(action="check")
 ```
 
-**返回信息**：
-- 当前安装版本
-- GitHub 最新版本
-- 是否有可用更新
-- 安装方式（git/pip）
+**Returned Information**:
+- Current installed version
+- Latest GitHub version
+- Whether an available update exists
+- Installation method (git/pip)
 
-### 3.2 `update` — 执行更新
+### 3.2 `update` — Execute Update
 
 ```python
-# git 安装模式：自动 git pull
+# git installation mode: automatically git pull
 daofy_update(action="update")
 ```
 
-- **git 安装模式**：自动执行 `git pull` 拉取最新代码
-- **pip 安装模式**：不会自动更新，提示用户运行 `pip install --upgrade daofy-for-delphi`
+- **git installation mode**: Automatically executes `git pull` to fetch the latest code
+- **pip installation mode**: Does not update automatically; prompts the user to run `pip install --upgrade daofy-for-delphi`
 
-### 3.3 `version` — 查看版本
+### 3.3 `version` — View Version
 
 ```python
 daofy_update(action="version")
 ```
 
-返回：
-- 当前版本号
-- 安装方式（git/pip）
-- 最近更新日期
+Returns:
+- Current version number
+- Installation method (git/pip)
+- Last update date
 
 ---
 
-## 4. 工作流场景
+## 4. Workflow Scenarios
 
-### 收到更新通知
+### Received an Update Notification
 
 ```
-AI: "检测到 Daofy 有新版本 v2026.07.05，当前版本 v2026.06.22。是否需要更新？"
-用户: "更新吧"
-AI: daofy_update(action="check")       # 确认版本
-     daofy_update(action="update")      # 执行更新
-     "更新完成。请重启 Daofy 或 AI Agent 使新版本生效。"
+AI: "A new Daofy version v2026.07.05 is available; current version v2026.06.22. Do you want to update?"
+User: "Yes, update it"
+AI: daofy_update(action="check")       # Confirm version
+     daofy_update(action="update")      # Execute update
+     "Update complete. Please restart Daofy or the AI Agent for the new version to take effect."
 ```
 
-### 手动检查版本
+### Manually Check Version
 
 ```python
-# 查看当前版本
+# View current version
 daofy_update(action="version")
 
-# 检查是否有更新
+# Check whether an update is available
 daofy_update(action="check")
 ```
 
-### pip 安装用户的更新
+### Updating for pip Installation Users
 
 ```python
-# 1. 检查版本
+# 1. Check version
 daofy_update(action="check")
-# → 返回：当前 v2026.06.22，最新 v2026.07.05，安装方式 pip
+# → Returns: current v2026.06.22, latest v2026.07.05, installation method pip
 
-# 2. 手动更新
+# 2. Manually update
 # pip install --upgrade daofy-for-delphi
 ```
 
 ---
 
-## 5. 故障排除
+## 5. Troubleshooting
 
-| 现象 | 原因 | 解决 |
+| Symptom | Cause | Solution |
 |------|------|------|
-| `update` 失败 | git 安装模式下本地有未提交修改 | 先 `code_hosting(action="git_status")` 检查，提交或 stash 后重试 |
-| 更新后工具不生效 | Daofy 进程未重启 | 重启 AI Agent 或 MCP Server |
-| pip 用户调用 `update` | 安装方式不支持 git pull | 使用 `pip install --upgrade daofy-for-delphi` |
-| `check` 返回网络错误 | 无法访问 GitHub | 检查网络/代理设置 |
-| 版本号显示异常 | 非标准安装 | 确认安装方式后重新安装 |
+| `update` fails | Uncommitted local changes in git installation mode | First use `code_hosting(action="git_status")` to check, then commit or stash and retry |
+| Tools do not take effect after update | Daofy process has not been restarted | Restart the AI Agent or MCP Server |
+| pip users call `update` | Installation method does not support git pull | Use `pip install --upgrade daofy-for-delphi` |
+| `check` returns network error | Cannot access GitHub | Check network/proxy settings |
+| Version number displays abnormally | Non-standard installation | Confirm the installation method and reinstall |
 
-### 常见更新后操作
+### Common Post-Update Actions
 
 ```json
 {
-  "更新类型": "操作",
-  "git pull": "重启 Daofy 进程",
-  "pip upgrade": "重启 AI Agent 客户端",
-  "配置文件变更": "检查 config/*.json 是否需要合并"
+  "Update Type": "Action",
+  "git pull": "Restart Daofy process",
+  "pip upgrade": "Restart AI Agent client",
+  "Config file changes": "Check whether config/*.json needs merging"
 }
 ```
