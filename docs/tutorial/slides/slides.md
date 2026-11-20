@@ -1,509 +1,509 @@
 # Daofy
-## 与 AI 共舞 · 享 AI 时代
+## Dance with AI · Enjoy the AI Era
 
 ---
 
-## 目录
+## Table of Contents
 
-1. 什么是 MCP？
-2. Daofy 能做什么？
-3. 安装（AI 自动）
-4. 知识库搜索
-5. 编译与格式化
-6. AI 辅助开发
-7. 高级功能
-8. 完整工作流演示
+1. What is MCP?
+2. What Can Daofy Do?
+3. Installation (AI Automatic)
+4. Knowledge Base Search
+5. Compilation and Formatting
+6. AI-Assisted Development
+7. Advanced Features
+8. Complete Workflow Demonstration
 
 ---
 
-## 什么是 MCP？
+## What is MCP?
 
 **Model Context Protocol**
 
-- 由 Anthropic 提出的开放协议
-- 让 AI 助手能直接调用本地工具
-- 类比：AI 的"USB 接口"
+- An open protocol proposed by Anthropic
+- Allows AI assistants to directly call local tools
+- Analogy: AI's "USB interface"
 
 ```
-AI 助手 ←→ MCP Server ←→ 本地环境
-  (Claude等)     (工具)    (编译器/文件系统)
+AI Assistant ←→ MCP Server ←→ Local Environment
+  (Claude, etc.)     (Tools)    (Compiler/File System)
 ```
 
 ---
 
-## MCP 解决了什么问题？
+## What Problem Does MCP Solve?
 
-**传统 AI 辅助开发：**
-
-```
-用户: "帮我编译一下项目"
-AI: "请打开命令行，输入 msbuild..."
-```
-
-**有了 MCP Server：**
+**Traditional AI-assisted development:**
 
 ```
-用户: "帮我编译一下项目"
-AI: ✅ 编译成功 (调用 MCP 工具)
+User: "Help me compile the project"
+AI: "Please open the command line and enter msbuild..."
 ```
 
-AI 从"给建议"变成"帮你做"。
+**With an MCP Server:**
+
+```
+User: "Help me compile the project"
+AI: ✅ Compilation succeeded (calling MCP tool)
+```
+
+AI changes from "giving advice" to "doing it for you".
 
 ---
 
-## Daofy 功能全景
+## Daofy Feature Overview
 
-| 模块 | 功能 |
+| Module | Function |
 |------|------|
-| 🔧 编译 | 项目编译、语法检查、批量编译 |
-| 📚 知识库 | 30 万函数、16 万页面索引 |
-| 📝 文件操作 | 读/写/格式化/备份/uses 管理（含 pasfmt） |
-| 🧩 组件管理 | DFM 增删改 + .dpk 编译安装 |
-| 📋 编码规范 | 规范驱动代码生成与审计 |
-| 🛡️ 运行时验证 | 编译后自动运行，检测启动崩溃 |
-| 🔍 运行时审计 | 扫描 DFM 组件类，检测遗漏 uses |
-| 🔗 RTTI 桥接 | 运行时发现/调用 Delphi 对象 published+public 方法 |
-| 🤖 自动化测试 | GUI 截图 + Console 交互，PE 自动检测 |
-| 🧠 经验记忆 | AI 经验自动去重保存 + 语义搜索 |
-| 📄 软著生成 | 源码+说明书+汇总表，浏览器 PDF 渲染 |
-| 🔄 版本更新 | 一键检查/更新 Daofy 版本 |
+| 🔧 Compilation | Project compilation, syntax checking, batch compilation |
+| 📚 Knowledge Base | 300k functions, 160k page index |
+| 📝 File Operations | Read/write/format/backup/uses management (including pasfmt) |
+| 🧩 Component Management | DFM add/remove/modify + .dpk compile/install |
+| 📋 Coding Standards | Standards-driven code generation and audit |
+| 🛡️ Runtime Verification | Auto-run after compile, detect startup crash |
+| 🔍 Runtime Audit | Scan DFM component classes, detect missing uses |
+| 🔗 RTTI Bridge | Runtime discover/call Delphi object published+public methods |
+| 🤖 Automated Testing | GUI screenshot + Console interaction, automatic PE detection |
+| 🧠 Experience Memory | AI experience auto deduplicated save + semantic search |
+| 📄 Software Copyright Generation | Source + manual + summary table, browser PDF rendering |
+| 🔄 Version Update | One-click check/update Daofy version |
 
 ---
 
-## 安装流程
+## Installation Process
 
-**用户只需：**
+**The user only needs:**
 
 ```
-用户: 帮我安装 Daofy MCP Server
+User: Help me install Daofy MCP Server
 ```
 
-**AI 自动完成：**
-1. ✅ 检查 Python/Git/7-Zip
-2. ✅ 克隆 GitHub 仓库
-3. ✅ 创建虚拟环境 + 安装依赖
-4. ✅ 自动检测 AI 客户端并配置
+**AI automatically completes:**
+1. ✅ Check Python/Git/7-Zip
+2. ✅ Clone GitHub repository
+3. ✅ Create virtual environment + install dependencies
+4. ✅ Automatically detect AI client and configure
 
-> 💡 整个过程在对话中完成，无需手动操作
+> 💡 The whole process is completed in the conversation, no manual operation required
 
 ---
 
-## 知识库规模
+## Knowledge Base Scale
 
-| 知识库 | 文件数 | 类数量 | 函数数量 | 大小 |
+| Knowledge Base | Files | Classes | Functions | Size |
 |--------|--------|--------|----------|------|
-| Delphi 源码 | 2,798 | 163,737 | 300,228 | 260 MB |
-| 三方库 | 1,800 | 5,724 | 28,801 | 27 MB |
-| 文档 (CHM) | 160,328 | — | — | 1,306 MB |
+| Delphi source code | 2,798 | 163,737 | 300,228 | 260 MB |
+| Third-party libraries | 1,800 | 5,724 | 28,801 | 27 MB |
+| Documentation (CHM) | 160,328 | — | — | 1,306 MB |
 
-**总计：近 17 万类、33 万函数、16 万文档页面**
+**Total: nearly 170k classes, 330k functions, 160k documentation pages**
 
 ---
 
-## 知识库搜索
+## Knowledge Base Search
 
-| 搜索方式 | 用法 | 示例 |
+| Search Method | Usage | Example |
 |----------|------|------|
-| 🎯 精确搜索 | 已知类名/函数名 | `TStringList`, `Split` |
-| 🔍 语义搜索 | 自然语言描述 | "JSON 深度比较" |
-| 🔗 引用查询 | 查谁引用了某单元 | `Vcl.Forms` 被哪些文件引用 |
+| 🎯 Exact search | Known class/function name | `TStringList`, `Split` |
+| 🔍 Semantic search | Natural language description | "JSON deep comparison" |
+| 🔗 Reference query | Find who references a unit | Which files reference `Vcl.Forms` |
 
-> 搜索策略：先猜精确名 → 再语义兜底
-
----
-
-## 语义搜索 — 发现隐藏 API
-
-**场景：你不知道 API 叫什么**
-
-```
-用户: Delphi 有没有可以比较两个 JSON 对象
-      是否结构相同的功能？
-```
-
-**传统方式**：翻 CHM / Google / StackOverflow
-
-**AI + KB 方式**：
-1. 语义搜索 30 万函数
-2. 命中 `TJSONObject.Equals`
-3. 确认签名 → 直接使用
+> Search strategy: first guess the exact name → then fall back to semantic search
 
 ---
 
-## 知识库驱动代码生成
+## Semantic Search — Discover Hidden APIs
 
-**场景：用 FireDAC 连接 SQLite**
-
-```
-用户: 帮我写一个 SQLite 数据库管理单元
-```
-
-**AI 的工作流：**
+**Scenario: You don't know what the API is called**
 
 ```
-① get_coding_rules()         → 获取规范
-② delphi_kb(TFDConnection)  → 查 API 签名
-③ delphi_kb(TFDQuery)       → 查参数绑定
-④ delphi_file(action="write", edits=[...]) → 生成代码（自动备份）
-⑤ delphi_project(action="compile") → 编译验证
+User: Does Delphi have a function that can compare whether
+      two JSON objects have the same structure?
 ```
 
-> 💡 不是凭记忆写，而是先查 KB 确认 API
+**Traditional way**: browse CHM / Google / StackOverflow
+
+**AI + KB way**:
+1. Semantically search 300k functions
+2. Hit `TJSONObject.Equals`
+3. Confirm signature → use directly
 
 ---
 
-## 编译功能
+## Knowledge Base-Driven Code Generation
 
-| 能力 | 说明 |
+**Scenario: Connect to SQLite with FireDAC**
+
+```
+User: Help me write a SQLite database management unit
+```
+
+**AI's workflow:**
+
+```
+① get_coding_rules()         → Get standards
+② delphi_kb(TFDConnection)  → Look up API signature
+③ delphi_kb(TFDQuery)       → Look up parameter binding
+④ delphi_file(action="write", edits=[...]) → Generate code (auto backup)
+⑤ delphi_project(action="compile") → Compile verification
+```
+
+> 💡 Rather than writing from memory, first check KB to confirm API
+
+---
+
+## Compilation Features
+
+| Capability | Description |
 |------|------|
-| 项目编译 | .dproj / .dpr → exe/dll |
-| 单文件检查 | .pas 语法检查 |
-| 批量编译 | .groupproj → 按依赖顺序 |
-| 多平台 | Win32/Win64/OSX/iOS/Android/Linux |
-| 配置 | Debug / Release + 自定义选项 |
+| Project compilation | .dproj / .dpr → exe/dll |
+| Single-file check | .pas syntax check |
+| Batch compilation | .groupproj → in dependency order |
+| Multi-platform | Win32/Win64/OSX/iOS/Android/Linux |
+| Configuration | Debug / Release + custom options |
 
 ---
 
-## 复杂编译错误诊断
+## Complex Compilation Error Diagnosis
 
-**示例：E2511 must have a comparer**
+**Example: E2511 must have a comparer**
 
 ```
-TDictionary<TCustomKey, string>  // 编译错误！
+TDictionary<TCustomKey, string>  // Compile error!
 ```
 
-**AI 的诊断链：**
-1. 搜索 KB → `TDictionary` 泛型约束
-2. 搜索 KB → `TEqualityComparer` 基类
-3. 根因：record 类型无默认比较器
-4. 生成 `TCustomKeyComparer` → 修复 → 编译通过
+**AI's diagnosis chain:**
+1. Search KB → `TDictionary` generic constraints
+2. Search KB → `TEqualityComparer` base class
+3. Root cause: record type has no default comparer
+4. Generate `TCustomKeyComparer` → fix → compilation passes
 
 ---
 
-## 统一文件操作 + 自动备份
+## Unified File Operations + Automatic Backup
 
-**一体化的文件接口 `delphi_file`：**
+**Unified file interface `delphi_file`:**
 
 ```
-delphi_file(action="read")              — 读文件（类/函数导航 + DFM 二进制→文本自动转换）
-delphi_file(action="write", edits=[...]) — 写文件（edits 格式，默认 backup=True）
-delphi_file(action="format")            — 格式化（pasfmt 驱动，自动备份）
-delphi_file(action="backup")            — 备份管理（创建/列表/恢复）
-delphi_file(action="uses")              — uses 子句增删（add/remove）
-manage_component(action="add|remove|modify") — DFM 组件管理 + PAS 声明自动同步
+delphi_file(action="read")              — Read file (class/function navigation + automatic DFM binary→text conversion)
+delphi_file(action="write", edits=[...]) — Write file (edits format, default backup=True)
+delphi_file(action="format")            — Format (pasfmt-driven, automatic backup)
+delphi_file(action="backup")            — Backup management (create/list/restore)
+delphi_file(action="uses")              — uses clause add/remove (add/remove)
+manage_component(action="add|remove|modify") — DFM component management + automatic PAS declaration synchronization
 ```
 
-**写入即备份 — 无需额外步骤：**
+**Write means backup — no extra steps:**
 
 ```
 delphi_file(action="write", file_path="Unit1.pas", edits=[{start_line:1, content:"..."}])
-                              ↑ 默认 backup=True，自动创建 __history 备份
+                              ↑ backup=True by default, automatically create __history backup
 ```
 
-**备份机制：**
+**Backup mechanism:**
 
 ```
-源文件                 __history/
+Source file                 __history/
 DataProcessor.pas  →  DataProcessor.pas.~1~
-                       DataProcessor.pas.~2~  (自动递增)
+                       DataProcessor.pas.~2~  (automatically increments)
 ```
 
-**备份管理：**
-- 查看备份列表 `backup_action="list"`
-- 恢复指定版本 `backup_action="restore", version=3`
-- 与 Delphi IDE 的 History 机制兼容
+**Backup management:**
+- View backup list `backup_action="list"`
+- Restore specified version `backup_action="restore", version=3`
+- Compatible with Delphi IDE's History mechanism
 
-> 💡 旧接口 `read_source_file` / `format_delphi` 已合并到此工具
+> 💡 Legacy interfaces `read_source_file` / `format_delphi` have been merged into this tool
 
 ---
 
-## DFM 二进制文件透明处理
+## Transparent Handling of Binary DFM Files
 
-**DFM 表单文件也有二进制格式，传统方式处理麻烦：**
+**DFM form files also have a binary format, which is troublesome to handle in traditional ways:**
 
 ```
-读取二进制 DFM → 乱码 → 还得手动转换
-编辑后保存 → 格式搞错 → 编译器报错
+Read binary DFM → garbled text → still need manual conversion
+Save after editing → wrong format → compiler error
 ```
 
-**`delphi_file` 透明处理：**
+**`delphi_file` transparent handling:**
 
 ```
 delphi_file(action="read",  file_path="Form1.dfm")
-  → 检测到二进制 → 自动转文本 → 返回可读内容 ✓
+  → Binary detected → automatically convert to text → return readable content ✓
 
 delphi_file(action="write", file_path="Form1.dfm", edits=[...])
-  → 原文件是二进制 → 写出后自动转回二进制 ✓
+  → Original file is binary → automatically convert back to binary after writing ✓
 ```
 
-**组件级操作：`manage_component` 工具 — 无需手动编辑 DFM 文本**
+**Component-level operations: `manage_component` tool — no need to manually edit DFM text**
 
 ```
 manage_component(action="add",    target_dfm="Form1.dfm",
   new_component_class="TButton", properties={"Caption": "OK"})
-  → DFM 新增按钮 + PAS 自动声明字段和事件 ✓
+  → Add button to DFM + automatically declare field and event in PAS ✓
 
 manage_component(action="modify", component_name="Button1",
   properties={"Caption": "确定", "Enabled": "False"})
-  → 改属性 + 自动同步 PAS ✓
+  → Modify properties + automatically synchronize PAS ✓
 
 manage_component(action="remove", component_name="Button1")
-  → 删组件 + 自动清理 PAS 声明 ✓
+  → Remove component + automatically clean up PAS declarations ✓
 ```
 
-**原理：按需编译 Delphi 转换器，调用 `ObjectResourceToText` / `ObjectTextToResource`**
+**Principle: compile the Delphi converter on demand, call `ObjectResourceToText` / `ObjectTextToResource`**
 
-> 💡 修改者无需关心 DFM 格式，读写接口一致
+> 💡 Editors do not need to care about DFM format; read/write interfaces are consistent
 
 ---
 
-## 编码规范控制 AI 行为
+## Coding Standards Control AI Behavior
 
-**同一需求，不同规则 → 不同代码**
+**Same requirement, different rules → different code**
 
 ```
-用户: 写一个字符串工具单元
+User: Write a string utility unit
 ```
 
-| 维度 | 现代规范 | 旧规范 |
-|------|----------|--------|
-| 命名 | T + 大驼峰 | 无前缀小驼峰 |
-| 参数 | A + 大驼峰 | 匈牙利命名 |
-| 缩进 | 2 空格 | 4 空格 |
-| begin | 另起一行 | 行尾 |
+| Dimension | Modern standard | Legacy standard |
+|----------|----------|--------|
+| Naming | T + PascalCase | no-prefix camelCase |
+| Parameters | A + PascalCase | Hungarian notation |
+| Indentation | 2 spaces | 4 spaces |
+| begin | new line | end of line |
 
-> 💡 规则不仅是被查询的，更是被执行的
+> 💡 Rules are not only queried, but also executed
 
 ---
 
-## 代码审计 + 创建工单
+## Code Audit + Create Tickets
 
-**审计维度：**
-- 🔴 资源泄漏（try/finally）
-- 🔴 循环内删除元素
-- 🟡 魔法数值
-- 🟡 未使用变量
-- 🔵 函数过长
+**Audit dimensions:**
+- 🔴 Resource leaks (try/finally)
+- 🔴 Deleting elements inside a loop
+- 🟡 Magic numbers
+- 🟡 Unused variables
+- 🔵 Function too long
 
-**审计结果 → 自动创建 Issue**
+**Audit results → automatically create Issue**
 
 ```
-GitHub Issue / Gitee 工单
-├── 标题: LegacyData.pas 代码质量问题
-├── 问题清单（含行号/级别/建议）
-└── Issue 链接
+GitHub Issue / Gitee ticket
+├── Title: LegacyData.pas code quality issues
+├── Problem list (including line numbers/severity/suggestions)
+└── Issue link
 ```
 
 ---
 
-## 多文件重构
+## Multi-file Refactoring
 
-**场景：TStringList → TArray\<String\>**
+**Scenario: TStringList → TArray\<String\>**
 
 ```
-用户: 把项目中所有 TStringList
-      替换为 TArray<String>
+User: Replace all TStringList in the project
+      with TArray<String>
 ```
 
-**AI 工作流：**
-1. 🔗 引用查询 → 评估影响范围
-2. 📝 逐文件修改（delphi_file write 默认自动备份）
-3. ✅ 每改一个编译验证
-4. 🎨 统一格式化
+**AI workflow:**
+1. 🔗 Reference query → assess impact scope
+2. 📝 Modify file by file (delphi_file write auto-backup by default)
+3. ✅ Compile and verify after each change
+4. 🎨 Uniform formatting
 
-> 💡 你做决策，AI 执行 + 验证
+> 💡 You make decisions, AI executes + verifies
 
 ---
 
-## 批量多项目编译
+## Batch Multi-Project Compilation
 
-**场景：编译整个解决方案**
+**Scenario: Compile the entire solution**
 
 ```
 ProjectGroup.groupproj
-├── LibProject/ (先编译，因为被依赖)
-└── AppProject/ (后编译)
+├── LibProject/ (compile first, because it is depended on)
+└── AppProject/ (compile later)
 ```
 
 ```
-用户: Release / Win64，编译全部
-AI: ✅ LibUtils → ✅ MainApp  一键完成
+User: Release / Win64, compile all
+AI: ✅ LibUtils → ✅ MainApp  completed in one click
 ```
 
-> 💡 自动解析 BuildOrder，按依赖顺序编译
+> 💡 Automatically parse BuildOrder and compile in dependency order
 
 ---
 
-## 文档知识库实战搜索
+## Practical Search in Documentation Knowledge Base
 
-**构建后：一句话搜 16 万页帮助文档**
+**After building: search 160k pages of help documentation with one sentence**
 
 ```
-用户: TCanvas.Draw 的参数说明，
-      特别是 DrawOpacity 的作用
+User: Parameter description of TCanvas.Draw,
+      especially the role of DrawOpacity
 ```
 
 ```
 Result:
-DrawOpacity: 绘制不透明度
-  0   = 完全透明
-  255 = 完全不透明（默认）
+DrawOpacity: Drawing opacity
+  0   = Completely transparent
+  255 = Completely opaque (default)
 ```
 
-> 💡 比翻 CHM 快两个数量级
+> 💡 Two orders of magnitude faster than browsing CHM
 
 ---
 
-## 安装组件包
+## Install Component Packages
 
 ```
-用户: 安装 MyComponent.dpk
+User: Install MyComponent.dpk
 ```
 
-**AI 完成：**
-1. 编译 .dpk
-2. 检测是否为设计期包
-3. 自动注册到 IDE 注册表
+**AI completes:**
+1. Compile .dpk
+2. Detect whether it is a design-time package
+3. Automatically register to IDE registry
 
 ```
-用户: 查看已安装的组件包
-AI: 列出所有注册的 BPL 包
+User: View installed component packages
+AI: List all registered BPL packages
 ```
 
 ---
 
-## 完整从 0 到 1 工作流
+## Complete 0-to-1 Workflow
 
 ```
-需求：JSON 配置文件管理单元
+Requirement: JSON configuration file management unit
 ```
 
 ```
-① get_coding_rules                       → 获取规范
-② delphi_kb(TJSON*)                      → 搜索 API 确认签名
-③ delphi_file(action="write", edits=[...]) → 写入代码（自动备份到 __history）
-④ delphi_file(action="format")           → 格式化代码
-⑤ delphi_project(action="compile")              → 编译验证
-⑥ delphi_project(action="compile", run_verify=True) → 运行验证（捕获 CreateForm 阶段崩溃）
-⑦ get_coding_rules(section="review")      → 审计
-⑧ delphi_project(action="runtime")              → 运行时注册检查（遗漏 uses 检测）
-⑨ experience(action="save")              → 保存经验（AI 自动去重）
-⑩ 清理 + 确认备份
+① get_coding_rules                       → Get standards
+② delphi_kb(TJSON*)                      → Search API to confirm signature
+③ delphi_file(action="write", edits=[...]) → Write code (automatically backed up to __history)
+④ delphi_file(action="format")           → Format code
+⑤ delphi_project(action="compile")              → Compile verification
+⑥ delphi_project(action="compile", run_verify=True) → Runtime verification (catch CreateForm stage crashes)
+⑦ get_coding_rules(section="review")      → Audit
+⑧ delphi_project(action="runtime")              → Runtime registration check (missing uses detection)
+⑨ experience(action="save")              → Save experience (AI automatic deduplication)
+⑩ Cleanup + confirm backup
 ```
 
-> 💡 重建前先检查现有帮助文档目录，避免重复构建
+> 💡 Before rebuilding, check the existing help documentation directory first to avoid duplicate builds
 
 ---
 
-## 运行时启动崩溃检测
+## Runtime Startup Crash Detection
 
-**CreateForm 阶段的异常，.dpr 的 try/except 抓不到**
+**Exceptions during the CreateForm stage cannot be caught by try/except in .dpr**
 
 ```
-Application.CreateForm(TMainForm, MainForm); // ← 异常被 VCL 内部吃掉
+Application.CreateForm(TMainForm, MainForm); // ← exception swallowed internally by VCL
 ```
 
-**方案：TStackTraceManager**
+**Solution: TStackTraceManager**
 
 ```
 StackTrace.pas
 ├── TStackTraceManager (singleton)
-│   └── 挂钩 RTL Exception.GetExceptionStackInfoProc
-│       → 异常 raise 时刻立即捕获（不依赖 try/except）
+│   └── Hook RTL Exception.GetExceptionStackInfoProc
+│       → Capture immediately at exception raise time (not dependent on try/except)
 ├── TDefaultExceptionLogger
-│   └── 写入 exception.log（UTF-8 BOM）
+│   └── Write to exception.log (UTF-8 BOM)
 └── ParseMapFile
-    └── 解析 .map 文件 → 函数名 + 行号
+    └── Parse .map file → function name + line number
 ```
 
 ---
 
-## run_verify 工作流
+## run_verify Workflow
 
 ```
 delphi_project(action="compile", run_verify=True)
 
 ① inject_verify_units()
-   ├── 备份 .dproj / .dpr
-   ├── 注入 DCCReference + DCC_UnitSearchPath
-   └── 注入 TStackTraceManager 初始化
+   ├── Back up .dproj / .dpr
+   ├── Inject DCCReference + DCC_UnitSearchPath
+   └── Inject TStackTraceManager initialization
 
-② 重新编译（带 StackTrace.pas）
+② Recompile (with StackTrace.pas)
 
-③ 启动 exe 运行 5 秒
+③ Start exe and run for 5 seconds
 
-④ 检查 exception.log
-   ├── 存在 → detect_encoding 读取 → 嵌入 MCP 响应
-   └── 不存在 → ✅ 验证通过
+④ Check exception.log
+   ├── Exists → detect_encoding read → embed in MCP response
+   └── Does not exist → ✅ Verification passed
 
-⑤ 恢复原始 .dproj / .dpr
+⑤ Restore original .dproj / .dpr
 ```
 
-**示例输出：**
+**Example output:**
 ```
-❌ 运行验证失败 - 检测到异常:
-[2026-05-25 13:02:46] Exception: 测试异常: 模拟启动崩溃
+❌ Runtime verification failed - exception detected:
+[2026-05-25 13:02:46] Exception: Test exception: Simulated startup crash
   Vcl.Forms.TCustomForm.DoCreate+$37 [Vcl.Forms.pas:4160]
   TestCrash.TestCrash+$55 [TestCrash.dpr:16]
 ```
 
 ---
 
-## 运行时注册检查
+## Runtime Registration Check
 
-**编译通过 ≠ 运行正常** — 组件运行时注册可能缺失
+**Compilation passes ≠ runs correctly** — component runtime registration may be missing
 
 ```
 delphi_project(action="runtime", project_path="App.dproj")
 ```
 
-**检查原理：**
+**Check principle:**
 ```
-src/rules/runtime_registry.json 规则表
-├── "TFDQuery" → 需要 FireDAC.DApt
-├── "TFDMemTable" → 需要 FireDAC.DApt  
-├── "TChart" → 需要 VCLTee.TeEngine
+src/rules/runtime_registry.json rule table
+├── "TFDQuery" → requires FireDAC.DApt
+├── "TFDMemTable" → requires FireDAC.DApt  
+├── "TChart" → requires VCLTee.TeEngine
 └── ...
 ```
 
-**扫描流程：**
+**Scan flow:**
 ```
-① 扫描 .pas/.dfm 中组件类名
-② 匹配规则表
-③ 检查 uses 子句中是否包含必需单元
-④ 报告缺失项
+① Scan component class names in .pas/.dfm
+② Match rule table
+③ Check whether required units are included in uses clause
+④ Report missing items
 ```
 
-**零配置扩展：** 新增规则只需编辑 JSON 文件，无需改代码
+**Zero-config extension:** to add a rule, just edit the JSON file, no code changes required
 
 ---
 
-## 示例：FireDAC SQLite 员工信息录入
+## Example: FireDAC SQLite Employee Information Entry
 
-**从头重建的演示项目 `employee-input/`：**
+**Demo project rebuilt from scratch `employee-input/`:**
 
 ```
 employee-input/
-├── EmployeeInput.dproj   # FireDAC SQLite 项目
-├── Form.Main.pas         # 主窗体 130 行
-├── Form.Main.dfm         # 左右分栏布局
-└── Win32/Debug/          # 编译输出
-    ├── EmployeeInput.exe # 3.8 MB 代码
-    └── employees.db      # 首次运行自动创建
+├── EmployeeInput.dproj   # FireDAC SQLite project
+├── Form.Main.pas         # Main form 130 lines
+├── Form.Main.dfm         # Left-right split layout
+└── Win32/Debug/          # Compile output
+    ├── EmployeeInput.exe # 3.8 MB code
+    └── employees.db      # Automatically created on first run
 ```
 
-**关键点：**
-- `TFDPhysSQLiteDriverLink` + `TFDConnection` → 自动建表
-- SQLite DB 自动创建在 exe 同级目录
-- DBGrid 列表（只读）+ DBEdit 编辑面板（左右分栏）
-- UTF-8 BOM 编码 — 消除 `W1057` 隐式字符串转换警告
-- `delphi_project(action="compile", run_verify=True)` — 编译 → 运行验证 一键通过
+**Key points:**
+- `TFDPhysSQLiteDriverLink` + `TFDConnection` → auto create tables
+- SQLite DB automatically created in the same directory as the exe
+- DBGrid list (read-only) + DBEdit edit panel (left-right split)
+- UTF-8 BOM encoding — eliminates `W1057` implicit string conversion warning
+- `delphi_project(action="compile", run_verify=True)` — compile → runtime verify one-click pass
 
 ---
 
-## 自动化测试 — GUI 模式
+## Automated Testing — GUI Mode
 
-**基于 Named Pipe 的 Delphi 原生自动化单元 `DaofyAutomation`**
+**Delphi native automation unit `DaofyAutomation` based on Named Pipe**
 
 ```
 automate_delphi(action="gui", app_path="App.exe",
@@ -512,23 +512,23 @@ automate_delphi(action="gui", app_path="App.exe",
           {"cmd":"capture","target":"result.png"}])
 ```
 
-**协议：JSON 请求/响应**
+**Protocol: JSON request/response**
 
-| 命令 | 说明 |
+| Command | Description |
 |------|------|
-| goto / click / dblclick | 定位/点击/双击组件 |
-| type / key | 输入文本 / 按键 |
-| capture / listwnd / dumpstate | 截图 / 窗口列表 / 控件树 |
-| wait / waitfor | 等待超时 / 等待窗口出现 |
-| rcall / rget / rset | 调用/读取/设置组件属性 |
+| goto / click / dblclick | locate/click/double-click components |
+| type / key | input text / key press |
+| capture / listwnd / dumpstate | screenshot / window list / control tree |
+| wait / waitfor | wait timeout / wait for window to appear |
+| rcall / rget / rset | call/read/set component properties |
 
-**无需手动配置：** 编译时通过 `DCC_UnitSearchPath=` 自动链接 DaofyAutomation 单元
+**No manual configuration:** automatically link the DaofyAutomation unit at compile time via `DCC_UnitSearchPath=`
 
 ---
 
-## 自动化测试 — Console 模式
+## Automated Testing — Console Mode
 
-**基于 subprocess stdin/stdout 的控制台程序交互，无需 Delphi 端改造**
+**Console program interaction based on subprocess stdin/stdout, no Delphi-side modification required**
 
 ```
 automate_delphi(action="console", app_path="Tool.exe",
@@ -540,152 +540,152 @@ automate_delphi(action="auto", app_path="Deploy.exe",
   input="\n", expect="success", args=["--silent"])
 ```
 
-**参数：**
-| 参数 | 说明 |
+**Parameters:**
+| Parameter | Description |
 |------|------|
-| input | 发送到 stdin 的文本（支持 `\n` 换行）|
-| expect | 期待的输出模式（匹配到才返回）|
-| timeout | 超时秒数（默认 30s）|
-| args | 命令行参数列表 |
+| input | Text sent to stdin (supports `\n` newline) |
+| expect | Expected output pattern (returns only when matched) |
+| timeout | Timeout in seconds (default 30s) |
+| args | Command-line argument list |
 
-**Windows PE 自动检测：** `action="auto"` 读取 EXE 头 Subsystem 字段区分 GUI/Console，无需手动指定
+**Windows PE automatic detection:** `action="auto"` reads the EXE header Subsystem field to distinguish GUI/Console, no manual specification required
 
 ---
 
-## RTTI 桥接 — 运行时发现 Delphi 能力
+## RTTI Bridge — Discover Delphi Capabilities at Runtime
 
-**三步法**：无需源码，通过 RTTI 发现和调用运行时对象
+**Three-step method**: no source code required, discover and call runtime objects through RTTI
 
 ```
-① delphi_rtti(action="guide")     → 使用指南
-② delphi_rtti(action="discover")  → 扫描所有类的 published+public 方法+参数
-③ delphi_rtti(action="call",      → 调用具体方法
+① delphi_rtti(action="guide")     → Usage guide
+② delphi_rtti(action="discover")  → Scan published+public methods+parameters of all classes
+③ delphi_rtti(action="call",      → Call specific method
      class_name="TMainForm",
      method="LoadCustomer",
      params={"customerName": "张三"})
 ```
 
-**应用场景：**
-- 远程控制正在运行的 Delphi 应用
-- 在 AI 对话中直接操作业务对象
-- 动态发现 VCL Form 的所有组件和方法
-- 不需要额外改造程序（链接 DaofyAutomation 即可）
+**Application scenarios:**
+- Remote control a running Delphi application
+- Directly operate business objects in AI conversation
+- Dynamically discover all components and methods of VCL Form
+- No additional program modification required (just link DaofyAutomation)
 
 ---
 
-## 经验记忆 — AI 学会记住
+## Experience Memory — AI Learns to Remember
 
-**Agent 经验自动积累，问题越用越少**
+**Agent experience accumulates automatically, fewer problems over time**
 
 ```
 experience(action="save")
-  ├─ 自动去重：相似度 > 0.85 → 合并到旧记录
-  ├─ 保存成功解决过的问题 + 解决步骤
-  └─ 后续任务自动搜索匹配经验
+  ├─ Auto deduplication: similarity > 0.85 → merge into old record
+  ├─ Save successfully solved problems + solution steps
+  └─ Automatically search matching experience for subsequent tasks
 
 experience(action="search", query="...")
-  └─ 语义搜索已有经验，避免重复踩坑
+  └─ Semantically search existing experience to avoid repeating pitfalls
 
 experience(action="merge", ids=[...])
-  └─ 将多条同类经验合并为一条抽象经验
+  └─ Merge multiple similar experiences into one abstract experience
 ```
 
-**效果**：下次遇到同样的问题，AI 直接使用已验证的解决方案
+**Effect**: next time the same problem occurs, AI directly uses the verified solution
 
 ---
 
-## 软著文档生成 — 一键出稿
+## Software Copyright Document Generation — One-Click Draft
 
-**满足中国软件著作权登记需求的自动化工具**
+**Automated tool that meets China software copyright registration requirements**
 
 ```
 generate_copyright(action="generate")
-  ├─ 源代码文档（逐页截图+行号）
-  ├─ 用户操作手册（按场景组织）
-  └─ 汇总表（项目信息+文档清单）
+  ├─ Source code document (page-by-page screenshots + line numbers)
+  ├─ User operation manual (organized by scenario)
+  └─ Summary table (project information + document list)
 
 generate_copyright(action="validate")
-  └─ 检查配置完整性
+  └─ Check configuration completeness
 ```
 
-**特点：**
-- 浏览器 PDF 渲染，所见即所得
-- 自动校验文档完整性
-- 支持配置更新
+**Features:**
+- Browser PDF rendering, WYSIWYG
+- Automatically validate document completeness
+- Support configuration updates
 
 ---
 
-## 版本更新 — 保持最新
+## Version Update — Stay Up to Date
 
 ```
-daofy_update(action="check")   → 检查 GitHub 新版
-daofy_update(action="update")  → git pull 自动更新
-daofy_update(action="version") → 显示当前版本
+daofy_update(action="check")   → Check for new version on GitHub
+daofy_update(action="update")  → git pull automatic update
+daofy_update(action="version") → Show current version
 ```
 
 ---
 
-## 支持平台
-| Trae | 自动 |
-| CodeArts Agent | 自动 |
-| Cursor | 自动 / 手动 |
-| Windsurf | 自动 |
-| 通义灵码 | 自动 |
-| 豆包 | 自动 |
-| Kimi | 自动 |
-| 更多... | install.ps1 自动检测 |
+## Supported Platforms
+| Trae | Automatic |
+| CodeArts Agent | Automatic |
+| Cursor | Automatic / Manual |
+| Windsurf | Automatic |
+| Tongyi Lingma | Automatic |
+| Doubao | Automatic |
+| Kimi | Automatic |
+| More... | install.ps1 auto-detection |
 
 ---
 
-## 总结
+## Summary
 
-| 能力 | 一句话 |
+| Capability | One sentence |
 |------|--------|
-| 🔧 编译 | 编译 + 诊断 + 批量 + run_verify |
-| 📚 KB 搜索 | 精确 + 语义 + 引用 |
-| 📝 文件操作 | 读/写/格式化/备份/uses 管理（含 pasfmt） |
-| 🧩 组件管理 | DFM 增删改 + 组件包编译安装 + PAS 同步 |
-| 📋 规范 | 驱动生成 + 驱动审计 |
-| 🛡️ 运行验证 | 启动崩溃检测 + 运行时注册审计 |
-| 🔗 RTTI 桥接 | 运行时发现/调用 Delphi 对象方法 |
-| 🤖 自动化 | 重构 + 修复 + 工单 + 自动化测试 |
-| 🧠 经验记忆 | AI 自动积累经验，去重+语义搜索 |
-| 📄 软著生成 | 源码+手册+汇总表，PDF 一键出稿 |
-| 🔄 版本更新 | 一键检查更新 Daofy |
+| 🔧 Compilation | Compile + diagnose + batch + run_verify |
+| 📚 KB search | Exact + semantic + reference |
+| 📝 File operations | Read/write/format/backup/uses management (including pasfmt) |
+| 🧩 Component management | DFM add/remove/modify + component package compile/install + PAS synchronization |
+| 📋 Standards | Drive generation + drive audit |
+| 🛡️ Runtime verification | Startup crash detection + runtime registration audit |
+| 🔗 RTTI bridge | Runtime discover/call Delphi object methods |
+| 🤖 Automation | Refactor + fix + tickets + automated testing |
+| 🧠 Experience memory | AI automatically accumulates experience, deduplication + semantic search |
+| 📄 Software copyright generation | Source + manual + summary table, one-click PDF draft |
+| 🔄 Version update | One-click check/update Daofy |
 
 ---
 
-## 开源信息
+## Open Source Information
 
 **GitHub**: [github.com/chinawsb/daofy](https://github.com/chinawsb/daofy)
 
-**许可证**: MIT
+**License**: MIT
 
-**技术栈**: Python 3.10+ / MCP Protocol
+**Tech stack**: Python 3.10+ / MCP Protocol
 
-**交流方式**: GitHub Issues
+**Communication**: GitHub Issues
 
 ---
 
 ## Q&A
 
-**感谢观看！**
+**Thanks for watching!**
 
-如果您觉得有用，请给项目点个 Star ⭐
+If you find it useful, please give the project a Star ⭐
 
 ---
 
-# 附录：演示准备清单
+# Appendix: Demo Preparation Checklist
 
-## 录制前准备
-- [ ] Python 3.10+ / Git / Delphi IDE 已安装
-- [ ] 项目已克隆 + 依赖已安装
-- [ ] AI 客户端已配置 MCP Server
-- [ ] 文档知识库已预先构建
-- [ ] 所有演示素材在正确目录
+## Pre-recording Preparation
+- [ ] Python 3.10+ / Git / Delphi IDE installed
+- [ ] Project cloned + dependencies installed
+- [ ] AI client configured with MCP Server
+- [ ] Documentation knowledge base pre-built
+- [ ] All demo assets in the correct directory
 
-## 关键操作提示
-- 安装部分全程 AI 对话，不展示终端
-- 复杂场景建议画中画显示 VS Code
-- 审计结果展示时停留 2-3 秒
-- 构建文档 KB 等耗时操作提前完成或加速
+## Key Operation Tips
+- The installation section is entirely AI conversation; do not show the terminal
+- For complex scenarios, recommend picture-in-picture showing VS Code
+- Pause for 2-3 seconds when showing audit results
+- Complete in advance or accelerate time-consuming operations such as building the documentation KB

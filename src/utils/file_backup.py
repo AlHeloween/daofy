@@ -1,9 +1,9 @@
 """
-文件备份工具 — __history 备份/恢复/列表
+File backup utility — __history backup/restore/list
 
-提供与 Delphi IDE 兼容的 __history 备份机制。
-备份文件命名: 文件名.~版本号~ (如 Unit.pas.~1~)
-超过 RETENTION_DAYS 天的旧备份自动清理。
+Provides a Delphi IDE-compatible __history backup mechanism.
+Backup file naming: filename.~version~ (e.g. Unit.pas.~1~)
+Old backups older than RETENTION_DAYS days are automatically cleaned up.
 """
 
 import os
@@ -15,24 +15,24 @@ from .logger import get_logger
 
 logger = get_logger(__name__)
 
-# 备份保留策略：超过此数量且超出保留天数的最旧备份自动清理
+# Backup retention policy: when count exceeds this and backups are older than retention days, oldest backups are pruned
 MAX_BACKUPS = 20
 RETENTION_DAYS = 7
 
-# 大文件拷贝缓冲区大小 (1MB) — shutil.copyfileobj 默认为 16KB
-# 64x 缓冲区 = 同等 I/O 下 64 倍更少的系统调用
+# Large-file copy buffer size (1MB) — shutil.copyfileobj defaults to 16KB
+# 64x buffer = 64x fewer syscalls for the same I/O
 _COPY_BUF_SIZE = 1024 * 1024
 
-# 全文编码检测上限：超过此大小（不可能是源码文本）时退化到多点采样，
-# 避免一次性读入数百 MB 造成内存峰值
+# Full-file encoding detection limit: above this size (not source text) degrade to multi-point sampling,
+# avoiding reading hundreds of MB at once and causing memory spikes
 _MAX_FULL_DETECT_BYTES = 32 * 1024 * 1024
 
-# UTF-16 无 BOM 启发式分析窗口：空字节分布是结构特征（与内容无关），
-# 取前 1MB 足够判定，避免超大文件构建百万级空字节位置列表
+# UTF-16 no-BOM heuristic analysis window: null byte distribution is structural (content-independent),
+# first 1MB is enough, avoiding building million-entry null position lists for huge files
 _UTF16_ANALYSIS_WINDOW = 1024 * 1024
 
-# chardet 低置信度时仅接受的多字节 CJK 编码；单字节编码（cp1252 等）
-# 接受任意字节永不报错，会误判，故不接受
+# Accept only multibyte CJK encodings when chardet confidence is low; single-byte encodings (cp1252 etc.)
+# accept arbitrary bytes and never error, causing misdetection, so they are not accepted
 _CHARDET_MULTIBYTE = {
     'big5', 'shift_jis', 'cp932', 'euc-kr', 'cp949',
     'euc-jp', 'iso-2022-jp', 'iso-2022-kr',
@@ -41,15 +41,15 @@ _CHARDET_MULTIBYTE = {
 
 def _fast_copy(src: str, dst: str) -> None:
     """
-    使用大缓冲区快速拷贝文件（带元数据保留）。
+    Fast file copy using a large buffer (preserves metadata).
 
-    shutil.copy2 内部使用 shutil.copyfileobj 的 16KB 默认缓冲区，
-    对于大文件会产生大量系统调用。此函数使用 1MB 缓冲区将
-    系统调用次数降低 64 倍。
+    shutil.copy2 internally uses shutil.copyfileobj's default 16KB buffer,
+    generating many syscalls for large files. This function uses a 1MB buffer
+    to reduce syscall count by 64x.
 
     Args:
-        src: 源文件路径
-        dst: 目标文件路径
+        src: source file path
+        dst: destination file path
     """
     with open(src, 'rb') as fsrc:
         with open(dst, 'wb') as fdst:
@@ -58,10 +58,10 @@ def _fast_copy(src: str, dst: str) -> None:
 
 
 def _normalize_charset_name(enc: str) -> str:
-    """归一化字符集名为项目标准名称"""
-    # chardet 返回名: GB2312, Shift_JIS, EUC-KR, ISO-2022-JP, Big5...
-    # locale 返回名: cp1252, gbk, big5, cp932, cp949...
-    # 统一转为小写 + 去横线后查表
+    """Normalize charset name to project standard name"""
+    # chardet returns: GB2312, Shift_JIS, EUC-KR, ISO-2022-JP, Big5...
+    # locale returns: cp1252, gbk, big5, cp932, cp949...
+    # Normalize to lowercase + remove hyphens before lookup
     key = enc.lower().replace('-', '')
     norms = {
         'utf8': 'utf-8',
@@ -73,7 +73,7 @@ def _normalize_charset_name(enc: str) -> str:
         'latin1': 'utf-8',
         'iso88591': 'utf-8',
         'gb2312': 'gbk',
-        'gb18030': 'gbk',   # GB18030 是 GBK 的超集，统一归为 gbk
+        'gb18030': 'gbk',   # GB18030 is a superset of GBK, uniformly mapped to gbk
         'cp936': 'gbk',
         'hzgb2312': 'gbk',
         'big5hkscs': 'big5',
@@ -82,14 +82,14 @@ def _normalize_charset_name(enc: str) -> str:
         'shiftjis': 'shift_jis',
         'euckr': 'euc-kr',
         'cp949': 'cp949',
-        'ksc56011987': 'cp949',  # ks_c_5601_1987 去横线+去下划线后
+        'ksc56011987': 'cp949',  # ks_c_5601_1987 after removing hyphens and underscores
         'eucjp': 'euc-jp',
         'iso2022jp': 'iso-2022-jp',
         'iso2022kr': 'iso-2022-kr',
     }
     if key in norms:
         return norms[key]
-    # 再去掉下划线试一次（兼容带下划线的格式）
+    # Try again after removing underscores (compatible with underscored formats)
     key_flat = key.replace('_', '')
     if key_flat in norms:
         return norms[key_flat]
@@ -98,39 +98,39 @@ def _normalize_charset_name(enc: str) -> str:
 
 def _read_sample_for_detection(f, file_size: int) -> bytes:
     """
-    超大文件（>32MB）多点采样：开头 + 1/3 + 2/3 + 末尾，总上限 256KB。
+    Multi-point sampling for very large files (>32MB): start + 1/3 + 2/3 + end, total cap 256KB.
 
     Args:
-        f: 已打开的二进制文件句柄（位于文件头）
-        file_size: 文件总字节数
+        f: opened binary file handle (positioned at file start)
+        file_size: total file size in bytes
 
     Returns:
-        采样字节串
+        Sampled byte string
     """
     chunk = 16384
     max_total = 262144
     parts = []
     total_read = 0
 
-    # 开头
+    # Start
     parts.append(f.read(chunk))
     total_read += chunk
 
-    # 1/3 处
+    # 1/3 position
     f.seek(max(0, file_size // 3 - chunk // 2))
     d = f.read(chunk)
     parts.append(d)
     total_read += len(d)
 
     if total_read < max_total:
-        # 2/3 处
+        # 2/3 position
         f.seek(max(0, file_size * 2 // 3 - chunk // 2))
         d = f.read(chunk)
         parts.append(d)
         total_read += len(d)
 
     if total_read < max_total:
-        # 末尾
+        # End
         f.seek(max(0, file_size - chunk))
         d = f.read(chunk)
         parts.append(d)
@@ -141,16 +141,16 @@ def _read_sample_for_detection(f, file_size: int) -> bytes:
 
 def _chardet_fallback(raw_data: bytes) -> Optional[str]:
     """
-    chardet 兜底检测：仅当全文 UTF-8 与 GBK 均解码失败时调用。
+    chardet fallback detection: called only when full-file UTF-8 and GBK both fail to decode.
 
-    高置信度(>0.7)直接采纳（归一化后）；低置信度仅接受多字节 CJK 编码
-    （big5/shift_jis/euc-kr 等），避免单字节编码误判。
+    High confidence (>0.7) is accepted directly (after normalization); low confidence accepts only
+    multibyte CJK encodings (big5/shift_jis/euc-kr etc.) to avoid single-byte encoding misdetection.
 
     Args:
-        raw_data: 文件原始字节
+        raw_data: raw file bytes
 
     Returns:
-        归一化编码名；无法识别返回 None
+        Normalized encoding name; None if unrecognized
     """
     try:
         import chardet
@@ -165,39 +165,39 @@ def _chardet_fallback(raw_data: bytes) -> Optional[str]:
         if norm in _CHARDET_MULTIBYTE:
             return norm
     except Exception:
-        logger.debug("chardet 检测失败，降级到默认编码 gbk")
+        logger.debug("chardet detection failed, degrading to default encoding gbk")
     return None
 
 
 def detect_encoding(file_path: str) -> str:
     """
-    检测文件编码。
+    Detect file encoding.
 
-    检测顺序: BOM → 无 BOM UTF-16 启发式 → 全文 UTF-8 → 全文 GBK → chardet 兜底
+    Detection order: BOM → no-BOM UTF-16 heuristic → full UTF-8 → full GBK → chardet fallback
 
-    - BOM 检测: UTF-8 BOM → utf-8-sig; UTF-16 BOM → utf-16
-    - 无 BOM UTF-16 启发式: 空字节分布（前 1MB 窗口）+ 全文 decode 验证
-    - 无 BOM 文本判定（全文检测，不再用 4K/多点采样）:
-      全文存在合法 UTF-8 序列 → utf-8（无 BOM）；否则全文可解 GBK → gbk
-    - chardet 兜底: UTF-8 与 GBK 均解码失败（编码异常/二进制/罕见多字节编码）
-      时识别 big5/shift_jis/euc-kr 等；仍失败默认 gbk
+    - BOM detection: UTF-8 BOM → utf-8-sig; UTF-16 BOM → utf-16
+    - No-BOM UTF-16 heuristic: null byte distribution (first 1MB window) + full decode verification
+    - No-BOM text determination (full-file detection, no longer 4K/multi-point sampling):
+      full file contains valid UTF-8 sequence → utf-8 (no BOM); otherwise full file decodes as GBK → gbk
+    - chardet fallback: when both UTF-8 and GBK decoding fail (encoding anomalies/binary/rare multibyte encodings)
+      identify big5/shift_jis/euc-kr etc.; if still failing default gbk
 
-    注: 全文判定后，多数 Big5/Shift-JIS/EUC-KR 文件因可作 GBK 解码而判为
-    gbk（大陆场景预期行为）；chardet 仅在 UTF-8/GBK 双失败时兜底参与。
+    Note: after full-file determination, most Big5/Shift-JIS/EUC-KR files can decode as GBK and are judged
+    gbk (expected behavior in mainland scenarios); chardet participates only as fallback when both UTF-8/GBK fail.
 
     Args:
-        file_path: 文件路径
+        file_path: file path
 
     Returns:
-        编码名称（utf-8 / utf-8-sig / utf-16 / utf-16-le / utf-16-be
-        / gbk / big5 / shift_jis / euc-kr / euc-jp 等）
+        Encoding name (utf-8 / utf-8-sig / utf-16 / utf-16-le / utf-16-be
+        / gbk / big5 / shift_jis / euc-kr / euc-jp etc.)
     """
     try:
         file_size = os.path.getsize(file_path)
 
-        # ── 全文读取 ──
-        # 前部采样（4K/多点）对"前部纯 ASCII、后部 CJK"的文件不安全，
-        # 一律读全文件判定；仅超 32MB 的非源码文件退化到多点采样。
+        # ── Full-file read ──
+        # Front sampling (4K/multi-point) is unsafe for files that are "pure ASCII at the front, CJK at the back",
+        # so always read the full file for determination; only non-source files over 32MB degrade to multi-point sampling.
         with open(file_path, 'rb') as f:
             if file_size <= _MAX_FULL_DETECT_BYTES:
                 raw_data = f.read()
@@ -207,45 +207,45 @@ def detect_encoding(file_path: str) -> str:
         if not raw_data:
             return 'utf-8'
 
-        # ── 1. BOM 检测 ──
+        # ── 1. BOM detection ──
         if raw_data.startswith(b'\xff\xfe') or raw_data.startswith(b'\xfe\xff'):
             return 'utf-16'
         if raw_data.startswith(b'\xef\xbb\xbf'):
             return 'utf-8-sig'
 
-        # ── 2. 无 BOM UTF-16 启发式检测 ──
-        # 前置原因: ASCII 型 UTF-16 无 BOM 文件（"u\0n\0i\0t\0..."）可作
-        # UTF-8 解出（含 NUL），必须先于 UTF-8 判定，否则会被误判为 utf-8。
-        # 空字节分布是结构特征，前 1MB 窗口足够；decode 用全文验证。
+        # ── 2. No-BOM UTF-16 heuristic detection ──
+        # Reason: ASCII-style UTF-16 no-BOM files ("u\0n\0i\0t\0...") can decode as
+        # UTF-8 (containing NUL) and must be checked before UTF-8 determination, otherwise they would be misjudged as utf-8.
+        # Null byte distribution is a structural feature; first 1MB window is sufficient; decode verifies full file.
         if len(raw_data) >= 8 and len(raw_data) % 2 == 0:
             sample = raw_data[:min(len(raw_data), _UTF16_ANALYSIS_WINDOW)]
 
-            # 找出所有 null 字节的位置
+            # Find positions of all null bytes
             null_positions = [i for i, b in enumerate(sample) if b == 0]
 
             if len(null_positions) >= 4:
-                # 计算相邻 null 字节的间距
+                # Compute gaps between adjacent null bytes
                 gaps = [null_positions[i + 1] - null_positions[i]
                         for i in range(len(null_positions) - 1)]
 
                 median_gap = statistics.median(gaps)
                 gap_range = max(gaps) - min(gaps)
                 mean_gap = statistics.mean(gaps)
-                # 间距一致性：越小越整齐。UTF-16 的 null 间距集中在 2 附近
+                # Gap consistency: smaller is more regular. UTF-16 null gaps cluster around 2
                 gap_consistency = gap_range / mean_gap if mean_gap > 0 else 0
-                # 小间隙占比：容忍被 CJK 段打断的间隙（如 "unit Test;\n// 中文..."）
-                # 文本类编码（utf-8/gbk/big5 等）几乎不含 NUL，null 密集且
-                # 集中在单一奇偶位的数据几乎必是 UTF-16，故放宽一致性条件安全。
+                # Small-gap ratio: tolerate gaps interrupted by CJK segments (e.g. "unit Test;\n// Chinese...")
+                # Text-like encodings (utf-8/gbk/big5 etc.) almost never contain NUL; data dense with nulls
+                # and concentrated in a single parity position is almost certainly UTF-16, so relaxing consistency is safe.
                 small_gap_ratio = (
                     sum(1 for g in gaps if g <= 3) / len(gaps)
                     if gaps else 0.0
                 )
 
-                # 计算奇偶位 null 分布
+                # Compute odd/even null distribution
                 odd_nulls = sum(1 for p in null_positions if p % 2 == 1)
                 even_nulls = len(null_positions) - odd_nulls
 
-                # UTF-16-LE: null 集中在奇数位，间距 ≈ 2，分布整齐
+                # UTF-16-LE: nulls concentrated at odd positions, gap ≈ 2, regular distribution
                 if (odd_nulls > even_nulls * 3
                         and median_gap <= 2.5
                         and (gap_consistency < 3.0 or small_gap_ratio >= 0.75)):
@@ -255,7 +255,7 @@ def detect_encoding(file_path: str) -> str:
                     except (UnicodeDecodeError, ValueError):
                         pass
 
-                # UTF-16-BE: null 集中在偶数位
+                # UTF-16-BE: nulls concentrated at even positions
                 if (even_nulls > odd_nulls * 3
                         and median_gap <= 2.5
                         and (gap_consistency < 3.0 or small_gap_ratio >= 0.75)):
@@ -265,23 +265,23 @@ def detect_encoding(file_path: str) -> str:
                     except (UnicodeDecodeError, ValueError):
                         pass
 
-        # ── 3. 全文 UTF-8 判定：存在合法 UTF-8 序列 → UTF-8 无 BOM ──
+        # ── 3. Full UTF-8 determination: valid UTF-8 sequence exists → UTF-8 no BOM ──
         try:
             raw_data.decode('utf-8')
             return 'utf-8'
         except UnicodeDecodeError:
             pass
 
-        # ── 4. 全文 GBK 判定：非 UTF-8 → GBK ──
+        # ── 4. Full GBK determination: not UTF-8 → GBK ──
         try:
             raw_data.decode('gbk')
             return 'gbk'
         except UnicodeDecodeError:
             pass
 
-        # ── 5. chardet 兜底 ──
-        # UTF-8 与 GBK 均解码失败（编码异常/二进制/罕见多字节编码）时才触发；
-        # 仍失败默认 gbk。
+        # ── 5. chardet fallback ──
+        # Triggered only when both UTF-8 and GBK fail to decode (encoding anomaly/binary/rare multibyte encodings);
+        # if still failing, default gbk.
         guess = _chardet_fallback(raw_data)
         if guess:
             return guess
@@ -289,21 +289,21 @@ def detect_encoding(file_path: str) -> str:
         return 'gbk'
 
     except Exception as e:
-        logger.warning(f"检测文件编码失败: {e}，使用默认编码 utf-8")
+        logger.warning(f"Failed to detect file encoding: {e}, using default encoding utf-8")
         return 'utf-8'
 
 
 def _prune_backups(history_dir: str, base_name: str) -> None:
     """
-    按策略清理旧备份：超过 MAX_BACKUPS 个时，清理超出部分中超过 RETENTION_DAYS 天的。
-    不足 MAX_BACKUPS 个时全部保留。
+    Prune old backups according to policy: when more than MAX_BACKUPS exist, remove those beyond the limit
+    that are older than RETENTION_DAYS. When fewer than MAX_BACKUPS exist, keep all.
 
     Args:
-        history_dir: __history 目录路径
-        base_name: 文件名（如 Unit.pas）
+        history_dir: __history directory path
+        base_name: file name (e.g. Unit.pas)
     """
     try:
-        # 收集所有合法备份，按版本号降序排列
+        # Collect all valid backups and sort by version number descending
         backups = []
         for f in os.listdir(history_dir):
             if not (f.startswith(f"{base_name}.~") and f.endswith("~")):
@@ -319,7 +319,7 @@ def _prune_backups(history_dir: str, base_name: str) -> None:
         if len(backups) <= MAX_BACKUPS:
             return
 
-        # 按版本号降序，保留最新的 MAX_BACKUPS 个
+        # Sort by version descending, keep the newest MAX_BACKUPS
         backups.sort(key=lambda x: x[0], reverse=True)
         protected = set(backups[:MAX_BACKUPS])
         cutoff = time.time() - RETENTION_DAYS * 86400
@@ -328,29 +328,29 @@ def _prune_backups(history_dir: str, base_name: str) -> None:
             if mtime < cutoff:
                 try:
                     os.remove(path)
-                    logger.debug(f"清理过期备份: {path} (版本 {ver}, {RETENTION_DAYS}天前)")
+                    logger.debug(f"Cleaned expired backup: {path} (version {ver}, {RETENTION_DAYS} days ago)")
                 except OSError:
                     pass
     except Exception as e:
-        logger.warning(f"清理旧备份失败: {e}")
+        logger.warning(f"Failed to clean old backups: {e}")
 
 
 def create_backup(file_path: str) -> Optional[str]:
     """
-    创建 __history 备份文件。
+    Create a __history backup file.
 
-    在源文件所在目录下创建 __history 子目录，生成带递增版本号的备份。
-    版本号格式: 文件名.~N~ (与 Delphi IDE 兼容)
+    Create a __history subdirectory in the source file's directory and generate a backup with an incrementing version number.
+    Version number format: filename.~N~ (compatible with Delphi IDE)
 
     Args:
-        file_path: 源文件路径
+        file_path: source file path
 
     Returns:
-        备份文件路径，失败返回 None
+        Backup file path, or None on failure
     """
     try:
         if not os.path.isfile(file_path):
-            logger.warning(f"备份失败，文件不存在: {file_path}")
+            logger.warning(f"Backup failed, file does not exist: {file_path}")
             return None
 
         file_dir = os.path.dirname(os.path.abspath(file_path))
@@ -359,7 +359,7 @@ def create_backup(file_path: str) -> Optional[str]:
 
         base_name = os.path.basename(file_path)
 
-        # 查找现有备份，确定新版本号
+        # Find existing backups and determine the new version number
         backup_files = [
             f for f in os.listdir(history_dir)
             if f.startswith(f"{base_name}.~") and f.endswith("~")
@@ -368,14 +368,14 @@ def create_backup(file_path: str) -> Optional[str]:
         max_version = 0
         for backup_file in backup_files:
             try:
-                version_str = backup_file[len(base_name) + 2:-1]  # 去掉 "文件名.~" 和 "~"
+                version_str = backup_file[len(base_name) + 2:-1]  # Strip "filename.~" and "~"
                 version = int(version_str)
                 if version > max_version:
                     max_version = version
             except (ValueError, IndexError):
                 continue
 
-        # 递增版本号；若目标路径已被占用（如因垃圾文件导致版本冲突）则继续递增
+        # Increment version number; if target path is already occupied (e.g. version conflict due to junk files), keep incrementing
         new_version = max_version + 1
         while True:
             backup_path = os.path.join(history_dir, f"{base_name}.~{new_version}~")
@@ -384,28 +384,28 @@ def create_backup(file_path: str) -> Optional[str]:
             new_version += 1
 
         _fast_copy(file_path, backup_path)
-        logger.info(f"创建备份文件: {backup_path}")
+        logger.info(f"Created backup file: {backup_path}")
 
-        # 清理超出上限的旧备份
+        # Clean up old backups beyond the limit
         _prune_backups(history_dir, base_name)
 
         return backup_path
 
     except Exception as e:
-        logger.warning(f"创建备份文件失败: {e}")
+        logger.warning(f"Failed to create backup file: {e}")
         return None
 
 
 def list_backups(file_path: str) -> List[Dict]:
     """
-    列出指定文件的所有备份版本。
+    List all backup versions of the specified file.
 
     Args:
-        file_path: 源文件路径
+        file_path: source file path
 
     Returns:
-        备份版本列表，每个元素包含 version, path, size, mtime 字段。
-        按版本号降序排列（最新的在前）。
+        List of backup versions, each containing version, path, size, mtime fields.
+        Sorted by version number descending (newest first).
     """
     file_dir = os.path.dirname(os.path.abspath(file_path))
     history_dir = os.path.join(file_dir, "__history")
@@ -440,36 +440,37 @@ def list_backups(file_path: str) -> List[Dict]:
 
 def restore_backup(file_path: str, version: Optional[int] = None) -> Optional[str]:
     """
-    从 __history 恢复文件到指定版本。
+    Restore a file to the specified version from __history.
 
     Args:
-        file_path: 源文件路径
-        version: 版本号，不传则使用最新版本
+        file_path: source file path
+        version: version number; uses the latest version if not provided
 
     Returns:
-        恢复的备份文件路径，失败返回 None
+        Restored backup file path, or None on failure
     """
     backups = list_backups(file_path)
     if not backups:
-        logger.warning(f"恢复失败，没有找到备份文件: {file_path}")
+        logger.warning(f"Restore failed, no backup files found: {file_path}")
         return None
 
     if version is not None:
         target = next((b for b in backups if b["version"] == version), None)
         if not target:
-            logger.warning(f"恢复失败，未找到版本 {version}，可用版本: {[b['version'] for b in backups]}")
+            logger.warning(f"Restore failed, version {version} not found, available versions: {[b['version'] for b in backups]}")
             return None
     else:
-        target = backups[0]  # 最新版本
+        target = backups[0]  # latest version
 
     try:
-        # 恢复前先备份当前文件（安全网）
+        # Back up the current file before restoring (safety net)
         create_backup(file_path)
 
         _fast_copy(target["path"], file_path)
-        logger.info(f"已从备份恢复: {target['path']} → {file_path}")
+        logger.info(f"Restored from backup: {target['path']} → {file_path}")
         return target["path"]
 
     except Exception as e:
-        logger.error(f"恢复备份失败: {e}")
+        logger.error(f"Failed to restore backup: {e}")
         return None
+

@@ -1,22 +1,22 @@
 """
-yolo_onnx — YOLOv11 ONNX 推理封装（无 PyTorch 依赖）
+yolo_onnx — YOLOv11 ONNX inference wrapper (no PyTorch dependency)
 
-使用 onnxruntime 加载 .onnx 格式的 YOLOv11 模型，
-完成前处理（letterbox resize）、推理、NMS 后处理。
+Loads a .onnx YOLOv11 model with onnxruntime,
+performs preprocessing (letterbox resize), inference, and NMS postprocessing.
 
-依赖:
-  - onnxruntime（OCR 可选依赖已包含）
-  - opencv-python-headless（已包含）
-  - numpy（已包含）
+Dependencies:
+  - onnxruntime (included in the optional OCR dependencies)
+  - opencv-python-headless (already included)
+  - numpy (already included)
 
-用法:
+Usage:
     from src.detection.yolo_onnx import YOLOONNXDetector
 
     detector = YOLOONNXDetector("yolo11n.onnx", conf_thresh=0.25)
     detections = detector.detect("screenshot.png")
     # → [Detection(class_id=1, class_name="TButton", ...), ...]
 
-支持 nms=True 内嵌的 ONNX 模型与 nms=False 的原始输出。
+Supports ONNX models with embedded nms=True and raw output from nms=False.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from .opencv_detector import Detection
 
 logger = logging.getLogger(__name__)
 
-# YOLO 默认类别名（仅 fallback，用户训练后应替换为自定义映射表）
+# Default YOLO class names (fallback only; replace with a custom mapping after training)
 _DEFAULT_CLASS_NAMES = {
     0: "TButton",
     1: "TEdit",
@@ -55,14 +55,14 @@ _DEFAULT_CLASS_NAMES = {
 
 
 class YOLOONNXDetector:
-    """YOLOv11 ONNX 推理封装。
+    """YOLOv11 ONNX inference wrapper.
 
     Args:
-        model_path: .onnx 模型文件路径。
-        conf_thresh: 置信度阈值，低于此值的检测框被过滤。
-        iou_thresh: NMS 的 IoU 阈值，默认 0.45。
-        class_names: 类别 ID → 名称的映射字典。
-        input_size: 模型输入尺寸 (w, h)，默认 (640, 640)。
+        model_path: Path to the .onnx model file.
+        conf_thresh: Confidence threshold; detections below this value are filtered out.
+        iou_thresh: NMS IoU threshold, default 0.45.
+        class_names: Mapping dictionary from class ID to name.
+        input_size: Model input size (w, h), default (640, 640).
     """
 
     def __init__(
@@ -80,89 +80,89 @@ class YOLOONNXDetector:
 
         if not os.path.isfile(model_path):
             raise FileNotFoundError(
-                f"ONNX 模型文件不存在: {model_path}\n"
-                "请先下载或训练模型，参考 docs/layout-completeness-detection.md"
+                f"ONNX model file not found: {model_path}\n"
+                "Please download or train a model first; see docs/layout-completeness-detection.md"
             )
 
         import onnxruntime as ort
 
-        # 优先使用 CUDA，不可用时回退 CPU
+        # Prefer CUDA, fall back to CPU if unavailable
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         try:
             self.session = ort.InferenceSession(
                 model_path, providers=providers,
             )
         except Exception:
-            logger.warning("CUDA 不可用，使用 CPU 推理")
+            logger.warning("CUDA is unavailable; using CPU inference")
             self.session = ort.InferenceSession(
                 model_path, providers=["CPUExecutionProvider"],
             )
 
-        # 获取输入/输出信息
+        # Get input/output information
         self.input_name = self.session.get_inputs()[0].name
         input_shape = self.session.get_inputs()[0].shape
         self.input_channels = input_shape[1] if len(input_shape) > 1 else 3
 
-        # 判断是否为 nms=True（内嵌 NMS）的模型
-        # nms=True 输出: [1, max_det, 6] = (x1, y1, x2, y2, conf, class_id)
-        # nms=False 输出: [1, 84, 8400] = (4 bbox + 80 cls × N candidates)
+        # Determine whether this is a model with nms=True (embedded NMS)
+        # nms=True output: [1, max_det, 6] = (x1, y1, x2, y2, conf, class_id)
+        # nms=False output: [1, 84, 8400] = (4 bbox + 80 cls × N candidates)
         out_shape = self.session.get_outputs()[0].shape
-        # 动态维度可能是字符串（如 'anchors'），需安全取值
+        # Dynamic dimensions may be strings (e.g. 'anchors'), so take values safely
         def _dim_val(d, default=0):
             return d if isinstance(d, (int, float)) else default
         dim1 = _dim_val(out_shape[1]) if len(out_shape) > 1 else 0
         dim2 = _dim_val(out_shape[2]) if len(out_shape) > 2 else 0
-        # nms=True 模型输出形状为 [1, max_det, 6]，6 表示 (x1,y1,x2,y2,conf,cls_id)
-        # nms=False 模型输出形状为 [1, 84, N] 或 [1, 5+num_classes, N]
+        # nms=True model output shape is [1, max_det, 6]; 6 means (x1,y1,x2,y2,conf,cls_id)
+        # nms=False model output shape is [1, 84, N] or [1, 5+num_classes, N]
         self.has_nms = len(out_shape) == 3 and dim2 == 6
 
         logger.info(
-            "YOLO ONNX 已加载: %s (输入 %s, 输出 %s, NMS=%s)",
+            "YOLO ONNX loaded: %s (input %s, output %s, NMS=%s)",
             Path(model_path).name, input_shape, out_shape, self.has_nms,
         )
 
     def detect(self, image_path: str) -> List[Detection]:
-        """对截图执行 YOLO 检测。
+        """Run YOLO detection on a screenshot.
 
         Args:
-            image_path: 截图文件路径。
+            image_path: Path to the screenshot file.
 
         Returns:
-            检测到的元素列表。
+            List of detected elements.
         """
         img = cv2.imread(image_path)
         if img is None:
-            raise FileNotFoundError(f"无法读取图片: {image_path}")
+            raise FileNotFoundError(f"Unable to read image: {image_path}")
 
         orig_h, orig_w = img.shape[:2]
 
-        # 1. 前处理: letterbox resize
+        # 1. Preprocessing: letterbox resize
         input_tensor, scale, pad_left, pad_top = self._preprocess(img)
 
-        # 2. 推理
+        # 2. Inference
         outputs = self.session.run(None, {self.input_name: input_tensor})
-        raw = outputs[0]  # [1, N, 6] 或 [1, 84, 8400]
+        raw = outputs[0]  # [1, N, 6] or [1, 84, 8400]
 
-        # 3. 后处理
+        # 3. Postprocessing
         if self.has_nms:
             detections = self._postprocess_nms(raw, scale, pad_left, pad_top)
         else:
             detections = self._postprocess_raw(raw, scale, pad_left, pad_top)
 
         logger.info(
-            "YOLO ONNX 检测完成: %d 个元素 (原图 %dx%d, 置信度≥%.2f)",
+            "YOLO ONNX detection complete: %d elements (original image %dx%d, confidence≥%.2f)",
             len(detections), orig_w, orig_h, self.conf_thresh,
         )
         return detections
 
     def _preprocess(self, img: np.ndarray) -> Tuple[np.ndarray, float, int, int]:
-        """Letterbox resize 前处理。
+        """Letterbox resize preprocessing.
 
         Returns:
             (input_tensor, scale, pad_left, pad_top)
                 - input_tensor: [1, 3, H, W] float32
-                - scale: 缩放比例
-                - pad_left/pad_top: 填充像素数
+                - scale: scaling ratio
+                - pad_left/pad_top: number of padding pixels
         """
         target_w, target_h = self.input_size
         h, w = img.shape[:2]
@@ -171,16 +171,16 @@ class YOLOONNXDetector:
         new_w = int(w * scale)
         new_h = int(h * scale)
 
-        # 缩放
+        # Resize
         resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
 
-        # 创建画布 + 填充
+        # Create canvas + padding
         canvas = np.full((target_h, target_w, 3), 114, dtype=np.uint8)
         pad_left = (target_w - new_w) // 2
         pad_top = (target_h - new_h) // 2
         canvas[pad_top:pad_top + new_h, pad_left:pad_left + new_w] = resized
 
-        # 归一化 + CHW + batch
+        # Normalize + CHW + batch
         input_tensor = canvas.astype(np.float32) / 255.0
         input_tensor = input_tensor.transpose(2, 0, 1)  # HWC → CHW
         input_tensor = np.expand_dims(input_tensor, axis=0)  # CHW → NCHW
@@ -191,7 +191,7 @@ class YOLOONNXDetector:
         self, raw: np.ndarray,
         scale: float, pad_left: int, pad_top: int,
     ) -> List[Detection]:
-        """解析 nms=True 模型输出 [1, max_det, 6]。"""
+        """Parse nms=True model output [1, max_det, 6]."""
         results: List[Detection] = []
         boxes = raw[0]  # [max_det, 6]
 
@@ -200,7 +200,7 @@ class YOLOONNXDetector:
             if conf < self.conf_thresh:
                 continue
 
-            # 转换回原图坐标
+            # Convert back to original image coordinates
             x1 = (x1 - pad_left) / scale
             y1 = (y1 - pad_top) / scale
             x2 = (x2 - pad_left) / scale
@@ -230,15 +230,15 @@ class YOLOONNXDetector:
         self, raw: np.ndarray,
         scale: float, pad_left: int, pad_top: int,
     ) -> List[Detection]:
-        """解析 nms=False 模型输出 [1, 84, 8400]。"""
+        """Parse nms=False model output [1, 84, 8400]."""
         raw = raw[0]  # [84, 8400]
 
-        # 前 4 行: bbox (cx, cy, w, h)
-        # 后续: class confidences
+        # First 4 rows: bbox (cx, cy, w, h)
+        # Remaining rows: class confidences
         bbox = raw[:4]  # [4, 8400]
         scores = raw[4:]  # [80, 8400]
 
-        # 解析候选框
+        # Parse candidate boxes
         boxes: List[Tuple[float, float, float, float, float, int]] = []
         for i in range(scores.shape[1]):
             max_score = float(np.max(scores[:, i]))
@@ -251,13 +251,13 @@ class YOLOONNXDetector:
             bw = float(bbox[2, i])
             bh = float(bbox[3, i])
 
-            # 转成 x1, y1, x2, y2
+            # Convert to x1, y1, x2, y2
             x1 = cx - bw / 2
             y1_val = cy_val - bh / 2
             x2 = cx + bw / 2
             y2_val = cy_val + bh / 2
 
-            # 转换回原图坐标
+            # Convert back to original image coordinates
             x1 = int(round((x1 - pad_left) / scale))
             y1_val = int(round((y1_val - pad_top) / scale))
             x2 = int(round((x2 - pad_left) / scale))
@@ -293,14 +293,14 @@ class YOLOONNXDetector:
         boxes: List[Tuple[float, float, float, float, float, int]],
         iou_thresh: float,
     ) -> List[int]:
-        """纯 NumPy NMS 实现。"""
+        """Pure NumPy NMS implementation."""
         if not boxes:
             return []
 
         bbox = np.array([b[:4] for b in boxes], dtype=np.float32)
         scores = np.array([b[4] for b in boxes], dtype=np.float32)
 
-        # 按置信度降序排列
+        # Sort by confidence descending
         order = scores.argsort()[::-1]
 
         x1 = bbox[:, 0]
@@ -318,7 +318,7 @@ class YOLOONNXDetector:
             if order.size == 1:
                 break
 
-            # 计算交并比
+            # Compute intersection over union
             xx1 = np.maximum(x1[i], x1[order[1:]])
             yy1 = np.maximum(y1[i], y1[order[1:]])
             xx2 = np.minimum(x2[i], x2[order[1:]])
@@ -331,3 +331,4 @@ class YOLOONNXDetector:
             order = order[idx + 1]
 
         return keep
+

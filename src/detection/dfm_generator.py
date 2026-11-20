@@ -1,15 +1,15 @@
 """
-dfm_generator — 布局检测结果 → Delphi DFM 文本
+dfm_generator — layout detection results → Delphi DFM text
 
-将 Detection 和 LayoutNode 树转换为 DfmComponent 树，
-再通过 dfm_parser.serialize_component 输出 DFM 文本。
+Converts Detection and LayoutNode trees into a DfmComponent tree,
+then outputs DFM text via dfm_parser.serialize_component.
 
-依赖:
+Dependencies:
   - src.tools.dfm_parser (DfmComponent, DfmProperty, serialize_component)
   - src.detection.opencv_detector (Detection)
   - src.detection.layout_parser (LayoutNode)
 
-用法:
+Usage:
     from src.detection.dfm_generator import DFMGenerator
 
     gen = DFMGenerator()
@@ -28,7 +28,7 @@ from .layout_parser import LayoutNode
 
 logger = logging.getLogger(__name__)
 
-# class_id → Delphi 属性映射
+# class_id → Delphi property mapping
 # key: class_id, value: (class_name, caption_prop, unit_hint)
 _CLASS_MAP: dict[int, tuple[str, str, str]] = {
     1:  ("TButton",        "Caption",  "Vcl.StdCtrls"),
@@ -55,7 +55,7 @@ _CLASS_MAP: dict[int, tuple[str, str, str]] = {
 
 
 def _gen_name(cls_name: str, seen_names: Set[str]) -> str:
-    """为给定的类名生成唯一的实例名。
+    """Generate a unique instance name for the given class name.
     
     TButton → Button1, Button2, ...
     TPanel  → Panel1, Panel2, ...
@@ -77,28 +77,28 @@ def _gen_name(cls_name: str, seen_names: Set[str]) -> str:
 
 
 class DFMGenerator:
-    """将布局检测树转换为 Delphi DFM 文本。"""
+    """Convert a layout detection tree into Delphi DFM text."""
 
     def __init__(self, default_form_class: str = "TForm",
                  default_form_name: str = "Form1"):
         """
         Args:
-            default_form_class: 生成的 DFM 根类名，默认 TForm。
-            default_form_name: 生成的 DFM 根实例名，默认 Form1。
+            default_form_class: Root class name for the generated DFM, default TForm.
+            default_form_name: Root instance name for the generated DFM, default Form1.
         """
         self.default_form_class = default_form_class
         self.default_form_name = default_form_name
 
     def generate(self, roots: List[LayoutNode],
                  image_path: str = "") -> str:
-        """生成 DFM 文本。
+        """Generate DFM text.
 
         Args:
-            roots: 布局树根节点列表（LayoutParser.build_hierarchy 的输出）。
-            image_path: 原始截图路径（仅用于日志和元信息）。
+            roots: List of layout tree root nodes (output of LayoutParser.build_hierarchy).
+            image_path: Original screenshot path (used only for logs and metadata).
 
         Returns:
-            DFM 格式文本字符串。
+            DFM-format text string.
         """
         seen_names: Set[str] = set()
         seen_names.add(self.default_form_name)
@@ -109,7 +109,7 @@ class DFMGenerator:
             prefix="object",
         )
 
-        # 从截图文件名推断窗体属性
+        # Infer form properties from the screenshot filename
         base = os.path.splitext(os.path.basename(image_path))[0] if image_path else ""
         if base:
             form.properties.append(DfmProperty(
@@ -123,26 +123,26 @@ class DFMGenerator:
             DfmProperty(name="Height", raw_value=self._infer_canvas_height(roots)),
         ])
 
-        # 将布局树转为 DfmComponent 并添加到窗体
+        # Convert the layout tree to DfmComponent and add it to the form
         for root in roots:
             comp = self._node_to_dfm(root, seen_names)
             if comp is not None:
                 form.children.append(comp)
 
         result = serialize_component(form)
-        logger.info("DFM 生成完成: %d 行, %d 个组件",
+        logger.info("DFM generation complete: %d lines, %d components",
                      result.count("\n") + 1,
                      len(form.children))
         return result
 
     def _node_to_dfm(self, node: LayoutNode,
                      seen_names: Set[str]) -> Optional[DfmComponent]:
-        """将一个 LayoutNode 转换为 DfmComponent。"""
+        """Convert a LayoutNode to a DfmComponent."""
         det = node.detection
 
         class_info = _CLASS_MAP.get(det.class_id)
         if class_info is None:
-            logger.debug("跳过未映射的 class_id=%d (%s)",
+            logger.debug("Skipping unmapped class_id=%d (%s)",
                          det.class_id, det.class_name)
             return None
 
@@ -155,7 +155,7 @@ class DFMGenerator:
             prefix="object",
         )
 
-        # 位置属性
+        # Position properties
         comp.properties.extend([
             DfmProperty(name="Left", raw_value=str(det.x)),
             DfmProperty(name="Top", raw_value=str(det.y)),
@@ -163,17 +163,17 @@ class DFMGenerator:
             DfmProperty(name="Height", raw_value=str(det.h)),
         ])
 
-        # 文本内容
+        # Text content
         text = det.text or ""
         if caption_prop and text:
             comp.properties.append(DfmProperty(
                 name=caption_prop, raw_value=f"'{text}'",
             ))
 
-        # 可见状态（不可见的不生成 Visible 属性，因为默认就是 True）
-        # 此处省略，因为 Detection 没有 confidence < 阈值时的标记。
+        # Visibility state (do not emit Visible for invisible elements because the default is True)
+        # Omitted here because Detection has no marker for confidence < threshold.
 
-        # 递归处理子节点
+        # Recursively process child nodes
         for child in node.children:
             child_comp = self._node_to_dfm(child, seen_names)
             if child_comp is not None:
@@ -183,7 +183,7 @@ class DFMGenerator:
 
     @staticmethod
     def _infer_canvas_width(roots: List[LayoutNode]) -> str:
-        """从布局树推断画布宽度。"""
+        """Infer canvas width from the layout tree."""
         if not roots:
             return "640"
         max_right = 0
@@ -195,7 +195,7 @@ class DFMGenerator:
 
     @staticmethod
     def _infer_canvas_height(roots: List[LayoutNode]) -> str:
-        """从布局树推断画布高度。"""
+        """Infer canvas height from the layout tree."""
         if not roots:
             return "480"
         max_bottom = 0
@@ -207,7 +207,7 @@ class DFMGenerator:
 
 
 def _walk_all(roots):
-    """广度遍历所有节点。"""
+    """Breadth-first traverse all nodes."""
     stack = list(roots)
     while stack:
         node = stack.pop(0)

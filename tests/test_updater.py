@@ -93,7 +93,7 @@ class TestCategorizeRequestError(unittest.TestCase):
 
         err = Exception("HTTP Error 403: rate limit exceeded")
         result = _categorize_request_error(err)
-        self.assertIn("受限", result)
+        self.assertIn("restricted", result)
 
     def test_timeout_error(self):
         """网络超时"""
@@ -101,7 +101,7 @@ class TestCategorizeRequestError(unittest.TestCase):
 
         err = TimeoutError("timed out")
         result = _categorize_request_error(err)
-        self.assertIn("超时", result)
+        self.assertIn("timed out", result)
 
     def test_dns_error(self):
         """DNS 解析失败"""
@@ -117,7 +117,7 @@ class TestCategorizeRequestError(unittest.TestCase):
 
         err = Exception("SSL: certificate verify failed")
         result = _categorize_request_error(err)
-        self.assertIn("代理", result)
+        self.assertIn("proxy", result)
 
     def test_generic_error(self):
         """通用错误"""
@@ -125,7 +125,7 @@ class TestCategorizeRequestError(unittest.TestCase):
 
         err = Exception("something went wrong")
         result = _categorize_request_error(err)
-        self.assertIn("请求失败", result)
+        self.assertIn("Request failed", result)
 
 
 class TestCheckForUpdateRouting(unittest.TestCase):

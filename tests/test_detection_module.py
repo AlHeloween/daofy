@@ -572,7 +572,7 @@ class TestAnalyzeLayout:
         """yolo 后端但不传模型路径"""
         result = analyze_layout("dummy.png", backend="yolo")
         assert result["success"] is False
-        assert "模型文件不存在" in result.get("error", "") or "不存在" in result.get("error", "")
+        assert "model file not found" in result.get("error", "") or "not found" in result.get("error", "")
 
     def test_analyze_with_text_in_nodes(self):
         """元素有文本时，DFM 中应包含文本内容"""

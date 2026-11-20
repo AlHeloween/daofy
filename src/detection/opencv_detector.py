@@ -1,10 +1,10 @@
 """
-opencv_detector — OpenCV 传统 CV UI 元素检测
+opencv_detector — OpenCV traditional CV UI element detection
 
-零额外依赖基线方案，可用于快速原型验证。
-使用 OpenCV 形态学操作检测 UI 元素边界并启发式分类。
+Zero-extra-dependency baseline solution, usable for rapid prototype validation.
+Uses OpenCV morphological operations to detect UI element boundaries and classify heuristically.
 
-依赖: opencv-python-headless, numpy（项目 OCR 可选依赖已包含）
+Dependencies: opencv-python-headless, numpy (included in the project's optional OCR dependencies)
 """
 
 from __future__ import annotations
@@ -22,16 +22,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Detection:
-    """单个检测到的 UI 元素。"""
+    """A single detected UI element."""
 
-    class_id: int          # YOLO 兼容的类别 ID
-    class_name: str        # 可读的类别名称
-    confidence: float      # 置信度 (0-1)
+    class_id: int          # YOLO-compatible class ID
+    class_name: str        # Human-readable class name
+    confidence: float      # Confidence (0-1)
     x: int                 # left
     y: int                 # top
     w: int                 # width
     h: int                 # height
-    text: str = ""         # OCR 提取的文字（初始为空，后续填充）
+    text: str = ""         # Text extracted by OCR (initially empty, filled later)
 
     @property
     def area(self) -> int:
@@ -56,75 +56,75 @@ class Detection:
         }
 
 
-# 启发式分类规则：按宽高比和面积判断元素类型
+# Heuristic classification rules: determine element type by aspect ratio and area
 _CLASS_RULES = [
     # (min_w/h_ratio, max_w/h_ratio, min_area, max_area, class_id, class_name)
-    # 按钮: 宽高比在 1.5~6 之间，面积适中
+    # Button: aspect ratio between 1.5 and 6, moderate area
     (1.5, 6.0,  400,  50000,  1, "TButton"),
-    # 输入框: 宽高比 > 3，面积适中
+    # Edit: aspect ratio > 3, moderate area
     (3.0, 20.0, 500,  80000,  2, "TEdit"),
-    # 标签: 宽高比较小，面积小
+    # Label: relatively small aspect ratio, small area
     (0.5, 6.0,  50,   30000,  3, "TLabel"),
-    # 下拉框: 宽高比 > 3，右侧有箭头特征
+    # Combo box: aspect ratio > 3, with arrow feature on the right
     (3.0, 15.0, 600,  60000,  4, "TComboBox"),
-    # 复选框: 接近正方形
+    # Checkbox: nearly square
     (0.8, 1.5,  80,   2500,   5, "TCheckBox"),
-    # 单选钮: 接近正方形
+    # Radio button: nearly square
     (0.8, 1.5,  80,   2500,   6, "TRadioButton"),
-    # 列表: 非常大的纵向矩形
+    # List: very large vertical rectangle
     (0.3, 4.0,  5000, 500000, 7, "TListBox"),
-    # 面板/容器: 面积大
+    # Panel/container: large area
     (0.3, 5.0,  8000, 999999, 9, "TPanel"),
 ]
 
 
 class OpenCVDetector:
-    """基于 OpenCV 传统 CV 的 UI 元素检测器。
+    """UI element detector based on traditional OpenCV CV.
 
-    使用形态学操作 + 轮廓分析检测控件边界，
-    然后按宽高比/面积启发式分类。
+    Uses morphological operations + contour analysis to detect control boundaries,
+    then classifies heuristically by aspect ratio/area.
     """
 
     def __init__(self, min_element_area: int = 50):
         """
         Args:
-            min_element_area: 最小元素面积，小于此值的轮廓被忽略。
+            min_element_area: Minimum element area; contours smaller than this are ignored.
         """
         self.min_area = min_element_area
 
     def detect(self, image_path: str) -> List[Detection]:
-        """检测截图中的 UI 元素。
+        """Detect UI elements in a screenshot.
 
         Args:
-            image_path: 截图文件路径。
+            image_path: Path to the screenshot file.
 
         Returns:
-            检测到的元素列表，按面积降序排列。
+            List of detected elements, sorted by area descending.
         """
         img = cv2.imread(image_path)
         if img is None:
-            raise FileNotFoundError(f"无法读取图片: {image_path}")
+            raise FileNotFoundError(f"Unable to read image: {image_path}")
 
         h, w = img.shape[:2]
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # 1. 自适应阈值二值化
+        # 1. Adaptive threshold binarization
         binary = cv2.adaptiveThreshold(
             gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY_INV, 21, 5,
         )
 
-        # 2. 形态学闭运算：合并文字区域为块
+        # 2. Morphological closing: merge text regions into blocks
         kernel_h = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
         kernel_v = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 3))
         closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_h, iterations=2)
         closed = cv2.morphologyEx(closed, cv2.MORPH_CLOSE, kernel_v, iterations=1)
 
-        # 3. 膨胀：扩大边缘，连接相邻区域
+        # 3. Dilation: expand edges and connect adjacent regions
         kernel_dilate = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
         dilated = cv2.dilate(closed, kernel_dilate, iterations=2)
 
-        # 4. 轮廓提取
+        # 4. Contour extraction
         contours, _ = cv2.findContours(
             dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE,
         )
@@ -133,13 +133,13 @@ class OpenCVDetector:
 
         for contour in contours:
             x, y, cw, ch = cv2.boundingRect(contour)
-            if cw < 8 or ch < 8:  # 过小的区域跳过
+            if cw < 8 or ch < 8:  # Skip regions that are too small
                 continue
             area = cw * ch
             if area < self.min_area:
                 continue
 
-            # 在原始灰度图上取内部区域，辅助分类
+            # Take the interior region from the original grayscale image to assist classification
             roi = gray[y : y + ch, x : x + cw]
             mean_brightness = float(np.mean(roi))
             std_brightness = float(np.std(roi))
@@ -151,18 +151,18 @@ class OpenCVDetector:
             detections.append(Detection(
                 class_id=class_id,
                 class_name=class_name,
-                confidence=0.5,  # 传统 CV 统一用 0.5
+                confidence=0.5,  # Traditional CV uses a uniform 0.5
                 x=x, y=y, w=cw, h=ch,
             ))
 
-        # 5. 按面积降序排列（容器优先）
+        # 5. Sort by area descending (containers first)
         detections.sort(key=lambda d: d.area, reverse=True)
 
-        # 6. 合并高度重叠的检测框（NMS 简化版）
+        # 6. Merge highly overlapping detection boxes (simplified NMS)
         detections = self._merge_overlapping(detections)
 
         logger.info(
-            "OpenCV 检测完成: %d 个元素 (原图 %dx%d)",
+            "OpenCV detection complete: %d elements (original image %dx%d)",
             len(detections), w, h,
         )
         return detections
@@ -171,35 +171,35 @@ class OpenCVDetector:
         self, cw: int, ch: int, area: int,
         mean_brightness: float, std_brightness: float,
     ) -> tuple[int, str]:
-        """启发式分类：按宽高比、面积、亮度特征判断元素类型。
+        """Heuristic classification: determine element type by aspect ratio, area, and brightness features.
 
         Returns:
-            (class_id, class_name) 或 (-1, "") 表示未知。
+            (class_id, class_name), or (-1, "") if unknown.
         """
         ratio = cw / max(ch, 1)
 
-        # 接近正方形的极小元素 → 复选框或单选钮
+        # Nearly square tiny element → checkbox or radio button
         if 0.8 <= ratio <= 1.5 and 80 <= area <= 2500:
-            # 亮度较高且标准差较大 → 复选框（勾选框通常有较亮的背景）
+            # Higher brightness and larger standard deviation → checkbox (check boxes usually have a brighter background)
             if mean_brightness > 150 and std_brightness > 40:
                 return (5, "TCheckBox")
             return (6, "TRadioButton")
 
-        # 大面积的平坦区域 → 面板
+        # Large flat region → panel
         if area > 8000 and cw > 100 and ch > 50:
             return (9, "TPanel")
 
-        # 按规则表匹配
+        # Match against the rule table
         for min_r, max_r, min_a, max_a, cid, cname in _CLASS_RULES:
             if min_r <= ratio <= max_r and min_a <= area <= max_a:
                 return (cid, cname)
 
-        # 无法分类
+        # Unable to classify
         return (-1, "")
 
     def _merge_overlapping(self, detections: List[Detection],
                            iou_thresh: float = 0.6) -> List[Detection]:
-        """合并高度重叠的检测框（保留面积较大的）。"""
+        """Merge highly overlapping detection boxes (keep the larger-area one)."""
         if not detections:
             return []
 
@@ -212,7 +212,7 @@ class OpenCVDetector:
                     continue
                 iou = self._iou(detections[i], detections[j])
                 if iou > iou_thresh:
-                    # 保留面积较大的框
+                    # Keep the box with the larger area
                     if detections[i].area >= detections[j].area:
                         keep[j] = False
                     else:
@@ -223,7 +223,7 @@ class OpenCVDetector:
 
     @staticmethod
     def _iou(a: Detection, b: Detection) -> float:
-        """计算两个检测框的 IoU。"""
+        """Compute the IoU of two detection boxes."""
         x1 = max(a.x, b.x)
         y1 = max(a.y, b.y)
         x2 = min(a.x + a.w, b.x + b.w)
@@ -231,3 +231,4 @@ class OpenCVDetector:
         inter = max(0, x2 - x1) * max(0, y2 - y1)
         union = a.area + b.area - inter
         return inter / max(union, 1)
+

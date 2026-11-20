@@ -1,11 +1,11 @@
 """
-DPROJ 文件解析器
+DPROJ file parser
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Province Zuoyou Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
-Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
+Update & Mod By Crystalxp (Night Killer QQ:281309196)
 
-解析 Delphi 项目文件(.dproj)以提取编译配置
+Parse Delphi project files (.dproj) to extract build configurations
 """
 
 import xml.etree.ElementTree as ET
@@ -17,17 +17,17 @@ logger = get_logger(__name__)
 
 
 class DprojParser:
-    """Delphi 项目文件解析器"""
+    """Delphi project file parser"""
 
-    # MSBuild 命名空间
+    # MSBuild namespace
     MSBUILD_NS = "http://schemas.microsoft.com/developer/msbuild/2003"
 
     def __init__(self, dproj_path: str):
         """
-        初始化解析器
+        Initialize parser
 
         Args:
-            dproj_path: .dproj 文件路径
+            dproj_path: .dproj file path
         """
         self.dproj_path = dproj_path
         self.tree = None
@@ -35,75 +35,75 @@ class DprojParser:
 
     def parse(self) -> bool:
         """
-        解析 .dproj 文件
+        Parse the .dproj file
 
         Returns:
-            是否解析成功
+            Whether parsing succeeded
         """
         try:
             self.tree = ET.parse(self.dproj_path)
             self.root = self.tree.getroot()
-            logger.info(f"成功解析 .dproj 文件: {self.dproj_path}")
+            logger.info(f"Successfully parsed .dproj file: {self.dproj_path}")
             return True
         except Exception as e:
-            logger.error(f"解析 .dproj 文件失败: {str(e)}")
+            logger.error(f"Failed to parse .dproj file: {str(e)}")
             return False
 
     def _find_element(self, parent: ET.Element, tag: str) -> Optional[ET.Element]:
         """
-        查找元素(带命名空间)
+        Find element (with namespace)
 
         Args:
-            parent: 父元素
-            tag: 标签名
+            parent: parent element
+            tag: tag name
 
         Returns:
-            找到的元素,如果未找到则返回 None
+            Found element, or None if not found
         """
         full_tag = f"{{{self.MSBUILD_NS}}}{tag}"
         return parent.find(full_tag)
 
     def _find_all_elements(self, parent: ET.Element, tag: str) -> List[ET.Element]:
         """
-        查找所有元素(带命名空间)
+        Find all elements (with namespace)
 
         Args:
-            parent: 父元素
-            tag: 标签名
+            parent: parent element
+            tag: tag name
 
         Returns:
-            找到的元素列表
+            List of found elements
         """
         full_tag = f"{{{self.MSBUILD_NS}}}{tag}"
         return parent.findall(full_tag)
 
     def get_unit_search_paths(self, config: str = None, platform: str = None) -> List[str]:
         """
-        获取单元搜索路径
+        Get unit search paths
 
         Args:
-            config: 配置名称(Debug/Release等),如果为 None 则获取所有配置
-            platform: 平台名称(Win32/Win64),如果为 None 则获取所有平台
+            config: configuration name (Debug/Release etc.); if None, get all configurations
+            platform: platform name (Win32/Win64); if None, get all platforms
 
         Returns:
-            单元搜索路径列表
+            List of unit search paths
         """
         if self.root is None:
-            logger.error("未解析 .dproj 文件")
+            logger.error("Unparsed .dproj file")
             return []
 
         paths = set()
 
-        # 遍历所有 PropertyGroup
+        # Iterate over all PropertyGroups
         for prop_group in self._find_all_elements(self.root, "PropertyGroup"):
-            # 检查配置和平台条件
+            # Check configuration and platform conditions
             condition = prop_group.get("Condition", "")
 
-            # 如果指定了配置或平台,检查条件是否匹配
+            # If config or platform is specified, check whether the condition matches
             if config or platform:
-                # 检查平台条件
+                # Check platform conditions
                 if platform:
-                    # 支持多种平台条件格式
+                    # Support multiple platform condition formats
                     platform_patterns = [
                         f"'$(Platform)'=='{platform}'",
                         f"'$(Base_{platform})'!=''",
@@ -114,7 +114,7 @@ class DprojParser:
                     if not any(pattern in condition for pattern in platform_patterns):
                         continue
 
-                # 检查配置条件
+                # Check configuration conditions
                 if config:
                     config_patterns = [
                         f"'$(Config)'=='{config}'",
@@ -122,37 +122,37 @@ class DprojParser:
                         f"'$(Cfg_2)'!=''" if config == "Release" else "",
                         f"'$(Cfg_3)'!=''" if config == "Dev" else ""
                     ]
-                    config_patterns = [p for p in config_patterns if p]  # 移除空字符串
+                    config_patterns = [p for p in config_patterns if p]  # Remove empty strings
                     if not any(pattern in condition for pattern in config_patterns):
                         continue
 
-            # 查找 DCC_UnitSearchPath 元素
+            # Find DCC_UnitSearchPath element
             unit_search_path_elem = self._find_element(prop_group, "DCC_UnitSearchPath")
             if unit_search_path_elem is not None and unit_search_path_elem.text:
-                # 分割路径(使用分号分隔)
+                # Split paths (semicolon-separated)
                 path_str = unit_search_path_elem.text.strip()
                 for path in path_str.split(';'):
                     path = path.strip()
-                    if path and not path.startswith('$('):  # 忽略 MSBuild 变量
-                        # 转换相对路径为绝对路径
+                    if path and not path.startswith('$('):  # Ignore MSBuild variables
+                        # Convert relative paths to absolute paths
                         if not Path(path).is_absolute():
                             project_dir = Path(self.dproj_path).parent
                             path = str((project_dir / path).resolve())
                         paths.add(path)
 
-        logger.info(f"找到 {len(paths)} 个单元搜索路径")
+        logger.info(f"Found {len(paths)} unit search paths")
         return list(paths)
 
     def get_namespace(self, config: str = None, platform: str = None) -> List[str]:
         """
-        获取命名空间
+        Get namespaces
 
         Args:
-            config: 配置名称
-            platform: 平台名称
+            config: configuration name
+            platform: platform name
 
         Returns:
-            命名空间列表
+            List of namespaces
         """
         if self.root is None:
             return []
@@ -180,14 +180,14 @@ class DprojParser:
 
     def get_build_events(self, config: str = None, platform: str = None) -> dict:
         """
-        获取编译事件
+        Get build events
 
         Args:
-            config: 配置名称
-            platform: 平台名称
+            config: configuration name
+            platform: platform name
 
         Returns:
-            编译事件字典,包含 PreBuildEvent, PreLinkEvent 和 PostBuildEvent
+            Build events dictionary containing PreBuildEvent, PreLinkEvent and PostBuildEvent
         """
         if self.root is None:
             return {}
@@ -250,32 +250,32 @@ class DprojParser:
 
     def get_output_path(self, config: str = None, platform: str = None) -> Optional[str]:
         """
-        获取输出路径（DCC_ExeOutput）
+        Get output path (DCC_ExeOutput)
 
         Args:
-            config: 配置名称
-            platform: 平台名称
+            config: configuration name
+            platform: platform name
 
         Returns:
-            输出路径
+            Output path
         """
         return self._get_config_path("DCC_ExeOutput", config, platform)
 
     def get_dcu_output_path(self, config: str = None, platform: str = None) -> Optional[str]:
         """
-        获取 DCU 输出路径（DCC_DcuOutput）
+        Get DCU output path (DCC_DcuOutput)
 
         Args:
-            config: 配置名称
-            platform: 平台名称
+            config: configuration name
+            platform: platform name
 
         Returns:
-            DCU 输出路径
+            DCU output path
         """
         return self._get_config_path("DCC_DcuOutput", config, platform)
 
     def _get_config_path(self, tag: str, config: str = None, platform: str = None) -> Optional[str]:
-        """通用：从 PropertyGroup 中读取指定标签的路径，替换变量并转为绝对路径。"""
+        """Generic: read the path of the specified tag from PropertyGroup, substitute variables, and convert to an absolute path."""
         if self.root is None:
             return None
 
@@ -304,14 +304,14 @@ class DprojParser:
 
     def get_conditional_defines(self, config: str = None, platform: str = None) -> List[str]:
         """
-        获取条件编译符号
+        Get conditional compilation symbols
 
         Args:
-            config: 配置名称
-            platform: 平台名称
+            config: configuration name
+            platform: platform name
 
         Returns:
-            条件编译符号列表
+            List of conditional compilation symbols
         """
         if self.root is None:
             return []
@@ -339,10 +339,10 @@ class DprojParser:
 
     def get_main_source(self) -> Optional[str]:
         """
-        获取主源文件名
+        Get main source file name
 
         Returns:
-            主源文件名(.dpr 文件名)
+            Main source file name (.dpr file name)
         """
         if self.root is None:
             return None
@@ -356,10 +356,10 @@ class DprojParser:
 
     def get_project_info(self) -> Dict:
         """
-        获取项目信息
+        Get project information
 
         Returns:
-            项目信息字典
+            Project information dictionary
         """
         if self.root is None:
             return {}
@@ -374,7 +374,7 @@ class DprojParser:
         }
 
         for prop_group in self._find_all_elements(self.root, "PropertyGroup"):
-            # 只读取第一个 PropertyGroup(通常包含基本信息)
+            # Read only the first PropertyGroup (usually contains basic information)
             if prop_group.get("Condition"):
                 continue
 
@@ -383,7 +383,7 @@ class DprojParser:
                 if elem is not None and elem.text:
                     info[key] = elem.text.strip()
 
-            # 特殊处理 MainSource
+            # Special handling for MainSource
             if info["main_source"] is None:
                 main_source_elem = self._find_element(prop_group, "MainSource")
                 if main_source_elem is not None and main_source_elem.text:
@@ -393,38 +393,38 @@ class DprojParser:
 
     def get_project_version(self) -> Optional[str]:
         """
-        获取项目版本号
+        Get project version number
 
         Returns:
-            项目版本号(如 "19.2"),如果未找到则返回 None
+            Project version number (e.g. "19.2"), or None if not found
         """
         info = self.get_project_info()
         return info.get("project_version")
 
     def is_file_in_project(self, file_name: str) -> bool:
         """
-        检查文件是否属于项目
+        Check whether a file belongs to the project
 
         Args:
-            file_name: 文件名(不含路径)
+            file_name: file name (without path)
 
         Returns:
-            文件是否属于项目
+            Whether the file belongs to the project
         """
         if self.root is None:
             return False
 
-        # 检查 ItemGroup 中的 DCCReference
+        # Check DCCReference in ItemGroup
         for item_group in self._find_all_elements(self.root, "ItemGroup"):
             for dcc_ref in self._find_all_elements(item_group, "DCCReference"):
                 include = dcc_ref.get("Include", "")
                 if include:
-                    # 提取文件名
+                    # Extract file name
                     ref_file_name = Path(include).name
                     if ref_file_name.lower() == file_name.lower():
                         return True
 
-        # 检查主源文件
+        # Check main source file
         main_source = self.get_main_source()
         if main_source and Path(main_source).name.lower() == file_name.lower():
             return True
@@ -433,15 +433,15 @@ class DprojParser:
 
     def get_debugger_run_params(self, config: str = None, platform: str = None) -> Optional[str]:
         """
-        获取调试器运行参数（Debugger_RunParams）。
-        对应 IDE 中 Project > Options > Debugger > Parameters 的设置。
+        Get debugger run parameters (Debugger_RunParams).
+        Corresponds to Project > Options > Debugger > Parameters in the IDE.
 
         Args:
-            config: 配置名称（Debug/Release/Dev）
-            platform: 平台名称（Win32/Win64）
+            config: configuration name (Debug/Release/Dev)
+            platform: platform name (Win32/Win64)
 
         Returns:
-            参数字符串，未找到则返回 None
+            Parameter string, or None if not found
         """
         if self.root is None:
             return None
@@ -458,7 +458,7 @@ class DprojParser:
             if params_elem is not None and params_elem.text:
                 return params_elem.text.strip()
 
-        # 找不到匹配配置的，尝试第一个非空值
+        # If no matching configuration is found, try the first non-empty value
         for prop_group in self._find_all_elements(self.root, "PropertyGroup"):
             params_elem = self._find_element(prop_group, "Debugger_RunParams")
             if params_elem is not None and params_elem.text:
@@ -468,9 +468,9 @@ class DprojParser:
 
     def get_resource_items(self) -> List[Dict[str, str]]:
         """
-        获取项目中所有的资源引用（RcItem 条目）。
+        Get all resource references (RcItem entries) in the project.
         
-        .dproj 格式:
+        .dproj format:
           <RcItem Include="templates/markdown.html">
             <ContainerId>ResourceItem</ContainerId>
             <ResourceType>RCDATA</ResourceType>
@@ -478,11 +478,11 @@ class DprojParser:
           </RcItem>
         
         Returns:
-            资源项列表，每项包含:
-              - include: 源文件路径(相对于 .dproj 目录)
-              - source_path: 源文件绝对路径
-              - resource_id: 资源 ID
-              - resource_type: 资源类型
+            List of resource items, each containing:
+              - include: source file path (relative to .dproj directory)
+              - source_path: absolute source file path
+              - resource_id: resource ID
+              - resource_type: resource type
         """
         if self.root is None:
             return []
@@ -519,21 +519,21 @@ class DprojParser:
 
     def get_target_platform(self) -> Optional[str]:
         """
-        从 .dproj 文件读取目标平台。
+        Read target platform from .dproj file.
         
-        在 PropertyGroup 中查找 <Platform> 元素，返回第一个非空值。
-        典型的 .dproj 格式:
+        Find <Platform> element in PropertyGroup, return the first non-empty value.
+        Typical .dproj format:
           <PropertyGroup Condition="'$(Base)'!=''">
             <Platform>Win64</Platform>
           </PropertyGroup>
         
-        Delphi 支持的全部平台:
+        All platforms supported by Delphi:
           Win32, Win64, OSX64, OSXARM64,
           iOSDevice64, iOSDevice, iOSSimulator,
           Android, Android64, Linux64
         
         Returns:
-            平台名称（如 "Win64", "Android"），未找到则返回 None
+            Platform name (e.g. "Win64", "Android"), or None if not found
         """
         VALID_PLATFORMS = {
             'Win32', 'Win64', 'OSX64', 'OSXARM64',
@@ -555,17 +555,17 @@ class DprojParser:
 
 def resolve_target_platform_from_dproj(project_path: str, default_platform: str = "win32") -> str:
     """
-    从 .dproj 文件解析目标平台，失败时返回默认值。
+    Parse target platform from .dproj file, return default on failure.
     
-    封装 try/parse/get_target_platform/fallback 的通用逻辑，
-    避免 compile_project.py 和 get_args.py 中重复代码。
+    Encapsulates common try/parse/get_target_platform/fallback logic,
+    avoiding duplicate code in compile_project.py and get_args.py.
     
     Args:
-        project_path: .dproj 文件路径
-        default_platform: 未找到时的默认平台
+        project_path: .dproj file path
+        default_platform: default platform when not found
         
     Returns:
-        平台名称小写，如 "win32", "android", "linux64"
+        Platform name in lowercase, e.g. "win32", "android", "linux64"
     """
     try:
         parser = DprojParser(project_path)
@@ -574,5 +574,5 @@ def resolve_target_platform_from_dproj(project_path: str, default_platform: str 
             if platform:
                 return platform.lower()
     except Exception as e:
-        logger.debug("忽略非致命异常: %s", str(e))
+        logger.debug("Ignoring non-fatal exception: %s", str(e))
     return default_platform

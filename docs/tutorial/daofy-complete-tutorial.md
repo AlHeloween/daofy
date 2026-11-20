@@ -1,124 +1,124 @@
-# Daofy for Delphi 完整使用教程
+# Daofy for Delphi Complete User Guide
 
-> **版本**: v2026.06.15.1 | **最后更新**: 2026-06-20
-
----
-
-## 目录
-
-- [第一章：Daofy 概述](#第一章daofy-概述)
-- [第二章：安装与配置](#第二章安装与配置)
-- [第三章：环境检查与诊断](#第三章环境检查与诊断)
-- [第四章：知识库搜索与管理](#第四章知识库搜索与管理)
-- [第五章：项目编译与配置管理](#第五章项目编译与配置管理)
-- [第六章：Delphi 文件操作](#第六章delphi-文件操作)
-  - [6.1 工具概述](#61-工具概述)
-  - [6.2 Action 速查](#62-action-速查)
-  - [6.3 行号规则](#63-行号规则)
-  - [6.4 读取文件](#64-读取文件)
-  - [6.5 写入文件](#65-写入文件)
-  - [6.6 格式化代码](#66-格式化代码)
-  - [6.7 备份管理](#67-备份管理)
-  - [6.8 Uses 子句管理](#68-uses-子句管理)
-  - [6.9 编码转换（encode）](#69-编码转换encode)
-  - [6.10 脏标记机制](#610-脏标记机制)
-- [第七章：编码规范与代码审计](#第七章编码规范与代码审计)
-- [第八章：代码托管与 Git 操作](#第八章代码托管与-git-操作)
-- [第九章：经验记忆管理](#第九章经验记忆管理)
-- [第十章：Delphi RTTI 桥接](#第十章delphi-rtti-桥接)
-- [第十一章：自动化测试](#第十一章自动化测试)
-- [第十二章：OCR 图像文字识别](#第十二章ocr-图像文字识别)
-- [第十三章：组件管理](#第十三章组件管理)
-- [第十四章：组件包管理](#第十四章组件包管理)
-- [第十五章：异步任务管理](#第十五章异步任务管理)
-- [第十六章：Daofy 自身更新管理](#第十六章daofy-自身更新管理)
-- [第十七章：软著文档生成](#第十七章软著文档生成)
-- [第十八章：故障排除与最佳实践](#第十八章故障排除与最佳实践)
+> **Version**: v2026.06.15.1 | **Last Updated**: 2026-06-20
 
 ---
 
-## 第一章：Daofy 概述
+## Table of Contents
 
-### 1.1 什么是 Daofy？
+- [Chapter 1: Daofy Overview](#chapter-1-daofy-overview)
+- [Chapter 2: Installation and Configuration](#chapter-2-installation-and-configuration)
+- [Chapter 3: Environment Check and Diagnostics](#chapter-3-environment-check-and-diagnostics)
+- [Chapter 4: Knowledge Base Search and Management](#chapter-4-knowledge-base-search-and-management)
+- [Chapter 5: Project Compilation and Configuration Management](#chapter-5-project-compilation-and-configuration-management)
+- [Chapter 6: Delphi File Operations](#chapter-6-delphi-file-operations)
+  - [6.1 Tool Overview](#61-tool-overview)
+  - [6.2 Action Quick Reference](#62-action-quick-reference)
+  - [6.3 Line Number Rules](#63-line-number-rules)
+  - [6.4 Read Files](#64-read-files)
+  - [6.5 Write Files](#65-write-files)
+  - [6.6 Format Code](#66-format-code)
+  - [6.7 Backup Management](#67-backup-management)
+  - [6.8 Uses Clause Management](#68-uses-clause-management)
+  - [6.9 Encoding Conversion (encode)](#69-encoding-conversion-encode)
+  - [6.10 Dirty Marker Mechanism](#610-dirty-marker-mechanism)
+- [Chapter 7: Coding Standards and Code Audit](#chapter-7-coding-standards-and-code-audit)
+- [Chapter 8: Code Hosting and Git Operations](#chapter-8-code-hosting-and-git-operations)
+- [Chapter 9: Experience Memory Management](#chapter-9-experience-memory-management)
+- [Chapter 10: Delphi RTTI Bridge](#chapter-10-delphi-rtti-bridge)
+- [Chapter 11: Automated Testing](#chapter-11-automated-testing)
+- [Chapter 12: OCR Image Text Recognition](#chapter-12-ocr-image-text-recognition)
+- [Chapter 13: Component Management](#chapter-13-component-management)
+- [Chapter 14: Component Package Management](#chapter-14-component-package-management)
+- [Chapter 15: Asynchronous Task Management](#chapter-15-asynchronous-task-management)
+- [Chapter 16: Daofy Self-Update Management](#chapter-16-daofy-self-update-management)
+- [Chapter 17: Software Copyright Document Generation](#chapter-17-software-copyright-document-generation)
+- [Chapter 18: Troubleshooting and Best Practices](#chapter-18-troubleshooting-and-best-practices)
 
-**Daofy（道飞）**——为创意插上翅膀。
+---
 
-Daofy for Delphi 是一个基于 **Model Context Protocol (MCP)** 的 MCP Server，它允许 AI 助手（如 Claude Desktop、CodeArts Agent、Cursor 等）直接编译 Delphi 项目并查询 Delphi 知识库。通过这个工具，您可以在与 AI 助手的对话中直接编译 Delphi 工程、查询 API 文档、搜索代码示例，无需手动切换到 IDE 或命令行。
+## Chapter 1: Daofy Overview
 
-### 1.2 核心优势
+### 1.1 What Is Daofy?
 
-| 优势 | 说明 |
+**Daofy (道飞)**—giving creativity wings.
+
+Daofy for Delphi is an MCP Server based on the **Model Context Protocol (MCP)**. It allows AI assistants (such as Claude Desktop, CodeArts Agent, Cursor, etc.) to directly compile Delphi projects and query the Delphi knowledge base. With this tool, you can directly compile Delphi projects, query API documentation, and search code examples within conversations with AI assistants, without manually switching to the IDE or command line.
+
+### 1.2 Core Advantages
+
+| Advantage | Description |
 |------|------|
-| **无缝集成** | 嵌入 AI 助手工作流，聊天中完成编译、搜索、编码 |
-| **零配置** | 自动从注册表检测 Delphi 编译器，无需手动配置 |
-| **知识库内置** | 内置 Delphi RTL/VCL/FMX 源码索引，支持语义搜索 |
-| **全生命周期** | 从创建项目、编译、审计到代码托管，一站式完成 |
-| **跨版本支持** | 支持 Delphi 2005 到 Delphi 13 全系列版本 |
+| **Seamless Integration** | Embedded in AI assistant workflows; complete compilation, search, and coding in chat |
+| **Zero Configuration** | Automatically detects Delphi compilers from the registry; no manual configuration required |
+| **Built-in Knowledge Base** | Built-in Delphi RTL/VCL/FMX source code index with semantic search support |
+| **Full Lifecycle** | From project creation, compilation, and auditing to code hosting, all in one place |
+| **Cross-Version Support** | Supports the full Delphi 2005 to Delphi 13 series |
 
-### 1.3 功能全景概览
+### 1.3 Feature Overview
 
-Daofy 提供 16 个 MCP 工具：
+Daofy provides 16 MCP tools:
 
-| # | 工具名 | 功能域 | 一句话用途 |
+| # | Tool Name | Functional Domain | One-line Purpose |
 |---|--------|--------|-----------|
-| 1 | `project` | 编译/配置/审计 | 项目全生命周期管理 |
-| 2 | `delphi_kb` | 知识库搜索/构建 | Delphi API、项目代码、文档搜索 |
-| 3 | `delphi_file` | 文件操作 | Delphi 文件读写/格式化/编码转换/备份 |
-| 4 | `manage_component` | 组件管理 | DFM 组件增删改 + PAS 自动同步 |
-| 5 | `check_environment` | 环境诊断 | 检查编译器、安装 pasfmt |
-| 6 | `async_task` | 后台任务 | 管理知识库构建等耗时任务 |
-| 7 | `package` | 组件包管理 | 编译安装 .dpk 组件包 |
-| 8 | `get_coding_rules` | 编码规范 | 获取 Delphi 编码规则 |
-| 9 | `code_hosting` | 代码托管 | Git 操作 + 平台 API |
-| 10 | `tool_help` | 帮助文档 | 获取任意工具完整帮助（详见下文说明） |
-| 11 | `experience` | 经验记忆 | 保存/搜索 AI 解决问题的经验 |
-| 12 | `daofy_update` | 自身更新 | 检查/更新 Daofy 版本 |
-| 13 | `delphi_rtti` | RTTI 桥接 | 发现和调用 Delphi 运行时能力 |
-| 14 | `automate_delphi` | 自动化测试 | GUI 截图 + 控制台交互 |
-| 15 | `ocr` | 图像分析 | 文字识别/截图对比/颜色分析 |
-| 16 | `generate_copyright` | 软著生成 | 生成软件著作权文档 |
+| 1 | `project` | Compilation/configuration/audit | Full project lifecycle management |
+| 2 | `delphi_kb` | Knowledge base search/build | Delphi API, project code, and document search |
+| 3 | `delphi_file` | File operations | Delphi file read/write/format/encoding conversion/backup |
+| 4 | `manage_component` | Component management | Add/remove/modify DFM components + automatic PAS sync |
+| 5 | `check_environment` | Environment diagnostics | Check compiler, install pasfmt |
+| 6 | `async_task` | Background tasks | Manage time-consuming tasks such as knowledge base builds |
+| 7 | `package` | Component package management | Compile and install .dpk component packages |
+| 8 | `get_coding_rules` | Coding standards | Get Delphi coding rules |
+| 9 | `code_hosting` | Code hosting | Git operations + platform API |
+| 10 | `tool_help` | Help documentation | Get complete help for any tool (see details below) |
+| 11 | `experience` | Experience memory | Save/search AI problem-solving experience |
+| 12 | `daofy_update` | Self-update | Check/update Daofy version |
+| 13 | `delphi_rtti` | RTTI bridge | Discover and invoke Delphi runtime capabilities |
+| 14 | `automate_delphi` | Automated testing | GUI screenshots + console interaction |
+| 15 | `ocr` | Image analysis | Text recognition/screenshot comparison/color analysis |
+| 16 | `generate_copyright` | Software copyright generation | Generate software copyright documents |
 
-> 💡 **`tool_help` 使用提示**：任何时候不确定某个工具的详细用法，可以调用 `tool_help(tool_name="工具名")` 获取该工具的完整帮助，包含参数说明、action 详解、使用示例、触发词等。例如 `tool_help(tool_name="delphi_file")`。
+> 💡 **`tool_help` Usage Tip**: Whenever you are unsure about the detailed usage of a tool, you can call `tool_help(tool_name="tool name")` to get complete help for that tool, including parameter descriptions, action details, usage examples, trigger words, etc. For example, `tool_help(tool_name="delphi_file")`.
 
-### 1.4 系统要求
+### 1.4 System Requirements
 
-| 组件 | 要求 |
+| Component | Requirement |
 |------|------|
 | **Python** | 3.10 ~ 3.14 |
-| **操作系统** | Windows（Delphi 仅支持 Windows） |
-| **Delphi 编译器** | dcc32.exe 或 dcc64.exe（任意版本） |
-| **Git** | 用于代码托管功能 |
-| **7-Zip** | 可选，用于解压 CHM 帮助文件（可放在 `tools/7z/` 免安装） |
+| **Operating System** | Windows (Delphi is supported only on Windows) |
+| **Delphi Compiler** | dcc32.exe or dcc64.exe (any version) |
+| **Git** | Used for code hosting features |
+| **7-Zip** | Optional, used to extract CHM help files (can be placed in `tools/7z/` as a portable install) |
 
 ---
 
-## 第二章：安装与配置
+## Chapter 2: Installation and Configuration
 
-### 2.1 方式一：pip 安装（推荐）
+### 2.1 Method 1: pip Installation (Recommended)
 
 ```bash
 pip install daofy-for-delphi
 ```
 
-> **国内用户加速**：
+> **Acceleration for users in China**:
 > ```bash
 > pip install daofy-for-delphi -i https://pypi.tuna.tsinghua.edu.cn/simple
 > ```
 
-安装完成后直接跳转到 → [2.3 配置 AI 助手](#23-配置-ai-助手)。
+After installation, jump directly to → [2.3 Configure AI Assistant](#23-configure-ai-assistant).
 
-### 2.2 方式二：源码安装
+### 2.2 Method 2: Source Code Installation
 
-#### 步骤 1：克隆项目
+#### Step 1: Clone the Project
 
 ```bash
 git clone https://github.com/chinawsb/daofy.git
-# 国内用户可用 Gitee 镜像
+# Users in China can use the Gitee mirror
 # git clone https://gitee.com/zuoyouruanjian/daofy.git
 cd daofy
 ```
 
-#### 步骤 2：创建并激活虚拟环境
+#### Step 2: Create and Activate a Virtual Environment
 
 ```bash
 python -m venv venv
@@ -126,33 +126,33 @@ venv\Scripts\activate     # Windows
 # source venv/bin/activate  # Linux/macOS
 ```
 
-#### 步骤 3：安装依赖
+#### Step 3: Install Dependencies
 
 ```bash
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-#### 步骤 4：安装可选扩展
+#### Step 4: Install Optional Extensions
 
 ```bash
-# 文件变更监听 —— 自动增量更新项目知识库
+# File change watching — automatically incrementally update the project knowledge base
 pip install daofy-for-delphi[watcher]
 
-# 语义搜索增强 —— 安装后搜索质量显著提升
+# Semantic search enhancement — search quality improves significantly after installation
 pip install daofy-for-delphi[embedding]
 
-# OCR 图像文字识别
+# OCR image text recognition
 pip install daofy-for-delphi[ocr]
 
-# Intel CPU OCR 加速（替换 onnxruntime → onnxruntime-openvino）
+# Intel CPU OCR acceleration (replace onnxruntime → onnxruntime-openvino)
 pip install daofy-for-delphi[ocr-openvino]
 ```
 
-### 2.3 配置 AI 助手
+### 2.3 Configure AI Assistant
 
-首次启动 MCP Server 时，会自动从 Windows 注册表检测已安装的 Delphi 编译器，**无需手动配置**。
+When the MCP Server starts for the first time, it automatically detects installed Delphi compilers from the Windows registry; **no manual configuration is required**.
 
-#### pip 安装的最简配置
+#### Minimal Configuration for pip Installation
 
 ```json
 {
@@ -169,9 +169,9 @@ pip install daofy-for-delphi[ocr-openvino]
 }
 ```
 
-#### 源码安装配置
+#### Source Installation Configuration
 
-**Claude Desktop**（`%APPDATA%\Claude\claude_desktop_config.json`）：
+**Claude Desktop** (`%APPDATA%\Claude\claude_desktop_config.json`):
 
 ```json
 {
@@ -189,7 +189,7 @@ pip install daofy-for-delphi[ocr-openvino]
 }
 ```
 
-**Trae**（`C:\Users\<用户名>\.trae-cn\mcp_config.json`）：
+**Trae** (`C:\Users\<用户名>\.trae-cn\mcp_config.json`):
 
 ```json
 {
@@ -207,7 +207,7 @@ pip install daofy-for-delphi[ocr-openvino]
 }
 ```
 
-**CodeArts Agent**（`~/.codeartsdoer/mcp/mcp_settings.json`）：
+**CodeArts Agent** (`~/.codeartsdoer/mcp/mcp_settings.json`):
 
 ```json
 {
@@ -226,101 +226,101 @@ pip install daofy-for-delphi[ocr-openvino]
 }
 ```
 
-### 2.4 使用安装脚本（源码安装）
+### 2.4 Use the Installation Script (Source Installation)
 
-项目提供了 `install.bat` 安装脚本，支持自动检测已安装的 AI 客户端并配置 MCP：
+The project provides an `install.bat` installation script that automatically detects installed AI clients and configures MCP:
 
 ```bash
 .\install.bat
 ```
 
-脚本支持检测的 AI 客户端：
+AI clients supported by the detection script:
 - Claude Desktop
 - Trae
 - CodeArts Agent
 - Cursor
 - Windsurf
 - Cline
-- 通义灵码（Tongyi Lingma）
-- 豆包（Doubao）
+- Tongyi Lingma
+- Doubao
 - Kimi
 - OpenCode
 
-### 2.5 验证安装
+### 2.5 Verify Installation
 
 ```bash
 python src/server.py
 ```
 
-看到以下输出表示启动成功：
+Seeing the following output indicates successful startup:
 ```
-INFO 启动 Daofy v2026.06.15.1
-INFO 配置管理器初始化完成
-INFO 编译服务初始化完成
+INFO Starting Daofy v2026.06.15.1
+INFO Configuration manager initialization complete
+INFO Compilation service initialization complete
 ...
 ```
 
 ---
 
-## 第三章：环境检查与诊断
+## Chapter 3: Environment Check and Diagnostics
 
-### 3.1 工具概述
+### 3.1 Tool Overview
 
-`check_environment` 是 Daofy 的环境诊断工具，用于检查 Delphi 编译器状态、重新检测已安装的编译器以及安装 pasfmt 格式化工具。
+`check_environment` is Daofy's environment diagnostics tool, used to check Delphi compiler status, re-detect installed compilers, and install the pasfmt formatting tool.
 
-### 3.2 Action 速查
+### 3.2 Action Quick Reference
 
-| Action | 用途 |
+| Action | Purpose |
 |--------|------|
-| `check`（默认） | 检查当前编译环境状态 |
-| `detect` | 从注册表/指定路径重新检测 Delphi 编译器 |
-| `install` | 下载并安装 pasfmt 格式化工具 |
-| `format_install` | 安装 pasfmt RAD Studio IDE 插件 |
+| `check` (default) | Check the current compilation environment status |
+| `detect` | Re-detect Delphi compilers from the registry/specified path |
+| `install` | Download and install the pasfmt formatting tool |
+| `format_install` | Install the pasfmt RAD Studio IDE plugin |
 
-### 3.3 检查编译环境
+### 3.3 Check the Compilation Environment
 
 ```python
 check_environment(action="check")
 ```
 
-返回信息包含：
-- 可用的编译器列表（名称、版本、路径）
-- 默认编译器
-- pasfmt 是否已安装
-- 环境状态（就绪/部分就绪/未就绪）
+The returned information includes:
+- List of available compilers (name, version, path)
+- Default compiler
+- Whether pasfmt is installed
+- Environment status (ready/partially ready/not ready)
 
-### 3.4 检测编译器
+### 3.4 Detect Compilers
 
 ```python
-# 从注册表检测
+# Detect from the registry
 check_environment(action="detect")
 
-# 从指定路径检测
+# Detect from a specified path
 check_environment(action="detect", search_path="D:\\Delphi\\Studio")
 ```
 
-检测流程：
-1. 扫描注册表 `HKEY_CURRENT_USER\SOFTWARE\Embarcadero\BDS` 下所有版本
-2. 自动检测各版本的编译器路径（dcc32.exe / dcc64.exe）
-3. 写入 `config/compilers.json`
+Detection process:
+1. Scan all versions under the registry key `HKEY_CURRENT_USER\SOFTWARE\Embarcadero\BDS`
+2. Automatically detect compiler paths for each version (dcc32.exe / dcc64.exe)
+3. Write to `config/compilers.json`
 
-### 3.5 安装 pasfmt 格式化工具
+### 3.5 Install the pasfmt Formatting Tool
 
 ```python
-# 下载安装到默认位置
+# Download and install to the default location
 check_environment(action="install")
 
-# 安装到指定目录
+# Install to a specified directory
 check_environment(action="install", install_dir="C:\\Tools\\pasfmt")
 ```
 
-安装后，`delphi_file(action="format")` 即可使用。
+After installation, `delphi_file(action="format")` can be used.
 
-### 3.6 支持的 Delphi 版本
+### 3.6 Supported Delphi Versions
 
-自动注册表检测支持 Delphi 2005 ~ Delphi 13 全系列版本：
+Automatic registry detection supports the full range of versions from Delphi 2005 to Delphi 13:
 
-| 版本 | 注册表版本号 |
+| Version | Registry Version Number |
 |------|------------|
 | Delphi 13 Florence | 37.0 |
 | Delphi 12 Athens | 23.0 |
@@ -330,209 +330,209 @@ check_environment(action="install", install_dir="C:\\Tools\\pasfmt")
 | ... | ... |
 | Delphi 2005 | 3.0 |
 
-### 3.7 典型工作流
+### 3.7 Typical Workflow
 
 ```python
-# 首次使用
-check_environment(action="check")    # 确认环境状态
-# → 编译器未找到
-check_environment(action="detect")   # 从注册表检测
-# → 开始编译
+# First use
+check_environment(action="check")    # Confirm environment status
+# → Compiler not found
+check_environment(action="detect")   # Detect from the registry
+# → Start compilation
 delphi_project(action="compile", ...)
 
-# 编译失败时
-delphi_project(action="compile")   # 失败
-check_environment(action="check")   # 确认编译器状态
-check_environment(action="detect")  # 重新检测后重试
+# When compilation fails
+delphi_project(action="compile")   # Failed
+check_environment(action="check")   # Confirm compiler status
+check_environment(action="detect")  # Re-detect and retry
 ```
 
 ---
 
-## 第四章：知识库搜索与管理
+## Chapter 4: Knowledge Base Search and Management
 
-### 4.1 工具概述
+### 4.1 Tool Overview
 
-`delphi_kb` 是 Daofy 的知识库搜索与管理工具。它整合了 **四大知识库**，支持类/函数/语义等多种搜索方式。
+`delphi_kb` is Daofy's knowledge base search and management tool. It integrates **four major knowledge bases** and supports multiple search methods such as class/function/semantic search.
 
-**核心用途**：AI 编写 Delphi 代码前，先查知识库确认 API 定义，避免凭空编造。
+**Core use case**: Before AI writes Delphi code, it first queries the knowledge base to confirm API definitions and avoid making things up.
 
-### 4.2 五大知识库
+### 4.2 Five Major Knowledge Bases
 
-| 知识库类型 | kb_type | 数据量 | 存储路径 |
+| Knowledge Base Type | kb_type | Data Volume | Storage Path |
 |-----------|---------|--------|---------|
-| Delphi 源码 | `delphi` | 163,737 类 / 300,228 函数 | `data/delphi-knowledge-base/` |
-| 项目知识库 | `project` | 项目自定 | `<项目目录>/.delphi-kb/` |
-| 第三方库 | `thirdparty` | 5,724 类 / 28,801 函数 | `data/thirdparty-knowledge-base/` |
-| 通用文档 | `document` | 160,328 篇 | `data/document-knowledge-base/` |
-| 示例代码 | `example` | 项目自定 | `data/example-knowledge-base/` |
+| Delphi Source | `delphi` | 163,737 classes / 300,228 functions | `data/delphi-knowledge-base/` |
+| Project Knowledge Base | `project` | Project-defined | `<项目目录>/.delphi-kb/` |
+| Third-Party Libraries | `thirdparty` | 5,724 classes / 28,801 functions | `data/thirdparty-knowledge-base/` |
+| General Documents | `document` | 160,328 articles | `data/document-knowledge-base/` |
+| Example Code | `example` | Project-defined | `data/example-knowledge-base/` |
 
-### 4.3 搜索 API
+### 4.3 Search API
 
 ```python
-# 搜索类（最常用）
+# Search for classes (most common)
 delphi_kb(query="TStringList")
 
-# 搜索函数
+# Search for functions
 delphi_kb(query="Create", search_type="function")
 
-# 语义搜索（自然语言描述需求）
+# Semantic search (describe requirements in natural language)
 delphi_kb(query="如何创建数据库连接", search_type="semantic")
 
-# 搜索项目代码
+# Search project code
 delphi_kb(query="TfrmMain", kb_type="project", project_path="Project.dproj")
 
-# 搜索 Delphi 官方 API
+# Search official Delphi API
 delphi_kb(query="TCustomADODataSet", kb_type="delphi")
 
-# 引用查询（评估修改影响范围）
+# Reference query (assess the impact scope of changes)
 delphi_kb(query="TStringList", search_type="reference")
 ```
 
-**参数说明**：
+**Parameter Description**:
 
-| 参数 | 必需 | 默认值 | 说明 |
+| Parameter | Required | Default | Description |
 |------|------|--------|------|
-| `query` | ✅ | — | 搜索关键词 |
+| `query` | ✅ | — | Search keyword |
 | `kb_type` | ❌ | all | all/delphi/project/thirdparty/document/example |
 | `search_type` | ❌ | — | class/function/procedure/record/interface/enum/set/helper/type/const/resourcestring/variable/property/method/field/event/operator/string/dfm/attribute/unit/semantic/reference/all |
-| `top_k` | ❌ | 200 | 最大返回结果数（最大 500） |
-| `project_path` | ❌ | 自动检测 | 项目路径 |
+| `top_k` | ❌ | 200 | Maximum number of returned results (maximum 500) |
+| `project_path` | ❌ | Automatically detected | Project path |
 
-### 4.4 搜索策略与优先级
+### 4.4 Search Strategy and Priority
 
-> ⭐ **AI 写代码前的标准搜索流程**
+> ⭐ **Standard search process for AI before writing code**
 
 ```
-⭐1  delphi_kb(query="TStringList")            精确类名搜索
-     └─ 无结果？→ 换名再试
-⭐2  delphi_kb(query="TMainForm")              换名（TMainForm→TfrmMain）
-     └─ 仍无结果？→ 搜函数
+⭐1  delphi_kb(query="TStringList")            Exact class name search
+     └─ No results? → Try another name
+⭐2  delphi_kb(query="TMainForm")              Try another name (TMainForm→TfrmMain)
+     └─ Still no results? → Search functions
 ⭐3  delphi_kb(query="Create",
-          search_type="function")             搜索函数（同时匹配 FF+FP）
-     └─ 仍无结果？→ 查引用
+          search_type="function")             Search functions (matches FF+FP at the same time)
+     └─ Still no results? → Check references
 ⭐4  delphi_kb(query="TForm1",
-          search_type="reference")            查引用（评估修改影响）
-     └─ 仍无结果？→ 语义搜索兜底
+          search_type="reference")            Check references (assess modification impact)
+     └─ Still no results? → Semantic search as fallback
 ⭐5  delphi_kb(query="创建主窗口",
-          search_type="semantic")             中文语义搜索兜底
+          search_type="semantic")             Chinese semantic search as fallback
 ```
 
-### 4.5 知识库统计
+### 4.5 Knowledge Base Statistics
 
 ```python
 delphi_kb(action="stats")
 ```
 
-| 知识库 | 文件数 | 类数量 | 函数数量 | 数据库大小 |
+| Knowledge Base | File Count | Class Count | Function Count | Database Size |
 |--------|-------|--------|---------|-----------|
-| Delphi 源码 | 2,798 | 163,737 | 300,228 | 260 MB |
-| 三方库 | 1,800 | 5,724 | 28,801 | 27 MB |
-| 通用文档 | 160,328 | — | — | 1,306 MB |
+| Delphi Source | 2,798 | 163,737 | 300,228 | 260 MB |
+| Third-Party Libraries | 1,800 | 5,724 | 28,801 | 27 MB |
+| General Documents | 160,328 | — | — | 1,306 MB |
 
-### 4.6 构建知识库
+### 4.6 Build the Knowledge Base
 
 ```python
-# Delphi 源码 KB（~1 分钟）
+# Delphi source KB (~1 minute)
 delphi_kb(action="build", kb_type="delphi", rebuild=True, async_mode=True)
 
-# 三方库 KB（~6 秒）
+# Third-party library KB (~6 seconds)
 delphi_kb(action="build", kb_type="thirdparty", rebuild=True, async_mode=True)
 
-# 文档 KB（~6 分钟，160328 文档）
+# Document KB (~6 minutes, 160,328 documents)
 delphi_kb(action="build", kb_type="document", rebuild=True, async_mode=True)
 
-# 项目 KB
+# Project KB
 delphi_kb(action="build", kb_type="project",
     project_path="Project.dproj", rebuild=True)
 ```
 
-**参数说明**：
+**Parameter Description**:
 
-| 参数 | 说明 |
+| Parameter | Description |
 |------|------|
-| `async_mode` | 默认 true，异步执行不阻塞 MCP 通道 |
-| `rebuild` | 强制完全重建（默认 false） |
-| `incremental` | 增量更新，只处理变更的文件 |
-| `directory` | 扫描目录（build document 时可指定，默认自动检测 Delphi 帮助目录） |
-| `extensions` | 文件扩展名过滤（如 `[".chm"]`） |
+| `async_mode` | Default true; executes asynchronously without blocking the MCP channel |
+| `rebuild` | Force a complete rebuild (default false) |
+| `incremental` | Incremental update, process only changed files |
+| `directory` | Scan directory (can be specified when building documents; by default automatically detects the Delphi help directory) |
+| `extensions` | File extension filter (e.g., `[".chm"]`) |
 
-### 4.7 构建 Delphi 帮助文档知识库
+### 4.7 Build a Delphi Help Document Knowledge Base
 
 ```python
-# 自动检测最新安装的 Delphi 帮助目录
+# Automatically detect the most recently installed Delphi help directory
 delphi_kb(action="build", kb_type="document",
     extensions=[".chm"], async_mode=True)
 
-# 手动指定目录
+# Manually specify a directory
 delphi_kb(action="build", kb_type="document",
     directory="C:\\Program Files (x86)\\Embarcadero\\Studio\\23.0\\Help\\Doc",
     extensions=[".chm"], async_mode=True)
 ```
 
-**版本对照**：37.0=Delphi 13, 23.0=Delphi 12, 22.0=Delphi 11, 21.0=Delphi 10.4
+**Version mapping**: 37.0=Delphi 13, 23.0=Delphi 12, 22.0=Delphi 11, 21.0=Delphi 10.4
 
-### 4.8 文档知识库搜索
+### 4.8 Document Knowledge Base Search
 
-构建完成后，就可以像搜索源码一样搜索帮助文档（`kb_type="document"` 路由到独立的文档搜索引擎，支持全文检索）：
+After the build is complete, you can search help documents just like source code (`kb_type="document"` routes to an independent document search engine with full-text search support):
 
 ```python
-# 搜索 API 文档
+# Search API documentation
 delphi_kb(query="TCanvas.Draw", kb_type="document")
 
-# 自然语言搜索
+# Natural language search
 delphi_kb(query="怎么用 PrintDialog 设置打印机参数", kb_type="document", search_type="semantic")
 ```
 
-> 💡 **提示**：`kb_type="document"` 走独立路由搜索文档知识库；`kb_type="all"` 也会自动包含文档搜索结果。
+> 💡 **Tip**: `kb_type="document"` uses an independent route to search the document knowledge base; `kb_type="all"` also automatically includes document search results.
 
-### 4.9 向量索引（Embedding）
+### 4.9 Vector Index (Embedding)
 
-向量索引基于 sentence-transformers 模型，实现**语义搜索**——你搜"怎么创建数据库连接"也能匹配到 `TADOConnection.Create`。
+The vector index is based on the sentence-transformers model and enables **semantic search**—when you search "how to create a database connection", it can also match `TADOConnection.Create`.
 
 ```python
-# 构建向量索引
+# Build the vector index
 delphi_kb(action="build_embedding", async_mode=True)
 ```
 
-| 功能 | 模型未加载 | 模型已加载 |
+| Feature | Model Not Loaded | Model Loaded |
 |------|-----------|-----------|
-| 语义搜索 | 降级为倒排索引 | 真语义搜索，余弦相似度排序 |
-| 经验库保存 | 不去重 | 自动 >0.85 去重合并 |
-| 经验库搜索 | LIKE 关键词降级 | 语义向量搜索 |
+| Semantic search | Falls back to inverted index | True semantic search, sorted by cosine similarity |
+| Experience library save | No deduplication | Automatically deduplicate and merge when >0.85 |
+| Experience library search | Falls back to LIKE keyword search | Semantic vector search |
 
 ---
 
-## 第五章：项目编译与配置管理
+## Chapter 5: Project Compilation and Configuration Management
 
-### 5.1 工具概述
+### 5.1 Tool Overview
 
-`project` 是 Daofy 中最核心的工具，提供 Delphi 项目的**全生命周期管理**——从创建项目、配置编译选项、执行编译到代码审计。
+`project` is the core tool in Daofy, providing **full lifecycle management** for Delphi projects—from creating projects and configuring compilation options to performing compilations and code audits.
 
-### 5.2 Action 速查
+### 5.2 Action Quick Reference
 
-| Action | 用途 | 必需参数 |
+| Action | Purpose | Required Parameters |
 |--------|------|---------|
-| `compile` | 编译 .dproj/.dpr/.dpk 项目 | `project_path` |
-| `compile_file` | 检查 .pas 文件语法 | `project_path` |
-| `dry_run` | 预览编译参数，不执行 | — |
-| `info` | 读取 .dproj 完整信息 | `project_path` |
-| `create` | 创建新 .dproj 文件 | `project_path`, `main_source` |
-| `set` | 设置 .dproj 属性值 | `project_path`, `property_name`, `value` |
-| `add_config` | 添加编译配置 | `project_path`, `config_name` |
-| `remove_config` | 删除编译配置 | `project_path`, `config_name` |
-| `add_source` | 添加源文件引用 | `project_path`, `source_file` |
-| `remove_source` | 删除源文件引用 | `project_path`, `source_file` |
-| `audit` | 运行 50+ 静态分析规则 | — |
-| `ast` | 代码骨架提取（最省 token） | `base_dir` |
-| `runtime` | 运行时注册检查 | — |
+| `compile` | Compile .dproj/.dpr/.dpk projects | `project_path` |
+| `compile_file` | Check .pas file syntax | `project_path` |
+| `dry_run` | Preview compilation parameters without executing | — |
+| `info` | Read complete .dproj information | `project_path` |
+| `create` | Create a new .dproj file | `project_path`, `main_source` |
+| `set` | Set .dproj property values | `project_path`, `property_name`, `value` |
+| `add_config` | Add a build configuration | `project_path`, `config_name` |
+| `remove_config` | Remove a build configuration | `project_path`, `config_name` |
+| `add_source` | Add a source file reference | `project_path`, `source_file` |
+| `remove_source` | Remove a source file reference | `project_path`, `source_file` |
+| `audit` | Run 50+ static analysis rules | — |
+| `ast` | Code skeleton extraction (most token-efficient) | `base_dir` |
+| `runtime` | Runtime registration check | — |
 
-### 5.3 编译项目
+### 5.3 Compile a Project
 
 ```python
-# 最简调用 — 自动检测项目类型和配置
+# Simplest call — automatically detect project type and configuration
 delphi_project(action="compile", project_path="Project.dproj")
 
-# 完整参数编译
+# Compile with full parameters
 delphi_project(action="compile",
     project_path="App.dproj",
     build_configuration="Release",
@@ -543,55 +543,55 @@ delphi_project(action="compile",
     debug=False,
     output_path=".\\Build\\Release")
 
-# 编译后运行验证（检测运行时崩溃）
+# Post-compile run verification (detect runtime crashes)
 delphi_project(action="compile",
     project_path="App.dproj",
     run_verify=True)
 ```
 
-**编译参数说明**：
+**Compilation Parameter Description**:
 
-| 参数 | 默认值 | 说明 |
+| Parameter | Default Value | Description |
 |------|--------|------|
-| `project_path` | — | .dproj/.dpr/.dpk/.pas 路径 |
+| `project_path` | — | Path to .dproj/.dpr/.dpk/.pas |
 | `target_platform` | win32 | win32/win64/osx64/... |
 | `build_configuration` | Debug | Debug/Release |
-| `compiler_version` | 自动检测最新 | 指定 Delphi 版本 |
-| `conditional_defines` | — | 条件编译符号数组 |
-| `unit_search_paths` | — | 额外单元搜索路径 |
-| `optimize` | true | 是否启用优化 |
-| `debug` | true | 是否生成调试信息 |
-| `timeout` | 300 | 超时秒数 |
-| `run_verify` | false | 编译后启动 3 秒验证是否崩溃 |
-| `output_path` | — | 编译输出目录 |
+| `compiler_version` | Automatically detect the latest | Specify Delphi version |
+| `conditional_defines` | — | Array of conditional compilation symbols |
+| `unit_search_paths` | — | Additional unit search paths |
+| `optimize` | true | Whether to enable optimization |
+| `debug` | true | Whether to generate debug information |
+| `timeout` | 300 | Timeout in seconds |
+| `run_verify` | false | Start for 3 seconds after compilation to verify whether it crashes |
+| `output_path` | — | Compilation output directory |
 
-### 5.4 编译事件
+### 5.4 Compilation Events
 
-`.dproj` 中的 `PreBuildEvent`/`PostBuildEvent`/`PreLinkEvent` 会自动执行，无需手动处理。
+The `PreBuildEvent`/`PostBuildEvent`/`PreLinkEvent` in `.dproj` are executed automatically; no manual handling is required.
 
-`run_verify` 编译成功后自动启动 exe 运行 3 秒，检测到 `exception.log` 时自动读取内容嵌入响应。
+After a successful compilation, `run_verify` automatically starts the exe for 3 seconds; when `exception.log` is detected, it automatically reads the content and embeds it in the response.
 
-### 5.5 单文件语法检查
+### 5.5 Single-File Syntax Check
 
 ```python
 delphi_project(action="compile_file", project_path="Unit1.pas")
 
-# 带搜索路径
+# With search paths
 delphi_project(action="compile_file",
     project_path="Unit1.pas",
     unit_search_paths=["..\\Shared"],
     conditional_defines=["TEST"])
 ```
 
-### 5.6 创建项目
+### 5.6 Create a Project
 
 ```python
-# 最简创建
+# Simplest creation
 delphi_project(action="create",
     project_path="MyApp.dproj",
     main_source="MyApp.dpr")
 
-# 带 Form 桩代码
+# With Form stub code
 delphi_project(action="create",
     project_path="MyApp.dproj",
     main_source="MyApp.dpr",
@@ -600,13 +600,13 @@ delphi_project(action="create",
     configs=["Debug", "Release", "Staging"])
 ```
 
-### 5.7 读取和修改项目配置
+### 5.7 Read and Modify Project Configuration
 
 ```python
-# 读取项目信息
+# Read project information
 delphi_project(action="info", project_path="Project.dproj")
 
-# 修改属性
+# Modify properties
 delphi_project(action="set",
     project_path="Project.dproj",
     property_name="DCC_Define",
@@ -614,148 +614,148 @@ delphi_project(action="set",
     config="Debug",
     platform="Win32")
 
-# 添加编译配置
+# Add a build configuration
 delphi_project(action="add_config",
     project_path="Project.dproj",
     config_name="Staging",
     base_config="Debug",
     defines=["STAGING"])
 
-# 删除编译配置
+# Remove a build configuration
 delphi_project(action="remove_config",
     project_path="Project.dproj",
     config_name="Staging")
 ```
 
-### 5.8 源文件管理
+### 5.8 Source File Management
 
 ```python
-# 添加源文件
+# Add a source file
 delphi_project(action="add_source",
     project_path="Project.dproj",
     source_file="Unit1.pas")
 
-# 删除源文件
+# Remove a source file
 delphi_project(action="remove_source",
     project_path="Project.dproj",
     source_file="Unit1.pas")
 ```
 
-### 5.9 编译错误排查
+### 5.9 Compilation Error Troubleshooting
 
 ```python
-# 常见排查流程
-delphi_project(action="compile")  失败
-check_environment(action="check")   # 确认编译器状态
-# → 检查 DCC_UnitSearchPath 是否包含需要的三方库路径
-# → 确认目标平台（win32/win64）编译器可用
-# → 条件编译符号是否匹配（DEBUG/RELEASE）
+# Common troubleshooting process
+delphi_project(action="compile")  fails
+check_environment(action="check")   # Confirm compiler status
+# → Check whether DCC_UnitSearchPath contains the required third-party library paths
+# → Confirm the compiler for the target platform (win32/win64) is available
+# → Whether conditional compilation symbols match (DEBUG/RELEASE)
 ```
 
-**常见编译错误**：
+**Common Compilation Errors**:
 
-| 错误现象 | 可能原因 | 解决 |
+| Error Symptom | Possible Cause | Solution |
 |---------|---------|------|
-| `Fatal: Unable to execute file` | 编译器路径错误 | `check_environment(action="detect")` 重新检测 |
-| `Fatal: File not found: xxx.dcu` | 缺少搜索路径 | 补充 `unit_search_paths` 参数 |
-| Exit code 2 | 编译事件失败或语法错误 | 查看详细输出定位错误行 |
+| `Fatal: Unable to execute file` | Compiler path is incorrect | Re-detect with `check_environment(action="detect")` |
+| `Fatal: File not found: xxx.dcu` | Missing search paths | Add the `unit_search_paths` parameter |
+| Exit code 2 | Compilation event failed or syntax error | Check the detailed output to locate the error line |
 
 ---
 
-## 第六章：Delphi 文件操作
+## Chapter 6: Delphi File Operations
 
-### 6.1 工具概述
+### 6.1 Tool Overview
 
-`delphi_file` 是 Delphi 文件的专用操作工具。支持 `.pas`、`.dpr`、`.dpk`、`.dfm`、`.fmx`、`.inc`、`.dproj`，自动处理编码检测/转换、`__history` 备份、DFM/FMX 二进制转换和同文件读写互斥。
+`delphi_file` is a dedicated tool for operating on Delphi files. It supports `.pas`, `.dpr`, `.dpk`, `.dfm`, `.fmx`, `.inc`, and `.dproj`, and automatically handles encoding detection/conversion, `__history` backups, DFM/FMX binary conversion, and same-file read/write mutual exclusion.
 
-> ⚠️ **禁止使用原生 read/write/edit 工具修改 .pas/.dfm 文件！必须使用 delphi_file。**
+> ⚠️ **Do not use native read/write/edit tools to modify .pas/.dfm files! You must use delphi_file.**
 
-### 6.2 Action 速查
+### 6.2 Action Quick Reference
 
-| Action | 用途 |
+| Action | Purpose |
 |--------|------|
-| `read` | 按路径读取，或按类名/函数名/record 定位后读取 |
-| `write` | 兼容写入接口，使用 `edits=[...]` |
-| `replace` | 按行范围替换（需提供 old_content 校验） |
-| `insert` | 按锚点行插入（需提供 old_content 校验） |
-| `delete` | 按行范围删除（需提供 old_content 校验） |
-| `format` | 使用 pasfmt 格式化 |
-| `backup` | 创建/列出/恢复 `__history` 备份 |
-| `encode` | 文件编码转换（自动检测源编码，支持 BOM 处理） |
-| `uses` | 增删 uses 子句单元 |
+| `read` | Read by path, or locate by class name/function name/record and then read |
+| `write` | Compatible write interface, using `edits=[...]` |
+| `replace` | Replace by line range (old_content verification required) |
+| `insert` | Insert at an anchor line (old_content verification required) |
+| `delete` | Delete by line range (old_content verification required) |
+| `format` | Format using pasfmt |
+| `backup` | Create/list/restore `__history` backups |
+| `encode` | File encoding conversion (automatically detects source encoding, supports BOM handling) |
+| `uses` | Add/remove units in the uses clause |
 
-### 6.3 行号规则
+### 6.3 Line Number Rules
 
-所有 `read`/`write`/`uses` 的行号参数和输出均为 **1-indexed inclusive**。
+All line number parameters and outputs for `read`/`write`/`uses` are **1-indexed inclusive**.
 
-| 示例 | 含义 |
+| Example | Meaning |
 |------|------|
-| `start_line=1` | 从第 1 行开始 |
-| `start_line=5, end_line=10` | 第 5 到第 10 行，包含两端 |
-| `write` 不传 `end_line` | 从 `start_line` 替换到文件末尾 |
+| `start_line=1` | Start from line 1 |
+| `start_line=5, end_line=10` | Lines 5 through 10, inclusive |
+| `write` does not pass `end_line` | Replace from `start_line` to the end of the file |
 
-### 6.4 读取文件
+### 6.4 Read Files
 
 ```python
-# 基本读取
+# Basic read
 delphi_file(action="read", file_path="Unit1.pas")
 
-# 分段读取
+# Read a range
 delphi_file(action="read", file_path="Unit1.pas", start_line=5, end_line=15)
 
-# 显示行号
+# Show line numbers
 delphi_file(action="read", file_path="Unit1.pas", show_line_numbers=True)
 
-# 按类型搜索读取
+# Search and read by type
 delphi_file(action="read", search_type="class", type_name="TButton")
 delphi_file(action="read", search_type="function", function_name="Create")
 delphi_file(action="read", search_type="record", record_name="TPoint")
 
-# 跨知识库搜索
+# Cross-knowledge-base search
 delphi_file(action="read", search_type="class",
     type_name="TMainForm", search_in="project", project_path="Project.dproj")
 ```
 
-### 6.5 写入文件
+### 6.5 Write Files
 
-**推荐使用 `replace`/`insert`/`delete` 语义操作**（更安全）：
+**It is recommended to use `replace`/`insert`/`delete` semantic operations** (safer):
 
 ```python
-# 替换行范围
+# Replace a line range
 delphi_file(action="replace",
     file_path="Unit1.pas",
     edits=[{"start_line": 5, "end_line": 10,
             "old_content": "  OldCall;\n",
             "content": "  NewCall;\n"}])
 
-# 按锚点插入
+# Insert at an anchor
 delphi_file(action="insert",
     file_path="Unit1.pas",
     edits=[{"start_line": 10, "position": "before",
             "old_content": "  OldCall;\n",
             "content": "  NewCall;\n"}])
 
-# 删除行范围
+# Delete a line range
 delphi_file(action="delete",
     file_path="Unit1.pas",
     edits=[{"start_line": 10, "end_line": 12,
             "old_content": "  OldCall;\n  OtherCall;\n"}])
 ```
 
-**兼容的 `write` 接口**：
+**Compatible `write` Interface**:
 
 ```python
-# 全文替换
+# Full-text replacement
 delphi_file(action="write",
     file_path="Unit1.pas",
     edits=[{"start_line": 1, "content": "unit Unit1;\n\ninterface\n\nimplementation\n\nend.\n"}])
 
-# 部分替换
+# Partial replacement
 delphi_file(action="write",
     file_path="Unit1.pas",
     edits=[{"start_line": 5, "end_line": 10, "content": "  // new code\n"}])
 
-# 多处修改合并到一次 write
+# Merge multiple modifications into one write
 delphi_file(action="write",
     file_path="Unit1.pas",
     edits=[
@@ -763,60 +763,60 @@ delphi_file(action="write",
         {"start_line": 18, "end_line": 21, "content": "  // second block\n"},
     ])
 
-# 预览模式（仅计算 diff，不写盘）
+# Preview mode (only calculates diff, does not write to disk)
 delphi_file(action="write",
     file_path="Unit1.pas",
     edits=[{"start_line": 5, "end_line": 10, "content": "  // new code\n"}],
     preview=True)
 ```
 
-**写入参数说明**：
+**Write Parameter Description**:
 
-| 参数 | 默认 | 说明 |
+| Parameter | Default | Description |
 |------|------|------|
-| `backup` | True | 写入前备份到 `__history` |
-| `encoding` | auto | 保持原编码；可显式指定 |
-| `auto_format` | False | 写入后自动 pasfmt |
-| `preview` | False | 仅计算 diff，不写盘 |
-| `force` | False | 跳过连续重复行检测 |
-| `allow_dirty` | False | 跳过脏标记检查（优先用 old_content） |
+| `backup` | True | Back up to `__history` before writing |
+| `encoding` | auto | Keep the original encoding; can be specified explicitly |
+| `auto_format` | False | Automatically run pasfmt after writing |
+| `preview` | False | Only calculate diff, do not write to disk |
+| `force` | False | Skip consecutive duplicate line detection |
+| `allow_dirty` | False | Skip the dirty marker check (prefer using old_content) |
 
-### 6.6 格式化代码
+### 6.6 Format Code
 
 ```python
 delphi_file(action="format", file_path="Unit1.pas")
 
-# 检查模式（仅检查格式，不修改）
+# Check mode (only check formatting, do not modify)
 delphi_file(action="format", mode="check", file_path="Unit1.pas")
 
-# 格式化代码字符串
+# Format a code string
 delphi_file(action="format", mode="code", code="procedure Test; begin end;")
 ```
 
-### 6.7 备份管理
+### 6.7 Backup Management
 
 ```python
-# 创建备份
+# Create a backup
 delphi_file(action="backup", file_path="Unit1.pas")
 
-# 列出备份
+# List backups
 delphi_file(action="backup", backup_action="list", file_path="Unit1.pas")
 
-# 恢复备份
+# Restore a backup
 delphi_file(action="backup", backup_action="restore", file_path="Unit1.pas", version=3)
 ```
 
-### 6.8 Uses 子句管理
+### 6.8 Uses Clause Management
 
 ```python
-# 添加 uses 单元
+# Add a uses unit
 delphi_file(action="uses",
     file_path="Unit1.pas",
     uses_action="add",
     unit_name="System.SysUtils",
     uses_section="interface")
 
-# 删除 uses 单元
+# Remove a uses unit
 delphi_file(action="uses",
     file_path="Unit1.pas",
     uses_action="remove",
@@ -824,607 +824,606 @@ delphi_file(action="uses",
     uses_section="interface")
 ```
 
-### 6.9 编码转换（encode）
+### 6.9 Encoding Conversion (encode)
 
-**功能**：将 Delphi 源文件在不同编码之间转换，自动处理 BOM（Byte Order Mark）。转换前自动备份到 `__history`，确保可回退。
+**Function**: Convert Delphi source files between different encodings and automatically handle BOM (Byte Order Mark). Automatically backs up to `__history` before conversion to ensure rollback is possible.
 
-**适用场景**：
-- 将 GBK 编码的旧项目文件转换为 UTF-8（推荐现代编码）
-- 添加/移除 UTF-8 BOM（`utf-8-sig` ↔ `utf-8`）
-- 跨平台协作时统一项目编码
+**Applicable Scenarios**:
+- Convert legacy project files encoded in GBK to UTF-8 (recommended modern encoding)
+- Add/remove UTF-8 BOM (`utf-8-sig` ↔ `utf-8`)
+- Unify project encoding during cross-platform collaboration
 
-**支持的目标编码**：
+**Supported Target Encodings**:
 
-| 编码名 | 说明 |
+| Encoding Name | Description |
 |--------|------|
-| `utf-8` | UTF-8 无 BOM（推荐） |
-| `utf-8-sig` | UTF-8 带 BOM（Windows 兼容性最佳） |
-| `gbk` | 简体中文 GBK（遗留项目兼容） |
-| `utf-16` | UTF-16 带 BOM |
+| `utf-8` | UTF-8 without BOM (recommended) |
+| `utf-8-sig` | UTF-8 with BOM (best Windows compatibility) |
+| `gbk` | Simplified Chinese GBK (legacy project compatibility) |
+| `utf-16` | UTF-16 with BOM |
 | `utf-16-le` | UTF-16 Little Endian |
 | `utf-16-be` | UTF-16 Big Endian |
-| `ansi` | 系统默认 ANSI 代码页（`locale.getpreferredencoding()`） |
+| `ansi` | System default ANSI code page (`locale.getpreferredencoding()`) |
 
-**BOM 处理规则**：
+**BOM Handling Rules**:
 
-| 源编码 → 目标编码 | BOM 行为 |
+| Source Encoding → Target Encoding | BOM Behavior |
 |------------------|---------|
-| `utf-8-sig` → `utf-8` | 自动**剥离** BOM 字节 |
-| `utf-8` → `utf-8-sig` | 自动**添加** UTF-8 BOM（`EF BB BF`） |
-| `utf-16`（任意） → 其他 | 自动**剥离**原 BOM，目标编码按需重加 |
-| `utf-8-sig` → `utf-8-sig` | 保持原 BOM 不变 |
+| `utf-8-sig` → `utf-8` | Automatically **strip** BOM bytes |
+| `utf-8` → `utf-8-sig` | Automatically **add** UTF-8 BOM (`EF BB BF`) |
+| `utf-16` (any) → Other | Automatically **strip** the original BOM; re-add for the target encoding as needed |
+| `utf-8-sig` → `utf-8-sig` | Keep the original BOM unchanged |
 
 ```python
-# UTF-8 无 BOM → UTF-8 带 BOM（Windows 兼容）
+# UTF-8 without BOM → UTF-8 with BOM (Windows compatibility)
 delphi_file(action="encode",
     file_path="Unit1.pas",
     to_encoding="utf-8-sig")
 
-# GBK → UTF-8（项目统一编码）
+# GBK → UTF-8 (unified project encoding)
 delphi_file(action="encode",
     file_path="LegacyUnit.pas",
     from_encoding="gbk",
     to_encoding="utf-8")
 
-# UTF-8 带 BOM → UTF-8 无 BOM（跨平台协作）
+# UTF-8 with BOM → UTF-8 without BOM (cross-platform collaboration)
 delphi_file(action="encode",
     file_path="Unit1.pas",
     to_encoding="utf-8")
 
-# UTF-8 → UTF-16（特定平台需求）
+# UTF-8 → UTF-16 (specific platform requirements)
 delphi_file(action="encode",
     file_path="Unit1.pas",
     from_encoding="utf-8",
     to_encoding="utf-16")
 
-# 预览模式（仅显示转换信息，不写盘）
+# Preview mode (only show conversion information, do not write to disk)
 delphi_file(action="encode",
     file_path="Unit1.pas",
     to_encoding="utf-8-sig",
     preview=True)
 ```
 
-**参数说明**：
+**Parameter Description**:
 
-| 参数 | 必需 | 默认 | 说明 |
+| Parameter | Required | Default | Description |
 |------|------|------|------|
-| `file_path` | ✅ | — | 目标文件路径（仅支持 Delphi 源文件扩展名） |
-| `to_encoding` | ✅ | — | 目标编码（`utf-8`/`utf-8-sig`/`gbk`/`utf-16`/`utf-16-le`/`utf-16-be`/`ansi`） |
-| `from_encoding` | ❌ | `auto` | 源编码（`auto`=自动检测，**推荐始终用 auto**；如需显式指定，请确保编码名称准确无误，否则会导致解码失败或乱码） |
-| `backup` | ❌ | `True` | 转换前自动备份到 `__history` |
-| `preview` | ❌ | `False` | 预览模式：只输出转换信息不写盘 |
+| `file_path` | ✅ | — | Target file path (only Delphi source file extensions are supported) |
+| `to_encoding` | ✅ | — | Target encoding (`utf-8`/`utf-8-sig`/`gbk`/`utf-16`/`utf-16-le`/`utf-16-be`/`ansi`) |
+| `from_encoding` | ❌ | `auto` | Source encoding (`auto`=automatic detection, **it is recommended to always use auto**; if explicit specification is needed, ensure the encoding name is accurate, otherwise decoding may fail or garbled text may result) |
+| `backup` | ❌ | `True` | Automatically back up to `__history` before conversion |
+| `preview` | ❌ | `False` | Preview mode: only output conversion information without writing to disk |
 
-**返回信息**：
+**Return Information**:
 
 ```
-转换成功：Unit1.pas
-  源编码: utf-8-sig → 目标编码: utf-8
-  文件大小: 1,024 B → 1,020 B (减小 4 B)
-  备份已创建: __history/Unit1.pas.20260620_123456.bak
+Conversion successful: Unit1.pas
+  Source encoding: utf-8-sig → Target encoding: utf-8
+  File size: 1,024 B → 1,020 B (decreased by 4 B)
+  Backup created: __history/Unit1.pas.20260620_123456.bak
 ```
 
-**安全机制**：
+**Safety Mechanisms**:
 
-1. **编码合法性校验**：先通过 Python `codecs.lookup()` 验证编码名称。若 `from_encoding` 指定错误导致解码失败，工具会报错并提示纠正，**不会静默写入乱码文件**（备份在读取阶段尚未创建，文件不会被破坏）
-2. **回读验证**：写入后重新读取文件，与原文对比确认无损
-3. **自动备份**：转换前创建 `__history` 备份，失败后自动清理临时文件
-4. **脏标记保护**：转换成功后文件标记为脏，再次写入前需重新读取
+1. **Encoding validity check**: First validate the encoding name via Python `codecs.lookup()`. If an incorrect `from_encoding` causes decoding failure, the tool reports an error and prompts for correction; **it will not silently write a garbled file** (the backup has not yet been created during the read phase, so the file will not be damaged)
+2. **Read-back verification**: After writing, re-read the file and compare it with the original to confirm there is no loss
+3. **Automatic backup**: Create a `__history` backup before conversion and automatically clean up temporary files after failure
+4. **Dirty marker protection**: After a successful conversion, the file is marked dirty and must be re-read before writing again
+### 6.10 Dirty Flag Mechanism
 
-### 6.10 脏标记机制
+After `write`, `format`, and `uses` succeed, the file is marked as **dirty**. Before writing to the same file again, you need to:
 
-`write`、`format`、`uses` 成功后会把文件标记为**脏**。再次写入同一文件前需要：
-
-1. 先 `read` 重新获取行号
-2. 或在每个 edit 内提供非空 `old_content`，由工具校验行号命中的旧内容
-3. 或使用 `preview=True` 预览 diff 后重新 read
-4. 或在确认行号无误时设置 `allow_dirty=True`
+1. First `read` to re-obtain line numbers
+2. Or provide non-empty `old_content` in each edit, and the tool verifies the old content at the matched line numbers
+3. Or use `preview=True` to preview the diff and then read again
+4. Or set `allow_dirty=True` when you are sure the line numbers are correct
 
 ---
 
-## 第七章：编码规范与代码审计
+## Chapter 7: Coding Standards and Code Auditing
 
-### 7.1 工具概述
+### 7.1 Tool Overview
 
-`get_coding_rules` 提供 Delphi 编码规范的按需查询。AI Agent 在写/修改任何 Delphi 代码前，**必须先调用此工具**了解编码规范，确保生成的代码风格与项目一致。
+`get_coding_rules` provides on-demand queries of Delphi coding standards. Before writing or modifying any Delphi code, the AI Agent **must first call this tool** to learn the coding standards, ensuring the generated code style is consistent with the project.
 
-### 7.2 获取编码规范
+### 7.2 Getting Coding Standards
 
 ```python
-# 获取完整工作流总览 + 章节索引（推荐首次调用）
+# Get the full workflow overview + section index (recommended for the first call)
 get_coding_rules()
 
-# 指定章节获取
-get_coding_rules(section="workflow")       # 工作流总览
-get_coding_rules(section="writing")        # 写代码规范
-get_coding_rules(section="review")         # 代码审查
-get_coding_rules(section="safety")         # 安全规范
-get_coding_rules(section="agent_rules")    # AI 行为规则
-get_coding_rules(section="kb_search")      # KB 搜索指南
-get_coding_rules(section="format")         # 格式化规则
-get_coding_rules(section="compile")        # 编译规则
-get_coding_rules(section="automation")     # 自动化测试架构
-get_coding_rules(section="list")           # 列出所有可用章节
+# Get a specified section
+get_coding_rules(section="workflow")       # Workflow overview
+get_coding_rules(section="writing")        # Code writing standards
+get_coding_rules(section="review")         # Code review
+get_coding_rules(section="safety")         # Safety standards
+get_coding_rules(section="agent_rules")    # AI behavior rules
+get_coding_rules(section="kb_search")      # KB search guide
+get_coding_rules(section="format")         # Formatting rules
+get_coding_rules(section="compile")        # Compilation rules
+get_coding_rules(section="automation")     # Automation test architecture
+get_coding_rules(section="list")           # List all available sections
 ```
 
-### 7.3 章节索引
+### 7.3 Section Index
 
-| Section | 内容 | 适用场景 |
+| Section | Content | Applicable Scenario |
 |---------|------|---------|
-| `workflow` | 工作流总览 | 首次接触项目时了解整体流程 |
-| `env` | ① 环境检查 | 首次运行/环境异常时 |
-| `kb_search` | ② KB 搜索 | 编码前查 API 定义 |
-| `writing` | ③ 命名/格式/泛型规则（含写入规则子章节） | 写/改代码前必看 |
-| `format` | ④ 格式化 | 格式化代码 |
-| `compile` | ⑤ 编译 | 编译验证 |
-| `review` | ⑥ 代码审核（含完整审核表） | 编译通过后审查代码 |
-| `cleanup` | ⑦ 清理与验证 | 最终清理 |
-| `safety` | 安全敏感操作规则 | 涉及注册表、进程、文件操作时 |
-| `performance` | 性能规则 | 性能敏感路径 |
-| `agent_rules` | AI 操作硬规则 | 了解 AI 的行为限制 |
-| `human_collab` | ⑧ 人机协同 — 异常诊断与人工介入 | 异常诊断或需人工介入时 |
-| `experience` | ⑨ 经验保存 — 知识沉淀到经验库 | 问题解决后保存经验时 |
-| `kb_build` | 知识库重建 | 需要重建 KB 时 |
-| `automation` | ⚙ 自动化测试架构（含提示词模板F + 经验优化闭环G） | 执行自动化 UI 测试前 |
+| `workflow` | Workflow overview | Understanding the overall process when first encountering a project |
+| `env` | ① Environment check | First run / when the environment is abnormal |
+| `kb_search` | ② KB search | Looking up API definitions before coding |
+| `writing` | ③ Naming/formatting/generics rules (including write-rule subsections) | Must-read before writing/modifying code |
+| `format` | ④ Formatting | Formatting code |
+| `compile` | ⑤ Compilation | Compilation verification |
+| `review` | ⑥ Code review (including the complete review checklist) | Reviewing code after compilation passes |
+| `cleanup` | ⑦ Cleanup and verification | Final cleanup |
+| `safety` | Safety-sensitive operation rules | When involving registry, processes, or file operations |
+| `performance` | Performance rules | Performance-sensitive paths |
+| `agent_rules` | AI hard operating rules | Understanding the AI's behavioral limits |
+| `human_collab` | ⑧ Human-machine collaboration — exception diagnosis and manual intervention | Exception diagnosis or when manual intervention is needed |
+| `experience` | ⑨ Experience saving — depositing knowledge into the experience base | When saving experience after a problem is solved |
+| `kb_build` | Knowledge base rebuild | When the KB needs to be rebuilt |
+| `automation` | ⚙ Automation test architecture (including prompt template F + experience optimization loop G) | Before executing automated UI tests |
 
-**组合章节**：
+**Combined sections**:
 
-| Section | 内容 |
+| Section | Content |
 |---------|------|
-| `coding` | 组合：writing + format + compile（完整编码流程） |
+| `coding` | Combination: writing + format + compile (complete coding process) |
 
-**writing 子章节**：
+**writing subsections**:
 
-| Section | 内容 |
+| Section | Content |
 |---------|------|
-| `delphi_file_write_rule` | delphi_file 写入规则（1-indexed/edits 参数） |
-| `delphi_file_dirty_flag` | 连续编辑与脏标记保护 |
-| `delphi_file_output_format` | delphi_file 紧凑输出格式 |
-| `delphi_file_usage_tips` | write 使用建议 |
+| `delphi_file_write_rule` | delphi_file write rules (1-indexed/edits parameter) |
+| `delphi_file_dirty_flag` | Continuous editing and dirty flag protection |
+| `delphi_file_output_format` | delphi_file compact output format |
+| `delphi_file_usage_tips` | write usage tips |
 
-**审核子章节**：
+**Review subsections**:
 
-| Section | 内容 |
+| Section | Content |
 |---------|------|
-| `consistency` | 一致性检查 |
-| `completeness` | 完整性检查 |
-| `resource_leak` | 资源泄露检查 |
-| `delphi_specific` | Delphi 特有模式 |
-| `common_errors` | 常见错误模式 |
-| `code_quality` | 代码质量 |
-| `data_conversion` | 数据转换 |
-| `performance` | 性能 |
-| `safety` | 安全 |
+| `consistency` | Consistency check |
+| `completeness` | Completeness check |
+| `resource_leak` | Resource leak check |
+| `delphi_specific` | Delphi-specific patterns |
+| `common_errors` | Common error patterns |
+| `code_quality` | Code quality |
+| `data_conversion` | Data conversion |
+| `performance` | Performance |
+| `safety` | Safety |
 
-> 使用 `get_coding_rules(section="list")` 获取实时更新的完整章节列表。
+> Use `get_coding_rules(section="list")` to get the real-time updated complete section list.
 
-### 7.4 规则优先级
+### 7.4 Rule Priority
 
 ```
-项目自定义规则 > 默认规则
+Project custom rules > Default rules
 ```
 
-当 `project_path` 指定具体项目时，会先尝试加载该项目下的自定义规则文件（`CODING_RULES.mdc`）；若无自定义规则，则使用内置默认规则。
+When `project_path` specifies a concrete project, the project's custom rules file (`CODING_RULES.mdc`) is loaded first; if there are no custom rules, the built-in default rules are used.
 
-Daofy 自带的默认规则源位于 `src/resources/coding-rules.md`，并通过 MCP Resource
-`delphi://coding-rules` 暴露给 AI Agent。项目目录下的 `CODING_RULES.mdc` 仍作为
-项目级覆盖文件名使用。
+Daofy's built-in default rule source is located at `src/resources/coding-rules.md` and is exposed to the AI Agent through the MCP Resource
+`delphi://coding-rules`. The `CODING_RULES.mdc` in the project directory is still used as the
+project-level override filename.
 
-### 7.5 代码审计
+### 7.5 Code Auditing
 
-`project` 工具的 audit/ast/runtime 三个 action 提供代码审计功能：
+The three actions audit/ast/runtime of the `project` tool provide code auditing functionality:
 
 ```python
-# ⭐ 代码骨架提取（最省 token）
+# ⭐ Code skeleton extraction (most token-efficient)
 delphi_project(action="ast", base_dir="src")
 
-# 单文件骨架提取
+# Single-file skeleton extraction
 delphi_project(action="ast", file_path="Unit1.pas")
 
-# 运行 50+ 静态分析规则
+# Run 50+ static analysis rules
 delphi_project(action="audit", base_dir="src")
 
-# 单文件指定严重级别
+# Single file with specified severity level
 delphi_project(action="audit",
     file_path="Unit1.pas",
     rules="P0",
     severity="warning",
     output_format="report")
 
-# 运行时注册检查（检测遗漏 uses 单元）
+# Runtime registration check (detects missing uses units)
 delphi_project(action="runtime", base_dir="src")
 ```
 
-### 7.6 审计工作流
+### 7.6 Auditing Workflow
 
 ```
-① 确定审计对象
-   ├─ Delphi 代码 → get_coding_rules(section="review")
-   └─ Python 代码 → 按安全/MCP/并发等类别逐项检查
-② 确定审计范围（全局/指定文件/新增代码）
-③ 搜索相关 API 定义，评估用法
-④ 调用 project(audit/ast)
-   → mode="ast"（推荐，快速了解代码结构）
-   → mode="audit"（深度规则检查，50+ 条规则）
-⑤ AI 解读结果，排除误报，生成修复建议
-⑥ project(compile) / pytest 验证
-⑦ 输出审计报告
+① Determine the audit target
+   ├─ Delphi code → get_coding_rules(section="review")
+   └─ Python code → check item by item by category such as safety/MCP/concurrency
+② Determine the audit scope (global/specified files/newly added code)
+③ Search for relevant API definitions and evaluate usage
+④ Call project(audit/ast)
+   → mode="ast" (recommended, quickly understand the code structure)
+   → mode="audit" (in-depth rule checking, 50+ rules)
+⑤ AI interprets the results, rules out false positives, and generates fix suggestions
+⑥ project(compile) / pytest verification
+⑦ Output the audit report
 ```
 
-### 7.7 审计报告模板
+### 7.7 Audit Report Template
 
 ```
-## 源码审计报告
+## Source Code Audit Report
 
-**项目**: <项目名称>
-**审计范围**: <全局 / 文件列表>
+**Project**: <project name>
+**Audit Scope**: <global / file list>
 
-### 概览
+### Overview
 
-| 类别 | 发现数 | 严重 | 一般 | 建议 |
+| Category | Findings | Critical | General | Suggestion |
 |------|--------|------|------|------|
-| 安全 | N | N | N | N |
-| 资源管理 | N | N | N | N |
-| 错误处理 | N | N | N | N |
-| **合计** | **N** | **N** | **N** | **N** |
+| Security | N | N | N | N |
+| Resource management | N | N | N | N |
+| Error handling | N | N | N | N |
+| **Total** | **N** | **N** | **N** | **N** |
 
-### 严重问题
+### Critical Issues
 
-1. [严重] <文件:F行>: <问题描述>
-   - **问题**: ...
-   - **风险**: ...
-   - **建议修复**: ...
+1. [Critical] <file:F line>: <problem description>
+   - **Problem**: ...
+   - **Risk**: ...
+   - **Suggested fix**: ...
 
-### 一般问题
+### General Issues
 ...
 
-### 审计结论
-<整体评估>
+### Audit Conclusion
+<overall assessment>
 ```
 
 ---
 
-## 第八章：代码托管与 Git 操作
+## Chapter 8: Code Hosting and Git Operations
 
-### 8.1 工具概述
+### 8.1 Tool Overview
 
-`code_hosting` 是 Daofy 中所有 Git 操作和代码托管平台操作的统一入口。提供 Git 本地操作（status/add/commit/push/clone）和多平台 API 操作（Gitea/GitHub/GitLab/Gitee/GitCode）。
+`code_hosting` is the unified entry point for all Git operations and code hosting platform operations in Daofy. It provides local Git operations (status/add/commit/push/clone) and multi-platform API operations (Gitea/GitHub/GitLab/Gitee/GitCode).
 
-> ⚠️ **核心规则**：所有 Git 操作必须使用此工具，禁止用 bash 直接执行 git 命令。
+> ⚠️ **Core rule**: All Git operations must use this tool; running git commands directly via bash is prohibited.
 
-### 8.2 支持的平台
+### 8.2 Supported Platforms
 
-| 平台 | 标识 | 说明 |
+| Platform | Identifier | Description |
 |------|------|------|
-| Gitea | `gitea` | 自托管 Gitea |
+| Gitea | `gitea` | Self-hosted Gitea |
 | GitHub | `github` | github.com |
 | GitLab | `gitlab` | GitLab CE/EE |
-| Gitee | `gitee` | gitee.com 码云 |
+| Gitee | `gitee` | gitee.com |
 | GitCode | `gitcode` | gitcode.net |
 
-### 8.3 Action 速查
+### 8.3 Action Cheat Sheet
 
-| Action 分组 | Action | 用途 |
+| Action Group | Action | Purpose |
 |------------|--------|------|
-| **Git 只读** | `git_status` | 查看仓库状态 |
-| | `git_diff` | 查看工作区/暂存区差异（同时查看 diff 时可添加 staged=True） |
-| | `git_show` | 查看提交或对象内容 |
-| | `git_log` | 查看提交历史 |
-| **Git 工作区变更** | `git_add` | 暂存文件（需 files 参数） |
-| | `git_restore` | 恢复文件（有破坏性，需 files 参数） |
-| | `git_unstage` | 取消暂存（需 files 参数） |
-| | `git_stash` | 管理 stash（push/list/pop/apply/drop/show） |
-| **Git 提交** | `git_commit` | 创建提交 |
-| **Git 分支** | `git_branch` | 查看/创建/删除分支（list/create/delete） |
-| | `git_switch` | 切换或创建分支（-c create） |
-| | `git_merge` | 合并分支（支持 ff-only/no-commit） |
-| | `git_tag` | 列出/创建/删除标签 |
-| **Git 远程** | `git_fetch` | 拉取远程引用（支持 --prune） |
-| | `git_pull` | 拉取并合并远程分支（支持 rebase/ff-only） |
-| | `git_push` | 推送到远程 |
-| | `git_push_retry` | 后台自动重试推送（可选 max_retries） |
-| **Git 异步** | `git_clone` | 克隆远程仓库 |
-| **平台 API — 工单** | `create_issue` | 创建工单 |
-| | `get_issue` | 查看工单详情 |
-| | `edit_issue` | 修改工单（title/body/state/labels） |
-| | `set_labels` | 设置工单标签 |
-| | `close_issue` | 关闭工单 |
-| | `add_comment` | 添加评论 |
-| | `list_issues` | 查询工单列表 |
-| **平台 API — PR** | `create_pull` | 创建 Pull Request |
-| | `get_pull` | 查看 Pull Request 详情 |
-| | `list_pulls` | 查询 Pull Request 列表 |
-| | `edit_pull` | 修改 Pull Request |
-| | `merge_pull` | 合并 Pull Request |
-| | `close_pull` | 关闭 Pull Request（不合并） |
-| | `reopen_pull` | 重新打开已关闭的 Pull Request |
-| **平台 API — Release** | `create_release` | 创建 Release |
-| | `get_release` | 查看 Release 详情 |
-| | `list_releases` | 查询 Release 列表 |
-| | `edit_release` | 修改 Release |
-| | `delete_release` | 删除 Release |
-| **平台 API — 其他** | `create_token` | 创建访问令牌（仅 Gitea） |
-| | `init_labels` | 批量初始化四维流程标签 |
+| **Git read-only** | `git_status` | View repository status |
+| | `git_diff` | View working tree/staged differences (add staged=True to also view diff) |
+| | `git_show` | View commit or object content |
+| | `git_log` | View commit history |
+| **Git working tree changes** | `git_add` | Stage files (requires files parameter) |
+| | `git_restore` | Restore files (destructive, requires files parameter) |
+| | `git_unstage` | Unstage (requires files parameter) |
+| | `git_stash` | Manage stash (push/list/pop/apply/drop/show) |
+| **Git commit** | `git_commit` | Create a commit |
+| **Git branch** | `git_branch` | View/create/delete branches (list/create/delete) |
+| | `git_switch` | Switch to or create a branch (-c create) |
+| | `git_merge` | Merge branches (supports ff-only/no-commit) |
+| | `git_tag` | List/create/delete tags |
+| **Git remote** | `git_fetch` | Fetch remote references (supports --prune) |
+| | `git_pull` | Pull and merge remote branches (supports rebase/ff-only) |
+| | `git_push` | Push to remote |
+| | `git_push_retry` | Auto-retry push in the background (optional max_retries) |
+| **Git async** | `git_clone` | Clone a remote repository |
+| **Platform API — Issues** | `create_issue` | Create an issue |
+| | `get_issue` | View issue details |
+| | `edit_issue` | Edit an issue (title/body/state/labels) |
+| | `set_labels` | Set issue labels |
+| | `close_issue` | Close an issue |
+| | `add_comment` | Add a comment |
+| | `list_issues` | Query the issue list |
+| **Platform API — PR** | `create_pull` | Create a Pull Request |
+| | `get_pull` | View Pull Request details |
+| | `list_pulls` | Query the Pull Request list |
+| | `edit_pull` | Edit a Pull Request |
+| | `merge_pull` | Merge a Pull Request |
+| | `close_pull` | Close a Pull Request (without merging) |
+| | `reopen_pull` | Reopen a closed Pull Request |
+| **Platform API — Release** | `create_release` | Create a Release |
+| | `get_release` | View Release details |
+| | `list_releases` | Query the Release list |
+| | `edit_release` | Edit a Release |
+| | `delete_release` | Delete a Release |
+| **Platform API — Other** | `create_token` | Create an access token (Gitea only) |
+| | `init_labels` | Bulk-initialize the four-dimensional workflow labels |
 
-### 8.4 Git 本地操作
+### 8.4 Local Git Operations
 
-**只读操作**（安全，不会修改仓库）：
+**Read-only operations** (safe, does not modify the repository):
 
 ```python
-# 查看状态
+# View status
 code_hosting(action="git_status")
 
-# 查看工作区差异
+# View working tree diff
 code_hosting(action="git_diff")
 
-# 查看暂存区差异（staged）
+# View staged diff (staged)
 code_hosting(action="git_diff", staged=True)
 
-# 查看差异统计摘要
+# View diff statistics summary
 code_hosting(action="git_diff", stat=True)
 
-# 查看指定文件的差异
+# View diff for specified files
 code_hosting(action="git_diff", files=["src/Unit1.pas", "src/Unit2.pas"])
 
-# 查看某次提交内容
+# View the content of a commit
 code_hosting(action="git_show", ref="HEAD")
 
-# 查看提交历史
+# View commit history
 code_hosting(action="git_log", limit=10)
 
-# 查看指定文件的提交历史
+# View commit history of specified files
 code_hosting(action="git_log", files=["src/Unit1.pas"])
 ```
 
-**工作区变更操作**（需 files 参数，避免误操作整个工作区）：
+**Working tree change operations** (require files parameter to avoid accidentally operating on the entire working tree):
 
 ```python
-# 暂存指定文件
+# Stage specified files
 code_hosting(action="git_add", files=["src/Unit1.pas", "src/Unit2.pas"])
 
-# 恢复工作区文件（有破坏性，必须传 files）
+# Restore working tree files (destructive, must pass files)
 code_hosting(action="git_restore", files=["src/Unit1.pas"])
 
-# 取消暂存
+# Unstage
 code_hosting(action="git_unstage", files=["src/Unit1.pas"])
 
-# Stash 管理
+# Stash management
 code_hosting(action="git_stash", op="push", message="wip: refactoring", include_untracked=True)
 code_hosting(action="git_stash", op="list")
 code_hosting(action="git_stash", op="pop", ref="stash@{0}")
 code_hosting(action="git_stash", op="show", ref="stash@{0}")
 ```
 
-**提交操作**：
+**Commit operations**:
 
 ```python
-# 创建提交
+# Create a commit
 code_hosting(action="git_commit", message="feat: add user authentication module")
 ```
 
-**分支与标签操作**：
+**Branch and tag operations**:
 
 ```python
-# 列出分支
+# List branches
 code_hosting(action="git_branch")
 
-# 列出所有分支（含远程）
+# List all branches (including remote)
 code_hosting(action="git_branch", remote_branches=True)
 
-# 创建新分支
+# Create a new branch
 code_hosting(action="git_branch", branch="feature/new-ui")
 
-# 删除分支
+# Delete a branch
 code_hosting(action="git_branch", branch="old-feature", delete=True)
 
-# 切换分支
+# Switch branch
 code_hosting(action="git_switch", branch="main")
 
-# 创建并切换分支
+# Create and switch branch
 code_hosting(action="git_switch", branch="feature/new-ui", create=True)
 
-# 从指定起点创建分支
+# Create a branch from a specified starting point
 code_hosting(action="git_switch", branch="feature/hotfix", create=True, start_point="v1.0")
 
-# 合并分支
+# Merge a branch
 code_hosting(action="git_merge", branch="feature/new-ui")
 
-# Fast-forward only 合并
+# Fast-forward only merge
 code_hosting(action="git_merge", branch="feature/bugfix", ff_only=True)
 
-# 列出标签
+# List tags
 code_hosting(action="git_tag")
 
-# 创建注解标签
+# Create an annotated tag
 code_hosting(action="git_tag", tag="v1.0.0", message="Release version 1.0.0")
 
-# 删除标签
+# Delete a tag
 code_hosting(action="git_tag", tag="v1.0.0-beta", delete=True)
 ```
 
-**远程操作**：
+**Remote operations**:
 
 ```python
-# 拉取远程引用
+# Fetch remote references
 code_hosting(action="git_fetch", remote="origin", branch="main")
 
-# 拉取并修剪已删除的远程分支
+# Fetch and prune deleted remote branches
 code_hosting(action="git_fetch", prune=True)
 
-# 拉取并合并远程分支
+# Pull and merge remote branches
 code_hosting(action="git_pull", remote="origin", branch="main")
 
-# 使用 rebase 方式拉取
+# Pull using rebase
 code_hosting(action="git_pull", rebase=True, ff_only=True)
 
-# 推送
+# Push
 code_hosting(action="git_push")
 
-# 推送指定分支
+# Push a specified branch
 code_hosting(action="git_push", branch="main", remote="origin")
 
-# 后台自动重试推送
+# Auto-retry push in the background
 code_hosting(action="git_push_retry")
 
-# 后台自动重试推送（自定义重试参数）
+# Auto-retry push in the background (custom retry parameters)
 code_hosting(action="git_push_retry", remote="origin", retry_interval=120, max_retries=5)
 
-# 克隆仓库
+# Clone a repository
 code_hosting(action="git_clone",
     url="https://github.com/user/repo.git",
-    mirror="https://gitclone.com")    # 国内加速
+    mirror="https://gitclone.com")    # Domestic acceleration
 
-# 克隆指定分支
+# Clone a specified branch
 code_hosting(action="git_clone",
     url="https://github.com/user/repo.git",
     branch="develop")
 ```
 
-### 8.5 平台 API 操作
+### 8.5 Platform API Operations
 
-> ⚠️ **参数说明**：所有平台 API 操作的 `repo` 参数均使用 `"owner/repo"` 格式（如 `"myorg/myproject"`），各 handler 内部自动从该字符串中分离 owner 和 repo。
+> ⚠️ **Parameter note**: For all platform API operations, the `repo` parameter uses the `"owner/repo"` format (e.g. `"myorg/myproject"`); each handler automatically separates owner and repo from that string.
 
-**工单操作**：
+**Issue operations**:
 
 ```python
-# 创建工单
+# Create an issue
 code_hosting(action="create_issue",
     repo="myorg/myproject",
     title="Fix login crash on Windows 11",
-    body="## 问题描述\n在 Windows 11 下点击登录按钮时崩溃",
+    body="## Problem description\nCrashes when clicking the login button on Windows 11",
     labels=["bug", "priority-high"])
 
-# 查看工单详情
+# View issue details
 code_hosting(action="get_issue",
     repo="myorg/myproject",
     issue_number=42)
 
-# 修改工单（可修改 title/body/state/labels）
+# Edit an issue (can modify title/body/state/labels)
 code_hosting(action="edit_issue",
     repo="myorg/myproject",
     issue_number=42,
-    title="更新后的标题",
-    body="更新后的描述",
+    title="Updated title",
+    body="Updated description",
     state="open")
 
-# 单独设置工单标签
+# Set issue labels separately
 code_hosting(action="set_labels",
     repo="myorg/myproject",
     issue_number=42,
     labels=["bug", "priority-high", "in-progress"])
 
-# 关闭工单
+# Close an issue
 code_hosting(action="close_issue",
     repo="myorg/myproject",
     issue_number=42)
 
-# 关闭工单并添加说明
+# Close an issue and add a note
 code_hosting(action="close_issue",
     repo="myorg/myproject",
     issue_number=42,
-    comment="已在 #43 中修复")
+    comment="Fixed in #43")
 
-# 添加评论
+# Add a comment
 code_hosting(action="add_comment",
     repo="myorg/myproject",
     issue_number=42,
-    body="已在 #43 中修复")
+    body="Fixed in #43")
 
-# 查询工单列表
+# Query the issue list
 code_hosting(action="list_issues",
     repo="myorg/myproject",
     state="open",
     labels=["bug"])
 
-# 初始化标签
+# Initialize labels
 code_hosting(action="init_labels",
     repo="myorg/myproject")
 ```
 
-**Pull Request 操作**：
+**Pull Request operations**:
 
 ```python
-# 创建 Pull Request
+# Create a Pull Request
 code_hosting(action="create_pull",
     repo="myorg/myproject",
     title="fix: login crash on Windows 11",
-    body="修复 Windows 11 下登录按钮崩溃的问题",
+    body="Fix the login button crash on Windows 11",
     source_branch="fix/login-crash",
     target_branch="main")
 
-# 查看 Pull Request 详情
+# View Pull Request details
 code_hosting(action="get_pull",
     repo="myorg/myproject",
     pull_number=42)
 
-# 列出 Pull Request
+# List Pull Requests
 code_hosting(action="list_pulls",
     repo="myorg/myproject",
     state="open",
     limit=20)
 
-# 修改 Pull Request（可修改 title/body/state/source_branch/target_branch）
+# Edit a Pull Request (can modify title/body/state/source_branch/target_branch)
 code_hosting(action="edit_pull",
     repo="myorg/myproject",
     pull_number=42,
-    title="更新后的 PR 标题",
+    title="Updated PR title",
     state="closed")
 
-# 合并 Pull Request
+# Merge a Pull Request
 code_hosting(action="merge_pull",
     repo="myorg/myproject",
     pull_number=42,
     merge_style="merge")     # merge/squash/rebase
 
-# 关闭 Pull Request（不合并）
+# Close a Pull Request (without merging)
 code_hosting(action="close_pull",
     repo="myorg/myproject",
     pull_number=42)
 
-# 重新打开已关闭的 Pull Request
+# Reopen a closed Pull Request
 code_hosting(action="reopen_pull",
     repo="myorg/myproject",
     pull_number=42)
 ```
 
-**Release 操作**：
+**Release operations**:
 
 ```python
-# 创建 Release
+# Create a Release
 code_hosting(action="create_release",
     repo="myorg/myproject",
     tag_name="v1.0.0",
     name="Version 1.0.0",
-    body="## 变更\n- 修复登录崩溃\n- 优化性能",
+    body="## Changes\n- Fix login crash\n- Optimize performance",
     draft=True,
     prerelease=False)
 
-# 查看 Release 详情
+# View Release details
 code_hosting(action="get_release",
     repo="myorg/myproject",
     tag_name="v1.0.0")
 
-# 列出 Release
+# List Releases
 code_hosting(action="list_releases",
     repo="myorg/myproject",
     limit=10)
 
-# 修改 Release
+# Edit a Release
 code_hosting(action="edit_release",
     repo="myorg/myproject",
     tag_name="v1.0.0",
     name="Version 1.0.0 (revised)",
-    body="## 变更\n- 修复登录崩溃\n- 优化性能\n- 更新文档")
+    body="## Changes\n- Fix login crash\n- Optimize performance\n- Update docs")
 
-# 删除 Release
+# Delete a Release
 code_hosting(action="delete_release",
     repo="myorg/myproject",
     tag_name="v1.0.0")
 ```
 
-**令牌与其他操作**：
+**Token and other operations**:
 
 ```python
-# 创建 Gitea 访问令牌（需要 base_url + username + password）
+# Create a Gitea access token (requires base_url + username + password)
 code_hosting(action="create_token",
     base_url="https://your-gitea.com",
     username="admin",
@@ -1433,188 +1432,188 @@ code_hosting(action="create_token",
     scopes=["read:repository", "write:repository", "read:issue", "write:issue"])
 ```
 
-### 8.6 完整工作流
+### 8.6 Complete Workflow
 
 ```python
 # ═══════════════════════════════════════════════
-# 日常开发提交
+# Daily development commits
 # ═══════════════════════════════════════════════
-delphi_file(action="write", ...)              # 编写代码
-delphi_project(action="compile", ...)                # 编译验证
+delphi_file(action="write", ...)              # Write code
+delphi_project(action="compile", ...)                # Compilation verification
 
-# 查看变更并提交
-code_hosting(action="git_diff", stat=True)     # 查看变更概览
-code_hosting(action="git_add", files=["."])   # 暂存
-code_hosting(action="git_commit", ...)        # 提交
-code_hosting(action="git_push")               # 推送
+# View changes and commit
+code_hosting(action="git_diff", stat=True)     # View change overview
+code_hosting(action="git_add", files=["."])   # Stage
+code_hosting(action="git_commit", ...)        # Commit
+code_hosting(action="git_push")               # Push
 
 # ═══════════════════════════════════════════════
-# Bug 修复完整闭环
+# Complete bug-fix loop
 # ═══════════════════════════════════════════════
-code_hosting(action="list_issues", repo="myorg/myproject", state="open", labels=["bug"])  # 查看待处理 Bug
-# → 创建分支修复
+code_hosting(action="list_issues", repo="myorg/myproject", state="open", labels=["bug"])  # View pending bugs
+# → Create a branch to fix
 git_switch(branch="fix/login-crash", create=True)
-# 修复代码
-delphi_project(action="compile", ...)                # 编译验证
+# Fix the code
+delphi_project(action="compile", ...)                # Compilation verification
 code_hosting(action="git_add", files=["src/login.pas"])
 code_hosting(action="git_commit", message="fix: #42 login crash")
-code_hosting(action="git_switch", branch="main")       # 切回主分支
-code_hosting(action="git_merge", branch="fix/login-crash")  # 合并
+code_hosting(action="git_switch", branch="main")       # Switch back to the main branch
+code_hosting(action="git_merge", branch="fix/login-crash")  # Merge
 code_hosting(action="git_push")
-# 更新工单
+# Update the issue
 code_hosting(action="get_issue", repo="myorg/myproject", issue_number=42)
-code_hosting(action="add_comment", repo="myorg/myproject", issue_number=42, body="已在 #43 中修复")
+code_hosting(action="add_comment", repo="myorg/myproject", issue_number=42, body="Fixed in #43")
 code_hosting(action="close_issue", repo="myorg/myproject", issue_number=42)
 
 # ═══════════════════════════════════════════════
-# 功能开发 — 分支管理
+# Feature development — branch management
 # ═══════════════════════════════════════════════
-code_hosting(action="git_switch", branch="feature/new-dialog", create=True)  # 创建功能分支
-# 开发中...
-code_hosting(action="git_stash", op="push", message="wip: unfinished change")  # 临时保存
-code_hosting(action="git_switch", branch="main")       # 切换到主分支修紧急问题
-# 修复紧急问题
-code_hosting(action="git_stash", op="pop")              # 恢复之前的未完成变更
+code_hosting(action="git_switch", branch="feature/new-dialog", create=True)  # Create a feature branch
+# Under development...
+code_hosting(action="git_stash", op="push", message="wip: unfinished change")  # Temporarily save
+code_hosting(action="git_switch", branch="main")       # Switch to the main branch to fix an urgent problem
+# Fix the urgent problem
+code_hosting(action="git_stash", op="pop")              # Restore the previous unfinished changes
 code_hosting(action="git_add", files=["src/dialog.pas"])
 code_hosting(action="git_commit", message="feat: add new customer dialog")
 code_hosting(action="git_switch", branch="main")
 code_hosting(action="git_merge", branch="feature/new-dialog")
-code_hosting(action="git_tag", tag="v1.1.0", message="Version 1.1.0")  # 打版本标签
+code_hosting(action="git_tag", tag="v1.1.0", message="Version 1.1.0")  # Tag a version
 code_hosting(action="git_push", branch="main")
-code_hosting(action="git_push", branch="--tags")        # 推送标签
+code_hosting(action="git_push", branch="--tags")        # Push tags
 
 # ═══════════════════════════════════════════════
-# 查看历史与调试
+# View history and debugging
 # ═══════════════════════════════════════════════
-code_hosting(action="git_log", limit=5)                  # 最近 5 条提交
-code_hosting(action="git_show", ref="abc1234")           # 查看特定提交
-code_hosting(action="git_diff", files=["src/unit1.pas"]) # 查看文件当前变更
+code_hosting(action="git_log", limit=5)                  # The 5 most recent commits
+code_hosting(action="git_show", ref="abc1234")           # View a specific commit
+code_hosting(action="git_diff", files=["src/unit1.pas"]) # View the current file changes
 ```
 
 ---
 
-## 第九章：经验记忆管理
+## Chapter 9: Experience Memory Management
 
-### 9.1 工具概述
+### 9.1 Tool Overview
 
-`experience` 是 Daofy 内置的 **AI 经验记忆系统**，用于持久化存储 AI 在解决问题时发现的有效做法和技巧。
+`experience` is Daofy's built-in **AI experience memory system**, used to persistently store effective practices and techniques discovered by the AI while solving problems.
 
-**核心理念**：AI 在编码过程中遇到的问题和解决方案不应被遗忘。经验知识库让每次"踩坑-解决"的循环都有积累。
+**Core idea**: Problems encountered by the AI during coding and their solutions should not be forgotten. The experience knowledge base allows each "trap-solution" cycle to accumulate.
 
-### 9.2 Action 速查
+### 9.2 Action Cheat Sheet
 
-| Action | 用途 | 必需参数 |
+| Action | Purpose | Required Parameters |
 |--------|------|---------|
-| `save` | 保存经验（自动去重） | `problem`, `solution` |
-| `search` | 语义搜索经验 | `query` |
-| `get` | 查看经验详情 | `id` |
-| `list` | 浏览列表 | — |
-| `update` | 更新经验 | `id` |
-| `merge` | 合并多条经验 | `ids`（至少 2 个） |
-| `prune` | 列出低价值经验 | — |
-| `delete` | 删除经验 | `id` |
-| `rebuild_embedding` | 重建缺失向量 | — |
+| `save` | Save experience (auto-deduplication) | `problem`, `solution` |
+| `search` | Semantic search of experience | `query` |
+| `get` | View experience details | `id` |
+| `list` | Browse the list | — |
+| `update` | Update experience | `id` |
+| `merge` | Merge multiple experiences | `ids` (at least 2) |
+| `prune` | List low-value experiences | — |
+| `delete` | Delete experience | `id` |
+| `rebuild_embedding` | Rebuild missing vectors | — |
 
-### 9.3 保存经验
+### 9.3 Saving Experience
 
 ```python
-# 基本保存
+# Basic save
 experience(action="save",
-    problem="编译 Delphi 项目时 dcc32 返回 exit code 2",
-    solution="检查 .dproj 中的 DCC_UnitSearchPath 是否包含所有第三方库路径，"
-             "然后在 delphi_project(action=compile) 中传入 unit_search_paths 补充",
+    problem="dcc32 returns exit code 2 when compiling the Delphi project",
+    solution="Check whether DCC_UnitSearchPath in .dproj includes all third-party library paths, "
+             "then pass unit_search_paths in delphi_project(action=compile) to supplement",
     tools_used=["project", "delphi_file"],
-    tags=["Delphi", "编译", "dcc32"])
+    tags=["Delphi", "compile", "dcc32"])
 
-# 强制保存（跳过 >0.7 相似度拦截）
+# Force save (skip the >0.7 similarity interception)
 experience(action="save",
     problem="...",
     solution="...",
     force=true)
 ```
 
-### 9.4 搜索经验
+### 9.4 Searching Experience
 
 ```python
-# 语义搜索
+# Semantic search
 experience(action="search",
-    query="编译报错找不到文件",
+    query="compile error file not found",
     top_k=5)
 
-# 按标签过滤搜索
+# Search filtered by tags
 experience(action="search",
-    query="Delphi 编译器配置",
-    tags=["Delphi", "编译"])
+    query="Delphi compiler configuration",
+    tags=["Delphi", "compile"])
 ```
 
-### 9.5 查看和管理
+### 9.5 Viewing and Managing
 
 ```python
-# 查看经验详情
+# View experience details
 experience(action="get", id="a1b2c3d4e5f6")
 
-# 浏览列表
+# Browse the list
 experience(action="list", limit=20)
 experience(action="list", tags=["Delphi"], sort_by="hit_count", limit=10)
 
-# 更新经验
+# Update experience
 experience(action="update", id="a1b2c3d4e5f6",
-    solution="更完善的解决步骤...")
+    solution="More complete solution steps...")
 
-# 合并多条经验
+# Merge multiple experiences
 experience(action="merge",
     ids=["a1b2c3d4e5f6", "b2c3d4e5f6a7"])
 
-# 列出低价值经验
+# List low-value experiences
 experience(action="prune", limit=20)
 
-# 删除经验
+# Delete experience
 experience(action="delete", id="a1b2c3d4e5f6")
 ```
 
-### 9.6 自动去重机制
+### 9.6 Automatic Deduplication Mechanism
 
-`save()` 不是简单 INSERT，而是"先查再决定"的智能流程：
+`save()` is not a simple INSERT, but an intelligent "query first, then decide" flow:
 
-| 相似度 | 处理方式 |
+| Similarity | Handling |
 |--------|---------|
-| > 0.85 | **自动合并**到旧记录，不新增 |
-| > 0.7 | **拦截提醒**，建议人工判断 |
-| ≤ 0.7 | **正常新建** |
+| > 0.85 | **Automatically merge** into the old record, no new entry |
+| > 0.7 | **Intercept and remind**, manual judgment suggested |
+| ≤ 0.7 | **Create normally** |
 
-### 9.7 经验维护最佳实践
+### 9.7 Best Practices for Experience Maintenance
 
-1. **保存前先泛化**：先 `search()` 确认是否已有同类经验，找到后用 `merge`/`update` 合并
-2. **任务完成后主动合并**：新方案与旧经验相关但方式不同，手动 merge
-3. **定期清理**：执行 `prune` 列出低价值记录，审查后 `delete`
-4. **发现重复时抽象合并**：同类问题合并为一条抽象经验，`tags` 覆盖各类场景
-5. **hit ≥ 3 规则化**：评估是否可以升级为 CODING_RULES 正式规则
+1. **Generalize before saving**: First `search()` to confirm whether a similar experience already exists; if found, merge it with `merge`/`update`
+2. **Actively merge after task completion**: When the new solution is related to an old experience but differs in approach, merge manually
+3. **Clean up regularly**: Run `prune` to list low-value records, review and `delete`
+4. **Abstract and merge when duplicates are found**: Merge similar problems into one abstract experience, with `tags` covering various scenarios
+5. **Regularize when hit ≥ 3**: Evaluate whether it can be upgraded to a formal CODING_RULES rule
 
 ---
 
-## 第十章：Delphi RTTI 桥接
+## Chapter 10: Delphi RTTI Bridging
 
-### 10.1 工具概述
+### 10.1 Tool Overview
 
-`delphi_rtti` 通过 Delphi Enhanced RTTI 发现和调用 Delphi 应用程序的运行时能力。三步法：guide → discover → call。
+`delphi_rtti` discovers and invokes the runtime capabilities of a Delphi application through Delphi Enhanced RTTI. Three-step method: guide → discover → call.
 
-### 10.2 前置条件
+### 10.2 Prerequisites
 
-在 Delphi 项目的 `.dpr` 文件中添加自动化单元：
+Add the automation unit to the Delphi project's `.dpr` file:
 
 ```pascal
 program MyApp;
 
 uses
-  Vcl.Forms,                              // VCL 项目
-  // 或 FMX.Forms,                        // FMX 项目
+  Vcl.Forms,                              // VCL project
+  // or FMX.Forms,                        // FMX project
   Vcl.DaofyAutomation in 'path\to\tools\auto\Vcl.DaofyAutomation.pas',
   DaofyAutomation.Base in 'path\to\tools\auto\DaofyAutomation.Base.pas',
-  // 或 Fmx.DaofyAutomation (FMX 项目)
+  // or Fmx.DaofyAutomation (FMX project)
   MainForm in 'MainForm.pas';
 
 begin
-  Vcl.DaofyAutomation.AutoStart;          // 启动自动化管道线程
+  Vcl.DaofyAutomation.AutoStart;          // Start the automation pipeline thread
   Application.Initialize;
   Application.CreateForm(TMainForm, MainForm);
   Application.Run;
@@ -1622,121 +1621,121 @@ begin
 end.
 ```
 
-### 10.3 三步工作流
+### 10.3 Three-Step Workflow
 
 ```python
-# 第一步：获取使用指南
+# Step 1: Get the usage guide
 delphi_rtti(action="guide")
 
-# 第二步：发现能力
+# Step 2: Discover capabilities
 delphi_rtti(action="discover",
     app_path="C:\\App\\MyApp.exe")
-# 可选：限定类名、保持进程
+# Optional: restrict the class name, keep the process alive
 delphi_rtti(action="discover",
     app_path="C:\\App\\MyApp.exe",
     class_name="TMainForm",
     keep_alive=True)
 
-# 第三步：调用方法
+# Step 3: Call a method
 delphi_rtti(action="call",
     app_path="C:\\App\\MyApp.exe",
     class_name="TMainForm",
     method="CreateOrder",
-    params={"customerName": "张三", "amount": 100})
+    params={"customerName": "Zhang San", "amount": 100})
 ```
 
-### 10.4 类型映射
+### 10.4 Type Mapping
 
-| Delphi 类型 | JSON 类型 | 说明 |
+| Delphi Type | JSON Type | Description |
 |------------|----------|------|
-| string (UnicodeString/AnsiString) | string | UTF-8 编码 |
+| string (UnicodeString/AnsiString) | string | UTF-8 encoded |
 | Integer, SmallInt, Int64 | integer | — |
 | Single, Double, Currency | number | — |
 | Boolean, ByteBool | boolean | — |
 | TDateTime | string | format: date-time |
-| 枚举类型 | string | 带 enum 约束 |
-| 动态数组/TArray | array | 元素类型递归映射 |
-| TObject 子类 | object | 有限支持 |
+| Enum type | string | with enum constraint |
+| Dynamic array/TArray | array | element types mapped recursively |
+| TObject subclass | object | limited support |
 | Variant | [string, number, boolean, null] | — |
 
-### 10.5 AI 注解（Custom Attributes）
+### 10.5 AI Annotations (Custom Attributes)
 
-在 Delphi 方法或参数上添加 `AI` 前缀的属性注解，给 AI Agent 提供更丰富的上下文：
+Add `AI`-prefixed attribute annotations on Delphi methods or parameters to provide richer context for the AI Agent:
 
 ```pascal
-[AIDescription('创建客户订单，返回新订单号')]
-[AIResultDescription('新创建的订单编号，失败返回 -1')]
-[AIExample('CreateOrder("张三", 100) → 10001')]
+[AIDescription('Create a customer order and return the new order number')]
+[AIResultDescription('The newly created order number; returns -1 on failure')]
+[AIExample('CreateOrder("Zhang San", 100) → 10001')]
 function CreateOrder(
-  [AIParamDescription('客户姓名')] const customerName: string;
-  [AIParamDescription('订单金额(元)')] amount: Integer
+  [AIParamDescription('Customer name')] const customerName: string;
+  [AIParamDescription('Order amount (yuan)')] amount: Integer
 ): Integer;
 ```
 
-| 属性 | 应用位置 | 说明 |
+| Attribute | Applied Position | Description |
 |------|---------|------|
-| `[AIDescription('...')]` | 方法 | 功能描述 |
-| `[AIResultDescription('...')]` | 方法 | 返回值说明 |
-| `[AIExample('...')]` | 方法 | 调用示例 |
-| `[AIParamDescription('...')]` | 参数 | 参数含义 |
+| `[AIDescription('...')]` | Method | Function description |
+| `[AIResultDescription('...')]` | Method | Return value description |
+| `[AIExample('...')]` | Method | Call example |
+| `[AIParamDescription('...')]` | Parameter | Parameter meaning |
 
 ---
 
-## 第十一章：自动化测试
+## Chapter 11: Automated Testing
 
-### 11.1 工具概述
+### 11.1 Tool Overview
 
-`automate_delphi` 驱动 Delphi 程序自动化测试，支持 **GUI 截图模式**（Named Pipe）和 **控制台交互模式**（subprocess stdin/stdout）。
+`automate_delphi` drives Delphi program automated testing, supporting **GUI screenshot mode** (Named Pipe) and **console interaction mode** (subprocess stdin/stdout).
 
-### 11.2 Action 速查
+### 11.2 Action Cheat Sheet
 
-| Action | 模式 | 说明 |
+| Action | Mode | Description |
 |--------|------|------|
-| `auto`（默认） | 自动检测 | 读 PE 头自动识别 GUI vs Console |
-| `gui` | 命名管道 GUI 操作 | 需要链接 DaofyAutomation 单元 |
-| `console` | 控制台交互 | 无需 Delphi 端改造 |
+| `auto` (default) | Auto-detect | Read the PE header to automatically identify GUI vs Console |
+| `gui` | Named pipe GUI operations | Requires linking the DaofyAutomation unit |
+| `console` | Console interaction | No Delphi-side modification required |
 
-### 11.3 GUI 模式
+### 11.3 GUI Mode
 
-GUI 模式通过命名管道与 Delphi 程序通信，支持以下命令：
+GUI mode communicates with the Delphi program through a named pipe and supports the following commands:
 
-**感知命令**（获取 UI 状态）：
-| 命令 | 作用 |
+**Perception commands** (get UI state):
+| Command | Purpose |
 |------|------|
-| `capture` | 截取当前窗口截图 |
-| `dumpstate` | 导出完整控件树 JSON |
-| `formsum` | 窗体摘要（dumpstate 紧凑版） |
-| `listwnd` | 枚举所有顶层窗口 |
-| `msgscan` | 扫描 MessageBox 弹窗 |
-| `dlgscan` | 扫描文件对话框状态（同步） |
-| `rinspect` | RTTI 成员发现 |
+| `capture` | Capture a screenshot of the current window |
+| `dumpstate` | Export the complete control tree as JSON |
+| `formsum` | Form summary (compact version of dumpstate) |
+| `listwnd` | Enumerate all top-level windows |
+| `msgscan` | Scan MessageBox popups |
+| `dlgscan` | Scan file dialog state (synchronous) |
+| `rinspect` | RTTI member discovery |
 
-**执行命令**（操作 UI）：
-| 命令 | 作用 |
+**Execution commands** (operate the UI):
+| Command | Purpose |
 |------|------|
-| `goto` | 导航到目标控件 |
-| `click` / `rclick` / `dblclick` | 单击/右键/双击（异步） |
-| `type` | 输入文本（异步） |
-| `key` | 按键 Tab/Enter/Esc（异步） |
-| `hover` / `move` / `drag` | 鼠标操作（异步） |
-| `rcall` / `rset` | RTTI 调用方法/设置属性（异步） |
-| `msgclick` / `dlgclick` / `msgclose` | 弹窗/菜单点击与关闭（`msgclose` 同步） |
-| `dlgfile` | 文件对话框输入路径（同步） |
-| `snapdir` | 设置截图输出目录（同步） |
-| `exit` | 退出目标进程 |
+| `goto` | Navigate to the target control |
+| `click` / `rclick` / `dblclick` | Single-click/right-click/double-click (asynchronous) |
+| `type` | Enter text (asynchronous) |
+| `key` | Press Tab/Enter/Esc (asynchronous) |
+| `hover` / `move` / `drag` | Mouse operations (asynchronous) |
+| `rcall` / `rset` | RTTI invoke method/set property (asynchronous) |
+| `msgclick` / `dlgclick` / `msgclose` | Popup/menu click and close (`msgclose` synchronous) |
+| `dlgfile` | Enter a path in a file dialog (synchronous) |
+| `snapdir` | Set the screenshot output directory (synchronous) |
+| `exit` | Exit the target process |
 
-**验证命令**（确认结果）：
-| 命令 | 作用 |
+**Verification commands** (confirm results):
+| Command | Purpose |
 |------|------|
-| `waitfor` | 等待条件满足 |
-| `wait` | 固定时间等待（毫秒） |
-| `rget` | RTTI 读属性值（首选断言方式） |
-| `rinspect` | RTTI 成员发现（同步，查看属性名/类型/方法，非值） |
+| `waitfor` | Wait until a condition is satisfied |
+| `wait` | Fixed time wait (milliseconds) |
+| `rget` | RTTI read property value (preferred assertion method) |
+| `rinspect` | RTTI member discovery (synchronous, view property names/types/methods, not values) |
 
-### 11.4 GUI 模式示例
+### 11.4 GUI Mode Example
 
 ```python
-# 基础自动化
+# Basic automation
 automate_delphi(action="gui",
     app_path="C:\\MyApp\\Win32\\Debug\\MyApp.exe",
     script=[
@@ -1746,36 +1745,36 @@ automate_delphi(action="gui",
         {"cmd": "type", "target": "EditPwd", "value": "123456"},
         {"cmd": "click", "target": "BtnLogin"},
         {"cmd": "waitfor", "target": "StatusBar",
-         "prop": "Caption", "value": "登录成功", "timeout": "5000"},
+         "prop": "Caption", "value": "Login successful", "timeout": "5000"},
         {"cmd": "capture", "target": "login_result"},
     ],
-    keep_alive=True)    # 进程复用
+    keep_alive=True)    # Process reuse
 ```
 
-### 11.5 进程复用模式
+### 11.5 Process Reuse Mode
 
-`keep_alive=true` 让进程常驻，避免反复启动：
+`keep_alive=true` keeps the process resident, avoiding repeated startup:
 
 ```python
-# 第一次：启动并保持
+# First time: start and keep alive
 automate_delphi(app_path="MyApp.exe", script=[goto, capture], keep_alive=True)
-# → 返回 process_reused:false, process_alive:true
+# → returns process_reused:false, process_alive:true
 
-# 第二次：复用已有进程
+# Second time: reuse the existing process
 automate_delphi(app_path="MyApp.exe", script=[click, capture])
-# → 返回 process_reused:true, process_alive:true
+# → returns process_reused:true, process_alive:true
 
-# 最后：发送 exit 终止
+# At the end: send exit to terminate
 automate_delphi(app_path="MyApp.exe", script=[exit])
-# → 返回 process_alive:false
+# → returns process_alive:false
 ```
 
-### 11.6 Console 模式
+### 11.6 Console Mode
 
-Console 模式通过 subprocess stdin/stdout 与控制台程序交互，**无需 Delphi 端改造**：
+Console mode interacts with console programs through subprocess stdin/stdout, **no Delphi-side modification required**:
 
 ```python
-# 基本交互
+# Basic interaction
 automate_delphi(action="console",
     app_path="Deploy.exe",
     input="Y\n",
@@ -1783,115 +1782,115 @@ automate_delphi(action="console",
     args=["--silent"],
     timeout=30)
 
-# 超时测试
+# Timeout test
 automate_delphi(action="console",
     app_path="Tool.exe",
     timeout=5)
 ```
 
-### 11.7 截图原理
+### 11.7 Screenshot Principles
 
-`capture` 命令自动选择最佳截图方式：
+The `capture` command automatically selects the best screenshot method:
 
-| 场景 | 方式 |
+| Scenario | Method |
 |------|------|
-| MessageBox/TaskDialog 弹窗 | `FindWindowW('#32770')` → GDI BitBlt → JPEG |
-| FMX 模态对话框 | `TFmxFormState.Modal` 检测 → PaintTo |
-| FMX 3D 窗体 | `TContext3D.CopyToBitmap` GPU readback |
-| FMX 2D 窗体 | `TCustomForm.PaintTo(Canvas)` |
-| VCL 窗体 | `GetWindowDC` + GDI BitBlt |
+| MessageBox/TaskDialog popup | `FindWindowW('#32770')` → GDI BitBlt → JPEG |
+| FMX modal dialog | `TFmxFormState.Modal` detection → PaintTo |
+| FMX 3D form | `TContext3D.CopyToBitmap` GPU readback |
+| FMX 2D form | `TCustomForm.PaintTo(Canvas)` |
+| VCL form | `GetWindowDC` + GDI BitBlt |
 
-### 11.8 MCP 提示词模板（Prompts）
+### 11.8 MCP Prompt Templates
 
-Daofy 注册了 **7 个 MCP Prompt 模板**，专为自动化测试工作流设计，在客户端支持 MCP Prompts 协议时可注入测试角色、引导代码分析和规划测试步骤。
+Daofy registers **7 MCP Prompt templates**, designed specifically for the automated testing workflow. When the client supports the MCP Prompts protocol, they can inject the testing role and guide code analysis and test step planning.
 
-| 模板名 | 作用 |
+| Template Name | Purpose |
 |--------|------|
-| `automate-expert-primer` | 🎭 **注入测试专家角色**：设定身份、三层递进思考模型 |
-| `automate-code-analysis` | 🔍 **代码感知分析**：读 DFM/PAS 生成控件映射表、事件分析、测试路径 |
-| `automate-test-plan` | 📋 **启动测试规划**：角色设定 + 代码分析 + 结构化步骤序列 |
-| `automate-step-execute` | ⚡ **单步执行协议**：前置感知 → 执行 → 等待 → 验证 |
-| `automate-failure-recover` | 🔧 **失败恢复**：诊断 → 决策 → 恢复 → 学习 |
-| `automate-save-experience` | 💾 **保存经验**：结构化记录成功/失败模式 |
-| `automate-session-end` | 🏁 **结束会话**：保存经验、导出脚本、角色切回开发模式 |
+| `automate-expert-primer` | 🎭 **Inject the testing expert role**: set the identity and the three-layer progressive thinking model |
+| `automate-code-analysis` | 🔍 **Code-aware analysis**: read DFM/PAS to generate a control mapping table, event analysis, and test paths |
+| `automate-test-plan` | 📋 **Start test planning**: role setting + code analysis + structured step sequence |
+| `automate-step-execute` | ⚡ **Single-step execution protocol**: pre-perception → execute → wait → verify |
+| `automate-failure-recover` | 🔧 **Failure recovery**: diagnose → decide → recover → learn |
+| `automate-save-experience` | 💾 **Save experience**: structurally record success/failure patterns |
+| `automate-session-end` | 🏁 **End the session**: save experience, export scripts, switch the role back to development mode |
 
 ```python
-# 使用示例（通过 MCP 协议的 prompts/get）：
-# 1. 注入专家角色
+# Usage example (via the MCP protocol prompts/get):
+# 1. Inject the expert role
 prompts/get name="automate-expert-primer" arguments={"app_name": "MyApp.exe", "project_path": "C:\\Project"}
 
-# 2. 代码感知分析
+# 2. Code-aware analysis
 prompts/get name="automate-code-analysis" arguments={"form_name": "TNewCustomerForm", "project_path": "C:\\App"}
 
-# 3. 结合自动化测试工作流使用 —— 完整方法论见 get_coding_rules(section="automation")
+# 3. Use in combination with the automated testing workflow — see get_coding_rules(section="automation") for the complete methodology
 ```
 
-> **注意**：MCP Prompts 是 MCP 协议的扩展功能，需要 AI 客户端支持。不与 Daofy 的 `automate_delphi` 工具冲突，可以配合使用。
+> **Note**: MCP Prompts is an extension feature of the MCP protocol and requires AI client support. It does not conflict with Daofy's `automate_delphi` tool and can be used together with it.
 
 ---
 
-## 第十二章：OCR 图像文字识别
+## Chapter 12: OCR Image Text Recognition
 
-### 12.1 工具概述
+### 12.1 Tool Overview
 
-`ocr` 提供图像分析能力：PP-OCRv6 文字识别、截图差异对比、颜色分析、图标匹配。
+`ocr` provides image analysis capabilities: PP-OCRv6 text recognition, screenshot diff comparison, color analysis, and icon matching.
 
-> ⚠️ **可选功能**，需要安装：`pip install daofy-for-delphi[ocr]`
+> ⚠️ **Optional feature**, requires installation: `pip install daofy-for-delphi[ocr]`
 
-### 12.2 Action 速查
+### 12.2 Action Quick Reference
 
-| Action | 用途 |
-|--------|------|
-| `recognize` | 完整 OCR 管线：检测 → 方向分类 → 文字识别 |
-| `detect` | 仅文本框检测 |
-| `status` | 查询模型加载状态和后端信息 |
-| `diff` | 截图差异对比（像素级） |
-| `color` | 区域颜色分析 |
-| `match` | 图标模板匹配 |
+| Action | Purpose |
+|--------|---------|
+| `recognize` | Full OCR pipeline: detection → orientation classification → text recognition |
+| `detect` | Text box detection only |
+| `status` | Query model loading status and backend info |
+| `diff` | Screenshot diff comparison (pixel-level) |
+| `color` | Region color analysis |
+| `match` | Icon template matching |
 
-### 12.3 使用示例
+### 12.3 Usage Examples
 
 ```python
-# 查询模型状态
+# Query model status
 ocr(action="status")
 
-# 文字识别
+# Text recognition
 ocr(action="recognize", image_path="screenshot.png")
 
-# 仅文本框检测
+# Text box detection only
 ocr(action="detect", image_path="screenshot.png")
 
-# 截图差异对比
+# Screenshot diff comparison
 ocr(action="diff",
     baseline="before_test.png",
     current="after_test.png",
     threshold=10)
 
-# 区域颜色分析
+# Region color analysis
 ocr(action="color",
     image_path="screenshot.png",
     region=[180, 170, 75, 25])    # [x, y, w, h]
 
-# 图标匹配
+# Icon matching
 ocr(action="match",
     image_path="screenshot.png",
     template_path="save_icon.png",
     threshold=0.8)
 ```
 
-### 12.4 技术架构
+### 12.4 Technical Architecture
 
-| 组件 | 说明 |
+| Component | Description |
 |------|------|
-| **模型** | PP-OCRv6（~65MB） |
-| **推理引擎** | ONNX Runtime（Intel CPU 可选 OpenVINO 加速） |
-| **图像处理** | OpenCV + Pillow |
-| **首次加载** | 自动下载模型到 `data/ocr-models/` |
+| **Model** | PP-OCRv6 (~65MB) |
+| **Inference Engine** | ONNX Runtime (OpenVINO acceleration optional on Intel CPU) |
+| **Image Processing** | OpenCV + Pillow |
+| **First Load** | Automatically downloads model to `data/ocr-models/` |
 
-### 12.5 响应格式
+### 12.5 Response Format
 
 ```json
-// recognize 响应
+// recognize response
 {
   "status": "ok",
   "action": "recognize",
@@ -1906,7 +1905,7 @@ ocr(action="match",
   ]
 }
 
-// diff 响应
+// diff response
 {
   "changed": true,
   "diff_pixels": 1234,
@@ -1914,14 +1913,14 @@ ocr(action="match",
   "regions": [{"bbox": [10,20,100,60], "area_pct": 0.3, "mean_diff": 45.3}]
 }
 
-// color 响应
+// color response
 {
   "avg_color": {"r": 255, "g": 0, "b": 0},
   "is_grayscale": false,
   "brightness": 0.33
 }
 
-// match 响应
+// match response
 {
   "found": true,
   "match_count": 1,
@@ -1931,36 +1930,36 @@ ocr(action="match",
 
 ---
 
-## 第十三章：组件管理
+## Chapter 13: Component Management
 
-### 13.1 工具概述
+### 13.1 Tool Overview
 
-`manage_component` 管理 Delphi 窗体中的**组件（控件）**，支持 DFM 组件的增删改和 DFM↔PAS 自动同步。
+`manage_component` manages **components (controls)** in Delphi forms, supporting adding, deleting, and modifying DFM components and automatic DFM↔PAS synchronization.
 
-> ⚠️ **注意**：`manage_component` 管理的是窗体上的 UI 组件（如 TButton、TEdit），与 `package` 管理的**组件包**（.dpk 包文件）是不同的概念。
+> ⚠️ **Note**: `manage_component` manages UI components on forms (such as TButton, TEdit), which is a different concept from the **component packages** (`.dpk` package files) managed by `package`.
 
-### 13.2 Action 速查
+### 13.2 Action Quick Reference
 
-| Action | 用途 | 必需参数 |
+| Action | Purpose | Required Parameters |
 |--------|------|---------|
-| `create` | 生成组件的 DFM 定义文本（编译+运行序列化） | `code` |
-| `add` | 向现有 DFM 添加子组件，自动同步 PAS | `target_dfm`, `new_component_class`（与 `dfm_text` 二选一） |
-| `remove` | 从 DFM 删除组件（含子树），自动同步 PAS | `target_dfm`, `component_name` |
-| `modify` | 修改 DFM 中组件属性，事件变更时同步 PAS | `target_dfm`, `component_name`, `properties` |
+| `create` | Generate a DFM definition text for a component (compile + runtime serialization) | `code` |
+| `add` | Add a child component to an existing DFM, automatically syncing PAS | `target_dfm`, `new_component_class` (mutually exclusive with `dfm_text`) |
+| `remove` | Delete a component (including its subtree) from a DFM, automatically syncing PAS | `target_dfm`, `component_name` |
+| `modify` | Modify component properties in a DFM, syncing PAS when events change | `target_dfm`, `component_name`, `properties` |
 
-### 13.3 DFM↔PAS 同步规则
+### 13.3 DFM↔PAS Synchronization Rules
 
-`add`/`remove`/`modify` 操作会**自动同步**对应的 PAS 文件：
+`add`/`remove`/`modify` operations **automatically synchronize** the corresponding PAS file:
 
-| 操作 | PAS 同步内容 |
+| Operation | PAS Sync Content |
 |------|-------------|
-| **add** | 新字段声明 + 事件方法桩（procedure 声明+实现） + 新增 uses 单元 |
-| **remove** | 删除字段声明 + 删除事件方法（声明+实现） |
-| **modify** | 事件属性变更 → 增/删/改事件方法声明（属性值不变时不同步） |
+| **add** | New field declaration + event method stub (procedure declaration + implementation) + newly added uses units |
+| **remove** | Delete field declaration + delete event methods (declaration + implementation) |
+| **modify** | Event property changes → add/delete/modify event method declarations (no sync when property values are unchanged) |
 
-### 13.4 创建组件 DFM（create）
+### 13.4 Creating a Component DFM (create)
 
-编译并运行指定的 Pascal 代码，从运行时的 RTTI 序列化出组件的 DFM 文本：
+Compile and run the specified Pascal code, then serialize the component's DFM text from runtime RTTI:
 
 ```python
 manage_component(action="create",
@@ -1980,21 +1979,21 @@ end;''',
     init_code='')
 ```
 
-| 参数 | 必需 | 默认 | 说明 |
+| Parameter | Required | Default | Description |
 |------|------|------|------|
-| `code` | ✅ | — | Pascal 实现代码，必须包含 `function CreateComponent(AOwner: TComponent): TComponent;` |
-| `uses` | ❌ | [] | 需要引用的单元列表 |
-| `type_decl` | ❌ | "" | 类型声明段（用于声明 Form 类、事件桩等） |
-| `init_code` | ❌ | "" | 初始化代码（自定义 Form 类需 `RegisterClass`） |
-| `compile_timeout` | ❌ | 60 | 编译超时秒数 |
-| `exec_timeout` | ❌ | 15 | 执行超时秒数 |
+| `code` | ✅ | — | Pascal implementation code, must contain `function CreateComponent(AOwner: TComponent): TComponent;` |
+| `uses` | ❌ | [] | List of units to reference |
+| `type_decl` | ❌ | "" | Type declaration section (used to declare Form classes, event stubs, etc.) |
+| `init_code` | ❌ | "" | Initialization code (custom Form classes require `RegisterClass`) |
+| `compile_timeout` | ❌ | 60 | Compile timeout in seconds |
+| `exec_timeout` | ❌ | 15 | Execution timeout in seconds |
 
-### 13.5 添加组件（add）
+### 13.5 Adding a Component (add)
 
-向现有的 DFM 文件中添加子组件，并自动同步 PAS 的字段声明和事件方法：
+Add a child component to an existing DFM file and automatically sync the PAS field declarations and event methods:
 
 ```python
-# 基本添加
+# Basic addition
 manage_component(action="add",
     target_dfm="Unit1.dfm",
     target_pas="Unit1.pas",
@@ -2004,13 +2003,13 @@ manage_component(action="add",
     properties={"Caption": "确认", "Left": "100", "Top": "50",
                 "OnClick": "BtnOKClick"})
 
-# 添加时不指定名称（自动生成 Button1）
+# Add without specifying a name (auto-generates Button1)
 manage_component(action="add",
     target_dfm="Unit1.dfm",
     new_component_class="TButton",
     properties={"Caption": "取消"})
 
-# 使用 DFM 文本片段添加复杂组件
+# Add a complex component using a DFM text snippet
 manage_component(action="add",
     target_dfm="Unit1.dfm",
     dfm_text='''object Panel1: TPanel
@@ -2022,19 +2021,19 @@ manage_component(action="add",
 end''')
 ```
 
-| 参数 | 必需 | 说明 |
+| Parameter | Required | Description |
 |------|------|------|
-| `target_dfm` | ✅ | 目标 DFM 文件路径 |
-| `target_pas` | ❌ | PAS 文件路径（提供时自动同步声明） |
-| `parent_name` | ❌ | 父组件名称（默认添加到根组件下） |
-| `new_component_class` | ✅（与 dfm_text 二选一） | 新组件类名（如 TButton） |
-| `new_component_name` | ❌ | 新组件实例名（默认自动生成如 Button1） |
-| `properties` | ❌ | 属性字典（如 `{"Caption": "OK", "OnClick": "BtnClick"}`） |
-| `dfm_text` | ❌ | DFM 文本片段（替代 new_component_class+properties） |
+| `target_dfm` | ✅ | Target DFM file path |
+| `target_pas` | ❌ | PAS file path (automatically syncs declarations when provided) |
+| `parent_name` | ❌ | Parent component name (added under the root component by default) |
+| `new_component_class` | ✅ (mutually exclusive with dfm_text) | New component class name (e.g., TButton) |
+| `new_component_name` | ❌ | New component instance name (auto-generated such as Button1 by default) |
+| `properties` | ❌ | Property dictionary (e.g., `{"Caption": "OK", "OnClick": "BtnClick"}`) |
+| `dfm_text` | ❌ | DFM text snippet (replaces new_component_class+properties) |
 
-### 13.6 删除组件（remove）
+### 13.6 Removing a Component (remove)
 
-从 DFM 中删除组件及其子树，同时自动删除 PAS 中对应的字段声明和事件方法：
+Delete a component and its subtree from a DFM, and simultaneously auto-delete the corresponding field declarations and event methods in the PAS:
 
 ```python
 manage_component(action="remove",
@@ -2043,30 +2042,30 @@ manage_component(action="remove",
     component_name="BtnCancel")
 ```
 
-| 参数 | 必需 | 说明 |
+| Parameter | Required | Description |
 |------|------|------|
-| `target_dfm` | ✅ | 目标 DFM 文件路径 |
-| `target_pas` | ❌ | PAS 文件路径（提供时自动同步删除） |
-| `component_name` | ✅ | 要删除的组件名称 |
+| `target_dfm` | ✅ | Target DFM file path |
+| `target_pas` | ❌ | PAS file path (automatically syncs deletions when provided) |
+| `component_name` | ✅ | Name of the component to delete |
 
-系统会自动处理：
-- 删除 DFM 中该组件及其所有子组件
-- 删除 PAS 中的字段声明（`BtnCancel: TButton;`）
-- 删除 PAS 中绑定的事件方法（声明段和实现段）
+The system automatically handles:
+- Deleting the component and all its child components from the DFM
+- Deleting the field declaration in the PAS (`BtnCancel: TButton;`)
+- Deleting the event methods bound in the PAS (declaration section and implementation section)
 
-### 13.7 修改组件（modify）
+### 13.7 Modifying a Component (modify)
 
-修改 DFM 中组件的属性值，当事件绑定变更时自动同步 PAS 声明：
+Modify component property values in a DFM, and automatically sync PAS declarations when event bindings change:
 
 ```python
-# 修改普通属性
+# Modify normal properties
 manage_component(action="modify",
     target_dfm="Unit1.dfm",
     target_pas="Unit1.pas",
     component_name="BtnOK",
     properties={"Caption": "确定", "Width": "100"})
 
-# 修改事件绑定（自动同步 PAS 声明）
+# Modify event bindings (automatically syncs PAS declarations)
 manage_component(action="modify",
     target_dfm="Unit1.dfm",
     target_pas="Unit1.pas",
@@ -2074,542 +2073,543 @@ manage_component(action="modify",
     properties={"OnClick": "BtnOKClickNew"})
 ```
 
-| 参数 | 必需 | 说明 |
+| Parameter | Required | Description |
 |------|------|------|
-| `target_dfm` | ✅ | 目标 DFM 文件路径 |
-| `target_pas` | ❌ | PAS 文件路径（事件变更时自动同步） |
-| `component_name` | ✅ | 要修改的组件名称 |
-| `properties` | ✅ | 属性字典（要修改的属性名和值） |
+| `target_dfm` | ✅ | Target DFM file path |
+| `target_pas` | ❌ | PAS file path (automatically syncs when events change) |
+| `component_name` | ✅ | Name of the component to modify |
+| `properties` | ✅ | Property dictionary (property names and values to modify) |
 
-**事件同步规则**：
-| 变化类型 | PAS 处理 |
+**Event synchronization rules**:
+| Change Type | PAS Handling |
 |---------|---------|
-| 新增事件绑定（如 `OnClick=BtnClick`） | 新增方法声明 `procedure BtnClick(Sender: TObject);` + 空实现 |
-| 修改事件绑定（`OnClick=OldClick` → `NewClick`） | 删除 `OldClick` 方法 + 新增 `NewClick` 方法 |
-| 删除事件绑定（移除 `OnClick` 属性） | 删除对应事件方法声明+实现 |
+| New event binding (e.g., `OnClick=BtnClick`) | Add method declaration `procedure BtnClick(Sender: TObject);` + empty implementation |
+| Modify event binding (`OnClick=OldClick` → `NewClick`) | Delete `OldClick` method + add `NewClick` method |
+| Remove event binding (remove `OnClick` property) | Delete corresponding event method declaration+implementation |
 
-> 💡 **关联章节**：
-> - [第六章：Delphi 文件操作](#第六章delphi-文件操作) — 了解 DFM 文件的更多读写操作和备份管理
-> - [第十章：Delphi RTTI 桥接](#第十章delphi-rtti-桥接) — 了解运行时组件分析和远程调用
+> 💡 **Related chapters**:
+> - [Chapter 6: Delphi File Operations](#第六章delphi-文件操作) — Learn more about DFM file read/write operations and backup management
+> - [Chapter 10: Delphi RTTI Bridge](#第十章delphi-rtti-桥接) — Learn about runtime component analysis and remote invocation
 
 ---
 
-## 第十四章：组件包管理
+## Chapter 14: Component Package Management
 
-### 14.1 工具概述
+### 14.1 Tool Overview
 
-`package` 管理 Delphi 组件包的编译和安装。支持 `.dproj`/`.dpk`/`.groupproj` 格式的包文件。
+`package` manages the compilation and installation of Delphi component packages. Supports package files in `.dproj`/`.dpk`/`.groupproj` formats.
 
-### 14.2 Action 速查
+### 14.2 Action Quick Reference
 
-| Action | 用途 |
+| Action | Purpose |
 |--------|------|
-| `install`（默认） | 编译并安装组件包 |
-| `list` | 列出已安装到 IDE 的组件包 |
+| `install` (default) | Compile and install a component package |
+| `list` | List component packages installed in the IDE |
 
-### 14.3 安装组件包
+### 14.3 Installing a Component Package
 
 ```python
-# 安装 .dpk 包
+# Install a .dpk package
 package(action="install", package_path="MyPackage.dpk")
 
-# 安装 .dproj 包
+# Install a .dproj package
 package(action="install", package_path="MyPackage.dproj")
 
-# 安装 .groupproj 项目组
+# Install a .groupproj project group
 package(action="install", package_path="MyPackage.groupproj")
 
-# Release 配置，64 位
+# Release configuration, 64-bit
 package(action="install",
     package_path="MyPackage.dpk",
     target_platform="win64",
     build_configuration="Release",
     timeout=300)
 
-# 仅编译不注册（运行期包）
+# Compile only without registering (runtime package)
 package(action="install",
     package_path="MyRuntime.dpk",
     install=False)
 ```
 
-### 14.4 列出已安装
+### 14.4 Listing Installed Packages
 
 ```python
 package(action="list")
 ```
 
-### 14.5 安装流程说明
+### 14.5 Installation Process Description
 
-| 包类型 | 处理方式 |
+| Package Type | Handling Method |
 |--------|---------|
-| **设计期包**（Design-time） | 编译 + 自动注册到 IDE 的 `Known Packages` |
-| **运行期包**（Runtime-only） | 仅编译，不注册 |
+| **Design-time package** (Design-time) | Compile + automatically register to the IDE's `Known Packages` |
+| **Runtime-only package** (Runtime-only) | Compile only, no registration |
 
 ---
 
-## 第十五章：异步任务管理
+## Chapter 15: Async Task Management
 
-### 15.1 工具概述
+### 15.1 Tool Overview
 
-`async_task` 管理 Daofy 中的**后台异步任务**。耗时操作（如知识库构建、文档扫描、向量索引构建）会在后台执行，不阻塞 MCP 通信通道。
+`async_task` manages **background async tasks** in Daofy. Time-consuming operations (such as knowledge base construction, document scanning, and vector index building) execute in the background without blocking the MCP communication channel.
 
-> 通常知识库构建通过 `delphi_kb(action="build", async_mode=True)` 自动触发，无需手动调用。
+> Knowledge base construction is usually automatically triggered via `delphi_kb(action="build", async_mode=True)`, so manual invocation is not required.
 
-### 15.2 Action 速查
+### 15.2 Action Quick Reference
 
-| Action | 用途 |
+| Action | Purpose |
 |--------|------|
-| `start` | 启动异步任务 |
-| `status` | 查询任务状态 |
-| `result` | 获取任务结果 |
-| `list` | 列出所有任务 |
-| `cancel` | 取消运行中的任务 |
+| `start` | Start an async task |
+| `status` | Query task status |
+| `result` | Get task result |
+| `list` | List all tasks |
+| `cancel` | Cancel a running task |
 
-### 15.3 使用示例
+### 15.3 Usage Examples
 
 ```python
-# 查询任务状态（短轮询）
+# Query task status (short polling)
 async_task(action="status", task_id="task_xxx")
 
-# 长轮询（最多等待 30 秒）
+# Long polling (wait up to 30 seconds)
 async_task(action="status", task_id="task_xxx", long_poll_seconds=30)
 
-# 获取任务结果
+# Get task result
 async_task(action="result", task_id="task_xxx")
 
-# 列出所有任务
+# List all tasks
 async_task(action="list")
 
-# 取消任务
+# Cancel a task
 async_task(action="cancel", task_id="task_xxx")
 ```
 
-### 15.4 支持的任务类型
+### 15.4 Supported Task Types
 
-| task_type | 说明 |
+| task_type | Description |
 |-----------|------|
-| `build_knowledge_base` | 构建 Delphi 源码知识库 |
-| `build_thirdparty_knowledge_base` | 构建三方库知识库 |
-| `init_project_knowledge_base` | 初始化项目知识库 |
-| `build_document_knowledge_base` | 构建文档知识库 |
-| `build_embedding` | 构建向量索引 |
+| `build_knowledge_base` | Build the Delphi source knowledge base |
+| `build_thirdparty_knowledge_base` | Build a third-party library knowledge base |
+| `init_project_knowledge_base` | Initialize the project knowledge base |
+| `build_document_knowledge_base` | Build the document knowledge base |
+| `build_embedding` | Build the vector index |
 
-### 15.5 通知机制
+### 15.5 Notification Mechanism
 
-Daofy 支持 **TaskStatusNotification 推送通知**——所有异步任务完成/失败/取消时，自动推送通知到 MCP 客户端，**无需轮询**。
+Daofy supports **TaskStatusNotification push notifications**—whenever any async task completes/fails/is cancelled, a notification is automatically pushed to the MCP client, **no polling required**.
 
 ---
 
-## 第十六章：Daofy 自身更新管理
+## Chapter 16: Daofy Self-Update Management
 
-### 16.1 工具概述
+### 16.1 Tool Overview
 
-`daofy_update` 管理 Daofy MCP Server 自身的版本检查和更新。支持两种安装模式的更新：
+`daofy_update` manages version checking and updates for the Daofy MCP Server itself. Supports updates for two installation modes:
 
-| 安装方式 | 更新方式 |
+| Installation Method | Update Method |
 |---------|---------|
-| **git clone** 源码安装 | `git pull` 拉取最新代码 |
-| **pip install** 安装 | 提示使用 `pip install --upgrade daofy-for-delphi` |
+| **git clone** source installation | `git pull` to fetch the latest code |
+| **pip install** installation | Prompt to use `pip install --upgrade daofy-for-delphi` |
 
-### 16.2 Action 速查
+### 16.2 Action Quick Reference
 
-| Action | 用途 |
+| Action | Purpose |
 |--------|------|
-| `check` | 检查版本（先用缓存/快速检查，失败后自动后台重试） |
-| `check_retry` | 强制提交后台自动重试版本检查任务（返回 task_id） |
-| `update` | 提交后台 git pull 更新任务（单次，返回 task_id） |
-| `update_retry` | 提交后台自动重试 git pull 任务（可指定重试间隔与次数，返回 task_id） |
-| `version` | 显示当前版本号和安装方式（git/pip） |
+| `check` | Check version (use cache/fast check first, automatically retry in the background on failure) |
+| `check_retry` | Force submission of a background automatic version-check retry task (returns task_id) |
+| `update` | Submit a background git pull update task (single attempt, returns task_id) |
+| `update_retry` | Submit a background auto-retry git pull task (retry interval and count can be specified, returns task_id) |
+| `version` | Show current version number and installation method (git/pip) |
 
-### 16.3 使用示例
+### 16.3 Usage Examples
 
 ```python
-# 检查更新（先用缓存/快速检查，失败后自动后台重试）
+# Check for updates (use cache/fast check first, automatically retry in the background on failure)
 daofy_update(action="check")
 
-# 强制后台重试版本检查（返回 task_id）
+# Force a background version-check retry (returns task_id)
 daofy_update(action="check_retry")
 
-# 查看当前版本
+# View current version
 daofy_update(action="version")
 
-# 执行更新（git 模式，单次）
+# Perform update (git mode, single attempt)
 daofy_update(action="update")
 
-# 后台自动重试 git pull（可指定参数）
+# Background auto-retry git pull (parameters can be specified)
 daofy_update(action="update_retry", retry_interval=60, max_retries=10)
 
-# 通过 async_task 查询后台更新进度
+# Query background update progress via async_task
 async_task(action="status", task_id="task_xxx")
 ```
 
-### 16.4 更新流程
+### 16.4 Update Process
 
-1. 启动时服务器自动在后台检查更新
-2. 发现新版本时通过智能提示通知 AI
-3. AI 询问用户是否更新
-4. 用户确认后执行 `daofy_update(action="update")`
-5. 更新完成后**重启 Daofy 或 AI Agent** 使新版本生效
+1. The server automatically checks for updates in the background at startup
+2. When a new version is found, the AI is notified via smart prompts
+3. The AI asks the user whether to update
+4. After user confirmation, execute `daofy_update(action="update")`
+5. After the update completes, **restart Daofy or the AI Agent** for the new version to take effect
 
 ---
 
-## 第十七章：软著文档生成
+## Chapter 17: Software Copyright Document Generation
 
-### 17.1 工具概述
+### 17.1 Tool Overview
 
-`generate_copyright` 生成软件著作权申请所需的文档，包括源代码文档、软件说明书和申请信息汇总表。
+`generate_copyright` generates documents required for software copyright applications, including source code documents, software manuals, and application information summary tables.
 
-### 17.2 Action 速查
+### 17.2 Action Quick Reference
 
-| Action | 用途 |
+| Action | Purpose |
 |--------|------|
-| `generate` | 生成所有软著文档 |
-| `validate` | 检查配置完整性 |
-| `update_config` | 更新配置信息 |
-| `status` | 检查浏览器环境 |
-| `list` | 列出已生成的文件 |
-| `generate_content` | 生成草稿 |
-| `audit` | 审计草稿，识别驳回风险 |
+| `generate` | Generate all copyright documents |
+| `validate` | Check configuration completeness |
+| `update_config` | Update configuration information |
+| `status` | Check the browser environment |
+| `list` | List generated files |
+| `generate_content` | Generate a draft |
+| `audit` | Audit the draft and identify rejection risks |
 
-### 17.3 使用示例
+### 17.3 Usage Examples
 
 ```python
-# 检查配置
+# Check configuration
 generate_copyright(action="validate")
 
-# 更新配置
+# Update configuration
 generate_copyright(action="update_config",
     config={"contact_person": "张三", "phone": "138xxxxxxxx"})
 
-# 生成文档
+# Generate documents
 generate_copyright(action="generate")
 
-# 审计草稿
+# Audit the draft
 generate_copyright(action="audit")
 ```
 
 ---
 
-## 第十八章：故障排除与最佳实践
+## Chapter 18: Troubleshooting and Best Practices
 
-### 18.1 常见问题排查
+### 18.1 Common Troubleshooting
 
-#### 编译器未找到
+#### Compiler Not Found
 
 ```python
-check_environment(action="detect")   # 重新检测
-# 或手动指定路径
+check_environment(action="detect")   # Re-detect
+# Or manually specify the path
 check_environment(action="detect", search_path="D:\\Delphi\\Studio")
 ```
 
-#### MCP Server 无法启动
+#### MCP Server Fails to Start
 
 ```bash
-# 检查 Python 环境
+# Check the Python environment
 pip install -r requirements.txt
-# 检查 MCP 库版本
+# Check the MCP library version
 pip show mcp
 ```
 
-#### 知识库搜索无结果
+#### Knowledge Base Search Returns No Results
 
 ```python
-# 确保已构建知识库
-delphi_kb(action="stats")                    # 查看统计信息
-delphi_kb(action="build", kb_type="project") # 构建项目知识库
+# Make sure the knowledge base has been built
+delphi_kb(action="stats")                    # View statistics
+delphi_kb(action="build", kb_type="project") # Build the project knowledge base
 ```
 
-#### 搜索不到类/函数
+#### Cannot Find a Class/Function
 
-- 检查 `kb_type` 是否正确（项目代码用 `project`）
-- 尝试部分匹配（仅类名不含命名空间）
-- 检查三方库是否已安装/构建
-- 直接按文件路径搜索
+- Check whether `kb_type` is correct (use `project` for project code)
+- Try partial matching (class name only without namespace)
+- Check whether the third-party library is installed/built
+- Search directly by file path
 
-#### 写入文件报错"脏标记"
+#### "Dirty Flag" Error When Writing Files
 
 ```python
-# 先重新读取文件获取最新行号
+# Re-read the file first to get the latest line numbers
 delphi_file(action="read", file_path="Unit1.pas")
-# 或在 edit 中提供 old_content 校验
+# Or provide old_content verification in edit
 ```
 
-#### 编译事件超时
+#### Compilation Event Timeout
 
 ```python
-# 增大 timeout 参数
+# Increase the timeout parameter
 delphi_project(action="compile", project_path="Project.dproj", timeout=900)
 ```
 
-### 18.2 知识库存储位置
 
-| 知识库类型 | 存储路径 |
+### 18.2 Knowledge Base Storage Locations
+
+| Knowledge Base Type | Storage Path |
 |-----------|---------|
-| Delphi 源码知识库 | `data/delphi-knowledge-base/` |
-| 第三方库知识库 | `data/thirdparty-knowledge-base/` |
-| 通用文档知识库 | `data/document-knowledge-base/` |
-| 项目知识库 | `<项目目录>/.delphi-kb/` |
-| 示例知识库 | `data/example-knowledge-base/` |
-| 经验知识库 | `data/experience-knowledge-base/` |
+| Delphi source knowledge base | `data/delphi-knowledge-base/` |
+| Third-party library knowledge base | `data/thirdparty-knowledge-base/` |
+| General document knowledge base | `data/document-knowledge-base/` |
+| Project knowledge base | `<project directory>/.delphi-kb/` |
+| Example knowledge base | `data/example-knowledge-base/` |
+| Experience knowledge base | `data/experience-knowledge-base/` |
 
-### 18.3 知识库自动生命周期
+### 18.3 Knowledge Base Automatic Lifecycle
 
-| 机制 | 触发时机 | 说明 |
+| Mechanism | Trigger Timing | Description |
 |------|---------|------|
-| **启动时自动构建** | MCP Server 启动 | 自动检测 CWD 下的 `.dproj`，提交后台增量 KB 构建 |
-| **热切换重建** | 用户手动 rebuild | 构建到临时目录，旧 KB 保持可查，构建完成原子 swap |
-| **文件变更监听** | 用户保存 `.pas/.dfm/.dproj` | 需要 `pip install daofy-for-delphi[watcher]`，3 秒去抖后自动触发增量更新 |
+| **Auto-build at startup** | MCP Server startup | Automatically detects `.dproj` files under CWD and submits a background incremental KB build |
+| **Hot-swap rebuild** | User manually rebuilds | Builds to a temporary directory while the old KB remains queryable; atomic swap upon completion |
+| **File change watching** | User saves `.pas/.dfm/.dproj` | Requires `pip install daofy-for-delphi[watcher]`; automatically triggers incremental updates after a 3-second debounce |
 
-### 18.4 最佳实践
+### 18.4 Best Practices
 
-#### 开发工作流
+#### Development Workflow
 
 ```python
-# 标准 Delphi 开发工作流
-get_coding_rules(section="workflow")          # ① 了解工作流
-get_coding_rules(section="writing")           # ② 了解编码规范
-delphi_kb(query="TStringList")               # ③ 搜索 API 定义
-delphi_file(action="read", file_path=...)    # ④ 读源码确认修改点
-delphi_file(action="write", edits=[...])     # ⑤ 写代码
-delphi_file(action="format", file_path=...)  # ⑥ 格式化
-delphi_project(action="compile", project_path=...)  # ⑦ 编译验证
-get_coding_rules(section="review")           # ⑧ 审查代码
-code_hosting(action="git_add", files=["."])  # ⑨ 提交代码
-code_hosting(action="git_commit", ...)       # ⑩ 创建提交
-code_hosting(action="git_push")              # ⑪ 推送
+# Standard Delphi development workflow
+get_coding_rules(section="workflow")          # ① Learn the workflow
+get_coding_rules(section="writing")           # ② Learn the coding standards
+delphi_kb(query="TStringList")               # ③ Search API definitions
+delphi_file(action="read", file_path=...)    # ④ Read source code to confirm modification points
+delphi_file(action="write", edits=[...])     # ⑤ Write code
+delphi_file(action="format", file_path=...)  # ⑥ Format
+delphi_project(action="compile", project_path=...)  # ⑦ Compile and verify
+get_coding_rules(section="review")           # ⑧ Review code
+code_hosting(action="git_add", files=["."])  # ⑨ Stage code
+code_hosting(action="git_commit", ...)       # ⑩ Create commit
+code_hosting(action="git_push")              # ⑪ Push
 ```
 
-#### Git 提交信息规范
+#### Git Commit Message Convention
 
 ```bash
-feat(scope): 新功能
-fix(scope): 修复 Bug
-docs(scope): 文档变更
-refactor(scope): 重构
-test(scope): 测试
-chore(scope): 构建/工具变更
+feat(scope): new feature
+fix(scope): bug fix
+docs(scope): documentation change
+refactor(scope): refactor
+test(scope): tests
+chore(scope): build/tooling change
 ```
 
-#### 知识库使用原则
+#### Knowledge Base Usage Principles
 
-1. **先精确搜索，后语义搜索**：精确类名 > 函数名 > 引用查询 > 语义搜索
-2. **尽可能使用英文搜索**：英文 API 名比中文语义搜索准确得多
-3. **搜索无结果时换名再试**：`TMainForm` → `TfrmMain` → `Form1`
-4. **项目代码用 `kb_type="project"`**：默认 `all` 不包含项目知识库
+1. **Exact search first, semantic search later**: exact class name > function name > reference query > semantic search
+2. **Use English search whenever possible**: English API names are far more accurate than Chinese semantic search
+3. **Try alternative names when search returns nothing**: `TMainForm` → `TfrmMain` → `Form1`
+4. **Use `kb_type="project"` for project code**: the default `all` does not include the project knowledge base
 
-#### 文件编辑安全原则
+#### File Editing Safety Principles
 
-1. **多处修改合并到一次 `write`**：不要对同一文件分多次调用
-2. **格式化前自动备份**：`backup=True`（默认）确保可回退
-3. **脏标记保护**：写入后文件标记脏，再次写入前必须重新 read
-4. **old_content 校验**：在 edit 中提供 old_content 可绕过脏标记且确保行号准确
+1. **Merge multiple modifications into a single `write`**: do not call multiple times on the same file
+2. **Automatic backup before formatting**: `backup=True` (default) ensures rollback capability
+3. **Dirty flag protection**: files are marked dirty after writing; re-read is required before writing again
+4. **old_content verification**: providing old_content in edit bypasses the dirty flag and ensures accurate line numbers
 
-#### 经验库维护原则
+#### Experience Base Maintenance Principles
 
-1. **保存前先泛化**：先搜索是否已有同类经验，找到后用 merge/update
-2. **定期清理**：每月执行 prune 列出低价值记录
-3. **hit ≥ 3 规则化**：高频经验升级为 CODING_RULES 正式规则
+1. **Generalize before saving**: first search for existing similar experiences; if found, use merge/update
+2. **Regular cleanup**: run prune monthly to list low-value records
+3. **Promote to rule when hit ≥ 3**: high-frequency experiences are upgraded to formal CODING_RULES
 
 ---
 
-## 附录 A：快速命令参考
+## Appendix A: Quick Command Reference
 
-### 环境与配置
+### Environment and Configuration
 
 ```python
-check_environment(action="check")            # 检查编译环境
-check_environment(action="detect")           # 检测编译器
+check_environment(action="check")            # Check the compilation environment
+check_environment(action="detect")           # Detect compilers
 ```
 
-### 知识库
+### Knowledge Base
 
 ```python
-delphi_kb(action="stats")                                    # 查看统计
-delphi_kb(query="TStringList")                               # 搜索类
-delphi_kb(query="Create", search_type="function")             # 搜索函数
-delphi_kb(query="JSON compare", search_type="semantic")      # 语义搜索
-delphi_kb(action="build", kb_type="document")                # 构建文档 KB
-delphi_kb(action="build", kb_type="project")                 # 构建项目 KB
+delphi_kb(action="stats")                                    # View statistics
+delphi_kb(query="TStringList")                               # Search for a class
+delphi_kb(query="Create", search_type="function")             # Search for a function
+delphi_kb(query="JSON compare", search_type="semantic")      # Semantic search
+delphi_kb(action="build", kb_type="document")                # Build the document KB
+delphi_kb(action="build", kb_type="project")                 # Build the project KB
 ```
 
-### 编译与审计
+### Compilation and Auditing
 
 ```python
-delphi_project(action="compile", project_path="App.dproj")          # 编译项目
-delphi_project(action="compile_file", project_path="Unit1.pas")     # 语法检查
-delphi_project(action="ast", base_dir="src")                        # 代码骨架
-delphi_project(action="audit", base_dir="src")                      # 代码审计
+delphi_project(action="compile", project_path="App.dproj")          # Compile the project
+delphi_project(action="compile_file", project_path="Unit1.pas")     # Syntax check
+delphi_project(action="ast", base_dir="src")                        # Code skeleton
+delphi_project(action="audit", base_dir="src")                      # Code audit
 ```
 
-### 文件操作
+### File Operations
 
 ```python
-delphi_file(action="read", file_path="Unit1.pas")            # 读文件
-delphi_file(action="write", file_path="Unit1.pas",           # 写文件
+delphi_file(action="read", file_path="Unit1.pas")            # Read a file
+delphi_file(action="write", file_path="Unit1.pas",           # Write a file
     edits=[{"start_line": 5, "content": "  // new code\n"}])
-delphi_file(action="format", file_path="Unit1.pas")          # 格式化
-delphi_file(action="encode", file_path="Unit1.pas",          # 编码转换
+delphi_file(action="format", file_path="Unit1.pas")          # Format
+delphi_file(action="encode", file_path="Unit1.pas",          # Encoding conversion
     to_encoding="utf-8")
-delphi_file(action="uses", uses_action="add",                # 添加 uses
+delphi_file(action="uses", uses_action="add",                # Add uses
     unit_name="System.SysUtils", file_path="Unit1.pas")
 ```
 
-### 代码托管
+### Code Hosting
 
 ```python
-code_hosting(action="git_status")                            # 查看状态
-code_hosting(action="git_diff", stat=True)                    # 查看变更摘要
-code_hosting(action="git_log", limit=5)                      # 查看提交历史
-code_hosting(action="git_add", files=["."])                  # 暂存
-code_hosting(action="git_commit", message="feat: xxx")       # 提交
-code_hosting(action="git_branch")                             # 列出分支
-code_hosting(action="git_switch", branch="feature")          # 切换分支
-code_hosting(action="git_merge", branch="feature")           # 合并分支
-code_hosting(action="git_fetch")                              # 拉取远程引用
-code_hosting(action="git_pull")                               # 拉取并合并
-code_hosting(action="git_push")                              # 推送
-code_hosting(action="git_tag", tag="v1.0", message="v1.0") # 创建标签
-code_hosting(action="create_issue", repo="my/myrepo",       # 创建工单
+code_hosting(action="git_status")                            # View status
+code_hosting(action="git_diff", stat=True)                    # View change summary
+code_hosting(action="git_log", limit=5)                      # View commit history
+code_hosting(action="git_add", files=["."])                  # Stage
+code_hosting(action="git_commit", message="feat: xxx")       # Commit
+code_hosting(action="git_branch")                             # List branches
+code_hosting(action="git_switch", branch="feature")          # Switch branches
+code_hosting(action="git_merge", branch="feature")           # Merge branches
+code_hosting(action="git_fetch")                              # Fetch remote refs
+code_hosting(action="git_pull")                               # Pull and merge
+code_hosting(action="git_push")                              # Push
+code_hosting(action="git_tag", tag="v1.0", message="v1.0") # Create a tag
+code_hosting(action="create_issue", repo="my/myrepo",       # Create an issue
     title="Bug", body="description")
-code_hosting(action="get_issue", repo="my/myrepo",           # 查看工单
+code_hosting(action="get_issue", repo="my/myrepo",           # View an issue
     issue_number=42)
-code_hosting(action="edit_issue", repo="my/myrepo",          # 修改工单
+code_hosting(action="edit_issue", repo="my/myrepo",          # Edit an issue
     issue_number=42, labels=["bug"])
 ```
 
-### 经验与更新
+### Experience and Updates
 
 ```python
-experience(action="save", problem="...", solution="...")     # 保存经验
-experience(action="search", query="...")                     # 搜索经验
-daofy_update(action="check")                                 # 检查更新
-daofy_update(action="check_retry")                           # 强制后台重试检查
-daofy_update(action="update")                                # 后台 git pull 更新
-daofy_update(action="update_retry")                          # 后台自动重试 git pull
-daofy_update(action="version")                               # 查看版本
+experience(action="save", problem="...", solution="...")     # Save experience
+experience(action="search", query="...")                     # Search experience
+daofy_update(action="check")                                 # Check for updates
+daofy_update(action="check_retry")                           # Force background retry check
+daofy_update(action="update")                                # Background git pull update
+daofy_update(action="update_retry")                          # Background auto-retry git pull
+daofy_update(action="version")                               # View version
 ```
 
-### 工具帮助
+### Tool Help
 
 ```python
-tool_help(tool_name="delphi_file")                           # 查看工具完整帮助
-tool_help(tool_name="project")                                # 查看 project 工具帮助
+tool_help(tool_name="delphi_file")                           # View full tool help
+tool_help(tool_name="project")                                # View project tool help
 ```
 
-### 组件管理
+### Component Management
 
 ```python
-manage_component(action="create", code="...", uses=["Vcl.StdCtrls"])  # 创建组件 DFM
-manage_component(action="add", target_dfm="Unit1.dfm",        # 添加组件
+manage_component(action="create", code="...", uses=["Vcl.StdCtrls"])  # Create a component DFM
+manage_component(action="add", target_dfm="Unit1.dfm",        # Add a component
     new_component_class="TButton", properties={"Caption": "OK"})
-manage_component(action="remove", target_dfm="Unit1.dfm",     # 删除组件
+manage_component(action="remove", target_dfm="Unit1.dfm",     # Remove a component
     component_name="BtnCancel")
-manage_component(action="modify", target_dfm="Unit1.dfm",     # 修改组件属性
+manage_component(action="modify", target_dfm="Unit1.dfm",     # Modify component properties
     component_name="BtnOK", properties={"Caption": "确定"})
 ```
 
-### 高级功能
+### Advanced Features
 
 ```python
-delphi_rtti(action="discover", app_path="App.exe")           # RTTI 发现
-delphi_rtti(action="call", app_path="App.exe",               # RTTI 调用
+delphi_rtti(action="discover", app_path="App.exe")           # RTTI discovery
+delphi_rtti(action="call", app_path="App.exe",               # RTTI invocation
     class_name="TMainForm", method="CreateOrder")
-automate_delphi(action="gui", app_path="App.exe",            # GUI 自动化
+automate_delphi(action="gui", app_path="App.exe",            # GUI automation
     script=[{"cmd":"goto","target":"TForm1"}])
-automate_delphi(action="console", app_path="Tool.exe",       # 控制台交互
+automate_delphi(action="console", app_path="Tool.exe",       # Console interaction
     input="Y\n", expect="complete")
-ocr(action="recognize", image_path="screenshot.png")         # OCR 识别
-package(action="install", package_path="MyPackage.dpk")      # 安装组件包
+ocr(action="recognize", image_path="screenshot.png")         # OCR recognition
+package(action="install", package_path="MyPackage.dpk")      # Install a component package
 ```
 
 ---
 
-## 附录 B：环境变量
+## Appendix B: Environment Variables
 
-| 环境变量 | 说明 |
+| Environment Variable | Description |
 |---------|------|
-| `PYTHONUNBUFFERED=1` | 禁用 Python 输出缓冲 |
-| `PYTHONIOENCODING=utf-8` | 设置标准 I/O 编码为 UTF-8 |
-| `PYTHONUTF8=1` | 启用 UTF-8 模式 |
-| `TRANSFORMERS_OFFLINE=1` | 离线模式（embedding 模型已缓存时使用） |
+| `PYTHONUNBUFFERED=1` | Disable Python output buffering |
+| `PYTHONIOENCODING=utf-8` | Set standard I/O encoding to UTF-8 |
+| `PYTHONUTF8=1` | Enable UTF-8 mode |
+| `TRANSFORMERS_OFFLINE=1` | Offline mode (used when the embedding model is already cached) |
 
 ---
 
-## 附录 C：项目结构
+## Appendix C: Project Structure
 
 ```
 daofy/
 ├── src/
-│   ├── server.py              # MCP 入口点
-│   ├── tools/                 # MCP 工具实现
-│   │   ├── project.py         # 项目生命周期管理
-│   │   ├── file_tool.py       # Delphi 文件操作
-│   │   ├── knowledge_base.py  # 知识库搜索
-│   │   ├── code_hosting.py    # Git/代码托管
-│   │   ├── delphi_rtti.py     # RTTI 桥接
-│   │   ├── environment.py     # 环境检查
-│   │   ├── experience.py      # 经验记忆
+│   ├── server.py              # MCP entry point
+│   ├── tools/                 # MCP tool implementations
+│   │   ├── project.py         # Project lifecycle management
+│   │   ├── file_tool.py       # Delphi file operations
+│   │   ├── knowledge_base.py  # Knowledge base search
+│   │   ├── code_hosting.py    # Git/code hosting
+│   │   ├── delphi_rtti.py     # RTTI bridge
+│   │   ├── environment.py     # Environment check
+│   │   ├── experience.py      # Experience memory
 │   │   └── ...
-│   ├── services/              # 业务逻辑
+│   ├── services/              # Business logic
 │   │   ├── compiler_service.py
 │   │   ├── automation_service.py
 │   │   ├── rtti_bridge.py
-│   │   └── knowledge_base/    # KB 模块
-│   ├── models/                # 数据模型
-│   ├── resources/             # MCP Resource 默认文档
-│   │   ├── coding-rules.md    # 内置编码规范
-│   │   └── automation/        # 自动化测试工作流资源
-│   ├── utils/                 # 工具函数
-│   └── tool_docs.py           # 工具文档
+│   │   └── knowledge_base/    # KB modules
+│   ├── models/                # Data models
+│   ├── resources/             # MCP Resource default documents
+│   │   ├── coding-rules.md    # Built-in coding standards
+│   │   └── automation/        # Automation test workflow resources
+│   ├── utils/                 # Utility functions
+│   └── tool_docs.py           # Tool documentation
 ├── config/
-│   └── logging_config.json    # 日志配置
+│   └── logging_config.json    # Logging configuration
 ├── tools/
-│   ├── auto/                  # DaofyAutomation 单元
+│   ├── auto/                  # DaofyAutomation units
 │   │   ├── DaofyAutomation.Base.pas
 │   │   ├── Vcl.DaofyAutomation.pas
 │   │   ├── Fmx.DaofyAutomation.pas
 │   │   └── DaofyAutomation.RttiDiscovery.pas
-│   └── daudit/                # 代码审计引擎
-├── data/                      # 知识库数据（运行时生成）
-├── docs/                      # 文档
-└── tests/                     # 测试用例
+│   └── daudit/                # Code audit engine
+├── data/                      # Knowledge base data (generated at runtime)
+├── docs/                      # Documentation
+└── tests/                     # Test cases
 ```
 
 ---
 
-## 附录 D：MCP 协议资源
+## Appendix D: MCP Protocol Resources
 
-Daofy 通过 MCP Resources 向 AI Agent 提供稳定文档入口。Agent 应优先读取这些
-`delphi://...` URI，而不是直接依赖 `.opencode/`、`.claude/`、`.cursor/`
-等客户端专用目录。
+Daofy provides stable documentation entry points to AI Agents via MCP Resources. Agents should preferentially read these
+`delphi://...` URIs rather than relying directly on client-specific directories such as
+`.opencode/`, `.claude/`, `.cursor/`, etc.
 
-| 资源 URI | 说明 |
+| Resource URI | Description |
 |---------|------|
-| `delphi://resources` | Daofy 公开资源索引（Markdown 格式） |
-| `delphi://coding-rules` | Delphi 编码规范（Markdown 格式） |
-| `delphi://automation/workflow` | 自动化测试完整工作流 |
-| `delphi://automation/script-generation-workflow` | AI 生成自动化脚本的完整流程 |
-| `delphi://automation/script-schema` | `automate_delphi` 脚本结构与断言写法 |
-| `delphi://automation/report-schema` | 自动化测试报告结构与解读方式 |
-| `delphi://automation/repair-loop` | 失败诊断、脚本修正、代码修正与重跑闭环 |
-| `delphi://automation/inline-unit` | `tools/auto` Delphi 内联单元接入说明 |
-| `delphi://health` | 服务器健康状态（JSON 格式） |
+| `delphi://resources` | Daofy public resource index (Markdown format) |
+| `delphi://coding-rules` | Delphi coding standards (Markdown format) |
+| `delphi://automation/workflow` | Complete automation test workflow |
+| `delphi://automation/script-generation-workflow` | Complete workflow for AI-generated automation scripts |
+| `delphi://automation/script-schema` | `automate_delphi` script structure and assertion syntax |
+| `delphi://automation/report-schema` | Automation test report structure and interpretation |
+| `delphi://automation/repair-loop` | Failure diagnosis, script correction, code correction, and re-run loop |
+| `delphi://automation/inline-unit` | `tools/auto` Delphi inline unit integration guide |
+| `delphi://health` | Server health status (JSON format) |
 
 ```python
-# 查看公开资源索引
-# 通过 MCP resources/read 访问 delphi://resources
+# View the public resource index
+# Access delphi://resources via MCP resources/read
 
-# 查看服务器状态
-# 通过 MCP resources/read 访问 delphi://health
+# View server status
+# Access delphi://health via MCP resources/read
 ```
 
-Resources 负责提供规范和流程文档；Prompts 负责启动特定工作流；Tools 负责实际
-执行编译、文件编辑、自动化测试和经验记录。
+Resources are responsible for providing standards and process documentation; Prompts are responsible for launching specific workflows; Tools are responsible for actually
+executing compilation, file editing, automation testing, and experience recording.
 
 ---
 
-> **版权信息**：Copyright © 2026 吉林省左右软件开发有限公司 / Equilibrium Software Development Co., Ltd, Jilin
+> **Copyright**: Copyright © 2026 吉林省左右软件开发有限公司 / Equilibrium Software Development Co., Ltd, Jilin
 >
-> **许可证**：MIT License
+> **License**: MIT License
 >
-> **联系方式**：提交 Issue 至 [GitHub](https://github.com/chinawsb/daofy) | QQ 群：250530692
+> **Contact**: Submit an Issue to [GitHub](https://github.com/chinawsb/daofy) | QQ Group: 250530692

@@ -1,19 +1,19 @@
 """
-自动更新模块 — 版本检测 / GitHub+PyPI Release 查询 / git pull 更新
+Automatic update module — version detection / GitHub+PyPI Release query / git pull update
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Province Zuoyou Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
 
-功能:
-  - get_current_version()       读取当前版本（metadata→pyproject.toml→环境变量）
-  - fetch_latest_release()      查询 GitHub 最新 Release（带镜像回退）
-  - fetch_pypi_version()        查询 PyPI 最新版本（pip 安装专用，无需认证）
-  - compare_versions(a, b)      比较 YYYY.MM.DD 版本号
-  - check_for_update()          智能版本检查（pip→PyPI，git→GitHub）
-  - check_for_update_retry()    ⭐ 异步自动重试版本检查（后台运行，可取消）
-  - is_git_installation()       判断是否为 git 源码安装
-  - is_pip_installation()       判断是否为 pip 安装
-  - git_pull_update()           执行 git pull 更新
+Features:
+  - get_current_version()       read current version (metadata→pyproject.toml→env var)
+  - fetch_latest_release()      query latest GitHub Release (with mirror fallback)
+  - fetch_pypi_version()        query latest PyPI version (pip installations only, no auth)
+  - compare_versions(a, b)      compare YYYY.MM.DD version numbers
+  - check_for_update()          smart version check (pip→PyPI, git→GitHub)
+  - check_for_update_retry()    ⭐ asynchronous automatic retry version check (background, cancellable)
+  - is_git_installation()       determine whether this is a git source installation
+  - is_pip_installation()       determine whether this is a pip installation
+  - git_pull_update()           execute git pull update
 """
 
 import asyncio
@@ -37,73 +37,73 @@ from ..constants import (
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# 仓库信息
+# Repository information
 # ============================================================
 RELEASE_REPO = "chinawsb/daofy"
 RELEASE_API = f"https://api.github.com/repos/{RELEASE_REPO}/releases/latest"
 
-# GitHub 国内镜像代理
+# GitHub domestic mirror proxies
 GITHUB_MIRRORS: list[str] = [
-    "",  # 原始源（优先尝试）
-    "https://ghproxy.com",  # ghproxy 新域名
-    "https://ghproxy.net",  # ghproxy 旧域名
+    "",  # Original source (tried first)
+    "https://ghproxy.com",  # ghproxy new domain
+    "https://ghproxy.net",  # ghproxy old domain
 ]
 
-# PyPI 包信息
+# PyPI package information
 PYPI_PACKAGE = "daofy-for-delphi"
 PYPI_JSON_URL = f"https://pypi.org/pypi/{PYPI_PACKAGE}/json"
 
-# PyPI 国内镜像
+# PyPI domestic mirrors
 PYPI_MIRRORS: list[str] = [
-    "",  # PyPI 官方
-    "https://pypi.tuna.tsinghua.edu.cn",  # 清华镜像
-    "https://mirrors.aliyun.com/pypi",  # 阿里云镜像
+    "",  # PyPI official
+    "https://pypi.tuna.tsinghua.edu.cn",  # Tsinghua mirror
+    "https://mirrors.aliyun.com/pypi",  # Aliyun mirror
 ]
 
-# 单次请求参数
+# Single request parameters
 MAX_RETRY = 3
-RETRY_DELAY = 2  # 秒
-REQUEST_TIMEOUT = 15  # 秒
+RETRY_DELAY = 2  # seconds
+REQUEST_TIMEOUT = 15  # seconds
 
-# 后台自动重试参数（check_for_update_retry）
-RETRY_INTERVAL = 300     # 两次重试间隔（5分钟）
-MAX_RETRIES = 12          # 最大重试次数（≈1小时）
-ETA_MINUTES = (RETRY_INTERVAL * MAX_RETRIES) // 60  # 约60分钟
+# Background automatic retry parameters (check_for_update_retry)
+RETRY_INTERVAL = 300     # interval between retries (5 minutes)
+MAX_RETRIES = 12          # max retries (≈1 hour)
+ETA_MINUTES = (RETRY_INTERVAL * MAX_RETRIES) // 60  # about 60 minutes
 
 
 # ============================================================
-# 版本工具
+# Version utilities
 # ============================================================
 
 def _get_project_root() -> Path:
-    """获取项目根目录（pyproject.toml 所在目录）。"""
-    # 当前文件在 src/utils/updater.py，向上两级
+    """Get the project root directory (where pyproject.toml is located)."""
+    # Current file is src/utils/updater.py, go up two levels
     return Path(__file__).resolve().parent.parent.parent
 
 
 def get_current_version() -> str:
-    """读取当前版本号。
+    """Read the current version number.
 
-    优先级：
-    1. DAOFY_VERSION 环境变量
-    2. importlib.metadata（pip 安装场景）
-    3. pyproject.toml 文件（源码运行兜底）
+    Priority:
+    1. DAOFY_VERSION environment variable
+    2. importlib.metadata (pip installation scenario)
+    3. pyproject.toml file (source-run fallback)
 
     Returns:
-        版本号字符串，如 "2026.07.18.1"；读取失败返回 "0.0.0"。
+        Version string, e.g. "2026.07.18.1"; returns "0.0.0" on read failure.
     """
-    # 1. 环境变量
+    # 1. Environment variable
     env_ver = os.environ.get("DAOFY_VERSION")
     if env_ver:
         return env_ver
 
-    # 2. importlib.metadata — pip 安装后的标准方式
+    # 2. importlib.metadata — standard method after pip installation
     try:
         return _get_installed_version(PYPI_PACKAGE)
     except PackageNotFoundError:
         pass
 
-    # 3. 读取 pyproject.toml（源码运行兜底）
+    # 3. Read pyproject.toml (source-run fallback)
     pyproject_path = _get_project_root() / "pyproject.toml"
     try:
         with open(pyproject_path, "r", encoding="utf-8") as f:
@@ -115,19 +115,19 @@ def get_current_version() -> str:
                         ver = parts[1].strip().strip('"').strip("'")
                         if ver:
                             return ver
-        logger.debug("pyproject.toml 中未找到 version 字段")
+        logger.debug("version field not found in pyproject.toml")
     except Exception as e:
-        logger.warning("读取版本号失败: %s", e)
+        logger.warning("Failed to read version number: %s", e)
 
     return os.environ.get("DAOFY_VERSION", "0.0.0")
 
 
 def compare_versions(a: str, b: str) -> int:
-    """比较两个 YYYY.MM.DD 版本号。
+    """Compare two YYYY.MM.DD version numbers.
 
     Args:
-        a: 版本号 A
-        b: 版本号 B
+        a: version number A
+        b: version number B
 
     Returns:
         1  if a > b
@@ -137,7 +137,7 @@ def compare_versions(a: str, b: str) -> int:
     try:
         parts_a = [int(x) for x in a.split(".")]
         parts_b = [int(x) for x in b.split(".")]
-        # 补齐到相同长度
+        # Pad to the same length
         max_len = max(len(parts_a), len(parts_b))
         parts_a += [0] * (max_len - len(parts_a))
         parts_b += [0] * (max_len - len(parts_b))
@@ -148,8 +148,8 @@ def compare_versions(a: str, b: str) -> int:
                 return -1
         return 0
     except (ValueError, AttributeError):
-        logger.warning(f"版本号格式异常: a={a!r}, b={b!r}，回退字符串比较")
-        # 回退：字符串比较
+        logger.warning(f"Invalid version format: a={a!r}, b={b!r}, falling back to string comparison")
+        # Fallback: string comparison
         if a > b:
             return 1
         if a < b:
@@ -158,18 +158,18 @@ def compare_versions(a: str, b: str) -> int:
 
 
 # ============================================================
-# GitHub API 查询（复用 install_mcp.py 的镜像回退模式）
+# GitHub API query (reuses install_mcp.py mirror fallback pattern)
 # ============================================================
 
 def _build_mirror_urls(url: str) -> list[str]:
-    """将 GitHub URL 扩展为多镜像 URL 列表（原始源 + 国内代理）。"""
+    """Expand a GitHub URL into a list of multi-mirror URLs (original source + domestic proxies)."""
     urls: list[str] = []
     for m in GITHUB_MIRRORS:
         if not m:
             urls.append(url)
         else:
             urls.append(f"{m}/{url}")
-    # 去重（保留顺序）
+    # Deduplicate (preserve order)
     seen: set[str] = set()
     result: list[str] = []
     for u in urls:
@@ -185,7 +185,7 @@ def _retry_urlopen(
     timeout: int = REQUEST_TIMEOUT,
     max_retry: int = MAX_RETRY,
 ) -> bytes:
-    """带重试的 urllib 请求。"""
+    """urllib request with retries."""
     last_err: Optional[Exception] = None
     for attempt in range(1, max_retry + 1):
         try:
@@ -196,24 +196,24 @@ def _retry_urlopen(
             last_err = e
             if attempt < max_retry:
                 wait = RETRY_DELAY * min(attempt, 5)
-                logger.debug(f"请求失败(第{attempt}次): {e}，{wait}秒后重试...")
+                logger.debug(f"Request failed (attempt {attempt}): {e}, retrying in {wait}s...")
                 import time
                 time.sleep(wait)
     raise last_err  # type: ignore[misc]
 
 
 # ============================================================
-# 公开 API
+# Public API
 # ============================================================
 
 def fetch_latest_release(timeout: int = REQUEST_TIMEOUT) -> Optional[dict]:
-    """查询 GitHub 最新 Release 信息。
+    """Query the latest GitHub Release information.
 
     Args:
-        timeout: 单次请求超时秒数
+        timeout: per-request timeout in seconds
 
     Returns:
-        dict 包含 tag_name, html_url, body 等字段；失败返回 None。
+        dict containing tag_name, html_url, body, etc.; None on failure.
     """
     api_urls = _build_mirror_urls(RELEASE_API)
     last_err: Optional[Exception] = None
@@ -229,29 +229,29 @@ def fetch_latest_release(timeout: int = REQUEST_TIMEOUT) -> Optional[dict]:
             return data
         except urllib.error.HTTPError as e:
             last_err = e
-            # 分类 HTTP 错误
+            # Classify HTTP errors
             if e.code == 403:
-                logger.warning("GitHub API 访问受限(403): %s — 可能是网络问题或 rate limit", api_url)
+                logger.warning("GitHub API access restricted (403): %s — may be a network issue or rate limit", api_url)
             elif e.code == 404:
-                logger.warning("GitHub Release 不存在(404): %s", api_url)
+                logger.warning("GitHub Release does not exist (404): %s", api_url)
             else:
-                logger.debug("从镜像获取 Release 信息失败: %s — HTTP %d", api_url, e.code)
+                logger.debug("Failed to get Release info from mirror: %s — HTTP %d", api_url, e.code)
             continue
         except Exception as e:
             last_err = e
-            logger.debug("从镜像获取 Release 信息失败: %s — %s", api_url, _categorize_request_error(e))
+            logger.debug("Failed to get Release info from mirror: %s — %s", api_url, _categorize_request_error(e))
             continue
     if last_err:
         error_hint = _categorize_request_error(last_err)
-        logger.warning("所有镜像获取 Release 信息均失败: %s", error_hint)
+        logger.warning("Failed to get Release info from all mirrors: %s", error_hint)
     return None
 
 
 def get_latest_version() -> Optional[str]:
-    """查询 GitHub 最新 Release 版本号。
+    """Query the latest GitHub Release version number.
 
     Returns:
-        版本号字符串（如 "2026.06.15"），失败返回 None。
+        Version string (e.g. "2026.06.15"), or None on failure.
     """
     data = fetch_latest_release()
     if data:
@@ -260,52 +260,52 @@ def get_latest_version() -> Optional[str]:
 
 
 def _categorize_request_error(err: Exception) -> str:
-    """将请求错误分类为用户友好的中文提示。
+    """Classify request errors into user-friendly English hints.
 
     Args:
-        err: 异常对象
+        err: exception object
 
     Returns:
-        用户友好的错误描述
+        User-friendly error description
     """
     err_str = str(err).lower()
 
     # Rate limit (GitHub 403)
     if "403" in err_str or "rate limit" in err_str or "abuse" in err_str:
-        return "GitHub API 访问受限（可能是网络问题或请求过于频繁）"
+        return "GitHub API access restricted (may be a network issue or too many requests)"
 
-    # 网络连接问题
+    # Network connection problems
     if any(kw in err_str for kw in (
         "timed out", "timeout", "connection refused",
         "connection reset", "connection abort",
     )):
-        return "网络连接超时或被拒绝，请检查网络连接"
+        return "Network connection timed out or refused; please check your network connection"
 
-    # DNS 解析失败
+    # DNS resolution failure
     if any(kw in err_str for kw in (
         "resolve", "name or service not known",
         "getaddrinfo", "nodename nor servname",
     )):
-        return "无法解析主机地址，请检查 DNS 或网络连接"
+        return "Unable to resolve host address; please check DNS or network connection"
 
-    # 被墙/代理失败
+    # Blocked/proxy failure
     if any(kw in err_str for kw in (
         "ssl", "certificate", "eof", "connection reset by peer",
     )):
-        return "网络连接异常（可能是代理或防火墙问题）"
+        return "Network connection error (possibly proxy or firewall issue)"
 
-    # 默认
-    return f"请求失败: {err}"
+    # Default
+    return f"Request failed: {err}"
 
 
 def fetch_pypi_version(timeout: int = REQUEST_TIMEOUT) -> Optional[str]:
-    """查询 PyPI 最新版本号（无需认证，国内可访问）。
+    """Query the latest PyPI version number (no auth required, accessible in China).
 
     Args:
-        timeout: 单次请求超时秒数
+        timeout: per-request timeout in seconds
 
     Returns:
-        版本号字符串（如 "2026.07.17"），失败返回 None。
+        Version string (e.g. "2026.07.17"), or None on failure.
     """
     for mirror in PYPI_MIRRORS:
         try:
@@ -322,48 +322,48 @@ def fetch_pypi_version(timeout: int = REQUEST_TIMEOUT) -> Optional[str]:
             )
             version = data.get("info", {}).get("version")
             if version:
-                logger.debug("从 PyPI 获取版本成功: %s (mirror: %s)", version, mirror or "official")
+                logger.debug("Got version from PyPI: %s (mirror: %s)", version, mirror or "official")
                 return version
         except Exception as e:
-            logger.debug("从 PyPI 获取版本失败: %s — %s", url, e)
+            logger.debug("Failed to get version from PyPI: %s — %s", url, e)
             continue
-    logger.warning("所有 PyPI 镜像获取版本均失败")
+    logger.warning("Failed to get version from all PyPI mirrors")
     return None
 
 
 def check_for_update() -> Optional[dict]:
-    """检查是否有新版本可用。
+    """Check whether a new version is available.
 
-    根据安装方式自动选择版本源：
-    - pip 安装 → 优先查询 PyPI（无需认证，国内可访问）
-    - git 安装 → 查询 GitHub Release
+    Automatically selects the version source based on installation type:
+    - pip installation → prefer PyPI (no auth required, accessible in China)
+    - git installation → query GitHub Release
 
     Returns:
-        dict 包含 current, latest, update_available, release_url, source；
-        查询失败返回 None。
+        dict containing current, latest, update_available, release_url, source;
+        None if query fails.
     """
     current = get_current_version()
     latest = None
-    source = "github"  # 默认来源
+    source = "github"  # default source
 
-    # pip 安装：优先查询 PyPI（无需认证，无 rate limit）
+    # pip installation: prefer PyPI (no auth, no rate limit)
     if is_pip_installation():
         latest = fetch_pypi_version()
         if latest:
             source = "pypi"
-            logger.debug("pip 安装: 从 PyPI 获取版本 %s", latest)
+            logger.debug("pip installation: got version %s from PyPI", latest)
         else:
-            # PyPI 失败，回退到 GitHub
-            logger.info("PyPI 查询失败，回退到 GitHub")
+            # PyPI failed, falling back to GitHub
+            logger.info("PyPI query failed, falling back to GitHub")
             latest = get_latest_version()
     else:
-        # git 安装或未知：查询 GitHub
+        # git installation or unknown: query GitHub
         latest = get_latest_version()
 
     if latest is None:
         return None
 
-    # 去除版本号前的 v 前缀（如果有）
+    # Strip leading v prefix from version, if present
     latest_clean = latest.lstrip("vV")
 
     available = compare_versions(latest_clean, current) > 0
@@ -379,21 +379,21 @@ def check_for_update() -> Optional[dict]:
 
 
 # ============================================================
-# 安装方式检测
+# Installation type detection
 # ============================================================
 
 # ============================================================
-# 异步自动重试版本检查（类似 code_hosting git_push_retry 模式）
+# Asynchronous automatic retry version check (similar to code_hosting git_push_retry pattern)
 # ============================================================
 
-# 全局缓存 — 最近一次成功的结果
+# Global cache — most recent successful result
 _update_cache: Optional[dict] = None
 _update_cache_time: float = 0.0
-_UPDATE_CACHE_TTL = 3600  # 1 小时缓存
+_UPDATE_CACHE_TTL = 3600  # 1-hour cache
 
 
 def _get_cached_result() -> Optional[dict]:
-    """获取缓存的版本检查结果（TTL 内有效）。"""
+    """Get the cached version check result (valid within TTL)."""
     if _update_cache is not None:
         elapsed = _time.monotonic() - _update_cache_time
         if elapsed < _UPDATE_CACHE_TTL:
@@ -402,35 +402,35 @@ def _get_cached_result() -> Optional[dict]:
 
 
 def get_cached_update_result() -> Optional[dict]:
-    """公开版 — 获取缓存的版本检查结果。
+    """Public version — get the cached version check result.
 
     Returns:
-        缓存的版本检查结果 dict，或 None（无缓存/已过期）。
+        Cached version check result dict, or None (no cache/expired).
     """
     return _get_cached_result()
 
 
 def _set_cached_result(result: Optional[dict]) -> None:
-    """设置版本检查缓存。"""
+    """Set the version check cache."""
     global _update_cache, _update_cache_time
     _update_cache = result
     _update_cache_time = _time.monotonic()
 
 
 def check_for_update_retry(**kwargs) -> dict:
-    """异步自动重试版本检查 — 后台线程运行，支持进度回调和取消。
+    """Asynchronous automatic retry version check — runs in background thread, supports progress callback and cancellation.
 
-    遵循 code_hosting git_push_retry 模式。
-    通过 AsyncTaskManager 提交到后台线程，自动重试直到成功或达到最大次数。
+    Follows the code_hosting git_push_retry pattern.
+    Submitted to a background thread via AsyncTaskManager, automatically retries until success or max attempts.
 
     Args:
-        **kwargs: 由 AsyncTaskManager 注入的回调参数：
-            _progress_callback: 进度回调函数
-            _cancellation_check: 取消检查函数
-            _task_id: 任务 ID
+        **kwargs: callback parameters injected by AsyncTaskManager:
+            _progress_callback: progress callback function
+            _cancellation_check: cancellation check function
+            _task_id: task ID
 
     Returns:
-        dict: 版本检查结果（与 check_for_update 格式一致），全部重试失败时返回 error dict。
+        dict: version check result (same format as check_for_update); returns error dict if all retries fail.
     """
     progress_cb = kwargs.get('_progress_callback')
     cancel_check = kwargs.get('_cancellation_check')
@@ -438,75 +438,75 @@ def check_for_update_retry(**kwargs) -> dict:
     last_error: Optional[str] = None
 
     for attempt in range(1, MAX_RETRIES + 1):
-        # 检查取消
+        # Check cancellation
         if cancel_check:
             try:
                 cancel_check()
             except Exception:
-                return {"error": "版本检查任务已取消", "status": "cancelled"}
+                return {"error": "Version check task cancelled", "status": "cancelled"}
 
-        # 先检查缓存是否有效
+        # First check whether the cache is valid
         cached = _get_cached_result()
         if cached is not None:
             if progress_cb:
-                progress_cb(100, f"使用缓存版本信息（{cached.get('current', '?')}）")
-            logger.info("版本检查命中缓存")
+                progress_cb(100, f"Using cached version info ({cached.get('current', '?')})")
+            logger.info("Version check hit cache")
             return cached
 
-        # 报告进度
+        # Report progress
         pct = (attempt / MAX_RETRIES) * 100
         if progress_cb:
             if attempt == 1:
-                progress_cb(pct, "正在检查版本更新...")
+                progress_cb(pct, "Checking for version updates...")
             else:
                 eta_remaining = ((MAX_RETRIES - attempt + 1) * RETRY_INTERVAL) // 60
                 progress_cb(
                     pct,
-                    f"版本检查第 {attempt}/{MAX_RETRIES} 次尝试"
-                    f"{'，失败后等待重试' if last_error else ''}"
-                    f"{'，预计还需 ~' + str(eta_remaining) + 'min' if eta_remaining > 0 else ''}"
+                    f"Version check attempt {attempt}/{MAX_RETRIES}"
+                    f"{', waiting to retry after failure' if last_error else ''}"
+                    f"{', estimated ~' + str(eta_remaining) + 'min remaining' if eta_remaining > 0 else ''}"
                 )
 
-        # 执行版本检查
+        # Perform version check
         try:
             result = check_for_update()
         except Exception as e:
             result = None
             last_error = str(e)
-            logger.warning(f"版本检查异常(第{attempt}次): {e}")
+            logger.warning(f"Version check exception (attempt {attempt}): {e}")
 
         if result is not None:
-            # 成功：缓存结果并返回
+            # Success: cache result and return
             _set_cached_result(result)
             if progress_cb:
                 if result.get("update_available"):
-                    progress_cb(100, f"发现新版本 v{result['latest']}（当前 v{result['current']}）")
+                    progress_cb(100, f"New version v{result['latest']} found (current v{result['current']})")
                 else:
-                    progress_cb(100, f"已是最新版本: v{result['current']}")
+                    progress_cb(100, f"Already up to date: v{result['current']}")
             logger.info(
-                "版本检查成功: %s (第%d次尝试)",
-                "有更新" if result.get("update_available") else "已是最新",
+                "Version check succeeded: %s (attempt %d)",
+                "update available" if result.get("update_available") else "already up to date",
                 attempt,
             )
             return result
 
-        last_error = "所有镜像获取 Release 信息均失败"
+        last_error = "Failed to obtain Release info from all mirrors"
 
-        # 还有重试次数：等待后重试
+        # Retries remain: wait and retry
         if attempt < MAX_RETRIES:
             wait = RETRY_INTERVAL
-            logger.info(f"版本检查失败(第{attempt}次)，{wait}秒后自动重试...")
+            logger.info(f"Version check failed (attempt {attempt}), automatically retrying in {wait}s...")
             if progress_cb:
                 eta_total = (RETRY_INTERVAL * MAX_RETRIES) // 60
                 progress_cb(
                     pct,
-                    f"第 {attempt}/{MAX_RETRIES} 次失败，{wait}秒后重试"
-                    f" | 预计最长 ~{eta_total}min"
+                    f"Attempt {attempt}/{MAX_RETRIES} failed, retrying in {wait}s"
+                    f" | estimated max ~{eta_total}min"
                 )
             _time.sleep(wait)
 
-    # 全部重试失败
-    error_msg = f"版本检查失败（{MAX_RETRIES}次重试，约{ETA_MINUTES}分钟）: {last_error}"
+    # All retries failed
+    error_msg = f"Version check failed ({MAX_RETRIES} retries, about {ETA_MINUTES} minutes): {last_error}"
     logger.error(error_msg)
     return {
         "error": error_msg,
@@ -516,11 +516,11 @@ def check_for_update_retry(**kwargs) -> dict:
 
 
 def is_git_installation() -> bool:
-    """检测当前是否为 git 源码安装（存在 .git 目录且有 git 命令）。"""
+    """Detect whether this is a git source installation (has .git directory and git command)."""
     git_dir = _get_project_root() / ".git"
     if not git_dir.exists():
         return False
-    # 检查 git 命令是否可用
+    # Check whether git command is available
     try:
         if sys.platform == "win32":
             subprocess.run(
@@ -538,25 +538,25 @@ def is_git_installation() -> bool:
 
 
 def is_pip_installation() -> bool:
-    """检测是否为 pip 安装（site-packages 中）。"""
-    # 如果当前文件在 site-packages 路径下，则是 pip 安装
+    """Detect whether this is a pip installation (in site-packages)."""
+    # If current file is under site-packages path, it is a pip installation
     module_path = Path(__file__).resolve()
     return "site-packages" in module_path.parts
 
 
 # ============================================================
-# git pull 更新（同步版 — 用于后台线程）
+# git pull update (sync version — for background threads)
 # ============================================================
 
 def git_pull_update_sync() -> dict:
-    """同步执行 git pull 更新（用于 AsyncTaskManager 后台线程）。
+    """Synchronously execute git pull update (for AsyncTaskManager background thread).
 
     Returns:
-        dict 包含 success, updated, message, output。
+        dict containing success, updated, message, output.
     """
     project_root = _get_project_root()
     try:
-        logger.info("正在执行 git pull 更新（同步）...")
+        logger.info("Executing git pull update (sync)...")
         proc_env = os.environ.copy()
         proc_env["GIT_TERMINAL_PROMPT"] = "0"
         result = subprocess.run(
@@ -574,13 +574,13 @@ def git_pull_update_sync() -> dict:
                 return {
                     "success": True,
                     "updated": False,
-                    "message": "已经是最新版本，无需更新。",
+                    "message": "Already up to date; no update needed.",
                     "output": stdout_text,
                 }
             return {
                 "success": True,
                 "updated": True,
-                "message": "更新成功！请重启 Daofy 或 AI Agent 使新版本生效。",
+                "message": "Update succeeded! Please restart Daofy or AI Agent for the new version to take effect.",
                 "output": stdout_text,
             }
         else:
@@ -588,56 +588,56 @@ def git_pull_update_sync() -> dict:
             return {
                 "success": False,
                 "updated": False,
-                "message": f"git pull 失败: {error_msg}",
+                "message": f"git pull failed: {error_msg}",
                 "output": error_msg,
             }
     except subprocess.TimeoutExpired:
         return {
             "success": False,
             "updated": False,
-            "message": "git pull 超时（>60秒），请检查网络连接后重试。",
+            "message": "git pull timed out (>60 seconds); please check your network connection and retry.",
             "output": "",
         }
     except FileNotFoundError:
         return {
             "success": False,
             "updated": False,
-            "message": "未找到 git 命令，请安装 Git 后重试。",
+            "message": "git command not found; please install Git and retry.",
             "output": "",
         }
     except Exception as e:
-        logger.error(f"git pull 异常: {e}", exc_info=True)
+        logger.error(f"git pull exception: {e}", exc_info=True)
         return {
             "success": False,
             "updated": False,
-            "message": f"更新失败: {e}",
+            "message": f"Update failed: {e}",
             "output": str(e),
         }
 
 
 # ============================================================
-# 后台自动重试 git pull 更新（类似 code_hosting git_push_retry）
+# Background automatic retry git pull update (similar to code_hosting git_push_retry)
 # ============================================================
 
-# 更新重试参数
-UPDATE_RETRY_INTERVAL = 60       # 两次重试间隔（60秒）
-UPDATE_MAX_RETRIES = 10           # 最大重试次数（≈10分钟）
+# Update retry parameters
+UPDATE_RETRY_INTERVAL = 60       # interval between retries (60 seconds)
+UPDATE_MAX_RETRIES = 10           # max retries (≈10 minutes)
 
 
 def _do_retry_update(**kwargs) -> dict:
-    """后台自动重试 git pull 更新 — 支持进度回调和取消。
+    """Background automatic retry git pull update — supports progress callback and cancellation.
 
-    遵循 code_hosting git_push_retry 模式。
-    通过 AsyncTaskManager 提交到后台线程，自动重试直到成功或达到最大次数。
+    Follows the code_hosting git_push_retry pattern.
+    Submitted to a background thread via AsyncTaskManager, automatically retries until success or max attempts.
 
     Args:
-        **kwargs: 由 AsyncTaskManager 注入的回调参数：
-            _progress_callback: 进度回调函数
-            _cancellation_check: 取消检查函数
-            _task_id: 任务 ID
+        **kwargs: callback parameters injected by AsyncTaskManager:
+            _progress_callback: progress callback function
+            _cancellation_check: cancellation check function
+            _task_id: task ID
 
     Returns:
-        dict: git pull 更新结果。
+        dict: git pull update result.
     """
     progress_cb = kwargs.get('_progress_callback')
     cancel_check = kwargs.get('_cancellation_check')
@@ -645,77 +645,77 @@ def _do_retry_update(**kwargs) -> dict:
     last_error: Optional[str] = None
 
     for attempt in range(1, UPDATE_MAX_RETRIES + 1):
-        # 检查取消
+        # Check cancellation
         if cancel_check:
             try:
                 cancel_check()
             except Exception:
-                return {"error": "更新任务已取消", "status": "cancelled"}
+                return {"error": "Update task cancelled", "status": "cancelled"}
 
-        # 报告进度
+        # Report progress
         pct = (attempt / UPDATE_MAX_RETRIES) * 100
         if progress_cb:
             if attempt == 1:
-                progress_cb(pct, "正在执行 git pull 更新...")
+                progress_cb(pct, "Executing git pull update...")
             else:
                 progress_cb(
                     pct,
-                    f"git pull 第 {attempt}/{UPDATE_MAX_RETRIES} 次尝试"
-                    f"{'，失败后等待重试' if last_error else ''}"
+                    f"git pull attempt {attempt}/{UPDATE_MAX_RETRIES}"
+                    f"{', waiting to retry after failure' if last_error else ''}"
                 )
 
-        # 执行 git pull
+        # Execute git pull
         try:
             result = git_pull_update_sync()
         except Exception as e:
             result = None
             last_error = str(e)
-            logger.warning(f"git pull 异常(第{attempt}次): {e}")
+            logger.warning(f"git pull exception (attempt {attempt}): {e}")
 
         if result is not None and result.get("success"):
             if progress_cb:
                 if result.get("updated"):
-                    progress_cb(100, f"更新成功！请重启 Daofy 使新版本生效。")
+                    progress_cb(100, f"Update succeeded! Please restart Daofy for the new version to take effect.")
                 else:
-                    progress_cb(100, "已经是最新版本，无需更新。")
-            logger.info("git pull 更新成功 (第%d次尝试)", attempt)
+                    progress_cb(100, "Already up to date; no update needed.")
+            logger.info("git pull update succeeded (attempt %d)", attempt)
             return result
 
         if result is not None:
-            last_error = result.get("message", "未知错误")
+            last_error = result.get("message", "Unknown error")
 
-        # 还有重试次数：等待后重试
+        # Retries remain: wait and retry
         if attempt < UPDATE_MAX_RETRIES:
             wait = UPDATE_RETRY_INTERVAL
-            logger.info(f"git pull 失败(第{attempt}次)，{wait}秒后自动重试...")
+            logger.info(f"git pull failed (attempt {attempt}), automatically retrying in {wait}s...")
             if progress_cb:
                 eta_total = (UPDATE_RETRY_INTERVAL * UPDATE_MAX_RETRIES) // 60
                 progress_cb(
                     pct,
-                    f"第 {attempt}/{UPDATE_MAX_RETRIES} 次失败，{wait}秒后重试"
-                    f" | 预计最长 ~{eta_total}min"
+                    f"Attempt {attempt}/{UPDATE_MAX_RETRIES} failed, retrying in {wait}s"
+                    f" | estimated max ~{eta_total}min"
                 )
             _time.sleep(wait)
 
-    # 全部重试失败
-    error_msg = f"git pull 更新失败（{UPDATE_MAX_RETRIES}次重试）: {last_error}"
+    # All retries failed
+    error_msg = f"git pull update failed ({UPDATE_MAX_RETRIES} retries): {last_error}"
     logger.error(error_msg)
     return {"success": False, "updated": False, "message": error_msg, "status": "failed"}
 
 
 # ============================================================
-# git pull 更新（异步版 — 用于直接 await 调用）
+# git pull update (async version — for direct await calls)
 # ============================================================
 
 async def git_pull_update() -> dict:
-    """执行 git pull 更新代码。
+    """Execute git pull to update code.
 
     Returns:
-        dict 包含 success, message, output。
+        dict containing success, message, output.
     """
     project_root = _get_project_root()
     try:
-        logger.info("正在执行 git pull 更新...")
+        logger.info("Executing git pull update...")
         proc = await asyncio.create_subprocess_exec(
             "git", "pull",
             cwd=str(project_root),
@@ -731,18 +731,18 @@ async def git_pull_update() -> dict:
         stderr_text = stderr.decode("utf-8", errors="replace").strip()
 
         if proc.returncode == 0:
-            # 检测是否有实际更新
+            # Detect whether there was an actual update
             if "Already up to date" in stdout_text:
                 return {
                     "success": True,
                     "updated": False,
-                    "message": "已经是最新版本，无需更新。",
+                    "message": "Already up to date; no update needed.",
                     "output": stdout_text,
                 }
             return {
                 "success": True,
                 "updated": True,
-                "message": "更新成功！请重启 Daofy 或 AI Agent 使新版本生效。",
+                "message": "Update succeeded! Please restart Daofy or AI Agent for the new version to take effect.",
                 "output": stdout_text,
             }
         else:
@@ -750,28 +750,29 @@ async def git_pull_update() -> dict:
             return {
                 "success": False,
                 "updated": False,
-                "message": f"git pull 失败: {error_msg}",
+                "message": f"git pull failed: {error_msg}",
                 "output": error_msg,
             }
     except asyncio.TimeoutError:
         return {
             "success": False,
             "updated": False,
-            "message": "git pull 超时（>60秒），请检查网络连接后重试。",
+            "message": "git pull timed out (>60 seconds); please check your network connection and retry.",
             "output": "",
         }
     except FileNotFoundError:
         return {
             "success": False,
             "updated": False,
-            "message": "未找到 git 命令，请安装 Git 后重试。",
+            "message": "git command not found; please install Git and retry.",
             "output": "",
         }
     except Exception as e:
-        logger.error(f"git pull 异常: {e}", exc_info=True)
+        logger.error(f"git pull exception: {e}", exc_info=True)
         return {
             "success": False,
             "updated": False,
-            "message": f"更新失败: {e}",
+            "message": f"Update failed: {e}",
             "output": str(e),
         }
+

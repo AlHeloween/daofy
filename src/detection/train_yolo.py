@@ -1,11 +1,11 @@
 """
-train_yolo — YOLOv11 训练 + ONNX 导出脚本
+train_yolo — YOLOv11 training + ONNX export script
 
-在用户侧训练环境中运行（需要 ultralytics + torch + onnx）。
-生成的数据集格式与此目录下的 synthetic_data_generator.py 兼容。
+Run in the user-side training environment (requires ultralytics + torch + onnx).
+The generated dataset format is compatible with synthetic_data_generator.py in this directory.
 
-用法:
-  # 基本训练（用合成数据或 Delphi 采集数据）
+Usage:
+  # Basic training (using synthetic data or data collected from Delphi)
   python -c "
   from src.detection.train_yolo import train
   train(
@@ -17,13 +17,13 @@ train_yolo — YOLOv11 训练 + ONNX 导出脚本
   )
   "
 
-  # 单行命令（直接运行模块）
+  # One-line command (run the module directly)
   python -m src.detection.train_yolo --data ./yolo_dataset/dataset.yaml --epochs 100
 
-输出:
-  yolo_output/train/weights/best.pt     ← PyTorch 权重
-  yolo_output/train/weights/best.onnx   ← ONNX 模型（可直接被 YOLOONNXDetector 加载）
-  yolo_output/train/results.csv         ← 训练指标
+Output:
+  yolo_output/train/weights/best.pt     ← PyTorch weights
+  yolo_output/train/weights/best.onnx   ← ONNX model (can be loaded directly by YOLOONNXDetector)
+  yolo_output/train/results.csv         ← Training metrics
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 def _check_deps() -> None:
-    """检查训练依赖是否已安装。"""
+    """Check whether the training dependencies are installed."""
     missing = []
     try:
         import ultralytics  # noqa: F401
@@ -51,9 +51,9 @@ def _check_deps() -> None:
         missing.append("torch")
     if missing:
         print(
-            f"缺少训练依赖: {', '.join(missing)}\n"
-            "请安装: pip install ultralytics torch torchvision onnx\n"
-            "或在有 GPU 的环境中运行。"
+            f"Missing training dependencies: {', '.join(missing)}\n"
+            "Please install: pip install ultralytics torch torchvision onnx\n"
+            "or run in an environment with a GPU."
         )
         sys.exit(1)
 
@@ -71,36 +71,36 @@ def train(
     pretrained: bool = True,
     export_onnx: bool = True,
 ) -> str:
-    """执行 YOLOv11 训练并导出 ONNX。
+    """Perform YOLOv11 training and export ONNX.
 
     Args:
-        data_yaml: dataset.yaml 路径。
-        model_size: YOLO 模型大小 (n/s/m/l/x)。
-        epochs: 训练轮数。
-        imgsz: 输入图片尺寸（像素）。
-        batch: 批次大小。
-        project: 输出项目目录。
-        name: 实验名称。
-        device: 设备 (''=auto, 'cpu', '0', '0,1')。
-        resume: 是否从断点恢复训练。
-        pretrained: 是否使用 COCO 预训练权重（强烈建议 True）。
-        export_onnx: 训练完成后是否导出 ONNX。
+        data_yaml: Path to dataset.yaml.
+        model_size: YOLO model size (n/s/m/l/x).
+        epochs: Number of training epochs.
+        imgsz: Input image size (pixels).
+        batch: Batch size.
+        project: Output project directory.
+        name: Experiment name.
+        device: Device (''=auto, 'cpu', '0', '0,1').
+        resume: Whether to resume training from a checkpoint.
+        pretrained: Whether to use COCO pretrained weights (strongly recommended True).
+        export_onnx: Whether to export ONNX after training completes.
 
     Returns:
-        ONNX 模型文件路径（如果 export_onnx=True）。
+        ONNX model file path (if export_onnx=True).
     """
     _check_deps()
 
     from ultralytics import YOLO
 
-    # 1. 加载预训练模型（YOLO 会自动下载 .pt）
+    # 1. Load the pretrained model (YOLO will automatically download .pt)
     model_name = f"yolo11{model_size}.pt" if pretrained else f"yolo11{model_size}.yaml"
     model = YOLO(model_name)
 
-    logger.info("开始训练: model=%s, data=%s, epochs=%d, imgsz=%d",
+    logger.info("Starting training: model=%s, data=%s, epochs=%d, imgsz=%d",
                  model_name, data_yaml, epochs, imgsz)
 
-    # 2. 训练
+    # 2. Train
     results = model.train(
         data=data_yaml,
         epochs=epochs,
@@ -111,33 +111,33 @@ def train(
         device=device,
         resume=resume,
         pretrained=pretrained,
-        # UI 截图专用增强（文本保持清晰）
-        hsv_h=0.015,          # 色相变化极小（防止文字变色）
-        hsv_s=0.2,            # 饱和度变化适中
-        hsv_v=0.2,            # 明度变化适中
-        translate=0.1,        # 平移
-        scale=0.2,            # 缩放
-        fliplr=0.5,           # 水平翻转
-        mosaic=0.5,           # 马赛克增强
-        mixup=0.1,            # 混合增强
+        # Augmentations specific to UI screenshots (keep text clear)
+        hsv_h=0.015,          # Very small hue variation (prevent text from changing color)
+        hsv_s=0.2,            # Moderate saturation variation
+        hsv_v=0.2,            # Moderate value/brightness variation
+        translate=0.1,        # Translation
+        scale=0.2,            # Scaling
+        fliplr=0.5,           # Horizontal flip
+        mosaic=0.5,           # Mosaic augmentation
+        mixup=0.1,            # Mixup augmentation
     )
 
-    # 3. 导出 ONNX
+    # 3. Export ONNX
     best_pt = Path(project) / name / "weights" / "best.pt"
     onnx_path = Path(project) / name / "weights" / "best.onnx"
 
     if export_onnx:
-        logger.info("导出 ONNX: %s → %s", best_pt, onnx_path)
+        logger.info("Exporting ONNX: %s → %s", best_pt, onnx_path)
         model.export(
             format="onnx",
             imgsz=imgsz,
-            half=False,        # FP32 保证兼容性
-            simplify=True,     # ONNX 简化
-            nms=True,          # 内嵌 NMS（推理时无需 Python 端 NMS）
+            half=False,        # FP32 to ensure compatibility
+            simplify=True,     # ONNX simplification
+            nms=True,          # Embedded NMS (no Python-side NMS needed during inference)
         )
 
         if onnx_path.exists():
-            logger.info("ONNX 导出成功: %s (大小: %.1f MB)",
+            logger.info("ONNX export successful: %s (size: %.1f MB)",
                          onnx_path, onnx_path.stat().st_size / 1e6)
         return str(onnx_path)
 
@@ -151,23 +151,23 @@ def train_from_delphi(
     epochs: int = 100,
     model_size: str = "n",
 ) -> str:
-    """一步完成：从 Delphi 应用采集数据 → 训练 → 导出 ONNX。
+    """Complete in one step: collect data from a Delphi application → train → export ONNX.
 
-    前置条件:
-      - Delphi exe 已链接 DaofyAutomation
-      - 已安装 ultralytics + torch
+    Prerequisites:
+      - The Delphi exe is linked with DaofyAutomation
+      - ultralytics + torch are installed
 
     Args:
-        app_path: Delphi exe 路径。
-        output_dir: 数据集和输出目录。
-        forms: 要采集的窗体列表。
-        epochs: 训练轮数。
-        model_size: YOLO 模型大小。
+        app_path: Path to the Delphi exe.
+        output_dir: Dataset and output directory.
+        forms: List of forms to collect.
+        epochs: Number of training epochs.
+        model_size: YOLO model size.
 
     Returns:
-        ONNX 模型路径。
+        ONNX model path.
     """
-    # 1. 采集数据
+    # 1. Collect data
     from .synthetic_data_generator import DelphiDataCollector
 
     collector = DelphiDataCollector(
@@ -176,12 +176,12 @@ def train_from_delphi(
         forms=forms,
     )
     stats = collector.collect_all()
-    logger.info("数据采集完成: %s", stats)
+    logger.info("Data collection complete: %s", stats)
 
     if stats["total_images"] == 0:
-        raise RuntimeError("未采集到任何训练数据。请检查 Delphi 应用是否已接入 DaofyAutomation。")
+        raise RuntimeError("No training data was collected. Please check whether the Delphi application is integrated with DaofyAutomation.")
 
-    # 2. 训练
+    # 2. Train
     data_yaml = str(Path(output_dir) / "dataset.yaml")
     onnx_path = train(
         data_yaml=data_yaml,
@@ -199,27 +199,27 @@ def generate_synthetic_and_train(
     epochs: int = 50,
     model_size: str = "n",
 ) -> str:
-    """一步完成：生成合成数据 → 训练 → 导出 ONNX。
+    """Complete in one step: generate synthetic data → train → export ONNX.
 
-    用于快速验证训练管线，无需 Delphi 环境。
+    Used to quickly validate the training pipeline without a Delphi environment.
 
     Args:
-        num_samples: 合成截图数量。
-        output_dir: 输出目录。
-        epochs: 训练轮数。
-        model_size: YOLO 模型大小。
+        num_samples: Number of synthetic screenshots.
+        output_dir: Output directory.
+        epochs: Number of training epochs.
+        model_size: YOLO model size.
 
     Returns:
-        ONNX 模型路径。
+        ONNX model path.
     """
     from .synthetic_data_generator import SyntheticDataGenerator
 
-    # 1. 生成合成数据
+    # 1. Generate synthetic data
     gen = SyntheticDataGenerator(output_dir=output_dir)
     stats = gen.generate(num_samples=num_samples)
-    logger.info("合成数据生成完成: %s", stats)
+    logger.info("Synthetic data generation complete: %s", stats)
 
-    # 2. 训练
+    # 2. Train
     data_yaml = str(Path(output_dir) / "dataset.yaml")
     onnx_path = train(
         data_yaml=data_yaml,
@@ -236,28 +236,28 @@ def evaluate(
     test_images_dir: str,
     test_labels_dir: str,
 ) -> dict:
-    """在测试集上评估 ONNX 或 PyTorch 模型的精度。
+    """Evaluate the accuracy of an ONNX or PyTorch model on a test set.
 
     Args:
-        model_path: .onnx 或 .pt 文件。
-        test_images_dir: 测试图片目录。
-        test_labels_dir: YOLO 格式标签目录。
+        model_path: .onnx or .pt file.
+        test_images_dir: Test image directory.
+        test_labels_dir: Directory of YOLO-format labels.
 
     Returns:
         {"map50": ..., "map50_95": ..., "precision": ..., "recall": ...}
     """
     if model_path.endswith(".onnx"):
-        # 用 YOLOONNXDetector 做推理评估
+        # Use YOLOONNXDetector for inference evaluation
         from .yolo_onnx import YOLOONNXDetector
         from .opencv_detector import Detection
 
         detector = YOLOONNXDetector(model_path)
     else:
-        # 用 ultralytics 评估
+        # Evaluate with ultralytics
         try:
             from ultralytics import YOLO
         except ImportError:
-            raise ImportError("评估 PyTorch 模型需要 ultralytics")
+            raise ImportError("Evaluating a PyTorch model requires ultralytics")
 
         model = YOLO(model_path)
         results = model.val(data=str(Path(test_images_dir).parent / "dataset.yaml"))
@@ -269,7 +269,7 @@ def evaluate(
         }
         return metrics
 
-    # ONNX 评估（对每张图做推理）
+    # ONNX evaluation (run inference on each image)
     import glob
     image_files = glob.glob(os.path.join(test_images_dir, "*.png")) + \
                   glob.glob(os.path.join(test_images_dir, "*.jpg"))
@@ -285,7 +285,7 @@ def evaluate(
         if not os.path.exists(label_path):
             continue
 
-        # 读取 GT 标签
+        # Read GT labels
         with open(label_path) as f:
             gt_boxes = []
             for line in f:
@@ -301,10 +301,10 @@ def evaluate(
 
         total_gt += len(gt_boxes)
 
-        # 推理
+        # Inference
         detections = detector.detect(img_path)
 
-        # 简单匹配
+        # Simple matching
         tp = 0
         fp = 0
         matched = set()
@@ -314,7 +314,7 @@ def evaluate(
                 if i in matched:
                     continue
                 if det.class_id == gt["class_id"]:
-                    # 检查 IoU（简化为正样例存在性）
+                    # Check IoU (simplified to existence of a positive sample)
                     found = True
                     matched.add(i)
                     break
@@ -339,34 +339,34 @@ def evaluate(
 
 
 # ============================================================
-# CLI 入口
+# CLI entry point
 # ============================================================
 
 def main():
-    """命令行入口。"""
-    parser = argparse.ArgumentParser(description="YOLOv11 训练 + ONNX 导出")
+    """Command-line entry point."""
+    parser = argparse.ArgumentParser(description="YOLOv11 training + ONNX export")
     parser.add_argument("--data", default="./yolo_dataset/dataset.yaml",
-                        help="dataset.yaml 路径")
-    parser.add_argument("--epochs", type=int, default=100, help="训练轮数")
+                        help="Path to dataset.yaml")
+    parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs")
     parser.add_argument("--model", default="n", choices=["n", "s", "m", "l", "x"],
-                        help="YOLO 模型大小")
-    parser.add_argument("--imgsz", type=int, default=640, help="输入图片尺寸")
-    parser.add_argument("--batch", type=int, default=16, help="批次大小")
-    parser.add_argument("--project", default="./yolo_output", help="输出目录")
-    parser.add_argument("--name", default="train", help="实验名称")
-    parser.add_argument("--device", default="", help="设备 (''=auto, 'cpu', '0')")
-    parser.add_argument("--resume", action="store_true", help="从断点恢复")
+                        help="YOLO model size")
+    parser.add_argument("--imgsz", type=int, default=640, help="Input image size")
+    parser.add_argument("--batch", type=int, default=16, help="Batch size")
+    parser.add_argument("--project", default="./yolo_output", help="Output directory")
+    parser.add_argument("--name", default="train", help="Experiment name")
+    parser.add_argument("--device", default="", help="Device (''=auto, 'cpu', '0')")
+    parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
     parser.add_argument("--no-pretrained", action="store_true",
-                        help="不使用 COCO 预训练")
+                        help="Do not use COCO pretrained weights")
     parser.add_argument("--no-onnx", action="store_true",
-                        help="不导出 ONNX")
+                        help="Do not export ONNX")
     parser.add_argument("--synthetic", type=int, default=0,
-                        help="生成 N 张合成数据并训练（无需 Delphi 环境）")
+                        help="Generate N synthetic samples and train (no Delphi environment required)")
 
     args = parser.parse_args()
 
     if args.synthetic > 0:
-        print(f"生成 {args.synthetic} 张合成数据并训练...")
+        print(f"Generating {args.synthetic} synthetic samples and training...")
         onnx_path = generate_synthetic_and_train(
             num_samples=args.synthetic,
             output_dir=args.project,
@@ -388,11 +388,12 @@ def main():
             export_onnx=not args.no_onnx,
         )
 
-    print(f"\n✅ 训练完成")
-    print(f"   ONNX 模型: {onnx_path}")
-    print(f"   复制到项目后即可被 YOLOONNXDetector 加载使用")
+    print(f"\n✅ Training complete")
+    print(f"   ONNX model: {onnx_path}")
+    print(f"   Copy it into the project and it can be loaded by YOLOONNXDetector")
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     main()
+

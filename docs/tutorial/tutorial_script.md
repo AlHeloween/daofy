@@ -1,460 +1,460 @@
-# Daofy 使用教程 — 录制演示脚本
+# Daofy Tutorial — Recording Demo Script
 
-**总时长**: 约 45-50 分钟  
-**目标受众**: Delphi 开发者（了解基本 Delphi 开发，初次接触 MCP/AI 辅助编程）  
-**录制工具建议**: OBS Studio / Bandicam / ScreenFlow  
-**屏幕分辨率建议**: 1920×1080 或更高  
-**剪辑建议**: 安装和构建知识库等耗时步骤可加速播放或剪辑跳过
-
----
-
-## 第一部分：开场 & 项目介绍（约 2 分钟）
-
-### 画面
-- 全屏展示 GitHub 项目页面：<https://github.com/chinawsb/daofy>
-- 镜头切到 PPT / 项目 README
-
-### 旁白脚本
-
-大家好，欢迎收看本期教程。
-
-今天给大家介绍一个非常实用的工具——**Daofy**。
-
-MCP 全称是 Model Context Protocol，由 Anthropic 公司推出的一种开放协议。它让 AI 助手（比如 Claude、CodeArts Agent 等）能够直接与你的本地开发环境交互。
-
-简单来说：**装了 Daofy 之后，你可以在 AI 助手的聊天对话中，直接编译 Delphi 项目、搜索 VCL/FMX 源码、查询 API 文档、甚至格式化代码。**
-
-不用在 AI 和 IDE 之间来回切换。一条指令下去，AI 调用 MCP 工具帮你完成。
-
-我们看看这个项目能做什么：
-
-- ✅ **编译 Delphi 项目** — 支持 .dproj / .dpr / .pas 文件
-- ✅ **知识库搜索** — 内置 Delphi RTL/VCL/FMX 源码索引，支持类名、函数名、语义搜索
-- ✅ **项目知识库** — 自动索引你项目中的代码和三方库
-- ✅ **代码格式化** — 集成 pasfmt，一键格式化 Delphi 源码
-- ✅ **编码规范查询** — 获取项目编码规则，让 AI 生成的代码符合你的风格
-- ✅ **组件包安装** — 编译并安装 .dpk 组件包到 IDE
-
-好，那我们从安装开始。
+**Total duration**: approx. 45-50 minutes  
+**Target audience**: Delphi developers (familiar with basic Delphi development, new to MCP/AI-assisted programming)  
+**Recommended recording tools**: OBS Studio / Bandicam / ScreenFlow  
+**Recommended screen resolution**: 1920×1080 or higher  
+**Editing suggestion**: Time-consuming steps such as installation and knowledge base building can be sped up or cut/skipped
 
 ---
 
-## 第二部分：AI 自动安装 & 配置（约 4 分钟）
+## Part 1: Opening & Project Introduction (approx. 2 minutes)
 
-> **设计思路**：整个安装过程不展示终端操作，全部在 AI 对话界面中完成。用户只需说一句话或粘贴一条提示词，AI Agent 自动处理一切。
+### Visuals
+- Show the GitHub project page full screen: <https://github.com/chinawsb/daofy>
+- Cut to PPT / project README
 
-### 场景 2.1 — 用户向 AI 提出安装需求
+### Narration Script
 
-#### 画面
-- 全屏展示 AI 助手对话界面（如 Claude Desktop / CodeArts Agent）
-- 用户输入安装指令
+Hello everyone, welcome to this tutorial.
 
-#### AI 对话演示
+Today I'll introduce a very practical tool—**Daofy**.
 
-```
-用户: 帮我安装 Daofy
-```
+MCP stands for Model Context Protocol, an open protocol introduced by Anthropic. It allows AI assistants (such as Claude, CodeArts Agent, etc.) to interact directly with your local development environment.
 
-或者粘贴 README 中的安装提示词：
+Simply put: **After installing Daofy, you can compile Delphi projects, search VCL/FMX source code, look up API documentation, and even format code directly in the AI assistant's chat conversation.**
 
-```
-用户: 请按以下步骤安装 Daofy:
+No need to switch back and forth between AI and the IDE. With one instruction, the AI calls MCP tools to do it for you.
 
-[] 检查并安装 Git/Python 3.10-3.14/7-Zip (安装时优先使用国内镜像源加速下载)
+Let's see what this project can do:
 
-[] 安装 https://github.com/chinawsb/daofy.git
+- ✅ **Compile Delphi projects** — supports .dproj / .dpr / .pas files
+- ✅ **Knowledge base search** — built-in Delphi RTL/VCL/FMX source code index, supports class name, function name, and semantic search
+- ✅ **Project knowledge base** — automatically indexes code and third-party libraries in your project
+- ✅ **Code formatting** — integrates pasfmt, one-click formatting of Delphi source code
+- ✅ **Coding rules lookup** — retrieves project coding rules so AI-generated code matches your style
+- ✅ **Component package installation** — compiles and installs .dpk component packages into the IDE
 
-[] 安装完成后验证结果并帮我配置当前客户端
-```
-
-#### 旁白
-
-很多第一次接触 MCP 的用户会觉得配置很麻烦——要装 Python、克隆项目、配虚拟环境、还要写 JSON 配置文件。
-
-但在我们这个教程里，**这些全都不需要手动做**。
-
-你只需要在 AI 助手的对话框里，输入一条指令："帮我安装 Daofy"。
-
-AI Agent 收到指令后会：
-1. 检查你的电脑上有没有 Python 和 Git
-2. 如果没有，自动下载安装
-3. 克隆 GitHub 仓库
-4. 创建虚拟环境、安装依赖
-5. 运行安装脚本，自动检测并配置你的 AI 客户端
-
-所有操作都在对话中由 AI 自动完成，你只需要看着它一步步执行，然后在需要确认的节点回答"是"或者"继续"即可。
+OK, let's start with installation.
 
 ---
 
-### 场景 2.2 — AI 逐步执行安装（画中画展示终端）
+## Part 2: AI Automatic Installation & Configuration (approx. 4 minutes)
 
-#### 画面
-- 主画面：AI 对话界面，AI 输出安装进度
-- **画中画（小窗口）**：实时展示 AI 正在执行的终端命令和输出，让观众看到背后实际在做什么
+> **Design idea**: The entire installation process does not show terminal operations; everything is completed in the AI chat interface. The user only needs to say one sentence or paste one prompt, and the AI Agent handles everything automatically.
 
-#### AI 对话输出（示意）
+### Scenario 2.1 — User Asks AI to Install
+
+#### Visuals
+- Show the AI assistant chat interface full screen (such as Claude Desktop / CodeArts Agent)
+- The user enters the installation instruction
+
+#### AI Conversation Demo
 
 ```
-AI: 开始安装 Daofy...
-
-第一步: 检查环境...
-  ✅ Git 已安装 (2.47.0)
-  ✅ Python 已安装 (3.12.4)
-  ⚠️ 未检测到 7-Zip，正在自动下载安装... 完成
-
-第二步: 克隆项目...
-  ✅ 已从 github.com/chinawsb/daofy 克隆
-
-第三步: 配置虚拟环境并安装依赖...
-  ✅ 虚拟环境已创建
-  ✅ 依赖安装完成 (使用清华镜像源加速)
-
-第四步: 配置 AI 客户端...
-  🔍 正在检测已安装的 AI 助手...
-  ✅ 检测到: Claude Desktop, Trae
-  ✅ 已自动配置 Claude Desktop
-  ✅ 已自动配置 Trae
-
-安装完成! 🎯
-现在你可以让我帮你编译 Delphi 项目了。
+User: Help me install Daofy
 ```
 
-#### 旁白
+Or paste the installation prompt from the README:
 
-AI 收到指令后，会按顺序执行安装步骤。
+```
+User: Please install Daofy by following these steps:
 
-在画中画窗口里，你可以看到 AI 实际上在执行各种终端命令——检查环境、克隆仓库、安装依赖。但对于观众来说，重点看 AI 对话界面的输出就够了，每一步都有清晰的进度和结果。
+[] Check for and install Git/Python 3.10-3.14/7-Zip (during installation, prefer domestic mirror sources to speed up downloads)
 
-最厉害的是第四步：AI 会自动检测你电脑上装了哪些 AI 客户端——Claude Desktop、Trae、CodeArts Agent、Cursor、Windsurf、通义灵码、豆包、Kimi 等十几种——然后自动写入 MCP 配置。**完全不需要手动编辑 JSON 文件。**
+[] Install https://github.com/chinawsb/daofy.git
+
+[] After installation, verify the result and help me configure the current client
+```
+
+#### Narration
+
+Many users new to MCP find configuration troublesome—they have to install Python, clone the project, set up a virtual environment, and write JSON configuration files.
+
+But in this tutorial, **none of this needs to be done manually**.
+
+You only need to enter one instruction in the AI assistant's chat box: "Help me install Daofy".
+
+After receiving the instruction, the AI Agent will:
+1. Check whether Python and Git are installed on your computer
+2. If not, download and install them automatically
+3. Clone the GitHub repository
+4. Create a virtual environment and install dependencies
+5. Run the installation script to automatically detect and configure your AI client
+
+All operations are completed automatically by the AI in the conversation. You only need to watch it execute step by step, and then answer "yes" or "continue" at nodes that require confirmation.
 
 ---
 
-### 场景 2.3 — 验证安装结果
+### Scenario 2.2 — AI Executes Installation Step by Step (picture-in-picture terminal display)
 
-#### 画面
-- AI 对话界面继续
+#### Visuals
+- Main view: AI chat interface, with AI outputting installation progress
+- **Picture-in-picture (small window)**: real-time display of the terminal commands and output the AI is executing, so viewers can see what is actually happening behind the scenes
 
-#### AI 对话演示
+#### AI Conversation Output (illustrative)
 
 ```
-用户: 检查一下安装是否成功
+AI: Starting Daofy installation...
+
+Step 1: Checking environment...
+  ✅ Git is installed (2.47.0)
+  ✅ Python is installed (3.12.4)
+  ⚠️ 7-Zip not detected, downloading and installing automatically... Done
+
+Step 2: Cloning project...
+  ✅ Cloned from github.com/chinawsb/daofy
+
+Step 3: Configuring virtual environment and installing dependencies...
+  ✅ Virtual environment created
+  ✅ Dependencies installed (using Tsinghua mirror for acceleration)
+
+Step 4: Configuring AI clients...
+  🔍 Detecting installed AI assistants...
+  ✅ Detected: Claude Desktop, Trae
+  ✅ Claude Desktop configured automatically
+  ✅ Trae configured automatically
+
+Installation complete! 🎯
+Now you can ask me to help you compile Delphi projects.
 ```
 
-- AI 调用 `check_environment(action="check")` 工具
-- 展示返回结果：编译器版本、路径、可用平台
+#### Narration
 
-#### 旁白
+After receiving the instruction, the AI executes the installation steps in order.
 
-安装完成后，输入"检查一下安装是否成功"。
+In the picture-in-picture window, you can see the AI actually executing various terminal commands—checking the environment, cloning the repository, installing dependencies. But for viewers, it's enough to focus on the output in the AI chat interface; each step has clear progress and results.
 
-AI 会调用 `check_environment` 工具，自动从 Windows 注册表检测 Delphi 编译器。如果一切正常，你会看到 Delphi 版本号、dcc32 路径、支持的编译平台——**全自动完成，零配置**。
-
-至此，整个安装配置过程不到两分钟，没有离开过 AI 对话框。
+The most impressive part is step 4: the AI automatically detects which AI clients are installed on your computer—Claude Desktop, Trae, CodeArts Agent, Cursor, Windsurf, Tongyi Lingma, Doubao, Kimi, and more than a dozen others—and then automatically writes the MCP configuration. **No manual editing of JSON files is needed at all.**
 
 ---
 
-## 第三部分：环境检测 & 首次启动（约 2 分钟）
+### Scenario 2.3 — Verify Installation Result
 
-### 场景 3.1 — 启动 MCP Server 并检查编译器
+#### Visuals
+- Continue with the AI chat interface
 
-#### 画面
-- 在 AI 助手的对话界面中，输入指令
-- **用分屏或画中画展示 AI 助手界面**
-
-#### AI 对话演示
+#### AI Conversation Demo
 
 ```
-用户: 检查一下 Delphi 编译环境
+User: Check whether the installation succeeded
 ```
 
-- AI 调用 `check_environment(action="check")` 工具
-- 展示返回结果：编译器版本、路径、可用平台等
+- AI calls the `check_environment(action="check")` tool
+- Display the returned result: compiler version, path, available platforms
 
-#### 旁白
+#### Narration
 
-启动配置好 MCP Server 的 AI 助手后，我们第一件事就是检查编译环境。
+After installation is complete, enter "Check whether the installation succeeded".
 
-输入"检查 Delphi 编译环境"，AI 就会调用 `check_environment` 工具，自动从 Windows 注册表检测已安装的 Delphi 编译器。
+The AI calls the `check_environment` tool and automatically detects Delphi compilers from the Windows registry. If everything is normal, you will see the Delphi version number, dcc32 path, and supported compilation platforms—**fully automatic, zero configuration**.
 
-你会看到检测到的 Delphi 版本、dcc32 编译器路径、以及支持的编译平台。**全程无需手动配置。**
+At this point, the entire installation and configuration process takes less than two minutes, without ever leaving the AI chat box.
 
 ---
 
-### 场景 3.2 — 查看知识库统计
+## Part 3: Environment Detection & First Launch (approx. 2 minutes)
 
-#### AI 对话演示
+### Scenario 3.1 — Start MCP Server and Check Compiler
+
+#### Visuals
+- Enter instructions in the AI assistant chat interface
+- **Use split screen or picture-in-picture to show the AI assistant interface**
+
+#### AI Conversation Demo
 
 ```
-用户: 查看 Delphi 知识库统计
+User: Check the Delphi compilation environment
 ```
 
-- AI 调用 `delphi_kb(action="stats")`
-- 展示结果：Delphi 源码知识库的文件数、类数量、函数数量
+- AI calls the `check_environment(action="check")` tool
+- Display the returned result: compiler version, path, available platforms, etc.
 
-#### 旁白
+#### Narration
 
-再来看知识库的状态。输入"查看 Delphi 知识库统计"，AI 会展示内置的 Delphi 源码知识库的规模。
+After starting the AI assistant configured with the MCP Server, the first thing we do is check the compilation environment.
 
-这个知识库已经预先构建好了 Delphi 官方 RTL、VCL、FMX 的源码索引——包含了超过 **16 万文件、16 万类、30 万个函数**的索引，几乎是 Delphi 全系版本的完整覆盖。
+Enter "Check the Delphi compilation environment", and the AI calls the `check_environment` tool, automatically detecting installed Delphi compilers from the Windows registry.
+
+You will see the detected Delphi version, dcc32 compiler path, and supported compilation platforms. **No manual configuration is required throughout.**
 
 ---
 
-## 第四部分：核心功能演示（约 22 分钟）
+### Scenario 3.2 — View Knowledge Base Statistics
 
-### 场景 4.1 — 搜索 Delphi API 定义（约 2 分钟）
-
-#### AI 对话演示
+#### AI Conversation Demo
 
 ```
-用户: 帮我查一下 TStringList 的类定义
+User: View Delphi knowledge base statistics
 ```
 
-- AI 调用 `delphi_kb(query="TStringList", search_type="class", kb_type="delphi")`
-- 展示搜索结果：类的继承链、所在单元、关键方法
+- AI calls `delphi_kb(action="stats")`
+- Display results: number of files, classes, and functions in the Delphi source knowledge base
 
-#### 旁白
+#### Narration
 
-先看知识库搜索功能——这是大家日常用得最多的。
+Next, let's look at the knowledge base status. Enter "View Delphi knowledge base statistics", and the AI displays the scale of the built-in Delphi source knowledge base.
 
-比如我想查 `TStringList` 的类定义，只需输入：
-
-AI 会搜索 Delphi 源码知识库，返回 `TStringList` 的完整信息：继承自 `TStrings` → `TPersistent` → `TObject`，在 `System.Classes` 单元中定义，以及有哪些关键方法。
+This knowledge base has already been prebuilt with source code indexes for Delphi's official RTL, VCL, and FMX—containing indexes of over **160,000 files, 160,000 classes, and 300,000 functions**, covering almost the complete range of Delphi versions.
 
 ---
 
-### 场景 4.2 — 搜索函数（约 1 分钟）
+## Part 4: Core Feature Demonstration (approx. 22 minutes)
 
-#### AI 对话演示
+### Scenario 4.1 — Search Delphi API Definitions (approx. 2 minutes)
+
+#### AI Conversation Demo
 
 ```
-用户: 查找 Delphi 中 Split 字符串分割函数
+User: Help me look up the class definition of TStringList
 ```
 
-- AI 调用 `delphi_kb(query="Split", search_type="function", kb_type="delphi")`
-- 展示搜索结果：函数签名、参数说明、所在单元
+- AI calls `delphi_kb(query="TStringList", search_type="class", kb_type="delphi")`
+- Display search results: class inheritance chain, unit location, key methods
 
-#### 旁白
+#### Narration
 
-查找函数也一样简单。
+First, let's look at the knowledge base search feature—this is what everyone uses most in daily work.
 
-比如说我想找字符串分割函数，输入"查找 Split 函数"，AI 会返回 `System.StrUtils.SplitString` 等匹配的函数，包括参数签名和使用说明。
+For example, if I want to look up the class definition of `TStringList`, I just enter:
 
-注意这里我们推荐用英文函数名搜索，比中文语义搜索准确得多。
+The AI searches the Delphi source knowledge base and returns complete information about `TStringList`: it inherits from `TStrings` → `TPersistent` → `TObject`, is defined in the `System.Classes` unit, and what its key methods are.
 
 ---
 
-### 场景 4.3 — 语义搜索发现隐藏 API（约 2 分钟）
+### Scenario 4.2 — Search Functions (approx. 1 minute)
 
-> **威力点**：你连 API 名字都不知道，用自然语言描述需求，AI 从 30 万+ 函数中找出你想要的。
+#### AI Conversation Demo
+
+```
+User: Find the Split string splitting function in Delphi
+```
+
+- AI calls `delphi_kb(query="Split", search_type="function", kb_type="delphi")`
+- Display search results: function signature, parameter descriptions, unit location
+
+#### Narration
+
+Finding functions is just as simple.
+
+For example, if I want to find a string splitting function, I enter "Find the Split function", and the AI returns matching functions such as `System.StrUtils.SplitString`, including parameter signatures and usage descriptions.
+
+Note that here we recommend searching with English function names, which is much more accurate than Chinese semantic search.
+
+---
+
+### Scenario 4.3 — Semantic Search Discovers Hidden APIs (approx. 2 minutes)
+
+> **Power point**: You don't even know the API name; describe your need in natural language, and the AI finds what you want among 300,000+ functions.
 >
-> ⚠️ **前置条件**：语义搜索需要先构建 embedding 向量索引：`delphi_kb(action="build_embedding", async_mode=true)`。未构建时 semantic 模式会降级为倒排索引搜索，效果可能不如预期。录制前请提前构建。
+> ⚠️ **Prerequisite**: Semantic search requires building the embedding vector index first: `delphi_kb(action="build_embedding", async_mode=true)`. If not built, semantic mode degrades to inverted index search, and the effect may be less than expected. Please build it in advance before recording.
 
-#### AI 对话演示
-
-```
-用户: Delphi 里有没有可以比较两个 JSON 对象是否结构相同的功能？
-     不是字符串比较，是忽略键顺序的语义比较。
-```
-
-- AI 调用 `delphi_kb(query="JSON object deep compare structural equality", search_type="semantic", kb_type="delphi")`
-- 30 万函数中匹配到 `System.Json.TJSONObject.Equals` 以及 `System.Generics.Defaults.TEqualityComparer`
-- AI 进一步调用 `delphi_kb(query="TJSONObject.Equals", search_type="function", kb_type="delphi")` 确认签名
-- 展示结果：`TJSONObject.Equals` 确实实现了值比较而非引用比较
+#### AI Conversation Demo
 
 ```
-用户: 再帮我找一个功能——读取大文本文件时按行处理，但不想一次性加载整个文件到内存。
+User: Does Delphi have a feature that can compare whether two JSON objects have the same structure?
+     Not a string comparison, but a semantic comparison that ignores key order.
 ```
 
-- AI 调用 `delphi_kb(query="read large text file line by line streaming", search_type="semantic", kb_type="delphi")`
-- 搜索结果：`System.Classes.TStreamReader.ReadLine`、`System.IOUtils.TFile.ReadAllLines`（但会全加载）
-- AI 推荐 `TStreamReader` 方式并展示用法
+- AI calls `delphi_kb(query="JSON object deep compare structural equality", search_type="semantic", kb_type="delphi")`
+- Matches `System.Json.TJSONObject.Equals` and `System.Generics.Defaults.TEqualityComparer` among 300,000 functions
+- AI further calls `delphi_kb(query="TJSONObject.Equals", search_type="function", kb_type="delphi")` to confirm the signature
+- Display result: `TJSONObject.Equals` indeed implements value comparison rather than reference comparison
 
-#### 旁白
+```
+User: Help me find another feature—when reading a large text file, process it line by line, but I don't want to load the entire file into memory at once.
+```
 
-这个场景展示的是**语义搜索的真正威力**。
+- AI calls `delphi_kb(query="read large text file line by line streaming", search_type="semantic", kb_type="delphi")`
+- Search results: `System.Classes.TStreamReader.ReadLine`, `System.IOUtils.TFile.ReadAllLines` (but it loads everything)
+- AI recommends the `TStreamReader` approach and shows usage
 
-前面我们演示了精确搜索——你知道 `TStringList` 或 `Split` 的名字，直接搜。但现实开发中，你常常遇到的问题是：**"Delphi 有没有做 X 的功能？"**——你连 API 叫什么都不知道。
+#### Narration
 
-比如"比较两个 JSON 对象是否相同"——如果用 `=` 运算符比较两个 `TJSONObject`，比较的是引用地址。你想要的其实是值比较。但你不知道这个 API 叫什么名字，甚至不确定 Delphi 有没有提供。
+This scenario demonstrates **the real power of semantic search**.
 
-这时候你用自然语言描述需求，AI 在 **30 万个函数**的知识库中做语义匹配，找到 `TJSONObject.Equals`——它确实重写了 `Equals` 方法来做值比较。
+Earlier we demonstrated exact search—you know the name `TStringList` or `Split`, so you search directly. But in real-world development, the problem you often encounter is: **"Does Delphi have a feature that does X?"**—you don't even know what the API is called.
 
-再比如"逐行读取大文件，不要一次性加载到内存"。语义搜索能区分 `TFile.ReadAllLines`（全加载）和 `TStreamReader.ReadLine`（流式读取）的区别，给出正确的推荐。
+For example, "compare whether two JSON objects are the same"—if you use the `=` operator to compare two `TJSONObject`s, it compares reference addresses. What you actually want is value comparison. But you don't know what this API is called, and you're not even sure whether Delphi provides it.
 
-这就是 30 万函数的 Delphi KB + 语义搜索的组合威力——**你不知道名字，但你描述需求，AI 帮你找到**。
+At this point, you describe your need in natural language, and the AI performs semantic matching in a knowledge base of **300,000 functions**, finding `TJSONObject.Equals`—it indeed overrides the `Equals` method to do value comparison.
+
+Another example: "read a large file line by line, don't load it all into memory at once." Semantic search can distinguish `TFile.ReadAllLines` (loads all) from `TStreamReader.ReadLine` (streaming read) and give the correct recommendation.
+
+This is the combined power of a 300,000-function Delphi KB + semantic search—**you don't know the name, but you describe the need, and the AI finds it for you**.
 
 ---
 
-### 场景 4.4 — 知识库驱动的复杂代码生成（约 3 分钟）
+### Scenario 4.4 — Knowledge Base-Driven Complex Code Generation (approx. 3 minutes)
 
-> **威力点**：AI 搜索 KB 确认 API 签名 → 生成代码 → 一次编译通过。对 FireDAC 这种参数繁多的库尤为强大。
+> **Power point**: AI searches the KB to confirm API signatures → generates code → compiles successfully on the first try. This is especially powerful for libraries with many parameters like FireDAC.
 
-#### AI 对话演示
+#### AI Conversation Demo
 
 ```
-用户: 帮我写一个 SQLite 数据库管理单元，使用 FireDAC 组件，
-      要求：
-      1. 支持连接配置（文件路径、池大小、超时）
-      2. Connect / Disconnect 方法
-      3. Execute 方法执行 SQL，支持参数绑定
-      4. Query 方法返回数据集
-      5. TestConnection 方法
-      按项目编码规范来，先去查一下规范。
+User: Help me write a SQLite database management unit using FireDAC components.
+      Requirements:
+      1. Support connection configuration (file path, pool size, timeout)
+      2. Connect / Disconnect methods
+      3. Execute method to execute SQL, with parameter binding support
+      4. Query method that returns a dataset
+      5. TestConnection method
+      Follow the project coding rules; go look up the rules first.
 ```
 
-##### 第 1 步：获取编码规范
+##### Step 1: Get Coding Rules
 
-- AI 调用 `get_coding_rules(section="writing")`
+- AI calls `get_coding_rules(section="writing")`
 
-##### 第 2 步：搜索 KB 确认 API 签名（关键！）
+##### Step 2: Search the KB to Confirm API Signatures (critical!)
 
-- AI 调用 `delphi_kb(query="TFDConnection", search_type="class", kb_type="delphi")` → 了解属性、方法
-- AI 调用 `delphi_kb(query="TFDQuery", search_type="class", kb_type="delphi")` → 了解 SQL 赋值、参数绑定
-- AI 调用 `delphi_kb(query="TFDPhysSQLiteDriverLink", search_type="class", kb_type="delphi")` → 确认驱动链接用法
-- AI 调用 `delphi_kb(query="TFDConnection.Params", search_type="function", kb_type="delphi")` → 确认参数配置方式
-- **（画中画展示：AI 在 KB 中查询到的 API 签名片段）**
+- AI calls `delphi_kb(query="TFDConnection", search_type="class", kb_type="delphi")` → understand properties and methods
+- AI calls `delphi_kb(query="TFDQuery", search_type="class", kb_type="delphi")` → understand SQL assignment and parameter binding
+- AI calls `delphi_kb(query="TFDPhysSQLiteDriverLink", search_type="class", kb_type="delphi")` → confirm driver link usage
+- AI calls `delphi_kb(query="TFDConnection.Params", search_type="function", kb_type="delphi")` → confirm parameter configuration method
+- **(Picture-in-picture: API signature snippets the AI found in the KB)**
 
-##### 第 3 步：生成代码
+##### Step 3: Generate Code
 
-- AI 结合：编码规范 + KB 查到的 API 签名 + 需求 → 生成 `DatabaseManager.pas`
-- 代码包含：TDatabaseConfig record、TDatabaseManager class、完整的 try/finally 保护
-- **（画中画展示：VS Code 中文件实时生成）**
+- AI combines: coding rules + API signatures found in the KB + requirements → generates `DatabaseManager.pas`
+- Code includes: TDatabaseConfig record, TDatabaseManager class, complete try/finally protection
+- **(Picture-in-picture: file being generated in real time in VS Code)**
 
-##### 第 4 步：编译验证
+##### Step 4: Compile and Verify
 
-- AI 调用 `delphi_project(action="compile", project_path="DatabaseManager.pas")` → 一次通过 ✅
+- AI calls `delphi_project(action="compile", project_path="DatabaseManager.pas")` → passes on first try ✅
 
-#### 旁白
+#### Narration
 
-前面的 INI 读写示例比较简单，这次我们来个真正有挑战的——**用 FireDAC 连接 SQLite**。
+The earlier INI read/write example was relatively simple. This time let's do something truly challenging—**connecting to SQLite with FireDAC**.
 
-FireDAC 的参数体系非常庞大：`TFDConnection` 的 driver 选择、`Params` 的键值对配置、`TFDQuery` 的 SQL 赋值和参数绑定、驱动链接的创建……手写这些代码时，你通常要去翻帮助或者抄以前的代码。
+FireDAC's parameter system is very large: `TFDConnection`'s driver selection, `Params` key-value configuration, `TFDQuery`'s SQL assignment and parameter binding, driver link creation... When writing this code by hand, you usually have to consult help or copy old code.
 
-但 AI 的做法完全不同：
+But the AI's approach is completely different:
 
-**第一步**，获取编码规范，确定风格。
+**Step 1**: Get the coding rules and determine the style.
 
-**第二步，也是关键**——AI 不是凭记忆瞎写，而是调用知识库搜索 `TFDConnection`、`TFDQuery`、`TFDPhysSQLiteDriverLink` 的类定义，**确认真实的 API 签名**。构造函数有几个参数？属性名叫什么？返回值类型是什么？全部从源码 KB 中确认。
+**Step 2, also the key**—the AI does not write blindly from memory; it calls knowledge base searches for the class definitions of `TFDConnection`, `TFDQuery`, and `TFDPhysSQLiteDriverLink` to **confirm the real API signatures**. How many parameters does the constructor have? What are the property names? What are the return types? All confirmed from the source KB.
 
-**第三步**，结合规范 + 需求 + 查到的 API 定义，生成 `DatabaseManager.pas`。注意它是怎么处理资源释放的——`Create` 中创建、`Destroy` 中释放、`Connect/Disconnect` 的正确配对。
+**Step 3**: Combine the rules + requirements + retrieved API definitions to generate `DatabaseManager.pas`. Note how it handles resource release—create in `Create`, release in `Destroy`, and correct pairing of `Connect/Disconnect`.
 
-**第四步**，编译验证，一次通过。
+**Step 4**: Compile and verify; it passes on the first try.
 
-关键是 **"先查 KB 确认 API，再写代码"** 的流程——生成的代码不是凭"AI 记忆"瞎猜，而是基于真实的 Delphi 源码定义。对于 FireDAC、Indy、REST 这类参数繁多的库，这比手翻帮助文档快十倍。
+The key is the process of **"first search the KB to confirm the API, then write code"**—the generated code is not guessed from "AI memory", but based on real Delphi source definitions. For libraries with many parameters such as FireDAC, Indy, and REST, this is ten times faster than manually flipping through help documentation.
 
 ---
 
-### 场景 4.5 — 编译 Delphi 项目（约 2 分钟）
+### Scenario 4.5 — Compile a Delphi Project (approx. 2 minutes)
 
-#### AI 对话演示
+#### AI Conversation Demo
 
 ```
-用户: 编译当前项目，Debug 模式，Win32 平台
+User: Compile the current project, Debug mode, Win32 platform
 ```
 
-- AI 调用 `delphi_project(action="compile", project_path="Project1.dproj", build_configuration="Debug", target_platform="win32")`
-- 展示编译过程输出：编译事件、编译参数、编译结果
+- AI calls `delphi_project(action="compile", project_path="Project1.dproj", build_configuration="Debug", target_platform="win32")`
+- Display compilation process output: build events, compilation parameters, compilation result
 
-#### 旁白
+#### Narration
 
-接下来是最核心的功能——编译项目。
+Next is the most core feature—compiling projects.
 
-在 AI 对话中输入"编译当前项目，Debug 模式，Win32 平台"。
+In the AI chat, enter "Compile the current project, Debug mode, Win32 platform".
 
-AI 会自动找到当前目录下的 .dproj 工程文件，调用 MSBuild 或 dcc32 编译器进行编译。整个编译过程会在聊天窗口中实时输出，包括预处理事件、编译参数、以及最终的编译结果。
+The AI automatically finds the .dproj project file in the current directory and calls MSBuild or the dcc32 compiler to compile. The entire compilation process is output in real time in the chat window, including pre-build events, compilation parameters, and the final compilation result.
 
-如果编译失败，AI 会自动分析错误信息并给出修复建议。
+If compilation fails, the AI automatically analyzes the error messages and gives fix suggestions.
 
 ---
 
-### 场景 4.6 — 单文件语法检查（约 1 分钟）
+### Scenario 4.6 — Single-File Syntax Check (approx. 1 minute)
 
-#### AI 对话演示
+#### AI Conversation Demo
 
 ```
-用户: 检查 Unit1.pas 的语法
+User: Check the syntax of Unit1.pas
 ```
 
-- AI 调用 `delphi_project(action="compile", project_path="Unit1.pas")`
-- 展示语法检查结果
+- AI calls `delphi_project(action="compile", project_path="Unit1.pas")`
+- Display syntax check result
 
-#### 旁白
+#### Narration
 
-如果你只想检查单个文件的语法，而不是编译整个项目，也非常简单。
+If you only want to check the syntax of a single file rather than compile the entire project, it's also very simple.
 
-输入"检查 Unit1.pas 的语法"，AI 会直接用 dcc32 编译该文件进行语法检查，快速反馈有没有语法错误。
+Enter "Check the syntax of Unit1.pas", and the AI directly compiles the file with dcc32 for a syntax check, quickly reporting whether there are syntax errors.
 
 ---
 
-### 场景 4.7 — 代码审计 + Gitea 缺陷闭环（约 4 分钟）
+### Scenario 4.7 — Code Audit + Gitea Defect Closed Loop (approx. 4 minutes)
 
-> **威力点**：从审计到工单到修复到关闭，全链路在一个 MCP 工具中完成，无需离开 AI 对话。
+> **Power point**: From audit to ticket to fix to close, the entire chain is completed in one MCP tool without leaving the AI conversation.
 
-#### AI 对话演示
+#### AI Conversation Demo
 
-##### Phase 1：代码审计
-
-```
-用户: 审查一下 review-demo/LegacyData.pas 的代码质量，
-      对比项目编码规则，输出审查报告
-```
-
-- AI 调用 `get_coding_rules(section="review")` — 获取审核维度和标准
-- AI 逐行分析代码，对照编码规则逐项检查：
+##### Phase 1: Code Audit
 
 ```
-📋 审查报告 — LegacyData.pas
+User: Review the code quality of review-demo/LegacyData.pas,
+      compare it against the project coding rules, and output a review report
+```
+
+- AI calls `get_coding_rules(section="review")` — get audit dimensions and standards
+- AI analyzes the code line by line and checks each item against the coding rules:
+
+```
+📋 Review Report — LegacyData.pas
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🔴 [严重] ExportData — 资源泄漏风险
-  Line 26: TStringList.Create 后没有 try/finally 保护
-  若 SaveToFile 抛出异常，LFile 永远不会被 Free
-  建议: 使用 try/finally 包裹
+🔴 [Critical] ExportData — Resource leak risk
+  Line 26: No try/finally protection after TStringList.Create
+  If SaveToFile throws an exception, LFile will never be Freed
+  Suggestion: Wrap with try/finally
 
-🔴 [严重] ProcessItems — 循环内删除导致跳项
-  Line 82: for 循环中执行 AItems.Delete(I)
-  删除后后续元素前移，I++ 会跳过一个元素
-  建议: 改为倒序遍历 for I := Count-1 downto 0
+🔴 [Critical] ProcessItems — Deleting inside a loop causes skipped items
+  Line 82: Executing AItems.Delete(I) inside a for loop
+  After deletion, subsequent elements shift forward, and I++ will skip an element
+  Suggestion: Change to reverse iteration: for I := Count-1 downto 0
 
-🟡 [警告] CalculateTotal — 魔法数值
-  Line 62: 循环上限 10 应定义为常量
-  Line 64: 因子 1.5 应定义为常量
-  Line 66: 阈值 100 应定义为常量
-  Line 68: 折扣率 0.95 应定义为常量
+🟡 [Warning] CalculateTotal — Magic numbers
+  Line 62: Loop upper limit 10 should be defined as a constant
+  Line 64: Factor 1.5 should be defined as a constant
+  Line 66: Threshold 100 should be defined as a constant
+  Line 68: Discount rate 0.95 should be defined as a constant
 
-🟡 [警告] GetUserCount — 逻辑错误
-  Line 49: LCount 在 try 块中赋值
-  Line 53: LFile 已在 finally 中释放后返回 LCount
-  当前代码正确，但模式危险 — 容易在修改时出错
-  建议: 直接在 try 块中赋值给 Result
+🟡 [Warning] GetUserCount — Logic error
+  Line 49: LCount is assigned inside the try block
+  Line 53: Returns LCount after LFile has been freed in finally
+  The current code is correct, but the pattern is dangerous — easy to make mistakes when modifying
+  Suggestion: Assign directly to Result inside the try block
 
-🔵 [建议] ExportData — 未使用变量
-  Line 24: LValue 声明了但只使用一次
-  建议: 直接内联 'data1;data2;data3'
+🔵 [Suggestion] ExportData — Unused variable
+  Line 24: LValue is declared but used only once
+  Suggestion: Inline 'data1;data2;data3' directly
 ```
 
-##### Phase 2：一键创建 Gitea 工单
+##### Phase 2: One-Click Create Gitea Issue
 
 ```
-用户: 把严重问题创建为 Gitea 工单，连接到 https://code.qdac.cc:3000，
-      仓库 myteam/demo-project
+User: Create the critical issues as Gitea tickets, connect to https://code.qdac.cc:3000,
+      repository myteam/demo-project
 ```
 
-- AI 调用 `code_hosting(platform="gitea", action="create_token", base_url="https://code.qdac.cc:3000", username="...", password="...")` → 获取 API Token（首次使用）
+- AI calls `code_hosting(platform="gitea", action="create_token", base_url="https://code.qdac.cc:3000", username="...", password="...")` → get API Token (first use)
   ```
-  ✅ Token 创建成功
-    值: 93f2c9e8...a083
-  ```
-
-- AI 调用 `code_hosting(platform="gitea", action="init_labels", base_url="...", token="...", repo="myteam/demo-project")`
-  → 初始化四维标签体系（可重复执行，不会重复创建）
-  ```
-  ✅ 标签初始化完成
-    新增: 18 | 跳过(已有): 18 | 合计: 18
-    分组: 优先级(4) 审阅(4) 状态(5) 类型(5)
+  ✅ Token created successfully
+    Value: 93f2c9e8...a083
   ```
 
-- AI 调用 `code_hosting(platform="gitea", action="create_issue", base_url="...", token="...", repo="myteam/demo-project",
+- AI calls `code_hosting(platform="gitea", action="init_labels", base_url="...", token="...", repo="myteam/demo-project")`
+  → initialize the four-dimensional label system (can be executed repeatedly without creating duplicates)
+  ```
+  ✅ Label initialization complete
+    Added: 18 | Skipped (existing): 18 | Total: 18
+    Groups: Priority(4) Review(4) Status(5) Type(5)
+  ```
+
+- AI calls `code_hosting(platform="gitea", action="create_issue", base_url="...", token="...", repo="myteam/demo-project",
      title="LegacyData.pas 代码质量审计问题",
      body="""## 发现的问题
 
@@ -468,248 +468,248 @@ AI 会自动找到当前目录下的 .dproj 工程文件，调用 MSBuild 或 dc
 4. 逻辑错误风险 — GetUserCount:49-53""",
      label_names=["类型/缺陷", "优先级/高", "状态/待确认"])`
   ```
-  ✅ 工单已创建
-    编号: #42 | 状态: open
-    标签: 类型/缺陷, 优先级/高, 状态/待确认
-    地址: https://code.qdac.cc:3000/myteam/demo-project/issues/42
+  ✅ Ticket created
+    Number: #42 | Status: open
+    Labels: Type/Defect, Priority/High, Status/To Confirm
+    URL: https://code.qdac.cc:3000/myteam/demo-project/issues/42
   ```
 
-##### Phase 3：修复代码
+##### Phase 3: Fix the Code
 
 ```
-用户: 按照审计建议修复代码
+User: Fix the code according to the audit suggestions
 ```
 
-- AI 读取 `LegacyData.pas` 源码
-- AI 逐项修复：
-  - ExportData: 添加 try/finally 包裹
-  - ProcessItems: 改为倒序遍历
-  - CalculateTotal: 魔法数值改为常量定义
-  - GetUserCount: 简化逻辑
-  - ExportData: 删除未使用的 LValue 变量
-- AI 调用 `delphi_project(action="compile", project_path="review-demo/LegacyData.pas")` — 编译验证修复后的代码
+- AI reads the `LegacyData.pas` source code
+- AI fixes each item:
+  - ExportData: add try/finally wrapping
+  - ProcessItems: change to reverse iteration
+  - CalculateTotal: replace magic numbers with constant definitions
+  - GetUserCount: simplify the logic
+  - ExportData: remove the unused LValue variable
+- AI calls `delphi_project(action="compile", project_path="review-demo/LegacyData.pas")` — compile and verify the fixed code
 
-##### Phase 4：提交修复并关闭工单
+##### Phase 4: Commit the Fix and Close the Issue
 
 ```
-用户: 提交修复代码，并在工单中关联提交记录后关闭
+User: Commit the fix, link the commit in the issue, and close it
 ```
 
-- AI 调用 `code_hosting(action="git_add", work_dir=".", files=["review-demo/LegacyData.pas"])`
-- AI 调用 `code_hosting(action="git_commit", work_dir=".", commit_message="fix: resolve code audit issues in LegacyData.pas
+- AI calls `code_hosting(action="git_add", work_dir=".", files=["review-demo/LegacyData.pas"])`
+- AI calls `code_hosting(action="git_commit", work_dir=".", commit_message="fix: resolve code audit issues in LegacyData.pas
 
 - Add try/finally guard to prevent resource leak
 - Fix loop index skipping on Delete
 - Replace magic numbers with constants
 - Clean up unused variable")`
   ```
-  ✅ 提交成功
+  ✅ Commit successful
     Hash: a1b2c3d4e5f6
-    信息: fix: resolve code audit issues in LegacyData.pas
+    Message: fix: resolve code audit issues in LegacyData.pas
   ```
 
-- AI 调用 `code_hosting(platform="gitea", action="add_comment", base_url="...", token="...", repo="myteam/demo-project",
+- AI calls `code_hosting(platform="gitea", action="add_comment", base_url="...", token="...", repo="myteam/demo-project",
      issue_number=42, body="已在 commit a1b2c3d4 中修复所有 5 个问题。")`
   ```
-  ✅ 评论已添加 (ID: 14203)  工单: #42
+  ✅ Comment added (ID: 14203)  Issue: #42
   ```
 
-- AI 调用 `code_hosting(platform="gitea", action="close_issue", base_url="...", token="...", repo="myteam/demo-project",
+- AI calls `code_hosting(platform="gitea", action="close_issue", base_url="...", token="...", repo="myteam/demo-project",
      issue_number=42, comment_body="已在 a1b2c3d4 中修复，编译通过 ✅")`
   ```
-  ✅ 工单 #42 已关闭
-    地址: https://code.qdac.cc:3000/myteam/demo-project/issues/42
-    关闭说明: 已在 a1b2c3d4 中修复，编译通过 ✅
+  ✅ Issue #42 closed
+    URL: https://code.qdac.cc:3000/myteam/demo-project/issues/42
+    Close note: 已在 a1b2c3d4 中修复，编译通过 ✅
   ```
 
-##### Phase 5：验证闭环
+##### Phase 5: Verify the Closed Loop
 
 ```
-用户: 查一下已关闭的工单，确认修复记录
+User: Check the closed issues and confirm the fix record
 ```
 
-- AI 调用 `code_hosting(platform="gitea", action="list_issues", base_url="...", token="...", repo="myteam/demo-project", state="closed")`
+- AI calls `code_hosting(platform="gitea", action="list_issues", base_url="...", token="...", repo="myteam/demo-project", state="closed")`
   ```
-  📋 共 1 个工单 (gitea, closed):
-    #42 [closed] LegacyData.pas 代码质量审计问题  类型/缺陷, 优先级/高, 状态/已关闭
+  📋 1 issue total (gitea, closed):
+    #42 [closed] LegacyData.pas code quality audit issues  Type/Defect, Priority/High, Status/Closed
   ```
 
-#### 旁白
+#### Narration
 
-这个场景展示的是 **代码审计 → 工单跟踪 → 修复 → 关闭** 的完整闭环，也是 `code_hosting` 统一工具的集中体现。
+This scenario demonstrates the complete closed loop of **code audit → ticket tracking → fix → close**, and it is also a concentrated expression of the unified `code_hosting` tool.
 
-整个流程拆解为五个阶段：
+The whole process is divided into five phases:
 
-**Phase 1 — 审计**：`get_coding_rules` 获取规范 → 逐行审查 → 输出结构化报告（含行号、严重级别、修复建议）
+**Phase 1 — Audit**: `get_coding_rules` retrieves the rules → line-by-line review → output a structured report (with line numbers, severity levels, and fix suggestions)
 
-**Phase 2 — 工单创建**：`code_hosting` 的四个 action 衔接：
-1. `create_token` → 获取 API 访问令牌（仅首次需要）
-2. `init_labels` → 初始化四维标签，同 scope 互斥
-3. `create_issue` → 创建工单，自动按名称匹配标签 ID
-4. 返回的工单链接可直接在浏览器中打开
+**Phase 2 — Issue creation**: four actions of `code_hosting` connect together:
+1. `create_token` → get an API access token (only needed the first time)
+2. `init_labels` → initialize four-dimensional labels; mutually exclusive within the same scope
+3. `create_issue` → create an issue, automatically matching label IDs by name
+4. The returned issue link can be opened directly in a browser
 
-**Phase 3 — 修复**：AI 根据审计建议逐项修改源码，每处修改针对具体行号，改完后编译验证。
+**Phase 3 — Fix**: the AI modifies the source code item by item according to the audit suggestions. Each change targets a specific line number, and after modification it compiles to verify.
 
-**Phase 4 — 关闭**：修复代码通过 `git_commit` 提交后，通过 `add_comment` 在工单中记录 commit hash，再用 `close_issue` 关闭。**commit 和 issue 之间的关联被保留在 Gitea 的评论中**，后续开发者可以追溯每个问题的修复历史。
+**Phase 4 — Close**: after the fixed code is committed via `git_commit`, it records the commit hash in the issue via `add_comment`, then closes it with `close_issue`. **The association between the commit and the issue is preserved in Gitea's comments**, so future developers can trace the fix history of each problem.
 
-**Phase 5 — 验证**：通过 `list_issues` 按状态过滤，确认工单已正确关闭，标签已自动切换为"状态/已关闭"。
+**Phase 5 — Verify**: use `list_issues` to filter by status and confirm the issue has been correctly closed, with the label automatically switched to "Status/Closed".
 
-关键点：**全部操作通过一个 `code_hosting` 工具完成**，不同的 action 参数切换操作类型。从发现问题到修复关闭，整个生命周期不离开 AI 对话框。这就是 MCP 协议 + 统一工具接口的威力。
+Key point: **all operations are completed through one `code_hosting` tool**, with different action parameters switching the operation type. From discovering the problem to fixing and closing it, the entire lifecycle never leaves the AI chat box. This is the power of the MCP protocol + unified tool interface.
 
 ---
 
-### 场景 4.8 — 搜索项目代码 & 引用查询（约 2 分钟）
+### Scenario 4.8 — Search Project Code & Reference Lookup (approx. 2 minutes)
 
-#### AI 对话演示
-
-```
-用户: 在项目中搜索 TfrmMain 类
-```
-
-- AI 调用 `delphi_kb(query="TfrmMain", kb_type="project", search_type="class")`
-- 展示搜索结果
+#### AI Conversation Demo
 
 ```
-用户: 查看项目中哪些单元引用了 Vcl.Forms
+User: Search the project for the TfrmMain class
 ```
 
-- AI 调用 `delphi_kb(query="Vcl.Forms", kb_type="project", search_type="reference")`
-- 展示引用列表
+- AI calls `delphi_kb(query="TfrmMain", kb_type="project", search_type="class")`
+- Display search results
 
-#### 旁白
+```
+User: See which units in the project reference Vcl.Forms
+```
 
-项目知识库是另一个非常实用的功能。首次搜索项目代码时，AI 会自动构建项目知识库，索引你项目中的所有源码和三方库。
+- AI calls `delphi_kb(query="Vcl.Forms", kb_type="project", search_type="reference")`
+- Display the reference list
 
-输入"在项目中搜索 TfrmMain 类"，AI 会在项目知识库中查找这个类的定义位置。
+#### Narration
 
-如果你想知道"哪些单元引用了 Vcl.Forms"，使用引用搜索，AI 会列出所有 uses 了 Vcl.Forms 的单元文件。这在重构或评估修改影响范围时特别有用。
+The project knowledge base is another very practical feature. The first time you search project code, the AI automatically builds the project knowledge base, indexing all source code and third-party libraries in your project.
+
+Enter "Search the project for the TfrmMain class", and the AI looks up the definition location of this class in the project knowledge base.
+
+If you want to know "which units reference Vcl.Forms", use reference search, and the AI lists all unit files that use Vcl.Forms. This is especially useful during refactoring or when assessing the impact scope of a change.
 
 ---
 
-### 场景 4.9 — 多文件重构（约 2 分钟）
+### Scenario 4.9 — Multi-File Refactoring (approx. 2 minutes)
 
-#### AI 对话演示
-
-```
-用户: 我想把项目中的 TStringList 全部替换为 TArray<String>，
-      先查一下哪些地方用了 TStringList，评估影响范围
-```
-
-- AI 调用 `delphi_kb(query="TStringList", kb_type="project", search_type="reference")` 查找引用
-- 展示引用列表：哪些文件、哪些行用到了 TStringList
-- AI 列出影响评估：涉及 X 个文件、Y 处引用、Z 个单元
+#### AI Conversation Demo
 
 ```
-用户: 影响不大，开始重构。逐个文件替换为 TArray<String>，
-      并调整相关的方法调用
+User: I want to replace all TStringList in the project with TArray<String>.
+      First check which places use TStringList and assess the impact scope.
 ```
 
-- AI 逐个文件编辑修改
-- 每次修改后调用 `delphi_project(action="compile", project_path="当前文件.pas")` 做语法检查
-- 全部修改完成后，调用 `delphi_project(action="compile", project_path="项目.dproj")` 做全项目编译验证，确保跨文件类型引用正确
-- 编译通过后，调用 `delphi_file(action="format")` 格式化代码
-- 展示最终编译通过的确认
+- AI calls `delphi_kb(query="TStringList", kb_type="project", search_type="reference")` to find references
+- Display the reference list: which files and which lines use TStringList
+- AI lists the impact assessment: involves X files, Y references, Z units
 
-#### 旁白
+```
+User: The impact is not big. Start refactoring. Replace them file by file with TArray<String>,
+      and adjust the related method calls.
+```
 
-下面这个场景展示的是**多文件重构**——这也是 AI 辅助开发的高价值场景。
+- AI edits and modifies files one by one
+- After each modification, it calls `delphi_project(action="compile", project_path="当前文件.pas")` for a syntax check
+- After all modifications are complete, it calls `delphi_project(action="compile", project_path="项目.dproj")` for full project compilation verification, ensuring cross-file type references are correct
+- After compilation passes, it calls `delphi_file(action="format")` to format the code
+- Display confirmation that final compilation passed
 
-比如我想把项目中所有 `TStringList` 的使用替换为 `TArray<String>`，这是一个跨多个文件的变更。
+#### Narration
 
-第一步，**查引用评估影响**。输入指令后，AI 先调用 `delphi_kb` 的引用搜索，找出所有用到了 `TStringList` 的文件和位置，列出一份影响清单——涉及几个文件、多少处引用。让你在动手之前就知道改动有多大。
+The next scenario demonstrates **multi-file refactoring**—also a high-value scenario for AI-assisted development.
 
-确认影响可控后，第二步，**执行重构**。AI 逐个文件修改，每改完一个文件就编译一次，确保没有引入新的错误。
+For example, I want to replace all uses of `TStringList` in the project with `TArray<String>`. This is a change spanning multiple files.
 
-全部改完后，再统一格式化代码。整个重构过程由 AI 执行、AI 验证，**你只需要做决策——改不改、改哪些——执行的脏活累活交给 AI**。
+Step 1, **check references to assess impact**. After entering the instruction, the AI first calls `delphi_kb` reference search to find all files and locations that use `TStringList`, and lists an impact checklist—how many files and how many references are involved. This lets you know how large the change is before you start.
 
-这就是引用查询 + 项目知识库 + 编译验证三者联动产生的化学效应。
+After confirming the impact is manageable, step 2, **execute the refactoring**. The AI modifies files one by one, compiling after each file to ensure no new errors are introduced.
+
+After all changes are complete, it formats the code uniformly. The entire refactoring process is executed and verified by the AI. **You only need to make decisions—whether to change and what to change—while the dirty work is left to the AI**.
+
+This is the chemical effect produced by reference lookup + project knowledge base + compilation verification working together.
 
 ---
 
-### 场景 4.10 — 代码格式化 & 自动备份（约 2 分钟）
+### Scenario 4.10 — Code Formatting & Automatic Backup (approx. 2 minutes)
 
-> **威力点**：格式化前自动创建 `__history` 版本备份，可随时回退。不怕改坏。
+> **Power point**: Automatically creates a `__history` version backup before formatting, so you can roll back at any time. No fear of breaking things.
 
-#### AI 对话演示
+#### AI Conversation Demo
 
 ```
-用户: 格式化 refactor-demo/DataProcessor.pas 的代码
+User: Format the code in refactor-demo/DataProcessor.pas
 ```
 
-##### 第 1 步：自动备份
+##### Step 1: Automatic Backup
 
-- AI 调用 `delphi_file(action="format", file_path="DataProcessor.pas", backup=true)`
-- pasfmt 在执行格式化前自动执行备份逻辑：
+- AI calls `delphi_file(action="format", file_path="DataProcessor.pas", backup=true)`
+- pasfmt automatically executes the backup logic before formatting:
   ```
-  ✅ 备份文件已创建: DataProcessor.pas.__history\DataProcessor.pas.~1~
+  ✅ Backup file created: DataProcessor.pas.__history\DataProcessor.pas.~1~
   ```
 
-##### 第 2 步：格式化
+##### Step 2: Formatting
 
-- pasfmt 执行格式化，展示 diff：
+- pasfmt performs formatting and displays the diff:
   ```diff
   - for I := 0 to ALines.Count - 1 do begin
   + for I := 0 to ALines.Count - 1 do
   + begin
   ```
 
-##### 第 3 步：查看备份
+##### Step 3: View the Backup
 
 ```
-用户: 让我看看备份文件
+User: Let me see the backup file
 ```
 
-- AI 列出 `__history` 目录内容：
+- AI lists the contents of the `__history` directory:
   ```
   DataProcessor.pas.~1~  (2026-05-15 09:00:00, 1.3 KB)
   ```
 
 ```
-用户: 对比备份和当前文件的差异
+User: Compare the backup and the current file
 ```
 
-- AI 展示 `diff` 对比格式化前后的变化
+- AI displays a `diff` comparison of the changes before and after formatting
 
 ```
-用户: 如果我不满意格式化的结果，帮我恢复到备份版本
+User: If I'm not satisfied with the formatting result, help me restore to the backup version
 ```
 
-- AI 将备份文件复制回原位置，恢复完成
+- AI copies the backup file back to the original location, and restoration is complete
 
-#### 旁白
+#### Narration
 
-代码格式化和重构有一个让人担心的问题——"改坏了怎么办？"
+Code formatting and refactoring have a worrying question—"What if it breaks?"
 
-`delphi_file`（原名 `file_tool`，旧名仍兼容）内置了自动备份机制。默认 `backup=true`，在执行任何写入前，它会在源文件同级目录下创建 `__history` 文件夹，保存一份带版本号的备份。
+`delphi_file` (formerly `file_tool`, the old name is still compatible) has a built-in automatic backup mechanism. By default, `backup=true`. Before performing any write, it creates a `__history` folder in the same directory as the source file and saves a versioned backup.
 
-备份文件的命名规则和 **Delphi IDE 自带的 History 机制完全一致**——`文件名.~版本号~`。如果你反复格式化多次，版本号会自动递增：`~1~`、`~2~`、`~3~`……
+The backup file naming rule is **exactly the same as Delphi IDE's built-in History mechanism**—`filename.~version~`. If you format multiple times, the version number automatically increments: `~1~`, `~2~`, `~3~`...
 
-任何时候你觉得改得不对，都可以让 AI 查看备份文件、对比差异，甚至直接从备份恢复。
+Any time you feel a change is wrong, you can ask the AI to view backup files, compare differences, or even restore directly from the backup.
 
-这个机制不只在格式化时生效——**AI 在重构、修复编译错误等任何修改代码的操作中，都会先备份再修改**，确保你的源码安全。
+This mechanism is not only effective during formatting—**the AI backs up before modifying code in any operation, including refactoring and fixing compilation errors**, ensuring your source code is safe.
 
 ---
 
-### 场景 4.11 — 编码规范对 AI 行为的影响（约 3 分钟）
+### Scenario 4.11 — How Coding Rules Affect AI Behavior (approx. 3 minutes)
 
-> **威力点**：同样的需求，换一套编码规则，AI 生成截然不同风格的代码。证明编码规范真实控制 AI 行为。
+> **Power point**: The same requirement, with a different set of coding rules, produces completely different code styles from the AI. This proves that coding rules truly control AI behavior.
 
-#### AI 对话演示
+#### AI Conversation Demo
 
 ```
-用户: 给我写一个字符串工具单元，包含 Join 和 Split 方法。
-      先用 demo-project 的编码规范。
+User: Write a string utility unit for me, including Join and Split methods.
+      Use demo-project's coding rules first.
 ```
 
-##### 第 1 组规则：现代规范（demo-project/CODING_RULES.mdc）
+##### Rule Set 1: Modern Rules (demo-project/CODING_RULES.mdc)
 
-- AI 调用 `get_coding_rules(project_path="demo-project/DemoApp.dproj")`
-- 获取的规则摘要：
+- AI calls `get_coding_rules(project_path="demo-project/DemoApp.dproj")`
+- Retrieved rule summary:
   ```
-  类型名: T + 大驼峰  变量: L + 大驼峰  参数: A + 大驼峰
-  缩进: 2 空格        begin: 另起一行    异常: 具体类型
+  Type names: T + PascalCase  Variables: L + PascalCase  Parameters: A + PascalCase
+  Indent: 2 spaces       begin: on a new line    Exceptions: specific types
   ```
-- AI 生成的代码：
+- Code generated by AI:
   ```delphi
   unit StringUtils;
 
@@ -737,23 +737,23 @@ AI 会自动找到当前目录下的 .dproj 工程文件，调用 MSBuild 或 dc
   ```
 
 ```
-用户: 现在切换成旧项目的编码规范再生成一次。
+User: Now switch to the legacy project's coding rules and generate it again.
 ```
 
-##### 第 2 组规则：旧项目规范（legacy-project/CODING_RULES.mdc）
+##### Rule Set 2: Legacy Project Rules (legacy-project/CODING_RULES.mdc)
 
-- AI 调用 `get_coding_rules(project_path="legacy-project/LegacyApp.dproj")`
+- AI calls `get_coding_rules(project_path="legacy-project/LegacyApp.dproj")`
 
-  （读取 legacy-project/CODING_RULES.mdc，包含匈牙利命名、4 空格缩进、行尾 begin 等规则）
+  (reads legacy-project/CODING_RULES.mdc, which contains rules such as Hungarian naming, 4-space indentation, and trailing begin)
 
-  （或者直接指定规则文件路径——AI 读取另一份 CODING_RULES）
+  (or directly specify the rule file path—the AI reads another CODING_RULES file)
 
-- 获取的规则摘要：
+- Retrieved rule summary:
   ```
-  类型名: 无 T 前缀小驼峰  变量: 匈牙利命名   参数: 无前缀小驼峰
-  缩进: 4 空格             begin: 行尾      异常: except Exception 兜底
+  Type names: camelCase without T prefix  Variables: Hungarian notation   Parameters: camelCase without prefix
+  Indent: 4 spaces             begin: at end of line      Exceptions: catch-all except Exception
   ```
-- AI 生成的代码：
+- Code generated by AI:
   ```delphi
   unit string_utils;
 
@@ -768,570 +768,569 @@ AI 会自动找到当前目录下的 .dproj 工程文件，调用 MSBuild 或 dc
     end;
   ```
 
-##### 并排对比
+##### Side-by-Side Comparison
 
-- **分屏展示**两段代码，标注差异点：
+- **Split-screen display** of the two code snippets, marking the differences:
 
-| 维度 | 现代规范 | 旧项目规范 |
+| Dimension | Modern rules | Legacy project rules |
 |------|----------|-----------|
-| 类型名 | `TStringUtils` | `StringUtils` |
-| 方法名 | `Join`, `Split` | `join`, `split` |
-| 参数名 | `AStrings`, `ASeparator` | `arrStrings`, `separator` |
-| 缩进 | 2 空格 | 4 空格 |
-| begin | 另起一行 | 行尾 |
-| 单元名 | `StringUtils` | `string_utils` |
+| Type names | `TStringUtils` | `StringUtils` |
+| Method names | `Join`, `Split` | `join`, `split` |
+| Parameter names | `AStrings`, `ASeparator` | `arrStrings`, `separator` |
+| Indent | 2 spaces | 4 spaces |
+| begin | on a new line | at end of line |
+| Unit name | `StringUtils` | `string_utils` |
 
-#### 旁白
+#### Narration
 
-前面我们看过编码规范查询——但它的真正价值在于：**规范不是摆设，它会实际改变 AI 的输出行为。**
+Earlier we looked at coding rules lookup—but its real value is: **rules are not decoration; they actually change the AI's output behavior.**
 
-这个对比实验很能说明问题：
+This comparison experiment illustrates the point well:
 
-同样的需求——"写一个字符串工具单元，包含 Join 和 Split 方法"。换了一套 CODING_RULES，AI 生成的是**风格截然不同的两套代码**。
+The same requirement—"write a string utility unit including Join and Split methods." With a different set of CODING_RULES, the AI generates **two completely different styles of code**.
 
-左边是现代规范：`T` 前缀类型名、`A` 前缀参数、`L` 前缀变量、2 空格缩进、`begin` 另起一行。
+The left side is modern rules: `T`-prefixed type names, `A`-prefixed parameters, `L`-prefixed variables, 2-space indentation, `begin` on a new line.
 
-右边是旧项目规范：无前缀类型名、匈牙利命名法、4 空格缩进、`begin` 放在行尾、甚至单元名都变成了下划线风格。
+The right side is legacy project rules: type names without prefixes, Hungarian notation, 4-space indentation, `begin` at the end of the line, and even the unit name becomes underscore style.
 
-**编码规范不是装饰——它真实地控制了 AI 的行为。**
+**Coding rules are not decoration—they truly control the AI's behavior.**
 
-这意味着：
-- 你接手一个遗留项目？把项目的原编码规范写成 CODING_RULES.mdc，AI 生成的代码自动匹配项目风格，不会显得突兀
-- 团队有严格的代码审查标准？把审查规则写进去，AI 生成代码时自动绕过红线
-- 新人加入团队？不用反复强调规范，AI 自动遵守
+This means:
+- Taking over a legacy project? Write the project's original coding rules into CODING_RULES.mdc, and AI-generated code automatically matches the project style without looking out of place
+- Does the team have strict code review standards? Write the review rules in, and the AI automatically avoids red lines when generating code
+- New people joining the team? No need to repeatedly emphasize the rules; the AI follows them automatically
 
-这就是编码规范对 AI Agent 的行为影响——**你定规则，AI 执行，一致性有保障**。
-
----
-
-### 场景 4.12 — 批量多项目编译（约 2 分钟）
-
-> **威力点**：一句话编译整个解决方案，依赖顺序由 AI 处理。
-
-#### AI 对话演示
-
-```
-用户: 编译整个解决方案，group-project 下的所有项目
-```
-
-- AI 发现 `ProjectGroup.groupproj` 文件，解析项目依赖关系
-- AI 按构建顺序编译：
-  - 第 1 步：`delphi_project(action="compile", project_path="LibProject/LibUtils.dproj", build_configuration="Debug")` → ✅
-  - 第 2 步：`delphi_project(action="compile", project_path="AppProject/MainApp.dproj", build_configuration="Debug")` → ✅
-- 展示编译输出：两个项目依次编译成功
-
-```
-用户: 用 Release 配置重新编译全部项目，Win64 平台
-```
-
-- AI 重新按序编译，这次 `target_platform="win64"`, `build_configuration="Release"`
-- 展示输出
-
-#### 旁白
-
-前面演示的都是单个项目编译。但在企业开发中，一个解决方案往往包含多个项目——一个公共库项目 + 几个应用项目，有依赖关系。
-
-传统做法：打开 IDE → 逐个打开每个项目 → 选择配置 → 编译 → 检查结果。如果是全量重新编译，还得注意编译顺序。
-
-现在你只需要说"编译整个解决方案"，AI 会自动找到 `.groupproj` 分组项目文件，解析项目间的依赖关系，**按正确的顺序逐个编译**——先编译 LibProject，再编译 AppProject。
-
-想换平台？"用 Release、Win64 重新编译全部"——一句话，AI 重新按序编译，你不用碰 IDE。
-
-## 第五部分：高级功能（约 12 分钟）
-
-### 场景 5.1 — 构建文档知识库（约 1.5 分钟）
-
-#### AI 对话演示
-
-```
-用户: 构建 Delphi 帮助文档知识库
-```
-
-- AI 调用 `delphi_kb(action="build", kb_type="document", async_mode=true)`
-- 返回 task_id
-- 然后调用 `async_task(action="status", task_id="xxx", long_poll_seconds=30)` 查看进度
-- **（剪辑提示：此过程耗时数分钟，建议加速或跳过等待）**
-
-#### 旁白
-
-我们知道 Delphi 的帮助文档有大量的 CHM 文件。项目支持将这些 CHM 帮助文档构建为可全文搜索的知识库。
-
-输入"构建 Delphi 帮助文档知识库"，AI 会自动检测 Delphi 安装目录下的帮助文档，用 7-Zip 解压 CHM 文件，然后构建全文索引。
-
-这个过程是异步执行的，你可以通过 `async_task` 查询构建进度。构建完成后，就可以像搜索源码一样搜索帮助文档了。
+This is the behavioral impact of coding rules on AI Agent—**you set the rules, the AI executes, and consistency is guaranteed**.
 
 ---
 
-### 场景 5.1b — 文档知识库实战搜索（约 2 分钟）
+### Scenario 4.12 — Batch Multi-Project Compilation (approx. 2 minutes)
 
-> **威力点**：16 万页 Delphi 帮助文档，一句自然语言找到答案。不需要翻 CHM，不需要记 API 手册。
+> **Power point**: Compile the entire solution with one sentence; the AI handles dependency order.
 
-#### AI 对话演示
-
-构建完成后：
+#### AI Conversation Demo
 
 ```
-用户: 查一下帮助文档，TCanvas.Draw 方法的参数说明，
-      特别是最后一个参数 DrawOpacity 的作用
+User: Compile the entire solution, all projects under group-project
 ```
 
-- AI 调用 `delphi_kb(query="TCanvas.Draw", kb_type="document", search_type="all")`
-- 在 16 万+ 文档页面中匹配到 `Vcl.Graphics.TCanvas.Draw` 帮助页面
-- 展示结果：
+- AI finds the `ProjectGroup.groupproj` file and parses project dependencies
+- AI compiles in build order:
+  - Step 1: `delphi_project(action="compile", project_path="LibProject/LibUtils.dproj", build_configuration="Debug")` → ✅
+  - Step 2: `delphi_project(action="compile", project_path="AppProject/MainApp.dproj", build_configuration="Debug")` → ✅
+- Display compilation output: two projects compiled successfully in sequence
+
+```
+User: Recompile all projects with Release configuration, Win64 platform
+```
+
+- AI recompiles in order, this time with `target_platform="win64"`, `build_configuration="Release"`
+- Display output
+
+#### Narration
+
+Everything demonstrated earlier was single-project compilation. But in enterprise development, a solution often contains multiple projects—a common library project plus several application projects, with dependencies between them.
+
+Traditional approach: open the IDE → open each project one by one → select configuration → compile → check results. If it's a full rebuild, you also have to pay attention to compilation order.
+
+Now you only need to say "compile the entire solution", and the AI automatically finds the `.groupproj` project group file, parses the dependencies between projects, and **compiles them one by one in the correct order**—first LibProject, then AppProject.
+
+Want to change platform? "Recompile everything with Release, Win64"—one sentence, and the AI recompiles in order. You don't need to touch the IDE.
+
+## Part 5: Advanced Features (approx. 12 minutes)
+
+### Scenario 5.1 — Build Documentation Knowledge Base (approx. 1.5 minutes)
+
+#### AI Conversation Demo
+
+```
+User: Build the Delphi help documentation knowledge base
+```
+
+- AI calls `delphi_kb(action="build", kb_type="document", async_mode=true)`
+- Returns task_id
+- Then calls `async_task(action="status", task_id="xxx", long_poll_seconds=30)` to check progress
+- **(Editing hint: This process takes several minutes; it is recommended to speed up or skip the wait)**
+
+#### Narration
+
+We know Delphi help documentation includes a large number of CHM files. The project supports building these CHM help documents into a full-text searchable knowledge base.
+
+Enter "Build the Delphi help documentation knowledge base", and the AI automatically detects help documents in the Delphi installation directory, extracts CHM files with 7-Zip, and then builds the full-text index.
+
+This process runs asynchronously, and you can check build progress via `async_task`. After the build is complete, you can search help documentation just like searching source code.
+
+---
+
+### Scenario 5.1b — Document Knowledge Base Search in Action (approx. 2 minutes)
+
+> **Power point**: 160,000+ pages of Delphi help documentation; find the answer with one natural language sentence. No need to flip through CHM files or memorize API manuals.
+
+#### AI Conversation Demo
+
+After the build is complete:
+
+```
+User: Check the help documentation for the parameter descriptions of the TCanvas.Draw method,
+      especially the role of the last parameter DrawOpacity
+```
+
+- AI calls `delphi_kb(query="TCanvas.Draw", kb_type="document", search_type="all")`
+- Matches the help page for `Vcl.Graphics.TCanvas.Draw` among 160,000+ documentation pages
+- Display result:
   ```
   procedure Draw(X, Y: Integer; const Graphic: TGraphic; DrawOpacity: Byte = 255);
-  // DrawOpacity: 绘制不透明度。0=完全透明, 255=完全不透明
-  // 默认值 255 表示完全不透明
+  // DrawOpacity: Drawing opacity. 0 = fully transparent, 255 = fully opaque
+  // The default value 255 means fully opaque
   ```
 
 ```
-用户: 搜索帮助文档，怎么用 PrintDialog 组件设置打印机参数
+User: Search the help documentation for how to use the PrintDialog component to set printer parameters
 ```
 
-- AI 调用 `delphi_kb(query="PrintDialog printer settings", kb_type="document", search_type="semantic")`
-- 搜索到 `Vcl.Dialogs.TPrintDialog` 帮助页面及相关文章
-- 返回用法说明和代码示例
+- AI calls `delphi_kb(query="PrintDialog printer settings", kb_type="document", search_type="semantic")`
+- Searches and finds the `Vcl.Dialogs.TPrintDialog` help page and related articles
+- Returns usage instructions and code examples
 
-#### 旁白
+#### Narration
 
-构建完帮助文档知识库后，最实在的用法就是——**搜帮助**。
+After building the help documentation knowledge base, the most practical use is—**searching help**.
 
-传统的 Delphi 帮助查找方式：打开 CHM → 找到索引 → 输入关键字 → 浏览 → 翻到对的页面。如果不知道准确的关键字，就更痛苦了。
+The traditional way to find Delphi help: open CHM → find the index → enter keywords → browse → flip to the right page. If you don't know the exact keyword, it's even more painful.
 
-现在你只需要说"查一下 TCanvas.Draw 的参数说明"，AI 在 16 万页帮助文档中做全文检索，直接定位到 `Vcl.Graphics.TCanvas.Draw` 的帮助页面，提取参数说明——`DrawOpacity` 从 0 到 255 控制不透明度，默认 255 不透明。
+Now you only need to say "check the parameter descriptions of TCanvas.Draw", and the AI performs full-text search across 160,000 pages of help documentation, directly locates the help page for `Vcl.Graphics.TCanvas.Draw`, and extracts the parameter description—`DrawOpacity` controls opacity from 0 to 255, with the default 255 being opaque.
 
-甚至可以用自然语言搜："怎么用 PrintDialog 设置打印机参数"——语义搜索会帮你找到相关的帮助文章。
+You can even search with natural language: "how to use PrintDialog to set printer parameters"—semantic search will help you find the relevant help articles.
 
-这就是 **16 万页文档的即时检索能力**，比翻 CHM 快两个数量级。
+This is **instant retrieval capability across 160,000 pages of documentation**, two orders of magnitude faster than flipping through CHM files.
+### Scenario 5.2 — Install Component Package (about 1 minute)
 
-### 场景 5.2 — 安装组件包（约 1 分钟）
-
-#### AI 对话演示
-
-```
-用户: 安装 MyComponent.dpk 组件包
-```
-
-- AI 调用 `package(action="install", package_path="MyComponent.dpk")`
-- 展示编译和注册过程
+#### AI Dialogue Demo
 
 ```
-用户: 查看已安装的组件包列表
+User: Install the MyComponent.dpk component package
 ```
 
-- AI 调用 `package(action="list")`
-- 展示已注册的 IDE 组件包
+- AI calls `package(action="install", package_path="MyComponent.dpk")`
+- Show the compilation and registration process
 
-#### 旁白
+```
+User: View the list of installed component packages
+```
 
-安装 Delphi 组件包也变得很简单。
+- AI calls `package(action="list")`
+- Show registered IDE component packages
 
-输入"安装 MyComponent.dpk"，AI 会编译这个包文件，如果是设计期包还会自动注册到 IDE 中。
+#### Narration
 
-安装完成后，输入"查看已安装的组件包列表"，就可以看到所有注册了的组件包。
+Installing a Delphi component package has also become very simple.
+
+Enter "Install MyComponent.dpk", and AI will compile this package file. If it is a design-time package, it will also automatically register it in the IDE.
+
+After installation is complete, enter "View the list of installed component packages", and you can see all registered component packages.
 
 ---
 
-### 场景 5.3 — 复杂编译错误诊断（约 2 分钟）
+### Scenario 5.3 — Complex Compile-Error Diagnosis (about 2 minutes)
 
-> **威力点**：AI 不是只看错误行——它搜索 KB 理解泛型约束、类型定义等深层信息，从根上修复问题。
+> **Key highlight**: AI does not just look at the error line—it searches the KB to understand deeper information such as generic constraints and type definitions, and fixes the problem at the root.
 
-#### AI 对话演示
+#### AI Dialogue Demo
 
 ```
-用户: 编译 compile-error-demo/ErrorCode.pas，如果有错误分析并修复
+User: Compile compile-error-demo/ErrorCode.pas, and if there are errors, analyze and fix them
 ```
 
-- AI 调用 `delphi_project(action="compile", project_path="compile-error-demo/ErrorCode.pas")`
-- 编译错误：
+- AI calls `delphi_project(action="compile", project_path="compile-error-demo/ErrorCode.pas")`
+- Compile error:
   ```
   [dcc32 Error] ErrorCode.pas(28): E2511 Type parameter 'TCustomKey' must have a comparer
                       to be used in TDictionary<TCustomKey, string>
   ```
 
-**传统做法：** 看到 `E2511 must have a comparer`，新手可能完全不知道什么意思。即使知道，也得去查 `IEqualityComparer<T>` 怎么实现。
+**Traditional approach:** Seeing `E2511 must have a comparer`, a beginner may have no idea what it means. Even if they know, they still have to look up how to implement `IEqualityComparer<T>`.
 
-**AI 的做法：**
+**AI's approach:**
 
-##### 第 1 步：搜索 KB 理解错误原因
+##### Step 1: Search the KB to Understand the Cause of the Error
 
-- AI 调用 `delphi_kb(query="TDictionary", search_type="class", kb_type="delphi")` → 查看泛型约束定义
-- 发现 `TDictionary<TKey, TValue>` 要求 `TKey` 实现 `IEqualityComparer<TKey>` 或传入比较器
-- AI 调用 `delphi_kb(query="TEqualityComparer", search_type="class", kb_type="delphi")` → 查看比较器基类
+- AI calls `delphi_kb(query="TDictionary", search_type="class", kb_type="delphi")` → view the generic constraint definition
+- Discovers that `TDictionary<TKey, TValue>` requires `TKey` to implement `IEqualityComparer<TKey>` or to pass in a comparer
+- AI calls `delphi_kb(query="TEqualityComparer", search_type="class", kb_type="delphi")` → view the comparer base class
 
-##### 第 2 步：分析根因
+##### Step 2: Analyze the Root Cause
 
-- `TCustomKey` 是 record 类型，没有默认比较器
-- 需要创建 `TEqualityComparer<TCustomKey>` 的子类，实现 `Equals` 和 `GetHashCode`
-- 在 `TDictionary.Create` 时传入比较器实例
+- `TCustomKey` is a record type and has no default comparer
+- Need to create a subclass of `TEqualityComparer<TCustomKey>` that implements `Equals` and `GetHashCode`
+- Pass a comparer instance in `TDictionary.Create`
 
-##### 第 3 步：修复代码
+##### Step 3: Fix the Code
 
-- AI 生成 `TCustomKeyComparer` 类
-- 修改 `TDataCache.Create` 传入比较器
-- 重编译 → 通过 ✅
+- AI generates the `TCustomKeyComparer` class
+- Modify `TDataCache.Create` to pass in the comparer
+- Recompile → passes ✅
 
-#### 旁白
+#### Narration
 
-前面的编译错误修复演示的是"缺少 uses 单元"这种简单情况。这次我们看一个**真正的硬骨头**。
+The previous compile-error fix demo was a simple case such as "missing uses unit". This time we look at a **truly tough nut**.
 
-`E2511 Type parameter must have a comparer`——这个错误对于有经验的 Delphi 开发者来说，意思是用 record 做 `TDictionary` 的 key 时，需要提供一个比较器。但如果你不熟悉泛型约束，这个错误信息非常 cryptic。
+`E2511 Type parameter must have a comparer`—for an experienced Delphi developer, this error means that when using a record as the key of a `TDictionary`, you need to provide a comparer. But if you are not familiar with generic constraints, this error message is very cryptic.
 
-AI 的做法跟人类完全不同：
+AI's approach is completely different from a human's:
 
-**第一步，AI 搜索知识库**。它去查 `TDictionary` 的类定义，看它的泛型约束到底是什么——确认了 `TKey` 需要 `IEqualityComparer` 的支持。
+**Step 1: AI searches the knowledge base**. It looks up the class definition of `TDictionary` to see what its generic constraint actually is—confirming that `TKey` needs the support of `IEqualityComparer`.
 
-**第二步，AI 再查 `TEqualityComparer` 的源码 KB**，看这个基类怎么继承、怎么实现 `Equals` 和 `GetHashCode`。
+**Step 2: AI then searches the source-code KB for `TEqualityComparer`** to see how this base class is inherited and how it implements `Equals` and `GetHashCode`.
 
-**第三步，根因分析**——`TCustomKey` 是 record，没有默认比较器，所以需要自定义一个 `TCustomKeyComparer`，在 `TDictionary.Create` 时传入。
+**Step 3: Root cause analysis**—`TCustomKey` is a record and has no default comparer, so a custom `TCustomKeyComparer` is needed and must be passed in at `TDictionary.Create`.
 
-最后生成修复代码，重新编译通过。
+Finally, it generates fix code, and recompilation passes.
 
-这就是 **AI + 知识库** 配合解决复杂问题的模式——**不是靠 AI 的记忆猜，而是真的去查源码定义来理解错误根因**。对于 Delphi 这种有着 30 年历史、API 庞大繁杂的生态，这个能力尤其珍贵。
+This is the pattern of **AI + knowledge base** working together to solve complex problems—**not relying on AI's memory to guess, but actually looking up source-code definitions to understand the root cause of the error**. For an ecosystem like Delphi, with a 30-year history and a huge, complex API, this capability is especially valuable.
 
-**这就形成了一个"写代码 → 编译 → 发现错误 → 修复 → 再编译"的闭环，完全在对话中完成。**
-
----
-
-### 场景 5.4 — 完整从 0 到 1 工作流（约 3 分钟）
-
-> **设计思路**：这是教程的灵魂场景，把前面所有工具串联成一个完整故事。展示 AI 从零开始完成一个功能的全过程。
-
-#### AI 对话演示
-
-故事线：项目需要一个**JSON 配置文件的读写单元**，从头开始实现。
-
-```
-用户: 我需要给项目加一个 JSON 配置文件管理单元，
-      按项目编码规范来。先获取一下规则。
-```
-
-##### 第 1 步：获取编码规范
-
-- AI 调用 `get_coding_rules(section="writing")`
-- 了解命名规范、文件头格式、异常处理要求
-
-```
-用户: 查一下 Delphi 处理 JSON 的官方类
-```
-
-##### 第 2 步：搜索 API
-
-- AI 调用 `delphi_kb(query="TJSONObject", search_type="class", kb_type="delphi")` 搜索 `TJSONObject`
-- AI 调用 `delphi_kb(query="TJSONValue", search_type="class", kb_type="delphi")` 搜索 `TJSONValue`
-- AI 调用 `delphi_kb(query="TFile.ReadAllText", search_type="function", kb_type="delphi")` 确认文件读取 API
-- 展示搜索结果和 API 用法
-
-```
-用户: 好，开始写代码。单元名 JsonConfigManager，
-      提供 LoadConfig、SaveConfig、GetValue、SetValue 方法
-```
-
-##### 第 3 步：AI 写代码
-
-- AI 结合编码规范和 API 定义，生成完整单元
-- 展示生成的代码（可以画中画展示代码文件实时变化）
-
-##### 第 4 步：编译验证
-
-```
-用户: 编译项目检查语法
-```
-
-- AI 调用 `delphi_project(action="compile", project_path="JsonConfigManager.pas")`
-- 如果编译失败，AI 自动修复并重新编译
-- 展示编译成功
-
-##### 第 5 步：格式化
-
-```
-用户: 格式化代码
-```
-
-- AI 调用 `delphi_file(action="format", file_path="JsonConfigManager.pas")`
-- 展示格式化后的最终代码
-
-##### 第 6 步：代码审计
-
-```
-用户: 审计一下代码质量
-```
-
-- AI 调用 `get_coding_rules(section="review")`
-- 逐项审查：资源泄漏？异常处理？命名规范？类型安全？
-- 输出审查报告
-
-```
-用户: 按审查意见修改
-```
-
-- AI 根据审查报告修改代码
-- 再次编译确认通过
-
-#### 旁白
-
-最后一个场景，我们把今天学到的所有工具串联起来，走一遍完整的 **从 0 到 1 开发工作流**。
-
-故事是这样的：项目需要一个 JSON 配置文件管理单元。
-
-你不需要手动打开 IDE、建文件、查帮助，全部在 AI 对话中完成：
-
-**① 获取编码规范** → AI 先了解项目规则
-**② 搜索 API 确认签名** → 查 `TJSONObject`、`TJSONValue`、`TFile.ReadAllText` 的确切用法
-**③ 知识库驱动代码生成** → 结合规范 + API 定义生成代码（delphi_file write 默认自动备份），而不是凭记忆瞎猜
-**④ 格式化** → pasfmt 统一风格
-**⑤ 编译验证** → 编译检查语法
-**⑥ 代码审计 + 创建工单** → 审计后把问题自动登记为 Issue
-**⑦ 清理 & 验证** → 删除未用代码，确认备份存在
-
-关键区别在于 **第②步和第⑥步**：
-- 第②步不是 AI 凭训练数据"回忆"API——它真的去知识库里查了 `TJSONObject` 的类继承链和构造函数签名
-- 第⑥步不是简单的"改完拉倒"——审计报告可以通过 MCP 内置的 `code_hosting` 工具一键转为工单，纳入 Gitea 问题追踪（⑧ Gitea 缺陷闭环：审计工单 → 修复 → `close_issue` 关联提交并关闭）
-
-整个流程你只需要做决策和提需求，AI 负责执行和验证。这就是 **MCP Server + AI 辅助 Delphi 开发** 的完整形态。
+**This forms a closed loop of "write code → compile → find errors → fix → recompile", completed entirely within the conversation.**
 
 ---
 
-### 场景 5.5 — Gitea 缺陷闭环实战（约 3 分钟）
+### Scenario 5.4 — Complete From-0-to-1 Workflow (about 3 minutes)
 
-> **威力点**：以本项目自身作为案例，演示代码提交 → 审计 → 创建工单 → 修复 → 关闭工单的完整 Gitea 闭环。
+> **Design idea**: This is the soul scenario of the tutorial, connecting all the previous tools into a complete story. It shows the whole process of AI completing a feature from scratch.
+
+#### AI Dialogue Demo
+
+Storyline: The project needs a **read/write unit for JSON configuration files**, implemented from scratch.
+
+```
+User: I need to add a JSON configuration file management unit to the project,
+      following the project coding standards. First get the rules.
+```
+
+##### Step 1: Get Coding Standards
+
+- AI calls `get_coding_rules(section="writing")`
+- Learn the naming conventions, file header format, and exception handling requirements
+
+```
+User: Look up the official Delphi classes for handling JSON
+```
+
+##### Step 2: Search the API
+
+- AI calls `delphi_kb(query="TJSONObject", search_type="class", kb_type="delphi")` to search for `TJSONObject`
+- AI calls `delphi_kb(query="TJSONValue", search_type="class", kb_type="delphi")` to search for `TJSONValue`
+- AI calls `delphi_kb(query="TFile.ReadAllText", search_type="function", kb_type="delphi")` to confirm the file-reading API
+- Show search results and API usage
+
+```
+User: Okay, start writing code. The unit name is JsonConfigManager,
+      providing the LoadConfig, SaveConfig, GetValue, and SetValue methods
+```
+
+##### Step 3: AI Writes Code
+
+- AI combines the coding standards and API definitions to generate the complete unit
+- Show the generated code (picture-in-picture can show real-time changes to the code file)
+
+##### Step 4: Compile and Verify
+
+```
+User: Compile the project to check syntax
+```
+
+- AI calls `delphi_project(action="compile", project_path="JsonConfigManager.pas")`
+- If compilation fails, AI automatically fixes it and recompiles
+- Show successful compilation
+
+##### Step 5: Format
+
+```
+User: Format the code
+```
+
+- AI calls `delphi_file(action="format", file_path="JsonConfigManager.pas")`
+- Show the final formatted code
+
+##### Step 6: Code Audit
+
+```
+User: Audit the code quality
+```
+
+- AI calls `get_coding_rules(section="review")`
+- Review item by item: resource leaks? Exception handling? Naming conventions? Type safety?
+- Output a review report
+
+```
+User: Modify according to the review comments
+```
+
+- AI modifies the code according to the review report
+- Compile again to confirm it passes
+
+#### Narration
+
+In this last scenario, we connect all the tools learned today into a complete **from-0-to-1 development workflow**.
+
+The story is this: the project needs a JSON configuration file management unit.
+
+You don't need to manually open the IDE, create files, or check help—everything is done in the AI conversation:
+
+**① Get coding standards** → AI first learns the project rules
+**② Search the API to confirm signatures** → look up the exact usage of `TJSONObject`, `TJSONValue`, and `TFile.ReadAllText`
+**③ Knowledge-base-driven code generation** → generate code by combining standards + API definitions (delphi_file write automatically backs up by default), rather than guessing from memory
+**④ Format** → pasfmt unifies style
+**⑤ Compile and verify** → compile to check syntax
+**⑥ Code audit + create ticket** → after the audit, automatically register issues as Issues
+**⑦ Cleanup & verification** → remove unused code and confirm backups exist
+
+The key difference lies in **steps ② and ⑥**:
+- Step ② is not AI "recalling" the API from training data—it actually goes to the knowledge base and looks up `TJSONObject`'s class inheritance chain and constructor signatures
+- Step ⑥ is not simply "change it and be done"—the audit report can be converted into a ticket with one click via the MCP built-in `code_hosting` tool and brought into Gitea issue tracking (⑧ Gitea defect closed loop: audit ticket → fix → `close_issue` links the commit and closes it)
+
+Throughout the whole process, you only need to make decisions and state requirements; AI is responsible for execution and verification. This is the complete form of **MCP Server + AI-assisted Delphi development**.
+
+---
+
+### Scenario 5.5 — Gitea Defect Closed-Loop Practice (about 3 minutes)
+
+> **Key highlight**: Using this project itself as a case study to demonstrate the complete Gitea closed loop of code commit → audit → create ticket → fix → close ticket.
 >
-> 所有操作通过 `code_hosting` 一个工具完成，无需切换平台。
+> All operations are completed through a single `code_hosting` tool, with no need to switch platforms.
 
-#### AI 对话演示
+#### AI Dialogue Demo
 
-故事线：我们刚完成 `code_hosting` 工具的开发，需要提交代码、审计、并将审计发现登记到 Gitea 跟踪。
-
-```
-用户: 把我们刚完成的 code_hosting.py 提交到 Git，
-      然后审计代码质量，有发现就创建 Gitea 工单跟踪。
-```
-
-##### 第 1 步：代码提交
-
-- AI 调用 `code_hosting(action="git_add", work_dir=".", files=["src/tools/code_hosting.py", "src/server.py", "tests/test_code_hosting.py"])`
-- AI 调用 `code_hosting(action="git_commit", work_dir=".", commit_message="feat: add unified code_hosting tool")`
-- 返回 commit hash：`0a7e8b7`
-
-##### 第 2 步：代码审计
-
-- AI 调用 `get_coding_rules(section="review")` 获取审核规范
-- AI 分析 `code_hosting.py` 代码，逐项检查：
-  - ✅ 参数校验完整性
-  - ✅ 异常处理覆盖
-  - ✅ 返回格式一致性
-  - ✅ 跨平台路径配置
-- 输出审查报告：列出通过项和改进建议
-
-##### 第 3 步：连接 Gitea 并创建工单
+Storyline: We have just completed development of the `code_hosting` tool and need to commit the code, audit it, and register the audit findings in Gitea for tracking.
 
 ```
-用户: 将审计结果创建为 Gitea 工单，连接到 https://code.qdac.cc:3000，
-      仓库 swish/api_test
+User: Commit the code_hosting.py we just finished to Git,
+      then audit the code quality, and if there are findings, create a Gitea ticket to track them.
 ```
 
-- AI 调用 `code_hosting(platform="gitea", action="create_token", base_url="https://code.qdac.cc:3000", username="...", password="...")` ← 获得 Token
-- AI 调用 `code_hosting(platform="gitea", action="init_labels", base_url="...", token="...", repo="swish/api_test")` ← 确保标签存在
-- AI 调用 `code_hosting(platform="gitea", action="create_issue", base_url="...", token="...", repo="swish/api_test",
+##### Step 1: Code Commit
+
+- AI calls `code_hosting(action="git_add", work_dir=".", files=["src/tools/code_hosting.py", "src/server.py", "tests/test_code_hosting.py"])`
+- AI calls `code_hosting(action="git_commit", work_dir=".", commit_message="feat: add unified code_hosting tool")`
+- Return commit hash: `0a7e8b7`
+
+##### Step 2: Code Audit
+
+- AI calls `get_coding_rules(section="review")` to get the review standards
+- AI analyzes the `code_hosting.py` code and checks item by item:
+  - ✅ Parameter validation completeness
+  - ✅ Exception handling coverage
+  - ✅ Return format consistency
+  - ✅ Cross-platform path configuration
+- Output a review report: list the passed items and improvement suggestions
+
+##### Step 3: Connect to Gitea and Create a Ticket
+
+```
+User: Create the audit results as a Gitea ticket, connecting to https://code.qdac.cc:3000,
+      repository swish/api_test
+```
+
+- AI calls `code_hosting(platform="gitea", action="create_token", base_url="https://code.qdac.cc:3000", username="...", password="...")` ← obtains Token
+- AI calls `code_hosting(platform="gitea", action="init_labels", base_url="...", token="...", repo="swish/api_test")` ← ensure labels exist
+- AI calls `code_hosting(platform="gitea", action="create_issue", base_url="...", token="...", repo="swish/api_test",
      title="[审计] code_hosting.py 代码审查",
      body="审计发现的改进建议...",
      label_names=["类型/改进", "优先级/中", "状态/待确认"])`
-- 返回工单链接：`https://code.qdac.cc:3000/swish/api_test/issues/7`
+- Return ticket link: `https://code.qdac.cc:3000/swish/api_test/issues/7`
 
-##### 第 4 步：修复问题
+##### Step 4: Fix the Issues
 
-- AI 根据审计建议修改代码：
-  - `_request()` 增加 token 空值校验
-  - `code_hosting()` 增加 API 操作前置参数检查
-- AI 调用 `code_hosting(action="git_add", ...)` + `git_commit` → commit `8f929b5`
+- AI modifies the code according to the audit suggestions:
+  - `_request()` adds a null check for token
+  - `code_hosting()` adds pre-operation parameter checks for API operations
+- AI calls `code_hosting(action="git_add", ...)` + `git_commit` → commit `8f929b5`
 
-##### 第 5 步：关闭工单（关联提交）
+##### Step 5: Close the Ticket (Linked to Commit)
 
 ```
-用户: 在工单中说明修复内容并关闭
+User: Explain the fix in the ticket and close it
 ```
 
-- AI 调用 `code_hosting(platform="gitea", action="add_comment", base_url="...", token="...", repo="swish/api_test",
+- AI calls `code_hosting(platform="gitea", action="add_comment", base_url="...", token="...", repo="swish/api_test",
      issue_number=7, body="已在 commit 8f929b5 中修复: ...")`
-- AI 调用 `code_hosting(platform="gitea", action="close_issue", base_url="...", token="...", repo="swish/api_test",
+- AI calls `code_hosting(platform="gitea", action="close_issue", base_url="...", token="...", repo="swish/api_test",
      issue_number=7, comment_body="已修复并合并，commit: 8f929b5")`
-- 工单关闭 ✅
+- Ticket closed ✅
 
-#### 旁白
+#### Narration
 
-最后一个场景，我们用 **本项目自身** 作为案例，走一遍完整的 Gitea 缺陷闭环。
+In this last scenario, we use **this project itself** as a case study to walk through the complete Gitea defect closed loop.
 
-这是一个真正发生在项目开发中的场景——你刚完成一个功能模块的开发，需要走完"提交 → 审计 → 跟踪 → 修复 → 关闭"的全流程。
+This is a scenario that really happens in project development—you have just finished developing a feature module and need to go through the full process of "commit → audit → track → fix → close".
 
-**① 代码提交**：`git_add` + `git_commit` 提交到本地仓库。
+**① Code commit**: `git_add` + `git_commit` to commit to the local repository.
 
-**② 代码审计**：调用 `get_coding_rules` 获取审核规范，逐项审查代码质量。
+**② Code audit**: call `get_coding_rules` to get the review standards and review code quality item by item.
 
-**③ 创建 Gitea 工单**：通过 `code_hosting` 的 `create_token` 获取访问令牌 → `init_labels` 确保四维标签存在 → `create_issue` 创建工单并打标签。全部通过**同一个工具**完成，不用离开 AI 对话。
+**③ Create a Gitea ticket**: use `code_hosting`'s `create_token` to obtain an access token → `init_labels` to ensure the four-dimensional labels exist → `create_issue` to create the ticket and apply labels. All done through **the same tool**, without leaving the AI conversation.
 
-**④ 修复**：根据审计建议修改代码，再次提交。
+**④ Fix**: modify the code according to the audit suggestions and commit again.
 
-**⑤ 关闭**：`add_comment` 记录修复内容（可包含 commit hash），`close_issue` 关闭工单。工单历史完整可追溯。
+**⑤ Close**: `add_comment` records the fix content (can include the commit hash), and `close_issue` closes the ticket. The ticket history is complete and traceable.
 
-这个闭环的关键价值在于：**审计结果不落地在对话里——而是被登记到 Gitea 的问题追踪系统中**，纳入团队的标准化流程。commit 与 issue 之间的关联也被记录下来，后续开发者可以 trace 每个问题的修复历史。
-
----
-
-### 场景 5.6 — 自动化测试（约 3 分钟）
-
-> **威力点**：同一个工具同时支持 GUI 截图和控制台交互，auto 模式自动识别 PE 类型，无需手动切换。
-
-#### AI 对话演示
-
-**GUI 模式 — 截图验证：**
-
-```
-用户: 对 App.exe 的登录界面截图，检查界面布局
-```
-
-- AI 调用 `automate_delphi(action="gui", app_path="App.exe", script=[{"cmd":"goto","target":"TLoginForm"},{"cmd":"capture","target":"login.png"}])`
-- 返回截图和控件信息
-
-```
-用户: 点击登录按钮，触发验证逻辑，输入用户名后截图
-```
-
-- AI 调用 `automate_delphi(action="gui", app_path="App.exe", script=[{"cmd":"goto","target":"TLoginForm"},{"cmd":"type","target":"edtUser","text":"admin"},{"cmd":"click","target":"btnLogin"},{"cmd":"capture","target":"after_login.png"}])`
-- 展示登录后的界面截图
-
-**Console 模式 — 命令行工具交互：**
-
-```
-用户: 测试 Deploy.exe 部署工具，用 auto 模式自动识别
-```
-
-- AI 调用 `automate_delphi(action="auto", app_path="Deploy.exe", input="Y\n", expect="Deploy complete", args=["--silent"])`
-- 返回匹配到 `Deploy complete` 后的完整输出
-
-```
-用户: 测试一下如果没有 input 输入，超时会不会正常退出
-```
-
-- AI 调用 `automate_delphi(action="console", app_path="Tool.exe", timeout=5)`
-- 返回：超时正确触发，进程已终止
-
-#### 旁白
-
-最后这个场景，我们看 Daofy 的自动化测试能力。
-
-**GUI 模式**用于基于截图的界面验证。AI 可以通过 `DaofyAutomation` 单元（需要在 Delphi 项目中引用）与目标程序建立 Named Pipe 通信，模拟用户操作——定位窗口、点击按钮、输入文本、截图验证。全程在 AI 对话中完成，无需手动编写 UI 测试脚本。
-
-**Console 模式**则不需要任何 Delphi 端改造——直接用 `subprocess` 启动控制台程序，通过 stdin/stdout 交互。`input` 参数发送文本（支持 `\n` 换行），`expect` 参数等待特定输出模式，`timeout` 控制超时。
-
-最关键的是 **`action="auto"` 模式**——工具会自动读取 EXE 文件的 PE 头 Subsystem 字段（2=GUI, 3=Console），判断目标程序类型，选择正确的交互方式。完全不需要用户指定。
-
-这解决了 Delphi 生态中一个长期痛点：**GUI 和 Console 程序互斥**。同一个 Delphi 项目要么是 GUI Application，要么是 Console Application——但测试的时候你可能两种都有，而 Daofy 用一个 `automate_delphi` 工具统一覆盖了两个场景。
+The key value of this closed loop is: **audit results do not just stay in the conversation—they are registered in Gitea's issue tracking system** and brought into the team's standardized process. The association between commits and issues is also recorded, so later developers can trace the fix history of each issue.
 
 ---
 
-## 第六部分：总结 & 结束（约 1 分钟）
+### Scenario 5.6 — Automated Testing (about 3 minutes)
 
-### 画面
-- 回到项目 GitHub 页面
-- 展示 README 中的 Star、License 等信息
+> **Key highlight**: The same tool supports both GUI screenshots and console interaction. Auto mode automatically identifies the PE type, with no manual switching required.
 
-### 旁白脚本
+#### AI Dialogue Demo
 
-好了，今天的教程到这里就结束了。我们来快速回顾一下：
+**GUI Mode — Screenshot Verification:**
 
-**📋 第一节 — 安装**
-一句话让 AI 自动完成克隆、配环境、配置客户端，零手动操作。
+```
+User: Take a screenshot of App.exe's login screen and check the interface layout
+```
 
-**🔍 第二节 — 知识库搜索**
-- 精确搜索：搜类（`TStringList`）、搜函数（`Split`），瞬间定位 API
-- **🆕 语义搜索**：不知道 API 名字？自然语言描述，AI 从 30 万+ 函数中找出你要的
-- **🆕 引用查询**：查哪些文件用了某个类型，评估重构影响
-- **🆕 文档 KB 实战搜索**：构建完成后，一句自然语言搜 16 万页帮助文档
+- AI calls `automate_delphi(action="gui", app_path="App.exe", script=[{"cmd":"goto","target":"TLoginForm"},{"cmd":"capture","target":"login.png"}])`
+- Return screenshot and control information
 
-**⚙️ 第三节 — 编译 & 格式化**
-- 编译完整项目或单文件语法检查
-- **🆕 复杂编译错误诊断**：AI 搜索 KB 理解泛型约束等深层原因，从根上修复
-- **🆕 批量多项目编译**：一句话编译整个解决方案，自动处理依赖顺序
-- pasfmt 一键格式化代码
+```
+User: Click the login button, trigger the validation logic, enter the username, and take a screenshot
+```
 
-**📝 第四节 — AI 辅助开发**
-- **🆕 知识库驱动的代码生成**：AI 先在 KB 查 API 签名，再写代码，一次编译通过
-- **🆕 编码规范驱动的代码审计**：逐条对照规范审查，输出结构化报告
-- **🆕 审计结果自动创建工单**：通过 MCP 内置 `code_hosting` 工具一键创建标签和工单
-- **🆕 多文件重构**：引用查询 → 影响评估 → 逐文件修改 → 编译验证
-- **🆕 修改前自动备份**：format/重构前自动创建 `__history` 版本备份，可恢复
-- **🆕 编码规范控制 AI 行为**：同一需求换套规则，生成风格完全不同的代码
+- AI calls `automate_delphi(action="gui", app_path="App.exe", script=[{"cmd":"goto","target":"TLoginForm"},{"cmd":"type","target":"edtUser","text":"admin"},{"cmd":"click","target":"btnLogin"},{"cmd":"capture","target":"after_login.png"}])`
+- Show the screenshot of the interface after login
 
-**🚀 第五节 — 高级功能**
-- 构建 CHM 帮助文档知识库，16 万页全文检索
-- 安装 .dpk 组件包到 IDE
-- 完整从 0 到 1 工作流：规范 → API 查证 → 代码生成 → 编译 → 格式化 → 审计 → 工单
-- **🆕 Gitea 缺陷闭环实战**：代码提交 → 审计 → 创建工单 → 修复 → 关闭，以本项目自身为案例
-- **🆕 自动化测试**：GUI 截图（Named Pipe） + 控制台交互（subprocess），同工具双模式，action=auto 自动识别 PE 类型
+**Console Mode — Command-Line Tool Interaction:**
 
-你可以把这个 MCP Server 配合任何支持 MCP 协议的 AI 助手使用——Claude Desktop、Trae、CodeArts Agent、Cursor 等等。
+```
+User: Test the Deploy.exe deployment tool, using auto mode for automatic detection
+```
 
-项目是完全开源的（MIT 协议），GitHub 地址在屏幕上方。如果觉得有用，别忘了点个 Star ⭐ 支持一下！
+- AI calls `automate_delphi(action="auto", app_path="Deploy.exe", input="Y\n", expect="Deploy complete", args=["--silent"])`
+- Return the complete output after matching `Deploy complete`
 
-最后，大家在使用过程中遇到任何问题，欢迎在 GitHub 上提交 Issue。
+```
+User: Test whether it exits normally on timeout when there is no input
+```
 
-感谢观看，我们下期再见！
+- AI calls `automate_delphi(action="console", app_path="Tool.exe", timeout=5)`
+- Return: timeout triggered correctly, process terminated
+
+#### Narration
+
+In this last scenario, we look at Daofy's automated testing capabilities.
+
+**GUI mode** is used for screenshot-based interface verification. AI can establish Named Pipe communication with the target program through the `DaofyAutomation` unit (which needs to be referenced in the Delphi project) to simulate user operations—locating windows, clicking buttons, entering text, and verifying with screenshots. The whole process is completed in the AI conversation, with no need to manually write UI test scripts.
+
+**Console mode** requires no Delphi-side modifications at all—it directly uses `subprocess` to launch the console program and interacts through stdin/stdout. The `input` parameter sends text (supports `\n` line breaks), the `expect` parameter waits for a specific output pattern, and `timeout` controls the timeout.
+
+The most important part is the **`action="auto"` mode**—the tool automatically reads the Subsystem field in the EXE file's PE header (2=GUI, 3=Console), determines the target program type, and chooses the correct interaction method. The user does not need to specify it at all.
+
+This solves a long-standing pain point in the Delphi ecosystem: **GUI and Console programs are mutually exclusive**. The same Delphi project is either a GUI Application or a Console Application—but when testing you may have both, and Daofy uses one `automate_delphi` tool to cover both scenarios uniformly.
 
 ---
 
-## 附录：录制提示
+## Part Six: Summary & Conclusion (about 1 minute)
 
-### 屏幕布局建议
+### Visuals
+- Return to the project GitHub page
+- Show Star, License, and other information in the README
 
-| 场景 | 布局 |
+### Narration Script
+
+Alright, that's the end of today's tutorial. Let's do a quick review:
+
+**📋 Section One — Installation**
+One sentence lets AI automatically complete cloning, environment setup, and client configuration, with zero manual operations.
+
+**🔍 Section Two — Knowledge Base Search**
+- Exact search: search classes (`TStringList`) and functions (`Split`) to locate APIs instantly
+- **🆕 Semantic search**: Don't know the API name? Describe it in natural language, and AI finds what you need from 300,000+ functions
+- **🆕 Reference query**: find which files use a certain type and assess the impact of refactoring
+- **🆕 Documentation KB practical search**: after the build is complete, search 160,000 pages of help documentation with one natural-language sentence
+
+**⚙️ Section Three — Compilation & Formatting**
+- Compile a complete project or do a single-file syntax check
+- **🆕 Complex compile-error diagnosis**: AI searches the KB to understand deep causes such as generic constraints and fixes them at the root
+- **🆕 Batch multi-project compilation**: compile the entire solution with one sentence, automatically handling dependency order
+- one-click code formatting with pasfmt
+
+**📝 Section Four — AI-Assisted Development**
+- **🆕 Knowledge-base-driven code generation**: AI first checks API signatures in the KB, then writes code, passing compilation on the first try
+- **🆕 Coding-standard-driven code audit**: review item by item against the standards and output a structured report
+- **🆕 Automatically create tickets from audit results**: use the MCP built-in `code_hosting` tool to create labels and tickets with one click
+- **🆕 Multi-file refactoring**: reference query → impact assessment → file-by-file modification → compile verification
+- **🆕 Automatic backup before modification**: automatically create a `__history` version backup before format/refactoring, which can be restored
+- **🆕 Coding standards control AI behavior**: change the rule set for the same requirement and generate code in a completely different style
+
+**🚀 Section Five — Advanced Features**
+- Build a CHM help documentation knowledge base with full-text search over 160,000 pages
+- Install .dpk component packages into the IDE
+- Complete from-0-to-1 workflow: standards → API verification → code generation → compilation → formatting → audit → ticket
+- **🆕 Gitea defect closed-loop practice**: code commit → audit → create ticket → fix → close, using this project itself as a case study
+- **🆕 Automated testing**: GUI screenshots (Named Pipe) + console interaction (subprocess), same tool with dual modes, action=auto automatically identifies PE type
+
+You can use this MCP Server with any AI assistant that supports the MCP protocol—Claude Desktop, Trae, CodeArts Agent, Cursor, and so on.
+
+The project is completely open source (MIT License), and the GitHub address is at the top of the screen. If you find it useful, don't forget to click Star ⭐ to support it!
+
+Finally, if you encounter any problems while using it, feel free to submit an Issue on GitHub.
+
+Thanks for watching, and see you next time!
+
+---
+
+## Appendix: Recording Tips
+
+### Screen Layout Suggestions
+
+| Scenario | Layout |
 |------|------|
-| GitHub 页面介绍 | 全屏浏览器 |
-| AI 安装演示 | 全屏 AI 对话界面 + **画中画**终端 |
-| AI 写代码（复杂代码生成） | 全屏 AI 对话 + **画中画** VS Code 展示代码 + KB 搜索结果 |
-| 语义搜索发现隐藏 API | 全屏 AI 对话，突出显示 KB 搜索的命中结果 |
-| 代码审计报告 + 创建工单 | 全屏 AI 对话 + **画中画** Gitea 工单界面 |
-| 复杂编译错误诊断 | 全屏 AI 对话，突出 KB 搜索 TDictionary 定义的过程 |
-| 批量多项目编译 | 全屏 AI 对话 + 画中画显示编译顺序和结果 |
-| 多文件重构 | 全屏 AI 对话 + **画中画** VS Code 显示文件切换 |
-| 文档 KB 实战搜索 | 全屏 AI 对话，展示搜索命中的帮助文档内容 |
-| 代码格式化 + 自动备份 | 分屏：左 = AI 对话，右 = 文件资源管理器展示 __history 目录 |
-| 编码规范影响对比 | 分屏：左 = 现代规范生成代码，右 = 旧规范生成代码，并排对比 |
-| Gitea 缺陷闭环实战 | 全屏 AI 对话 + **画中画** Gitea 工单界面展示工单状态变化 |
-| 自动化测试 GUI 模式 | 全屏 AI 对话，突出返回的截图结果和控件树信息 |
-| 自动化测试 Console 模式 | 全屏 AI 对话，突出 stdin/stdout 交互过程 |
+| GitHub page introduction | Full-screen browser |
+| AI installation demo | Full-screen AI dialogue interface + **picture-in-picture** terminal |
+| AI writes code (complex code generation) | Full-screen AI dialogue + **picture-in-picture** VS Code showing code + KB search results |
+| Semantic search discovers hidden APIs | Full-screen AI dialogue, highlighting KB search hits |
+| Code audit report + create ticket | Full-screen AI dialogue + **picture-in-picture** Gitea ticket interface |
+| Complex compile-error diagnosis | Full-screen AI dialogue, highlighting the process of searching the KB for the TDictionary definition |
+| Batch multi-project compilation | Full-screen AI dialogue + picture-in-picture showing compilation order and results |
+| Multi-file refactoring | Full-screen AI dialogue + **picture-in-picture** VS Code showing file switching |
+| Documentation KB practical search | Full-screen AI dialogue, showing the help documentation content hit by the search |
+| Code formatting + automatic backup | Split screen: left = AI dialogue, right = File Explorer showing the __history directory |
+| Coding standard impact comparison | Split screen: left = code generated with modern standards, right = code generated with old standards, side-by-side comparison |
+| Gitea defect closed-loop practice | Full-screen AI dialogue + **picture-in-picture** Gitea ticket interface showing ticket status changes |
+| Automated testing GUI mode | Full-screen AI dialogue, highlighting the returned screenshot results and control tree information |
+| Automated testing Console mode | Full-screen AI dialogue, highlighting the stdin/stdout interaction process |
 
-### 需要提前准备
+### Preparation Required
 
-- [ ] Python 3.10+ 已安装
-- [ ] Git 已安装
-- [ ] Delphi IDE 已安装（任意版本）
-- [ ] 项目已克隆并安装好依赖
-- [ ] AI 客户端（如 Claude Desktop）已配置好 MCP Server
-- [ ] 准备一个可编译的 Delphi 示例项目（含 .dproj 文件）
-- [ ] 测试用的 .pas 文件（含可展示的编译错误）
-- [ ] 提前准备 JSON 读写单元的示例代码（场景 5.4 使用）
-- [ ] 重构场景需要一个含多处 TStringList 用法的项目（refactor-demo/）
-- [ ] 复杂编译错误场景需要 ErrorCode.pas（泛型约束错误，compile-error-demo/）
-- [ ] 代码审计场景需要 LegacyData.pas（含故意遗留的 5 类问题，review-demo/）
-- [ ] 批量编译场景需要 group-project/ 的多项目结构
-- [ ] 文档知识库需要在录制前完成构建（构建耗时数分钟）
-- [ ] 语义搜索场景需要提前构建 embedding 向量索引：`delphi_kb(action="build_embedding")`
-- [ ] Gitea 场景需要可访问的 Gitea 实例（如 https://code.qdac.cc:3000）和仓库权限
-- [ ] Gitea 缺陷闭环场景需要预先在仓库中运行一次 init_labels 创建标签
-- [ ] 自动化测试场景需要准备一个可运行的 GUI 程序（含 DaofyAutomation 单元）和一个控制台程序
-- [ ] 延时代码：`Start-Sleep -Seconds 3` 插入操作间控制节奏
+- [ ] Python 3.10+ installed
+- [ ] Git installed
+- [ ] Delphi IDE installed (any version)
+- [ ] Project cloned and dependencies installed
+- [ ] AI client (such as Claude Desktop) configured with the MCP Server
+- [ ] Prepare a compilable Delphi sample project (including a .dproj file)
+- [ ] A .pas file for testing (containing a demonstrable compile error)
+- [ ] Prepare sample code for a JSON read/write unit in advance (used in Scenario 5.4)
+- [ ] The refactoring scenario needs a project containing multiple uses of TStringList (refactor-demo/)
+- [ ] The complex compile-error scenario needs ErrorCode.pas (generic constraint error, compile-error-demo/)
+- [ ] The code audit scenario needs LegacyData.pas (containing 5 types of intentionally left issues, review-demo/)
+- [ ] The batch compilation scenario needs the multi-project structure in group-project/
+- [ ] The documentation knowledge base needs to be built before recording (the build takes several minutes)
+- [ ] The semantic search scenario requires building the embedding vector index in advance: `delphi_kb(action="build_embedding")`
+- [ ] The Gitea scenario needs an accessible Gitea instance (such as https://code.qdac.cc:3000) and repository permissions
+- [ ] The Gitea defect closed-loop scenario requires running init_labels once in the repository in advance to create labels
+- [ ] The automated testing scenario needs a runnable GUI program (including the DaofyAutomation unit) and a console program
+- [ ] Delay code: insert `Start-Sleep -Seconds 3` between operations to control pacing
 
-### 剪辑标记
+### Editing Markers
 
-- **[加速]** — 安装依赖、构建知识库等耗时操作，建议 5x-10x 加速
-- **[剪辑]** — 等待完成、中间输出过长等，建议直接剪掉
-- **[画中画]** — 需要同时展示 AI 对话和代码/终端时
-- **[审计报告]** — 代码审计输出报告时，逐条展示可停留 2-3 秒，让观众看清每项问题
-- **[重构过程]** — 多文件修改可加速展示，每改完一个文件停留一下展示编译结果
+- **[Speed up]** — For time-consuming operations such as installing dependencies and building the knowledge base, 5x-10x speed-up is recommended
+- **[Cut]** — For waiting for completion, overly long intermediate output, etc., it is recommended to cut them directly
+- **[Picture-in-picture]** — When AI dialogue and code/terminal need to be shown at the same time
+- **[Audit report]** — When the code audit outputs a report, show each item for 2-3 seconds so viewers can clearly see each issue
+- **[Refactoring process]** — Multi-file modifications can be shown at increased speed; pause after each file is modified to show the compilation result
 
-### 常见翻车点
+### Common Pitfalls
 
-1. **Python 编码问题** — 确保 PowerShell 中先执行 `$env:PYTHONIOENCODING='utf-8'`
-2. **虚拟环境未激活** — 演示前确认 `venv\Scripts\activate` 已执行
-3. **配置文件路径** — 手动配置时路径中的反斜杠要双写或使用正斜杠
-4. **Delphi 编译器版本** — 不同 dproj 的 ProjectVersion 要匹配正确的 Delphi 版本
+1. **Python encoding issues** — Make sure to run `$env:PYTHONIOENCODING='utf-8'` in PowerShell first
+2. **Virtual environment not activated** — Before the demo, confirm that `venv\Scripts\activate` has been run
+3. **Configuration file paths** — When configuring manually, backslashes in paths must be doubled or forward slashes used
+4. **Delphi compiler version** — The ProjectVersion of different dproj files must match the correct Delphi version
