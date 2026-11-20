@@ -1,70 +1,70 @@
-# Daofy MCP Server 审计报告
+# Daofy MCP Server Audit Report
 
-**审计日期**: 2026-06-25  
-**项目版本**: 2026.06.22  
-**审计范围**: 代码质量、项目结构、依赖管理、安全性、文档完整性  
-**审计人**: LangRouter Auto
-
----
-
-## 总体评价
-
-Daofy 是一个成熟的 Python MCP Server，为 Delphi IDE 提供编译、知识库搜索、文件操作、自动化测试等全生命周期工具链。项目结构清晰（services/tools/utils 分层），测试覆盖较完整（60+ 测试文件），编码规范良好。
-
-**整体评级**: B+（良好，存在一些值得关注的问题）
+**Audit date**: 2026-06-25  
+**Project version**: 2026.06.22  
+**Audit scope**: code quality, project structure, dependency management, security, documentation completeness  
+**Auditor**: LangRouter Auto
 
 ---
 
-## 一、严重问题
+## Overall Assessment
 
-### 1.1 `except Exception:` 裸捕获过多
+Daofy is a mature Python MCP Server that provides a full-lifecycle toolchain for the Delphi IDE, including compilation, knowledge base search, file operations, automated testing, and more. The project structure is clear (services/tools/utils layering), test coverage is relatively complete (60+ test files), and coding standards are good.
 
-全项目大量使用 `except Exception:` 而不绑定变量（缺少 `as e`），且未用 `exc_info=True` 记录堆栈。这会导致：
-- 异常详情丢失，排查困难
-- 可能静默吞掉不该吞的错误（如 `KeyboardInterrupt`）
+**Overall rating**: B+ (Good, with some issues worth paying attention to)
 
-**影响文件**: `server.py` 中 ~15 处，`async_tasks.py`、`file_tool.py`、`knowledge_base.py`、`compile_project.py` 等均有分布
+---
 
-**示例**:
+## 1. Serious Issues
+
+### 1.1 Too many bare `except Exception:` captures
+
+The entire project makes extensive use of `except Exception:` without binding the variable (missing `as e`), and does not use `exc_info=True` to record the stack. This leads to:
+- Loss of exception details, making troubleshooting difficult
+- Possible silent swallowing of errors that should not be swallowed (such as `KeyboardInterrupt`)
+
+**Affected files**: about 15 places in `server.py`, with distribution also in `async_tasks.py`, `file_tool.py`, `knowledge_base.py`, `compile_project.py`, etc.
+
+**Example**:
 ```python
 # server.py:2301
 except Exception:
     logger.warning("清理 pkb_cache 时发生异常", exc_info=True)
 
-# 虽然用了 exc_info=True，但仍建议捕获具体异常或至少 as e
+# Although exc_info=True is used, it is still recommended to catch specific exceptions or at least use as e
 ```
 
-**建议**: 统一改为 `except Exception as e:` + `logger.warning("...", exc_info=True)`，或捕获具体异常类型。
+**Recommendation**: Uniformly change to `except Exception as e:` + `logger.warning("...", exc_info=True)`, or catch specific exception types.
 
-### 1.2 `winreg` 重复导入
+### 1.2 Duplicate `winreg` import
 
-`server.py` 第 15 行和第 252 行都执行了 `import winreg`。第 252 行的导入在 `run_server()` 函数体内，属于不必要的重复导入。
+Both line 15 and line 252 of `server.py` execute `import winreg`. The import on line 252 is inside the `run_server()` function body and is an unnecessary duplicate import.
 
-**建议**: 删除第 252 行的 `import winreg`，函数体内直接使用模块级导入。
+**Recommendation**: Delete the `import winreg` on line 252; use the module-level import directly within the function body.
 
-### 1.3 `pydantic` 依赖几乎未使用
+### 1.3 `pydantic` dependency is barely used
 
-`pyproject.toml` 将 `pydantic>=2.0.0` 列为主依赖，但全项目仅在 `server.py:1609` 有一处使用：
+`pyproject.toml` lists `pydantic>=2.0.0` as a main dependency, but there is only one use in the entire project at `server.py:1609`:
 ```python
 from pydantic import AnyUrl
 ```
-使用频率极低，应考虑降级为可选依赖或移除。
+Usage frequency is extremely low; consider downgrading it to an optional dependency or removing it.
 
 ---
 
-## 二、代码结构与组织
+## 2. Code Structure and Organization
 
-### 2.1 大模块拆分
+### 2.1 Splitting Large Modules
 
-| 文件 | 行数 | 评价 |
+| File | Lines | Assessment |
 |------|------|------|
-| `src/server.py` | 2368 | 过大，建议拆分 — 尤其是工具 handler 定义（~900 行）和 list_tools schema 定义（~600 行） |
-| `src/tool_docs.py` | 1033 | 工具文档与 schema 分离做得好，但仍有拆分空间 |
-| `install_mcp.py` | 1980 | 安装脚本过长，可拆分出独立功能模块 |
+| `src/server.py` | 2368 | Too large; recommend splitting — especially the tool handler definitions (~900 lines) and the list_tools schema definitions (~600 lines) |
+| `src/tool_docs.py` | 1033 | Separation of tool documentation and schema is done well, but there is still room for splitting |
+| `install_mcp.py` | 1980 | Installation script is too long; separate functional modules can be split out |
 
-**建议**: 将 `server.py` 中的 `list_tools()` 的 Tool schema 定义拆分到独立文件（如 `tool_schemas.py`），将 tool handler 拆分到 `handlers/` 目录。
+**Recommendation**: Split the Tool schema definitions of `list_tools()` in `server.py` into a standalone file (e.g., `tool_schemas.py`), and split tool handlers into a `handlers/` directory.
 
-### 2.2 调试文件滞留项目根目录
+### 2.2 Debug Files Left in Project Root
 
 ```text
 _debug_ocr.py      (2288 bytes)
@@ -72,9 +72,9 @@ _debug_pyclipper.py (3312 bytes)
 _test_ocr.py        (1505 bytes)
 ```
 
-虽已被 `.gitignore` 忽略，但留在磁盘上易造成混淆。建议清理或移入 `tests/debug/`。
+Although they are already ignored by `.gitignore`, leaving them on disk can easily cause confusion. Recommend cleaning them up or moving them into `tests/debug/`.
 
-### 2.3 `tests/` 中含 Delphi 源码
+### 2.3 `tests/` Contains Delphi Source Code
 
 ```text
 rtti_comprehensive_test.dpr  (16KB)
@@ -85,161 +85,162 @@ test_getattrs2.dpr
 test_getattrs_minimal.dpr
 ```
 
-这些 Delphi 项目文件用于 RTTI 集成测试，放在 `tests/` 中合理，但建议移入 `tests/fixtures/` 子目录以区分 Python 测试和测试固件。
+These Delphi project files are used for RTTI integration tests. Keeping them in `tests/` is reasonable, but it is recommended to move them into the `tests/fixtures/` subdirectory to distinguish Python tests from test fixtures.
 
 ---
 
-## 三、依赖管理
+## 3. Dependency Management
 
-### 3.1 已移除的依赖未清理
+### 3.1 Removed Dependencies Not Cleaned Up
 
-根据提交 `878c3af`（perf: scanner 移除 BeautifulSoup 依赖，html2text 替代 HTML 处理），`beautifulsoup4` 已不再被 `scanner.py` 使用。但 `pyproject.toml` 仍保留：
+According to commit `878c3af` (perf: scanner removes BeautifulSoup dependency, html2text replaces HTML handling), `beautifulsoup4` is no longer used by `scanner.py`. However, `pyproject.toml` still retains:
 ```toml
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
 ```
 
-**建议**: 确认 `beautifulsoup4` 和 `lxml` 是否仍被其他模块使用，如已无依赖则移出。
+**Recommendation**: Confirm whether `beautifulsoup4` and `lxml` are still used by other modules; if there is no longer a dependency, remove them.
 
-### 3.2 `python-docx` 使用情况不明
+### 3.2 Usage of `python-docx` Unclear
 
-`pyproject.toml` 依赖了 `python-docx>=0.8.11`，但仅在 `copyright_service.py` 中可能用于 Word 文档生成。建议标注为 optional dependency。
-
----
-
-## 四、安全性
-
-### 4.1 路径安全验证良好
-
-`file_tool.py` 实现了完整的路径安全性校验（`_validate_path`），包含：
-- Null 字节注入检查
-- 系统敏感目录保护
-- 符号链接解析
-
-**评价**: ✅ 良好实践
-
-### 4.2 子进程参数校验
-
-`code_hosting.py` 实现了 `_validate_git_arg()` 防止参数注入（空字节、换行、`--xxx` 形式的参数），已完成相关测试覆盖。
-
-**评价**: ✅ 良好实践
+`pyproject.toml` depends on `python-docx>=0.8.11`, but it may only be used in `copyright_service.py` for Word document generation. Recommend marking it as an optional dependency.
 
 ---
 
-## 五、测试覆盖
+## 4. Security
 
-### 5.1 测试总数
+### 4.1 Path Security Validation Is Good
 
-约 60+ 个测试文件，数百个测试用例。主要覆盖：
+`file_tool.py` implements complete path security validation (`_validate_path`), including:
+- Null byte injection check
+- System sensitive directory protection
+- Symbolic link resolution
 
-| 模块 | 测试文件 | 覆盖度 |
+**Assessment**: ✅ Good practice
+
+### 4.2 Subprocess Argument Validation
+
+`code_hosting.py` implements `_validate_git_arg()` to prevent argument injection (null bytes, newlines, arguments in the form `--xxx`), and related test coverage has been completed.
+
+**Assessment**: ✅ Good practice
+
+---
+
+## 5. Test Coverage
+
+### 5.1 Total Tests
+
+Approximately 60+ test files and hundreds of test cases. Main coverage:
+
+| Module | Test file | Coverage |
 |------|---------|--------|
-| 文件操作 | `test_file_tool.py` (100KB) | 高 |
-| 代码托管 | `test_code_hosting.py` (63KB) | 高 |
-| 审计 | `test_audit_integration.py` (43KB) | 高 |
-| RTTI 桥接 | `test_rtti_*.py` (多文件) | 高 |
-| 知识库 | `test_document_kb.py`, `test_example_kb.py` 等 | 中-高 |
-| OCR | `test_ocr_service.py`, `test_ocr_tool.py` | 中 |
+| File operations | `test_file_tool.py` (100KB) | High |
+| Code hosting | `test_code_hosting.py` (63KB) | High |
+| Audit | `test_audit_integration.py` (43KB) | High |
+| RTTI bridge | `test_rtti_*.py` (multiple files) | High |
+| Knowledge base | `test_document_kb.py`, `test_example_kb.py`, etc. | Medium-High |
+| OCR | `test_ocr_service.py`, `test_ocr_tool.py` | Medium |
 
-### 5.2 测试缺口
+### 5.2 Test Gaps
 
-- **`test_doc_consistency.py`**: 文档一致性测试（5362 字节），覆盖面有限
-- **UI 自动化测试**: `test_console_automation.py` 存在，但 GUI 自动化测试覆盖不足
-- **知识库构建的集成测试**: 缺少端到端的 KB 构建 + 搜索验证
+- **`test_doc_consistency.py`**: documentation consistency test (5362 bytes), limited coverage
+- **UI automation testing**: `test_console_automation.py` exists, but GUI automation test coverage is insufficient
+- **Integration testing for knowledge base construction**: lacks end-to-end KB build + search verification
 
 ---
 
-## 六、文档
+## 6. Documentation
 
-### 6.1 文档完整性
+### 6.1 Documentation Completeness
 
-`docs/` 目录文档较为完善：
+Documentation in the `docs/` directory is relatively complete:
 
-| 文档 | 说明 | 评价 |
+| Document | Description | Assessment |
 |------|------|------|
-| `project.md` | 项目整体说明 | ✅ |
-| `delphi_kb.md` | 知识库使用 | ✅ |
-| `file_tool_audit_report.md` | 文件工具审计 | ✅ |
-| `rtti-mcp-bridge-design.md` | RTTI 桥接设计 | ✅ |
-| `todos.md` / `tofix.md` | 已知问题和待办 | ✅ |
+| `project.md` | Project overview | ✅ |
+| `delphi_kb.md` | Knowledge base usage | ✅ |
+| `file_tool_audit_report.md` | File tool audit | ✅ |
+| `rtti-mcp-bridge-design.md` | RTTI bridge design | ✅ |
+| `todos.md` / `tofix.md` | Known issues and TODOs | ✅ |
 
-### 6.2 配置规范文档
+### 6.2 Configuration Specification Document
 
-`config/CODING_RULES.mdc` 达 155KB，包含详细的 Delphi 编码规范。内容详尽但体积较大，建议拆分或提供快速导航索引。
+`config/CODING_RULES.mdc` reaches 155KB and contains detailed Delphi coding standards. The content is thorough but large; recommend splitting it or providing a quick navigation index.
 
 ---
 
-## 七、环境与构建
+## 7. Environment and Build
 
-### 7.1 编译器环境
+### 7.1 Compiler Environment
 
-| 项目 | 状态 |
+| Item | Status |
 |------|------|
-| Delphi 版本 | 13 Florence (Win32) |
-| 编译器数量 | 2 个（均可用） |
-| 第三方库路径 | 212 个已配置 |
-| Delphi 帮助目录 | 已自动检测 |
+| Delphi version | 13 Florence (Win32) |
+| Number of compilers | 2 (both available) |
+| Third-party library paths | 212 configured |
+| Delphi help directory | Automatically detected |
 
-### 7.2 AST 分析引擎（daudit）
+### 7.2 AST Analysis Engine (daudit)
 
-`tools/daudit/daudit.exe` (8.5MB) 可用。但存在大量构建产物驻留：
+`tools/daudit/daudit.exe` (8.5MB) is available. However, a large number of build artifacts remain:
 
-| 文件 | 大小 | 建议 |
+| File | Size | Recommendation |
 |------|------|------|
-| `daudit.exe.bak` | 5.5 MB | 删除（备份文件） |
-| `daudit.map` | 5.8 MB | 删除（调试映射，运行不需要） |
-| `daudit.drc` | 33 KB | 可删除（资源编译中间文件） |
-| `crash.log`, `exception.log`, `lsp_server.log` | ~1.4MB | 可清理 |
-| `cache/` 目录 | ~数百 KB | 按需清理 |
+| `daudit.exe.bak` | 5.5 MB | Delete (backup file) |
+| `daudit.map` | 5.8 MB | Delete (debug mapping, not needed at runtime) |
+| `daudit.drc` | 33 KB | Can be deleted (resource compilation intermediate file) |
+| `crash.log`, `exception.log`, `lsp_server.log` | ~1.4MB | Can be cleaned up |
+| `cache/` directory | ~hundreds of KB | Clean up as needed |
 
 ---
 
-## 八、知识库数据
+## 8. Knowledge Base Data
 
-`data/` 目录中存在多个备份版本：
+There are multiple backup versions in the `data/` directory:
 
 ```text
-document-knowledge-base          ← 当前版本
-document-knowledge-base.bak.v3   ← 可清理
-document-knowledge-base.bak.v4   ← 可清理
-document-knowledge-base.bak.v5   ← 可清理
+document-knowledge-base          ← current version
+document-knowledge-base.bak.v3   ← can be cleaned up
+document-knowledge-base.bak.v4   ← can be cleaned up
+document-knowledge-base.bak.v5   ← can be cleaned up
 ```
 
-多个备份占用磁盘空间，建议确认不再需要后清理旧备份。
+Multiple backups occupy disk space; recommend confirming they are no longer needed and then cleaning up old backups.
 
 ---
 
-## 九、已知待处理问题（来自 tofix.md）
+## 9. Known Pending Issues (from tofix.md)
 
-| 编号 | 问题 | 状态 | 优先级 |
+| No. | Issue | Status | Priority |
 |------|------|------|--------|
-| 8 | 新增平台 API 缺少真实平台契约验证 | ⏳ 待验证 | 中 |
-| 11 | 运行中的 MCP 服务不自动加载新 schema | 📌 运维提示 | 低 |
+| 8 | New platform API lacks real platform contract verification | ⏳ Pending verification | Medium |
+| 11 | Running MCP service does not automatically load new schemas | 📌 Operations note | Low |
 
 ---
 
-## 十、优点与亮点
+## 10. Strengths and Highlights
 
-1. **架构清晰**: services/tools/utils 三层分离，模块职责明确
-2. **测试完善**: 60+ 测试文件，对核心功能覆盖充分
-3. **安全实践好**: 路径校验、命令注入防护
-4. **异常日志**: 多数异常场景有 `exc_info=True` 记录堆栈
-5. **版本管理**: `__version__.py` 动态读取 `pyproject.toml`，单点维护
-6. **智能提示**: `_get_smart_hint()` 在工具返回后提供上下文建议
-7. **渐进式功能**: OCR 等功能设计为 optional dependencies，不增加基础安装负担
-8. **提交规范**: Git 提交信息清晰，中文描述 + 英文标签
+1. **Clear architecture**: three-layer separation of services/tools/utils, with clear module responsibilities
+2. **Comprehensive testing**: 60+ test files, with sufficient coverage of core functionality
+3. **Good security practices**: path validation, command injection protection
+4. **Exception logging**: most exception scenarios use `exc_info=True` to record the stack
+5. **Version management**: `__version__.py` dynamically reads `pyproject.toml`, single-point maintenance
+6. **Smart hints**: `_get_smart_hint()` provides context suggestions after a tool returns
+7. **Progressive features**: features such as OCR are designed as optional dependencies, without increasing the burden of the base installation
+8. **Commit standards**: Git commit messages are clear, with Chinese descriptions + English tags
 
 ---
 
-## 十一、改进建议优先级
+## 11. Priority of Improvement Suggestions
 
-| 优先级 | 建议 |
+| Priority | Suggestion |
 |--------|------|
-| P0 | 修复裸 `except Exception:` 缺乏变量绑定的问题 |
-| P1 | 拆分过大的 `server.py`（工具 schema + handler 分离） |
-| P1 | 清理 `data/` 中的旧 KB 备份和 `tools/daudit/` 中的构建产物 |
-| P2 | 确认 `beautifulsoup4` 和 `lxml` 依赖是否仍需保留 |
-| P2 | 将 `pydantic` 从主依赖降级为可选 |
-| P2 | 将调试脚本移入 `tests/debug/` 或删除 |
-| P3 | 将 Delphi 测试固件移入 `tests/fixtures/` |
-| P3 | 拆分 `config/CODING_RULES.mdc` 为大文档 |
+| P0 | Fix the issue of bare `except Exception:` lacking variable binding |
+| P1 | Split the oversized `server.py` (separate tool schema + handler) |
+| P1 | Clean up old KB backups in `data/` and build artifacts in `tools/daudit/` |
+| P2 | Confirm whether `beautifulsoup4` and `lxml` dependencies still need to be retained |
+| P2 | Downgrade `pydantic` from a main dependency to optional |
+| P2 | Move debug scripts into `tests/debug/` or delete them |
+| P3 | Move Delphi test fixtures into `tests/fixtures/` |
+| P3 | Split the large `config/CODING_RULES.mdc` document |
+

@@ -1,28 +1,28 @@
-# Delphi AST 语义分析引擎 — 知识库增强 + 代码审计规格书
+# Delphi AST Semantic Analysis Engine — Knowledge Base Enhancement + Code Audit Specification
 
-> 版本：v1.0  
-> 用途：Daofy MCP Server 配套 AST 解析器（daudit.exe）开发规格  
-> 集成方式：Delphi 控制台程序 → subprocess JSON 管道 → Python KB 服务
-
----
-
-## 目录
-
-1. [架构概述](#1-架构概述)
-2. [集成协议](#2-集成协议)
-3. [知识库增强接口](#3-知识库增强接口)
-4. [审计规则完整清单](#4-审计规则完整清单)
-5. [数据库 Schema 扩展](#5-数据库-schema-扩展)
-6. [Python 集成改动](#6-python-集成改动)
-7. [实施路线图](#7-实施路线图)
+> Version: v1.0
+> Purpose: Development specification for the Daofy MCP Server companion AST parser (daudit.exe)
+> Integration: Delphi console program → subprocess JSON pipe → Python KB service
 
 ---
 
-## 1. 架构概述
+## Table of Contents
+
+1. [Architecture Overview](#1-architecture-overview)
+2. [Integration Protocol](#2-integration-protocol)
+3. [Knowledge Base Enhancement Interface](#3-knowledge-base-enhancement-interface)
+4. [Complete Audit Rule List](#4-complete-audit-rule-list)
+5. [Database Schema Extension](#5-database-schema-extension)
+6. [Python Integration Changes](#6-python-integration-changes)
+7. [Implementation Roadmap](#7-implementation-roadmap)
+
+---
+
+## 1. Architecture Overview
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                     daudit.exe (Delphi Console)                    │
+│                     daudit.exe (Delphi Console)                   │
 │                                                                   │
 │  ┌──────────┐   ┌──────────────────┐   ┌───────────────────────┐  │
 │  │  Lexer   │ → │   Parser (AST)    │ → │  Semantic Analysis   │  │
@@ -33,63 +33,63 @@
 │                          │             └──────────┬────────────┘  │
 │                          │                        │               │
 │                          ▼                        ▼               │
-│                    ┌────────────────────────────────────────┐      │
-│                    │         JSON Output (stdout)           │      │
-│                    │ · --mode audit 代码审计违规报告          │      │
-│                    │ · --mode ast   AST 语法解析             │      │
-│                    └──────────────────┬─────────────────────┘      │
+│                    ┌────────────────────────────────────────┐     │
+│                    │         JSON Output (stdout)           │     │
+│                    │ · --mode audit Code audit violation report │ │
+│                    │ · --mode ast  AST syntax parsing       │     │
+│                    └──────────────────┬─────────────────────┘     │
 └───────────────────────────────────────┼───────────────────────────┘
                                         │ stdout (JSON)
                                         ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                    Python MCP Server 侧                           │
+│                    Python MCP Server Side                          │
 │                                                                   │
-│  smart_cache_knowledge_base.py  ← 消费 JSON, 写入 SQLite          │
-│  tools/knowledge_base.py        ← 搜索接口, 向 AI 返回结果        │
-│  tools/audit.py (新增)          ← 审计接口, 向 AI 返回违规报告    │
+│  smart_cache_knowledge_base.py  ← consume JSON, write to SQLite    │
+│  tools/knowledge_base.py        ← search interface, return results to AI │
+│  tools/audit.py (new)           ← audit interface, return violation report to AI │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### 核心分层
+### Core Layers
 
-| 层 | 职责 | 技术载体 |
+| Layer | Responsibility | Technical Carrier |
 |----|------|---------|
-| **AST 解析** | 将 Delphi 源码解析为语法树，覆盖 class/record/interface/function/property/field/const/enum 等全部语法结构 | daudit.exe `--mode ast` |
-| **语义分析** | 作用域解析（实体归属）、类型绑定（类型名→定义）、引用追踪（谁用了谁）、继承链解析 | daudit.exe `--mode ast` |
-| **审计引擎** | 在 AST + 语义分析结果上，运行预定义规则集，输出违规报告 | daudit.exe `--mode audit` |
-| **AI 决策** | 消费审计报告，分类严重程度、排除误报、生成修复建议、输出最终报告 | MCP Server + LLM |
+| **AST parsing** | Parse Delphi source into a syntax tree, covering all syntax structures such as class/record/interface/function/property/field/const/enum | daudit.exe `--mode ast` |
+| **Semantic analysis** | Scope resolution (entity ownership), type binding (type name→definition), reference tracking (who uses whom), inheritance chain resolution | daudit.exe `--mode ast` |
+| **Audit engine** | Run predefined rule sets on AST + semantic analysis results and output violation reports | daudit.exe `--mode audit` |
+| **AI decision-making** | Consume audit reports, classify severity, eliminate false positives, generate fix suggestions, output final report | MCP Server + LLM |
 
 ---
 
-## 2. 集成协议
+## 2. Integration Protocol
 
-### 2.1 命令行接口
+### 2.1 Command-Line Interface
 
 ```bash
-# ── 模式 1：AST 语法解析（实体提取） ──
+# ── Mode 1: AST syntax parsing (entity extraction) ──
 daudit.exe --mode ast "C:\Dev\Unit1.pas" [--format json] [--compact]
 
-# ── 模式 2：代码审计（返回违规列表） ──
-# 全项目审计
+# ── Mode 2: Code audit (returns violation list) ──
+# Full project audit
 daudit.exe --mode audit --source-dir "C:\Project\src" --output "audit_report.json" [--rules P0,P1]
 
-# 指定规则
+# Specify rules
 daudit.exe --mode audit --source-dir "C:\Project\src" --rules C001,C002,R001
 
-# 增量审计（只审计 git 变更的文件）
+# Incremental audit (only audit git-changed files)
 daudit.exe --mode audit --git-diff HEAD~1 --source-dir "C:\Project\src"
 ```
 
-### 2.2 STDIO 协议标准
+### 2.2 STDIO Protocol Standard
 
 ```
-stdin:   批处理模式时接收文件列表 JSON
-stdout:  JSON（主输出通道，每行一个完整 JSON 或批处理整体 JSON）
-stderr:  日志/诊断（不影响 MCP 通信管道）
-exit:    0 = 全部成功, 1 = 部分文件失败, 2 = 严重错误
+stdin:   In batch mode, receives file list JSON
+stdout:  JSON (main output channel; one complete JSON per line or overall batch JSON)
+stderr:  Logs/diagnostics (does not affect the MCP communication pipe)
+exit:    0 = all success, 1 = partial file failure, 2 = severe error
 ```
 
-### 2.3 批处理输入格式
+### 2.3 Batch Input Format
 
 ```json
 {
@@ -107,9 +107,9 @@ exit:    0 = 全部成功, 1 = 部分文件失败, 2 = 严重错误
 
 ---
 
-## 3. AST 语法解析输出格式（`--mode ast`）
+## 3. AST Syntax Parsing Output Format (`--mode ast`)
 
-### 3.1 输出 JSON Schema
+### 3.1 Output JSON Schema
 
 ```json
 {
@@ -188,14 +188,14 @@ exit:    0 = 全部成功, 1 = 部分文件失败, 2 = 严重错误
 }
 ```
 
-### 3.2 实体 kind 编码表
+### 3.2 Entity Kind Encoding Table
 
-| 编码 | 含义 | 关键附加字段 |
+| Code | Meaning | Key Additional Fields |
 |------|------|-------------|
 | `TC` | Class | inherits_from, inheritance_chain, members, visibility, modifiers |
-| `TR` | Record | inherits_from (如果有), members |
+| `TR` | Record | inherits_from (if any), members |
 | `TI` | Interface | inherits_from, guid |
-| `TH` | Class/Record Helper | parent_scope = 目标类型 |
+| `TH` | Class/Record Helper | parent_scope = target type |
 | `TE` | Enum | values[] |
 | `TS` | Set | base_type |
 | `TY` | Type Alias | definition, is_pointer, is_array |
@@ -218,80 +218,80 @@ exit:    0 = 全部成功, 1 = 部分文件失败, 2 = 严重错误
 
 ---
 
-## 4. 审计规则完整清单（`--mode audit`）
+## 4. Complete Audit Rule List (`--mode audit`)
 
-### 4.1 规则总表
+### 4.1 Rule Summary Table
 
-三条优先级：**P0 = 必须实现**，P1 = 高价值，P2 = 后续迭代。
+Three priority levels: **P0 = must implement**, P1 = high value, P2 = future iteration.
 
-每条规则包含：
-- 检测机制：告诉 AST 引擎在语法树中找什么
-- 输出格式：统一 `AuditViolation` JSON
-- is_ai_needed：false = AST 直接出结论，true = 需要 AI 再判断
+Each rule includes:
+- Detection mechanism: tells the AST engine what to look for in the syntax tree
+- Output format: unified `AuditViolation` JSON
+- is_ai_needed: false = AST directly concludes, true = requires AI to judge further
 
 ---
 
-#### P0 规则（21 条，ROI 最高）
+#### P0 Rules (21 rules, highest ROI)
 
-| ID | 类别 | 规则 | 检测方法 | is_ai_needed |
+| ID | Category | Rule | Detection Method | is_ai_needed |
 |----|------|------|---------|:-----------:|
-| **C001** | 错误模式 | `with` 语句检测 | 找所有 `WithStatement` 节点 | false |
-| **C002** | 错误模式 | 空 `except` 块 | `ExceptBlock` 内无语句 | false |
-| **C003** | 错误模式 | `as` 前无 `is` 检查 | `AsExpression` 前 5 行无 `IsExpression` | false |
-| **C004** | 错误模式 | `raise` 前无日志 | `ExceptBlock` 中只有 `raise;`，无日志调用 | false |
-| **R001** | 资源泄露 | `Create`/`Free` 不配对 | 类作用域内统计 Create:N vs Free/FreeAndNil:N | false |
-| **R002** | 资源泄露 | `TFileStream`/`THandle` 未释放 | 变量路径上无 `.Free`/`.Close` | false |
-| **R003** | 资源泄露 | `TObjectList.OwnsObjects` 未设置 | `TObjectList.Create` 无参数或未赋值 | false |
-| **R004** | 资源泄露 | `TStringBuilder`/`TEncoding` 未释放 | 临时创建的实例使用后无 `.Free` | false |
-| **Q001** | 代码质量 | 方法超长 >80 行 | `end_line - start_line > 80` | false |
-| **Q002** | 代码质量 | 圈复杂度 >3 | 递归统计 `if/for/while/case/try` 嵌套深度 | false |
-| **Q003** | 代码质量 | 魔法数字 | 数值字面量过滤 `0/1/-1/True/False/已命名常量/类型边界` | false |
-| **Q004** | 代码质量 | 方法参数 >5 个 | `MethodDeclaration.params.length > 5` | false |
-| **Q005** | 代码质量 | 类方法 >50 个 | `ClassDeclaration.methods.length > 50` | false |
-| **D001** | Delphi | 循环内字符串 `+` | 循环体内 `BinaryExpression(op='+', string)` | false |
-| **D002** | Delphi | 循环内 `Create` | 循环体内 `CallExpression(.Create)` | false |
-| **D003** | Delphi | 枚举 case 遗漏 | `CaseStatement` 分支数 < 枚举元素数 | true |
-| **D004** | Delphi | override 缺 `inherited` | 方法 `modifiers:['override']` 体内无 `InheritedCall` | true |
-| **S001** | 安全 | SQL 字符串拼接 | `SQL.Add`/`SQL.Text` + `+` 拼接表达式 | false |
-| **S002** | 安全 | 函数返回值缺失 | 有多路 `if/else` 但部分路径无 `Result:=` 赋值 | false |
-| **S003** | 安全 | 输出参数未标注 | 引用传递参数（非 string/record/interface）无 `var`/`out` | false |
-| **U001** | 一致性 | uses 未引用 | uses 列表中的单元在 AST 符号引用中从未出现 | false |
+| **C001** | Error pattern | `with` statement detection | Find all `WithStatement` nodes | false |
+| **C002** | Error pattern | Empty `except` block | `ExceptBlock` contains no statements | false |
+| **C003** | Error pattern | `as` without preceding `is` check | No `IsExpression` within 5 lines before `AsExpression` | false |
+| **C004** | Error pattern | No logging before `raise` | `ExceptBlock` contains only `raise;`, no logging call | false |
+| **R001** | Resource leak | `Create`/`Free` mismatch | Count Create:N vs Free/FreeAndNil:N within class scope | false |
+| **R002** | Resource leak | `TFileStream`/`THandle` not released | No `.Free`/`.Close` on variable path | false |
+| **R003** | Resource leak | `TObjectList.OwnsObjects` not set | `TObjectList.Create` without parameter or not assigned | false |
+| **R004** | Resource leak | `TStringBuilder`/`TEncoding` not released | Temporarily created instance has no `.Free` after use | false |
+| **Q001** | Code quality | Method too long >80 lines | `end_line - start_line > 80` | false |
+| **Q002** | Code quality | Cyclomatic complexity >3 | Recursively count `if/for/while/case/try` nesting depth | false |
+| **Q003** | Code quality | Magic numbers | Numeric literals filtered for `0/1/-1/True/False/named constants/type boundaries` | false |
+| **Q004** | Code quality | Method parameters >5 | `MethodDeclaration.params.length > 5` | false |
+| **Q005** | Code quality | Class methods >50 | `ClassDeclaration.methods.length > 50` | false |
+| **D001** | Delphi | String `+` inside loop | `BinaryExpression(op='+', string)` inside loop body | false |
+| **D002** | Delphi | `Create` inside loop | `CallExpression(.Create)` inside loop body | false |
+| **D003** | Delphi | Missing enum case | `CaseStatement` branch count < enum element count | true |
+| **D004** | Delphi | override missing `inherited` | Method with `modifiers:['override']` has no `InheritedCall` in body | true |
+| **S001** | Security | SQL string concatenation | `SQL.Add`/`SQL.Text` + `+` concatenation expression | false |
+| **S002** | Security | Missing function return value | Multiple `if/else` paths but some paths lack `Result:=` assignment | false |
+| **S003** | Security | Unannotated output parameters | Reference-passed parameters (non-string/record/interface) without `var`/`out` | false |
+| **U001** | Consistency | Unreferenced uses | Units in uses list never appear in AST symbol references | false |
 
-#### P1 规则（15 条，需要基础语义分析）
+#### P1 Rules (15 rules, require basic semantic analysis)
 
-| ID | 类别 | 规则 | 检测方法 | 依赖 |
+| ID | Category | Rule | Detection Method | Dependency |
 |----|------|------|---------|------|
-| **R005** | 资源 | try 未紧接获取 | 资源创建后下一句不是 `try` | AST 邻接检查 |
-| **R006** | 资源 | 数据库连接未关闭 | `TSQLConnection`/`TADOConnection` 变量无 `.Close`/`.Free` | 类型绑定 |
-| **C005** | 错误 | 事件未置 nil | `destructor` 中无 `OnXxx := nil` | 类属性表 + 析构体 |
-| **C006** | 错误 | 匿名方法循环捕获 | 循环内 `AnonymousMethod` 引用循环变量 | 作用域分析 |
-| **C007** | 错误 | 线程访问 VCL | `TThread.Execute` 调用链中有 VCL 控件访问 | 调用图 + 类型绑定 |
-| **D005** | Delphi | class helper 冲突 | 同目标类型多 helper 定义同名方法 | 跨文件注册表 |
-| **D006** | Delphi | published 非流式 | `published` 段含泛型/非流式类型 | 类型绑定 |
-| **D007** | Delphi | AnsiString/WideString | 所有 AnsiString/WideString 声明 | 类型绑定 |
-| **D008** | Delphi | Variant 使用 | 所有 Variant 声明和赋值 | 类型绑定 |
-| **Q006** | 质量 | IntToStr 低效 | 循环字符串拼接中出现 `IntToStr` | 调用追踪 |
-| **Q007** | 质量 | 循环内重复 `as` | 循环体内相同类型的 `AsExpression` | 表达式匹配 |
-| **S004** | 安全 | 硬编码凭据 | string literal 含 `password`/`secret`/`api.key` 模式 | 字符串分析 |
-| **S005** | 安全 | 用户字符串硬编码 | `ShowMessage`/`MessageDlg` 参数为 literal | 函数调用分析 |
-| **P001** | 性能 | 循环内重复 `as` | 同 Q007，标记严重级别更高 | 表达式匹配 |
-| **P002** | 性能 | RTTI 高频调用 | 方法内多次 `GetType`/`GetDeclaredMethods` 等 RTTI 调用（每次创建接口包装有开销） | 调用计数 |
+| **R005** | Resource | try not immediately after acquisition | Next statement after resource creation is not `try` | AST adjacency check |
+| **R006** | Resource | Database connection not closed | `TSQLConnection`/`TADOConnection` variable has no `.Close`/`.Free` | Type binding |
+| **C005** | Error | Event not set to nil | No `OnXxx := nil` in `destructor` | Class property table + destructor body |
+| **C006** | Error | Anonymous method loop capture | `AnonymousMethod` inside loop references loop variable | Scope analysis |
+| **C007** | Error | Thread accesses VCL | VCL control access in `TThread.Execute` call chain | Call graph + type binding |
+| **D005** | Delphi | class helper conflict | Multiple helpers for same target type define methods with same name | Cross-file registry |
+| **D006** | Delphi | published non-streamable | `published` section contains generic/non-streamable types | Type binding |
+| **D007** | Delphi | AnsiString/WideString | All AnsiString/WideString declarations | Type binding |
+| **D008** | Delphi | Variant usage | All Variant declarations and assignments | Type binding |
+| **Q006** | Quality | Inefficient IntToStr | `IntToStr` appears in loop string concatenation | Call tracking |
+| **Q007** | Quality | Repeated `as` inside loop | Same-type `AsExpression` inside loop body | Expression matching |
+| **S004** | Security | Hard-coded credentials | String literal contains `password`/`secret`/`api.key` patterns | String analysis |
+| **S005** | Security | Hard-coded user strings | `ShowMessage`/`MessageDlg` parameter is a literal | Function call analysis |
+| **P001** | Performance | Repeated `as` inside loop | Same as Q007, marked with higher severity | Expression matching |
+| **P002** | Performance | High-frequency RTTI calls | Multiple `GetType`/`GetDeclaredMethods` and other RTTI calls within a method (each creates an interface wrapper with overhead) | Call counting |
 
-#### P2 规则（9 条，后续迭代）
+#### P2 Rules (9 rules, future iteration)
 
-| ID | 类别 | 规则 | 说明 |
+| ID | Category | Rule | Description |
 |----|------|------|------|
-| **R007** | 资源 | 接口循环引用 | 类型引用图中 A→B→A，AST 标出可疑 |
-| **R008** | 资源 | TComponent 重复 Free | Owner/Parent 链上的重复释放 |
-| **C008** | 错误 | 空 `finally` 块 | finally 内无操作 |
-| **D009** | Delphi | init/finalization 泄漏 | 段中有 Create 无 Free |
-| **D010** | Delphi | 类型硬转换 `Type(x)` | 找所有 HardCast |
-| **Q008** | 质量 | 代码克隆 | AST 子树相似度匹配 |
-| **Q009** | 质量 | 命名规范 | 可配置的命名约定检查 |
-| **S006** | 安全 | 缓冲区溢出 | Move/CopyMemory 目标大小检查 |
-| **A001** | 综合 | 影响范围分析 | 改一个实体标记所有影响文件 |
+| **R007** | Resource | Interface circular reference | Type reference graph A→B→A; AST marks suspicious cases |
+| **R008** | Resource | TComponent double Free | Double release along Owner/Parent chain |
+| **C008** | Error | Empty `finally` block | No operation inside finally |
+| **D009** | Delphi | init/finalization leak | Create without Free in section |
+| **D010** | Delphi | Hard type cast `Type(x)` | Find all HardCast |
+| **Q008** | Quality | Code clone | AST subtree similarity matching |
+| **Q009** | Quality | Naming convention | Configurable naming convention checks |
+| **S006** | Security | Buffer overflow | Move/CopyMemory destination size check |
+| **A001** | Comprehensive | Impact scope analysis | Mark all affected files when an entity changes |
 
-### 4.2 审计违规 JSON 格式
+### 4.2 Audit Violation JSON Format
 
 ```json
 {
@@ -308,39 +308,39 @@ exit:    0 = 全部成功, 1 = 部分文件失败, 2 = 严重错误
   "violations": [
     {
       "rule_id": "C001",
-      "rule_name": "with 语句",
+      "rule_name": "with statement",
       "severity": "suggestion",
-      "category": "常见错误模式",
+      "category": "Common error patterns",
       "file": "Unit1.pas",
       "line": 42,
       "column": 3,
       "code_snippet": "with StringList do",
-      "message": "使用 with 语句可能导致命名冲突和可读性下降",
+      "message": "Using a with statement may cause name conflicts and reduce readability",
       "is_ai_needed": false,
       "fix_example": "for I := 0 to StringList.Count - 1 do\n  StringList[I] := ...;"
     },
     {
       "rule_id": "R001",
-      "rule_name": "Create/Free 不配对",
+      "rule_name": "Create/Free mismatch",
       "severity": "critical",
-      "category": "资源泄露",
+      "category": "Resource leak",
       "file": "Unit2.pas",
       "line": 85,
       "code_snippet": "FBitmap := TBitmap.Create;",
-      "context_code": "...\nconstructor TMyClass.Create;\nbegin\n  FBitmap := TBitmap.Create;\nend;\n\ndestructor TMyClass.Destroy;\nbegin\n  // FBitmap.Free;  ← 缺失\n  inherited;\nend;",
-      "message": "TMyClass 中 TBitmap.Create 在构造中创建，但析构中无对应 Free",
+      "context_code": "...\nconstructor TMyClass.Create;\nbegin\n  FBitmap := TBitmap.Create;\nend;\n\ndestructor TMyClass.Destroy;\nbegin\n  // FBitmap.Free;  ← missing\n  inherited;\nend;",
+      "message": "TBitmap.Create is called in TMyClass constructor, but there is no corresponding Free in the destructor",
       "is_ai_needed": false,
       "fix_example": "destructor TMyClass.Destroy;\nbegin\n  FBitmap.Free;\n  inherited;\nend;"
     },
     {
       "rule_id": "D003",
-      "rule_name": "枚举 case 遗漏",
+      "rule_name": "Missing enum case",
       "severity": "warning",
-      "category": "Delphi 特有",
+      "category": "Delphi-specific",
       "file": "Unit3.pas",
       "line": 200,
       "code_snippet": "case Color of\n  Red: ...;\n  Green: ...;\nend;",
-      "message": "枚举 TColor 有 4 个值，case 只覆盖了 2 个，遗漏: Blue, Yellow",
+      "message": "Enum TColor has 4 values, but case covers only 2; missing: Blue, Yellow",
       "is_ai_needed": true,
       "extra_data": {
         "enum_name": "TColor",
@@ -348,7 +348,7 @@ exit:    0 = 全部成功, 1 = 部分文件失败, 2 = 严重错误
         "covered_values": ["Red", "Green"],
         "missing_values": ["Blue", "Yellow"]
       },
-      "fix_example": "case Color of\n  Red: ...;\n  Green: ...;\n  Blue: ...;\n  Yellow: ...;\nelse\n  raise Exception.Create('未知颜色');\nend;"
+      "fix_example": "case Color of\n  Red: ...;\n  Green: ...;\n  Blue: ...;\n  Yellow: ...;\nelse\n  raise Exception.Create('Unknown color');\nend;"
     }
   ],
 
@@ -364,22 +364,22 @@ exit:    0 = 全部成功, 1 = 部分文件失败, 2 = 严重错误
 }
 ```
 
-### 4.3 严重级别定义
+### 4.3 Severity Level Definitions
 
-| 级别 | 含义 | AI 处理方式 |
+| Level | Meaning | AI Handling |
 |------|------|-----------|
-| `critical` | 必然导致资源泄漏/崩溃/安全漏洞 | 必须修复，AI 直接出修复方案 |
-| `warning` | 大概率是问题 | AI 验证后出修复方案 |
-| `suggestion` | 风格/质量建议 | AI 判断是否采用，纳入报告"建议"段 |
+| `critical` | Will inevitably cause resource leaks/crashes/security vulnerabilities | Must fix; AI directly produces fix plan |
+| `warning` | High probability of being a problem | AI verifies, then produces fix plan |
+| `suggestion` | Style/quality suggestion | AI decides whether to adopt; included in report "Suggestions" section |
 
 ---
 
-## 5. 数据库 Schema 扩展
+## 5. Database Schema Extension
 
-### 5.1 vocabularies 表新增列
+### 5.1 New Columns in vocabularies Table
 
 ```sql
--- 知识库已有表 vocabularies，新增 AST 增强字段
+-- Existing knowledge base table vocabularies; add AST enhancement fields
 ALTER TABLE vocabularies ADD COLUMN end_line INTEGER;
 ALTER TABLE vocabularies ADD COLUMN end_offset INTEGER;
 ALTER TABLE vocabularies ADD COLUMN body_length INTEGER;
@@ -391,26 +391,26 @@ ALTER TABLE vocabularies ADD COLUMN type_refs TEXT;         -- JSON: [{"name":"T
 ALTER TABLE vocabularies ADD COLUMN member_count INTEGER;
 ALTER TABLE vocabularies ADD COLUMN inheritance_chain TEXT; -- JSON: ["TStringList","TStrings","TPersistent","TObject"]
 ALTER TABLE vocabularies ADD COLUMN generics TEXT;          -- JSON: {"T":"class,constructor"}
-ALTER TABLE vocabularies ADD COLUMN values TEXT;            -- 枚举值/常量值 JSON
-ALTER TABLE vocabularies ADD COLUMN params TEXT;            -- 函数参数 JSON
-ALTER TABLE vocabularies ADD COLUMN return_type TEXT;       -- 函数返回类型
-ALTER TABLE vocabularies ADD COLUMN calls TEXT;             -- 函数调用列表 JSON
-ALTER TABLE vocabularies ADD COLUMN ref_count INTEGER;      -- 被引用次数（由语义分析填充）
-ALTER TABLE vocabularies ADD COLUMN source TEXT;            -- "ast" | "regex" (标识数据来源)
+ALTER TABLE vocabularies ADD COLUMN values TEXT;            -- Enum values/constant values JSON
+ALTER TABLE vocabularies ADD COLUMN params TEXT;            -- Function parameter JSON
+ALTER TABLE vocabularies ADD COLUMN return_type TEXT;       -- Function return type
+ALTER TABLE vocabularies ADD COLUMN calls TEXT;             -- Function call list JSON
+ALTER TABLE vocabularies ADD COLUMN ref_count INTEGER;      -- Reference count (populated by semantic analysis)
+ALTER TABLE vocabularies ADD COLUMN source TEXT;            -- "ast" | "regex" (identifies data source)
 ```
 
-### 5.2 新增 entity_refs 表（引用图谱）
+### 5.2 New entity_refs Table (Reference Graph)
 
 ```sql
 CREATE TABLE IF NOT EXISTS entity_refs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_id INTEGER NOT NULL,          -- vocabularies.id（引用者）
-    target_name TEXT NOT NULL,            -- 被引用的实体名
-    target_kind TEXT,                     -- 被引用的实体 kind (TC/FF/...)
-    target_file_id INTEGER,              -- 被引用的目标所在文件
+    source_id INTEGER NOT NULL,          -- vocabularies.id (referrer)
+    target_name TEXT NOT NULL,            -- Referenced entity name
+    target_kind TEXT,                     -- Referenced entity kind (TC/FF/...)
+    target_file_id INTEGER,              -- File where the referenced target is located
     ref_type TEXT NOT NULL,               -- 'type_ref' | 'call' | 'inherits' | 'uses' | 'access'
-    line INTEGER,                         -- 引用发生的行号
-    code_snippet TEXT,                    -- 引用处的代码片段（简短）
+    line INTEGER,                         -- Line number where reference occurs
+    code_snippet TEXT,                    -- Code snippet at reference (short)
     FOREIGN KEY (source_id) REFERENCES vocabularies(id) ON DELETE CASCADE
 );
 
@@ -419,7 +419,7 @@ CREATE INDEX IF NOT EXISTS idx_entity_refs_target ON entity_refs(target_name, ta
 CREATE INDEX IF NOT EXISTS idx_entity_refs_target_file ON entity_refs(target_file_id);
 ```
 
-### 5.3 新增 audit_results 表（审计结果缓存）
+### 5.3 New audit_results Table (Audit Result Cache)
 
 ```sql
 CREATE TABLE IF NOT EXISTS audit_results (
@@ -431,7 +431,7 @@ CREATE TABLE IF NOT EXISTS audit_results (
     line INTEGER,
     code_snippet TEXT,
     message TEXT,
-    is_ai_confirmed INTEGER DEFAULT 0,   -- 0=AST自动, 1=AI已确认, 2=已修复已验证
+    is_ai_confirmed INTEGER DEFAULT 0,   -- 0=AST automatic, 1=AI confirmed, 2=fixed and verified
     fix_suggestion TEXT,
     scan_timestamp REAL,
     created_at REAL DEFAULT (julianday('now')),
@@ -445,16 +445,16 @@ CREATE INDEX IF NOT EXISTS idx_audit_rule ON audit_results(rule_id);
 
 ---
 
-## 6. Python 集成改动
+## 6. Python Integration Changes
 
-### 6.1 知识库解析函数替换
+### 6.1 Knowledge Base Parsing Function Replacement
 
-文件：`src/services/knowledge_base/smart_cache_knowledge_base.py`
+File: `src/services/knowledge_base/smart_cache_knowledge_base.py`
 
 ```python
 @staticmethod
 def _parse_delphi_file_static(file_path_str: str) -> Tuple[str, List[Dict], int, List[str]]:
-    """解析 Delphi 文件：优先 AST 引擎，失败则 fallback 正则"""
+    """Parse Delphi file: prefer AST engine, fallback to regex on failure"""
     
     ast_result = _call_daudit_kb(file_path_str)
     
@@ -467,7 +467,7 @@ def _parse_delphi_file_static(file_path_str: str) -> Tuple[str, List[Dict], int,
                 'line': ent['start_line'],
                 'base_class': ent.get('inherits_from'),
                 'description': ent.get('definition', ''),
-                # AST 增强字段
+                # AST enhancement fields
                 'end_line': ent.get('end_line'),
                 'code_block': ent.get('code_block', ''),
                 'signature': ent.get('signature', ''),
@@ -488,12 +488,12 @@ def _parse_delphi_file_static(file_path_str: str) -> Tuple[str, List[Dict], int,
         
         return (file_path_str, items, total_lines, uses_list)
     
-    # fallback: 当前正则逻辑
+    # fallback: current regex logic
     return _regex_fallback(file_path_str)
 
 
 def _call_daudit_kb(file_path: str) -> Optional[Dict]:
-    """调用 daudit.exe --mode kb 单文件模式"""
+    """Call daudit.exe --mode kb single-file mode"""
     ```python
     import subprocess, json
     
@@ -510,13 +510,13 @@ def _call_daudit_kb(file_path: str) -> Optional[Dict]:
         if result.returncode == 0 and result.stdout.strip():
             return json.loads(result.stdout)
     except (subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as e:
-        logger.warning("AST 解析失败 %s: %s", file_path, e)
+        logger.warning("AST parsing failed %s: %s", file_path, e)
     
     return None
 
 
 def _find_daudit() -> Optional[str]:
-    """查找 daudit.exe 路径"""
+    """Find daudit.exe path"""
     candidates = [
         Path(__file__).parent.parent.parent.parent / "tools" / "daudit" / "daudit.exe",
         Path.cwd() / "tools" / "daudit" / "daudit.exe",
@@ -527,15 +527,15 @@ def _find_daudit() -> Optional[str]:
     return None
 ```
 
-### 6.2 新增审计 MCP 工具
+### 6.2 New Audit MCP Tool
 
-文件：`src/tools/audit.py`（新增）
+File: `src/tools/audit.py` (new)
 
 ```python
 """
-审计 MCP 工具
+Audit MCP tool
 
-提供 daudit --mode=audit 的 AI Agent 调用接口。
+Provides an AI Agent invocation interface for daudit --mode=audit.
 """
 
 import json
@@ -549,7 +549,7 @@ logger = logging.getLogger(__name__)
 
 
 def _find_daudit() -> Optional[str]:
-    """查找 daudit.exe"""
+    """Find daudit.exe"""
     candidates = [
         Path(__file__).parent.parent.parent / "tools" / "daudit" / "daudit.exe",
         Path.cwd() / "tools" / "daudit" / "daudit.exe",
@@ -561,7 +561,7 @@ def _find_daudit() -> Optional[str]:
 
 
 def _call_audit(source_dir: str, rules: Optional[str] = None) -> Optional[Dict]:
-    """调用 daudit.exe --mode=audit"""
+    """Call daudit.exe --mode=audit"""
     daudit = _find_daudit()
     if not daudit:
         return None
@@ -579,20 +579,20 @@ def _call_audit(source_dir: str, rules: Optional[str] = None) -> Optional[Dict]:
         if result.returncode in (0, 1) and result.stdout.strip():
             return json.loads(result.stdout)
     except (subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as e:
-        logger.error("审计失败: %s", e)
+        logger.error("Audit failed: %s", e)
     
     return None
 
 
 async def run_audit(arguments: Dict[str, Any]) -> CallToolResult:
     """
-    执行代码审计
+    Execute code audit
     
-    参数:
-    - source_dir: 源码目录（必需）
-    - rules: 规则集，如 "P0" / "P0,P1" / "C001,R001"（可选，默认 P0）
-    - severity: 最低严重级别 "suggestion" | "warning" | "critical"（可选，默认 suggestion）
-    - output_format: "report" | "json"（可选，默认 report）
+    Parameters:
+    - source_dir: source directory (required)
+    - rules: rule set, e.g. "P0" / "P0,P1" / "C001,R001" (optional, default P0)
+    - severity: minimum severity "suggestion" | "warning" | "critical" (optional, default suggestion)
+    - output_format: "report" | "json" (optional, default report)
     """
     source_dir = arguments.get("source_dir", "")
     rules = arguments.get("rules", "P0")
@@ -601,27 +601,27 @@ async def run_audit(arguments: Dict[str, Any]) -> CallToolResult:
     
     if not source_dir:
         return CallToolResult(
-            content=[TextContent(text="必须提供 source_dir 参数")],
+            content=[TextContent(text="The source_dir parameter is required")],
             isError=True,
         )
     
-    # 调用 AST 引擎
+    # Call AST engine
     result = _call_audit(source_dir, rules)
     if not result:
         return CallToolResult(
-            content=[TextContent(text="审计执行失败，请检查 daudit.exe 是否可用")],
+            content=[TextContent(text="Audit execution failed; please check whether daudit.exe is available")],
             isError=True,
         )
     
     if output_format == "json":
         return CallToolResult(content=[TextContent(text=json.dumps(result, indent=2, ensure_ascii=False))])
     
-    # 格式化为可读报告
+    # Format as readable report
     return CallToolResult(content=[TextContent(text=_format_audit_report(result, severity))])
 
 
 def _format_audit_report(result: Dict, min_severity: str) -> str:
-    """将审计结果格式化为 Markdown 报告"""
+    """Format audit results as a Markdown report"""
     summary = result.get("audit_summary", {})
     violations = result.get("violations", [])
     
@@ -629,15 +629,15 @@ def _format_audit_report(result: Dict, min_severity: str) -> str:
     min_level = severity_level.get(min_severity, 0)
     
     report = []
-    report.append("# 代码审计报告")
+    report.append("# Code Audit Report")
     report.append("")
-    report.append(f"**扫描目录**: {summary.get('source_dir', 'N/A')}")
-    report.append(f"**文件数**: {summary.get('total_files', 0)}")
-    report.append(f"**违规总数**: {summary.get('total_violations', 0)}")
-    report.append(f"**扫描耗时**: {summary.get('scan_time_ms', 0)}ms")
+    report.append(f"**Scanned directory**: {summary.get('source_dir', 'N/A')}")
+    report.append(f"**File count**: {summary.get('total_files', 0)}")
+    report.append(f"**Total violations**: {summary.get('total_violations', 0)}")
+    report.append(f"**Scan duration**: {summary.get('scan_time_ms', 0)}ms")
     report.append("")
     
-    # 按严重级别分组
+    # Group by severity
     groups = {"critical": [], "warning": [], "suggestion": []}
     for v in violations:
         lv = severity_level.get(v.get("severity", "suggestion"), 0)
@@ -648,21 +648,21 @@ def _format_audit_report(result: Dict, min_severity: str) -> str:
         items = groups[severity_label]
         if not items:
             continue
-        label_map = {"critical": "🔴 严重", "warning": "🟡 一般", "suggestion": "🔵 建议"}
-        report.append(f"## {label_map[severity_label]} ({len(items)} 条)")
+        label_map = {"critical": "🔴 Critical", "warning": "🟡 General", "suggestion": "🔵 Suggestion"}
+        report.append(f"## {label_map[severity_label]} ({len(items)} items)")
         report.append("")
         
         for v in items:
             report.append(f"### [{v['rule_id']}] {v['rule_name']}")
-            report.append(f"- **文件**: {v['file']}:{v['line']}")
-            report.append(f"- **说明**: {v['message']}")
+            report.append(f"- **File**: {v['file']}:{v['line']}")
+            report.append(f"- **Description**: {v['message']}")
             if v.get('code_snippet'):
-                report.append(f"- **代码**:")
+                report.append(f"- **Code**:")
                 report.append(f"  ```pascal")
                 report.append(f"  {v['code_snippet']}")
                 report.append(f"  ```")
             if not v.get('is_ai_needed', True):
-                report.append(f"- **修复示例**:")
+                report.append(f"- **Fix example**:")
                 report.append(f"  ```pascal")
                 report.append(f"  {v.get('fix_example', '')}")
                 report.append(f"  ```")
@@ -671,137 +671,137 @@ def _format_audit_report(result: Dict, min_severity: str) -> str:
     return "\n".join(report)
 ```
 
-### 6.3 Server 注册
+### 6.3 Server Registration
 
-文件：`src/server.py`（追加）
+File: `src/server.py` (append)
 
 ```python
 from src.tools.audit import run_audit
 
-# 在 list_tools() 中以 project 工具注册（2026.05 合并）:
+# Register in list_tools() as the project tool (merged in 2026.05):
 tools.append(Tool(
     name="project",
-    description="项目全生命周期管理: 编译/配置/审计",
+    description="Project lifecycle management: compile/configure/audit",
     inputSchema={
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": ["compile", "audit", "ast", "runtime", ...]},
-            "project_path": {"type": "string", "description": "项目文件路径"},
+            "project_path": {"type": "string", "description": "Project file path"},
         },
         "additionalProperties": True,
         "required": ["action"],
     },
 ))
 
-# 在 call_tool() 中分发:
-# delphi_project(action="audit", ...) 路由到 run_audit(arguments)
+# Dispatch in call_tool():
+# delphi_project(action="audit", ...) routes to run_audit(arguments)
 ```
 
-> **注意**: 2026.05 重构后，`run_audit`、`compile_project`、`dproj_tool` 已合并为 `project` 工具，
-> 通过 action 参数切换功能。详见 `tool_help("project")`。
+> **Note**: After the 2026.05 refactor, `run_audit`, `compile_project`, and `dproj_tool` have been merged into the `project` tool,
+> switching functions via the action parameter. See `tool_help("project")` for details.
 
 ---
 
-## 7. 实施路线图
+## 7. Implementation Roadmap
 
-### Phase 0 — 基础能力（1-2 周）
+### Phase 0 — Basic Capabilities (1-2 weeks)
 
-目标：AST 引擎能跑通，替换当前正则解析
-
-```
-[ ] Lexer + Parser 基础骨架
-[ ] 支持 class/record/interface/function/procedure/const/enum 解析
-[ ] --mode ast 单文件/批量模式
-[ ] --mode audit 审计模式
-[ ] Python 集成：_parse_delphi_file_static 双通道（AST + fallback）
-[ ] 6 条 P0 审计规则：C001, C002, Q003, Q001, R001, D004
-```
-
-### Phase 1 — 作用域 + 语义（2-3 周）
-
-目标：实体归属、继承链、基础类型绑定
+Goal: AST engine can run end-to-end and replace the current regex parser
 
 ```
-[ ] 作用域解析：每个实体知道自己的 parent_scope
-[ ] 继承链解析：class → 所有祖先类
-[ ] 基础类型绑定：TMyVar: TStringList → type_ref
-[ ] --mode=audit 全项目模式
-[ ] 全部 21 条 P0 规则实现
+[ ] Lexer + Parser basic skeleton
+[ ] Support parsing class/record/interface/function/procedure/const/enum
+[ ] --mode ast single-file/batch mode
+[ ] --mode audit audit mode
+[ ] Python integration: _parse_delphi_file_static dual channel (AST + fallback)
+[ ] 6 P0 audit rules: C001, C002, Q003, Q001, R001, D004
 ```
 
-### Phase 2 — 完整审计（2-3 周）
+### Phase 1 — Scope + Semantics (2-3 weeks)
 
-目标：审计引擎可以投入生产使用
-
-```
-[ ] 15 条 P1 规则实现
-[ ] 跨文件类型注册表（class helper 冲突、枚举引用）
-[ ] 引用图（entity_refs 表）
-[ ] AI Agent 审计报告格式化（run_audit MCP 工具）
-[ ] 增量审计（git diff 模式）
-```
-
-### Phase 3 — 图谱 + 高级（持续迭代）
+Goal: entity ownership, inheritance chains, basic type binding
 
 ```
-[ ] 9 条 P2 规则实现
-[ ] 代码克隆检测
-[ ] 影响范围分析
-[ ] 审计结果历史追踪（audit_results 表比对）
+[ ] Scope resolution: each entity knows its parent_scope
+[ ] Inheritance chain resolution: class → all ancestor classes
+[ ] Basic type binding: TMyVar: TStringList → type_ref
+[ ] --mode=audit full-project mode
+[ ] Implement all 21 P0 rules
+```
+
+### Phase 2 — Complete Audit (2-3 weeks)
+
+Goal: audit engine can be put into production
+
+```
+[ ] Implement 15 P1 rules
+[ ] Cross-file type registry (class helper conflicts, enum references)
+[ ] Reference graph (entity_refs table)
+[ ] AI Agent audit report formatting (run_audit MCP tool)
+[ ] Incremental audit (git diff mode)
+```
+
+### Phase 3 — Graph + Advanced (continuous iteration)
+
+```
+[ ] Implement 9 P2 rules
+[ ] Code clone detection
+[ ] Impact scope analysis
+[ ] Audit result history tracking (audit_results table comparison)
 ```
 
 ---
 
-## 附录：`CODING_RULES.mdc` 审核表映射
+## Appendix: `CODING_RULES.mdc` Audit Checklist Mapping
 
-下面是从 CODING_RULES.mdc 审计清单到 AST 规则 ID 的完整映射，用于追踪覆盖情况：
+The following is the complete mapping from the CODING_RULES.mdc audit checklist to AST rule IDs, used to track coverage:
 
-| CODING_RULES 检查项 | AST 规则 ID | 覆盖率 |
+| CODING_RULES Check Item | AST Rule ID | Coverage |
 |--------------------|------------|--------|
-| 命名规范 | Q009 (P2) | 部分覆盖 |
-| 异常模式 | — (AI 独占) | 0% |
+| Naming conventions | Q009 (P2) | Partial coverage |
+| Exception patterns | — (AI only) | 0% |
 | OleVariant vs Variant | D008 (P1) | 100% |
-| 平台兼容 | — | 0%（无法自动化） |
-| 事件释放（多线程） | C005 (P1) | 部分覆盖 |
-| 所有路径 | S002 (P0) | 部分覆盖（函数返回值） |
-| 边界条件 | — (AI 独占) | 0% |
-| 输入验证 | — (AI 独占) | 0% |
-| **资源释放路径** | **R001-R004 (P0)** | **100%** |
-| **并发安全** | **C007 (P1)** | **部分覆盖（线程→VCL）** |
-| **函数返回值** | **S002 (P0)** | **100%** |
-| const/out/in 参数 | S003 (P0) | 100% |
-| 初始化/终结段 | D009 (P2) | 部分覆盖 |
-| **Create/Free 配对** | **R001 (P0)** | **100%** |
+| Platform compatibility | — | 0% (cannot automate) |
+| Event release (multithreading) | C005 (P1) | Partial coverage |
+| All paths | S002 (P0) | Partial coverage (function return values) |
+| Boundary conditions | — (AI only) | 0% |
+| Input validation | — (AI only) | 0% |
+| **Resource release paths** | **R001-R004 (P0)** | **100%** |
+| **Concurrency safety** | **C007 (P1)** | **Partial coverage (thread→VCL)** |
+| **Function return values** | **S002 (P0)** | **100%** |
+| const/out/in parameters | S003 (P0) | 100% |
+| Initialization/finalization sections | D009 (P2) | Partial coverage |
+| **Create/Free pairing** | **R001 (P0)** | **100%** |
 | try/finally | R005 (P1) | 100% |
-| 文件/句柄 | R002 (P0) | 100% |
-| 数据库连接 | R006 (P1) | 100% |
-| GDI/系统资源 | R002 (P0) | 100% |
-| 接口引用 | R007 (P2) | 部分覆盖 |
+| Files/handles | R002 (P0) | 100% |
+| Database connections | R006 (P1) | 100% |
+| GDI/system resources | R002 (P0) | 100% |
+| Interface references | R007 (P2) | Partial coverage |
 | **TObjectList.OwnsObjects** | **R003 (P0)** | **100%** |
-| **字符串拼接** | **D001 (P0)** | **100%** |
-| published 区 | D006 (P1) | 100% |
-| **RTTI** | **P002 (P1)** | **部分覆盖（高频调用检测）** |
-| **枚举 case** | **D003 (P0)** | **100%** |
-| Class Helper 冲突 | D005 (P1) | 100% |
-| **空 except** | **C002 (P0)** | **100%** |
-| **类型转换安全** | **C003 (P0)** | **100%** |
-| 事件释放 | C005 (P1) | 100% |
-| **匿名方法捕获** | **C006 (P1)** | **100%** |
-| **线程访问 VCL** | **C007 (P1)** | **100%** |
-| **with 语句** | **C001 (P0)** | **100%** |
-| **函数/方法规模** | **Q001 (P0)** | **100%** |
-| **圈复杂度** | **Q002 (P0)** | **100%** |
-| **魔法数字** | **Q003 (P0)** | **100%** |
-| 代码重复 | Q008 (P2) | 100% |
-| **SQL 注入** | **S001 (P0)** | **100%** |
-| 硬编码凭据 | S004 (P1) | 100% |
-| 国际化 | S005 (P1) | 部分覆盖 |
-| **循环内内存分配** | **D002 (P0)** | **100%** |
-| **字符串操作** | **D001 (P0)** | **100%** |
+| **String concatenation** | **D001 (P0)** | **100%** |
+| published section | D006 (P1) | 100% |
+| **RTTI** | **P002 (P1)** | **Partial coverage (high-frequency call detection)** |
+| **Enum case** | **D003 (P0)** | **100%** |
+| Class Helper conflicts | D005 (P1) | 100% |
+| **Empty except** | **C002 (P0)** | **100%** |
+| **Type conversion safety** | **C003 (P0)** | **100%** |
+| Event release | C005 (P1) | 100% |
+| **Anonymous method capture** | **C006 (P1)** | **100%** |
+| **Thread accessing VCL** | **C007 (P1)** | **100%** |
+| **with statement** | **C001 (P0)** | **100%** |
+| **Function/method size** | **Q001 (P0)** | **100%** |
+| **Cyclomatic complexity** | **Q002 (P0)** | **100%** |
+| **Magic numbers** | **Q003 (P0)** | **100%** |
+| Code duplication | Q008 (P2) | 100% |
+| **SQL injection** | **S001 (P0)** | **100%** |
+| Hard-coded credentials | S004 (P1) | 100% |
+| Internationalization | S005 (P1) | Partial coverage |
+| **Memory allocation inside loop** | **D002 (P0)** | **100%** |
+| **String operations** | **D001 (P0)** | **100%** |
 
-**粗体** = 高优先级（P0/P1），总计约 35 项可自动化，覆盖 CODING_RULES 约 70% 的检查项。
+**Bold** = high priority (P0/P1); approximately 35 items in total can be automated, covering about 70% of CODING_RULES check items.
 
 ---
 
-> 本文档是 Ast 引擎开发的技术规格。  
-> 后续开发应从这里开始：**Phase 0 的 AST 解析器核心 + 6 条 P0 规则先行验证**。
+> This document is the technical specification for AST engine development.
+> Subsequent development should start here: **Phase 0's AST parser core + 6 P0 rules for first validation**.

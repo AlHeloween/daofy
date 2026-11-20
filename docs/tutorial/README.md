@@ -1,158 +1,158 @@
-# Daofy 教程素材
+# Daofy Tutorial Materials
 
-本目录包含录制教程所需的所有演示素材，按场景组织。
+This directory contains all demo materials needed for recording tutorials, organized by scenario.
 
 ---
 
-## 目录结构
+## Directory Structure
 
 ```
 docs/tutorial/
-├── tutorial_script.md         ← 完整演示脚本（主脚本）
-├── README.md                  ← 本文件（素材索引）
+├── tutorial_script.md         ← complete demo script (main script)
+├── README.md                  ← this file (material index)
 │
-├── demo-project/              ← 场景 4.5 / 4.7 / 5.4 / 4.11
-│   ├── DemoApp.dproj          # 示例 Delphi 项目文件
-│   ├── DemoApp.dpr            # 程序入口
-│   ├── MainForm.pas           # 主单元（使用 JsonConfigManager）
-│   ├── JsonConfigManager.pas  # JSON 配置管理器（完整实现）
-│   └── CODING_RULES.mdc       # 项目编码规范（现代风格）
+├── demo-project/              ← Scenarios 4.5 / 4.7 / 5.4 / 4.11
+│   ├── DemoApp.dproj          # Sample Delphi project file
+│   ├── DemoApp.dpr            # Program entry point
+│   ├── MainForm.pas           # Main unit (uses JsonConfigManager)
+│   ├── JsonConfigManager.pas  # JSON configuration manager (full implementation)
+│   └── CODING_RULES.mdc       # Project coding standards (modern style)
 │
-├── legacy-project/            ← 场景 4.11 编码规范对比
-│   ├── LegacyApp.dproj        # 占位项目文件（用于 project_path 参数）
-│   └── CODING_RULES.mdc       # 旧项目编码规范（匈牙利命名/4空格/行尾begin）
+├── legacy-project/            ← Scenario 4.11 coding standards comparison
+│   ├── LegacyApp.dproj        # Placeholder project file (for project_path parameter)
+│   └── CODING_RULES.mdc       # Old project coding standards (Hungarian naming / 4 spaces / begin at end of line)
 │
-├── review-demo/               ← 场景 4.7 代码审计
-│   └── LegacyData.pas         # 含 5 类故意问题的代码（无提示注释）
+├── review-demo/               ← Scenario 4.7 code audit
+│   └── LegacyData.pas         # Code containing 5 types of intentional issues (no hint comments)
 │
-├── refactor-demo/             ← 场景 4.9 多文件重构
-│   ├── DataProcessor.pas      # 用 TStringList 做数据解析
-│   ├── ConfigManager.pas      # 用 TStringList 管理配置
-│   └── UserManager.pas        # 用 TStringList 管理用户
+├── refactor-demo/             ← Scenario 4.9 multi-file refactoring
+│   ├── DataProcessor.pas      # Uses TStringList for data parsing
+│   ├── ConfigManager.pas      # Uses TStringList to manage configuration
+│   └── UserManager.pas        # Uses TStringList to manage users
 │
-├── compile-error-demo/        ← 场景 5.3 复杂编译错误诊断
-│   ├── ErrorCode.pas          # 未提供比较器的 TDictionary 泛型错误
-│   └── ErrorCode_Fixed.pas    # 修复后的参考版本（录制者对照用）
+├── compile-error-demo/        ← Scenario 5.3 complex compilation error diagnosis
+│   ├── ErrorCode.pas          # TDictionary generic error without a comparer provided
+│   └── ErrorCode_Fixed.pas    # Fixed reference version (for the recorder's comparison)
 │
-├── database-demo/             ← 场景 4.4 知识库驱动代码生成
-│   └── DatabaseManager.pas    # AI 生成的 FDConnection + SQLite 管理单元
+├── database-demo/             ← Scenario 4.4 knowledge base-driven code generation
+│   └── DatabaseManager.pas    # AI-generated FDConnection + SQLite management unit
 │
-├── group-project/             ← 场景 4.12 批量多项目编译
-│   ├── ProjectGroup.groupproj # 项目分组文件
-│   ├── LibProject/            # 公共库项目（先编译）
+├── group-project/             ← Scenario 4.12 batch multi-project compilation
+│   ├── ProjectGroup.groupproj # Project group file
+│   ├── LibProject/            # Shared library project (compiled first)
 │   │   ├── LibUtils.dproj
 │   │   ├── LibUtils.dpr
 │   │   └── LibUtils.pas
-│   └── AppProject/            # 应用项目（后编译，依赖 LibProject）
+│   └── AppProject/            # Application project (compiled later, depends on LibProject)
 │       ├── MainApp.dproj
 │       ├── MainApp.dpr
 │       └── MainApp.pas
 │
-├── employee-input/            ← 场景 4.5 FireDAC SQLite 员工信息录入
-│   ├── EmployeeInput.dproj    # FireDAC SQLite 项目
-│   ├── EmployeeInput.dpr      # 程序入口
-│   ├── Form.Main.pas          # 主窗体（DBGrid + DBEdit 详情面板）
-│   └── Form.Main.dfm          # 窗体布局（左右分栏）
+├── employee-input/            ← Scenario 4.5 FireDAC SQLite employee information entry
+│   ├── EmployeeInput.dproj    # FireDAC SQLite project
+│   ├── EmployeeInput.dpr      # Program entry point
+│   ├── Form.Main.pas          # Main form (DBGrid + DBEdit detail panel)
+│   └── Form.Main.dfm          # Form layout (left-right split)
 │
-├── test-project/              ← 场景 4.6 单文件语法检查/run_verify 验证
-│   ├── TestProject.dproj      # 简洁 VCL 项目
+├── test-project/              ← Scenario 4.6 single-file syntax check/run_verify verification
+│   ├── TestProject.dproj      # Simple VCL project
 │   ├── TestProject.dpr
 │   ├── Unit1.pas
 │   └── Unit1.dfm
 │
-├── test-verify-crash/         ← 场景 run_verify 崩溃检测演示
-│   ├── TestCrash.dproj        # FormCreate 抛出异常
+├── test-verify-crash/         ← Scenario run_verify crash detection demo
+│   ├── TestCrash.dproj        # FormCreate throws an exception
 │   ├── TestCrash.dpr
 │   ├── MainForm.pas
 │   ├── MainForm.crash.dproj.bak
 │   ├── Form.MainForm.pas
 │   └── Form.MainForm.dfm
 │
-└── workflow-demo/             ← 场景 5.4 完整工作流
-    ├── config.json            # JSON 示例配置文件
-    └── IniConfigManager.pas   # INI 读写单元
+└── workflow-demo/             ← Scenario 5.4 complete workflow
+    ├── config.json            # JSON sample configuration file
+    └── IniConfigManager.pas   # INI read/write unit
 ```
 
 ---
 
-## 场景对照表
+## Scenario Mapping Table
 
-| 场景 | 素材 | 威力点 |
+| Scenario | Material | Highlight |
 |------|------|--------|
-| 4.3 语义搜索发现隐藏 API | — | 30 万函数中自然语言匹配 |
-| 4.4 知识库驱动复杂代码生成 | `database-demo/DatabaseManager.pas` | AI 查 KB 确认 FDConnection 签名后生成 |
-| 4.5 编译项目 | `demo-project/DemoApp.dproj` | 一键编译 |
-| 4.6 单文件语法检查 | `demo-project/MainForm.pas` | 快速检查 |
-| 4.7 编码规范驱动审计 + 创建工单 | `review-demo/LegacyData.pas` | 逐条对照规范审查 + 自动创建 Issue |
-| 4.8 引用查询 | `refactor-demo/*.pas` | 评估修改影响 |
-| 4.9 多文件重构 | `refactor-demo/*.pas` | TStringList → TArray\<String\> |
-| 4.10 代码格式化 + 自动备份 | `refactor-demo/*.pas` | pasfmt 格式化 + `__history` 版本备份 |
-| 4.11 编码规范控制 AI 行为 | `demo-project/CODING_RULES.mdc` + `legacy-project/CODING_RULES.mdc` | 同需求→不同规则→不同代码风格 |
-| 4.12 批量多项目编译 | `group-project/ProjectGroup.groupproj` | 自动处理依赖顺序 |
-| 5.1a 构建文档 KB | — | 16 万页 CHM 索引 |
-| 5.1b 文档 KB 实战搜索 | — | 自然语言搜帮助文档 |
-| 5.2 安装组件包 | — | 编译注册 .dpk |
-| 5.3 复杂编译错误诊断 | `compile-error-demo/ErrorCode.pas` | KB 查泛型约束 → 根因修复 |
-| 5.4 完整从 0 到 1 工作流 | `demo-project/*` | 规范→API→编码→编译→审计→工单 |
-| **5.6 自动化测试（GUI）** | 含 DaofyAutomation 单元的 GUI 程序 | Named Pipe 截图 + 控件交互 |
-| **5.6 自动化测试（Console）** | 任意控制台程序 | subprocess stdin/stdout，无需改造 |
+| 4.3 Semantic search discovers hidden APIs | — | Natural language matching among 300,000 functions |
+| 4.4 Knowledge base-driven complex code generation | `database-demo/DatabaseManager.pas` | AI checks the KB to confirm the FDConnection signature before generating |
+| 4.5 Compile project | `demo-project/DemoApp.dproj` | One-click compilation |
+| 4.6 Single-file syntax check | `demo-project/MainForm.pas` | Quick check |
+| 4.7 Coding standards-driven audit + create ticket | `review-demo/LegacyData.pas` | Item-by-item review against the standards + automatically create an Issue |
+| 4.8 Reference query | `refactor-demo/*.pas` | Assess the impact of changes |
+| 4.9 Multi-file refactoring | `refactor-demo/*.pas` | TStringList → TArray\<String\> |
+| 4.10 Code formatting + automatic backup | `refactor-demo/*.pas` | pasfmt formatting + `__history` version backup |
+| 4.11 Coding standards control AI behavior | `demo-project/CODING_RULES.mdc` + `legacy-project/CODING_RULES.mdc` | Same requirement → different rules → different code style |
+| 4.12 Batch multi-project compilation | `group-project/ProjectGroup.groupproj` | Automatically handles dependency order |
+| 5.1a Build documentation KB | — | 160,000-page CHM index |
+| 5.1b Practical search in documentation KB | — | Natural language search of help documentation |
+| 5.2 Install component package | — | Compile and register .dpk |
+| 5.3 Complex compilation error diagnosis | `compile-error-demo/ErrorCode.pas` | Query KB for generic constraints → root-cause fix |
+| 5.4 Complete 0-to-1 workflow | `demo-project/*` | Standards → API → coding → compilation → audit → ticket |
+| **5.6 Automated testing (GUI)** | GUI program containing the DaofyAutomation unit | Named Pipe screenshots + control interaction |
+| **5.6 Automated testing (Console)** | Any console program | subprocess stdin/stdout, no modification required |
 
 ---
 
-## 关键场景详解
+## Key Scenario Details
 
-### `compile-error-demo/` — 复杂编译错误诊断
+### `compile-error-demo/` — Complex Compilation Error Diagnosis
 
-**错误**：`E2511 Type parameter 'TCustomKey' must have a comparer`
+**Error**: `E2511 Type parameter 'TCustomKey' must have a comparer`
 
-**根因**：`TDictionary<TCustomKey, string>` 的 `TKey` 是 record，没有默认 `IEqualityComparer`。
+**Root cause**: The `TKey` of `TDictionary<TCustomKey, string>` is a record and has no default `IEqualityComparer`.
 
-**AI 的诊断链**：
-1. 搜 KB → `TDictionary` 类定义 → 发现泛型约束需要比较器
-2. 搜 KB → `TEqualityComparer` 类定义 → 了解如何子类化
-3. 生成 `TCustomKeyComparer` + 修改构造函数
-4. 重编译通过
+**AI's diagnostic chain**:
+1. Search KB → `TDictionary` class definition → discover that the generic constraint requires a comparer
+2. Search KB → `TEqualityComparer` class definition → learn how to subclass
+3. Generate `TCustomKeyComparer` + modify the constructor
+4. Recompile successfully
 
-`ErrorCode_Fixed.pas` 是修复后的参考版本（录制者对照用，不给 AI 输入）。
+`ErrorCode_Fixed.pas` is the fixed reference version (for the recorder's comparison, not provided as input to the AI).
 
-### `review-demo/LegacyData.pas` — 5 类故意问题
+### `review-demo/LegacyData.pas` — 5 Types of Intentional Issues
 
-| # | 问题 | 位置 | 级别 |
+| # | Issue | Location | Level |
 |---|------|------|------|
-| 1 | TStringList.Create 没有 try/finally | ExportData | 🔴 严重 |
-| 2 | for 循环内 Delete 导致跳项 | ProcessItems | 🔴 严重 |
-| 3 | 魔法数值（10/1.5/100/0.95） | CalculateTotal | 🟡 警告 |
-| 4 | finally 后取值，逻辑脆弱 | GetUserCount | 🟡 警告 |
-| 5 | 未使用的局部变量 LValue | ExportData | 🔵 建议 |
+| 1 | TStringList.Create has no try/finally | ExportData | 🔴 Critical |
+| 2 | Delete inside a for loop causes skipped items | ProcessItems | 🔴 Critical |
+| 3 | Magic numbers (10/1.5/100/0.95) | CalculateTotal | 🟡 Warning |
+| 4 | Value retrieval after finally, fragile logic | GetUserCount | 🟡 Warning |
+| 5 | Unused local variable LValue | ExportData | 🔵 Suggestion |
 
-> 代码文件**不含任何提示性注释**，问题全部隐藏在逻辑层面。
+> The code file **contains no hint comments**; all issues are hidden in the logic.
 
-### `refactor-demo/` — 可重构的模式
+### `refactor-demo/` — Refactorable Patterns
 
-三个单元都返回 `TStringList`，适合整体重构为 `TArray<String>`：
+All three units return `TStringList`, making them suitable for overall refactoring to `TArray<String>`:
 - **DataProcessor.pas**: ParseCSV / SplitLines / JoinLines
 - **ConfigManager.pas**: LoadConfig / GetSectionNames
 - **UserManager.pas**: LoadUsers / GetUserEmails / SortUsers
 
-### `group-project/` — 编译依赖顺序
+### `group-project/` — Compilation Dependency Order
 
 ```
-LibProject/LibUtils.dproj → 先编译（输出 .dll/.bpl）
-        ↓ 依赖
-AppProject/MainApp.dproj → 后编译（引用 LibUtils 单元）
+LibProject/LibUtils.dproj → compile first (outputs .dll/.bpl)
+        ↓ depends on
+AppProject/MainApp.dproj → compile later (references the LibUtils unit)
 ```
 
-`ProjectGroup.groupproj` 的 `<BuildOrder>` 中明确指定了顺序。
+The order is explicitly specified in `<BuildOrder>` of `ProjectGroup.groupproj`.
 
 ---
 
-## 录制前准备清单
+## Pre-recording Preparation Checklist
 
-- [ ] Python 3.10+ / Git / Delphi IDE 已安装
-- [ ] 项目已克隆，依赖已安装，AI 客户端已配置好 MCP Server
-- [ ] `demo-project/` 复制到本机可编译路径
-- [ ] `.dproj` 的 `ProjectVersion` 匹配本地 Delphi 版本（21=10.4 / 22=11 / 23=12）
-- [ ] 文档知识库已预先构建完成（构建耗时数分钟，建议录前建好）
-- [ ] 语义搜索场景需提前构建 embedding：`delphi_kb(action="build_embedding")`
-- [ ] Gitea 场景需可访问的 Gitea 实例（如 https://code.qdac.cc:3000）和仓库权限
-- [ ] 每个场景录制前确认素材文件在正确目录
+- [ ] Python 3.10+ / Git / Delphi IDE installed
+- [ ] Project cloned, dependencies installed, AI client configured with the MCP Server
+- [ ] `demo-project/` copied to a compilable path on the local machine
+- [ ] The `ProjectVersion` of `.dproj` matches the local Delphi version (21=10.4 / 22=11 / 23=12)
+- [ ] Documentation knowledge base has been pre-built (building takes several minutes; it is recommended to build it before recording)
+- [ ] For semantic search scenarios, build embedding in advance: `delphi_kb(action="build_embedding")`
+- [ ] For Gitea scenarios, an accessible Gitea instance (e.g., https://code.qdac.cc:3000) and repository permissions are required
+- [ ] Before recording each scenario, confirm that the material files are in the correct directory

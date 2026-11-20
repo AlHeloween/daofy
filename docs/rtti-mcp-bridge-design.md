@@ -1,64 +1,64 @@
-# Delphi RTTI → MCP 桥接设计文档
+# Delphi RTTI → MCP Bridge Design Document
 
-> **版本**: v0.1 (草案)
-> **日期**: 2026-06-13
-> **状态**: 设计评审
+> **Version**: v0.1 (Draft)
+> **Date**: 2026-06-13
+> **Status**: Design Review
 
 ---
 
-## 目录
+## Table of Contents
 
-1. [背景与问题](#1-背景与问题)
-2. [Agent Skills 开放标准概述](#2-agent-skills-开放标准概述)
-3. [系统架构](#3-系统架构)
-4. [Phase 0 — Delphi 端 RTTI 发现协议](#4-phase-0--delphi-端-rtti-发现协议)
+1. [Background and Problem](#1-background-and-problem)
+2. [Agent Skills Open Standard Overview](#2-agent-skills-open-standard-overview)
+3. [System Architecture](#3-system-architecture)
+4. [Phase 0 — Delphi-side RTTI Discovery Protocol](#4-phase-0--delphi-side-rtti-discovery-protocol)
 5. [Phase 1 — MCP Tool: delphi_rtti](#5-phase-1--mcp-tool-delphi_rtti)
 6. [Phase 2 — Agent Skill: delphi-rtti-bridge](#6-phase-2--agent-skill-delphi-rtti-bridge)
-7. [Phase 3 — 多平台 Skill 分发](#7-phase-3--多平台-skill-分发)
-8. [类型映射表](#8-类型映射表)
-9. [文件清单与实施顺序](#9-文件清单与实施顺序)
-10. [参考资源](#10-参考资源)
+7. [Phase 3 — Multi-platform Skill Distribution](#7-phase-3--multi-platform-skill-distribution)
+8. [Type Mapping Table](#8-type-mapping-table)
+9. [File List and Implementation Order](#9-file-list-and-implementation-order)
+10. [References](#10-references)
 
 ---
 
-## 1. 背景与问题
+## 1. Background and Problem
 
-### 1.1 现状
+### 1.1 Current State
 
-Daofy 已经具备通过命名管道与 Delphi 应用通信的自动化引擎 (`automation_service.py`)。其中已包含基于 RTTI 的命令：
+Daofy already has an automation engine (`automation_service.py`) that communicates with Delphi applications through named pipes. It already includes RTTI-based commands:
 
-| 命令 | 功能 |
+| Command | Function |
 |------|------|
-| `rcall` | 调用 Delphi 对象的 published 方法 |
-| `rinspect` | 检查 Delphi 控件树 |
-| `rget` | 读取 Delphi 对象属性 |
-| `rset` | 设置 Delphi 对象属性 |
+| `rcall` | Call published methods of Delphi objects |
+| `rinspect` | Inspect the Delphi control tree |
+| `rget` | Read Delphi object properties |
+| `rset` | Set Delphi object properties |
 
-但当前的问题是：**AI 无从知晓 Delphi 应用暴露了哪些能力**。每次调用都需要用户或 AI 猜测方法名和参数格式。
+But the current problem is: **AI has no way to know which capabilities a Delphi application exposes**. Every call requires the user or AI to guess method names and parameter formats.
 
-### 1.2 目标
+### 1.2 Goals
 
-让 Delphi 应用通过 RTTI 自描述其能力，AI Agent 可以：
+Let Delphi applications self-describe their capabilities through RTTI, so AI Agents can:
 
-1. **发现** — 知道 Delphi 应用暴露了哪些 published 方法/属性
-2. **调用** — 带类型正确的参数调用这些方法
-3. **读取** — 以结构化的方式读取运行时数据
-4. **零知识预设** — AI 不需要预知 Delphi 端的 API 设计
+1. **Discover** — know which published methods/properties a Delphi application exposes
+2. **Call** — call these methods with type-correct parameters
+3. **Read** — read runtime data in a structured way
+4. **Zero knowledge presupposition** — AI does not need to know the Delphi-side API design in advance
 
-### 1.3 设计原则
+### 1.3 Design Principles
 
-- **渐进式披露**：只在实际需要时加载完整上下文（遵循 Agent Skills 标准）
-- **单点权威**：只维护一份 SKILL.md，其他平台文件自动派生
-- **向后兼容**：不破坏现有 `automate_delphi` 工具
-- **标准优先**：优先使用 MCP 标准 + Agent Skills 开放标准
+- **Progressive disclosure**: load full context only when actually needed (following the Agent Skills standard)
+- **Single source of truth**: maintain only one SKILL.md; other platform files are derived automatically
+- **Backward compatibility**: do not break the existing `automate_delphi` tool
+- **Standards first**: prioritize the MCP standard + Agent Skills open standard
 
 ---
 
-## 2. Agent Skills 开放标准概述
+## 2. Agent Skills Open Standard Overview
 
-### 2.1 什么是 Agent Skills
+### 2.1 What are Agent Skills
 
-Agent Skills 是 Anthropic 于 2025 年 12 月发布的开放标准（[agentskills.io](https://agentskills.io)），已被 **30+ 工具**采纳：
+Agent Skills is an open standard released by Anthropic in December 2025 ([agentskills.io](https://agentskills.io)), adopted by **30+ tools**:
 
 - Claude Code / Claude.ai
 - Cursor / Windsurf
@@ -67,64 +67,64 @@ Agent Skills 是 Anthropic 于 2025 年 12 月发布的开放标准（[agentskil
 - OpenCode / OpenClaw
 - Trae Solo
 - Gemini CLI
-- VS Code (内置)
+- VS Code (built-in)
 
-### 2.2 核心概念：Progressive Disclosure（渐进式披露）
+### 2.2 Core Concept: Progressive Disclosure
 
 ```
-Level 1: YAML Frontmatter      —— 始终加载（~50 tokens）
-  name + description 告诉 AI 何时触发此技能
+Level 1: YAML Frontmatter      —— always loaded (~50 tokens)
+  name + description tells AI when to trigger this skill
 
-Level 2: SKILL.md Body          —— 匹配时加载（~200-500 行）
-  完整的步骤指令、规则、示例
+Level 2: SKILL.md Body          —— loaded when matched (~200-500 lines)
+  Complete step instructions, rules, examples
 
-Level 3: references/ 文件        —— 按需加载
-  scripts/          更深层的文档、脚本、模板
+Level 3: references/ files        —— loaded on demand
+  scripts/          deeper documentation, scripts, templates
   assets/
 ```
 
-### 2.3 SKILL.md 文件格式
+### 2.3 SKILL.md File Format
 
 ```markdown
 ---
 name: skill-name
-description: 简洁描述技能功能和触发场景（最长 1024 字符）
-license: Apache-2.0                    # 可选
-compatibility: claude-code, opencode   # 可选
-metadata:                              # 可选
+description: Concise description of the skill's function and trigger scenarios (max 1024 characters)
+license: Apache-2.0                    # Optional
+compatibility: claude-code, opencode   # Optional
+metadata:                              # Optional
   author: daofy
   version: "1.0"
-allowed-tools: Bash(*) WebFetch        # 可选，实验性
+allowed-tools: Bash(*) WebFetch        # Optional, experimental
 ---
 
-# 技能名称
+# Skill Name
 
-## 概述
+## Overview
 ...
 
-## 使用流程
+## Usage Flow
 ...
 
-## 参考文件
-在需要时加载 `references/xxx.md`
+## Reference Files
+Load `references/xxx.md` when needed
 ```
 
-### 2.4 技能目录结构
+### 2.4 Skill Directory Structure
 
 ```
 skill-name/
-├── SKILL.md          # 必需：元数据 + 指令
-├── scripts/          # 可选：可执行脚本（Python/Bash/JS）
-├── references/       # 可选：按需加载的文档
-├── assets/           # 可选：模板/资源/配置文件
-└── metadata.json     # 可选：额外发现信息
+├── SKILL.md          # Required: metadata + instructions
+├── scripts/          # Optional: executable scripts (Python/Bash/JS)
+├── references/       # Optional: documents loaded on demand
+├── assets/           # Optional: templates/resources/config files
+└── metadata.json     # Optional: additional discovery information
 ```
 
 ---
 
-## 3. 系统架构
+## 3. System Architecture
 
-### 3.1 整体架构图
+### 3.1 Overall Architecture Diagram
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -144,71 +144,71 @@ skill-name/
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │ list_tools()                                              │   │
-│  │  ├── delphi_rtti (1 个工具, 3 个 action)                  │   │
-│  │  │    ├── action=guide    返回使用指南（自描述）            │   │
-│  │  │    ├── action=discover 扫描 Delphi RTTI 能力            │   │
-│  │  │    └── action=call     调用 RTTI 暴露的方法             │   │
-│  │  └── 其他现有工具（project, delphi_kb, ...）               │   │
+│  │  ├── delphi_rtti (1 tool, 3 actions)                  │   │
+│  │  │    ├── action=guide    returns usage guide (self-describing)            │   │
+│  │  │    ├── action=discover scans Delphi RTTI capabilities            │   │
+│  │  │    └── action=call     calls RTTI-exposed methods             │   │
+│  │  └── other existing tools (project, delphi_kb, ...)               │   │
 │  │                                                           │   │
 │  │ list_prompts()                                            │   │
-│  │  └── delphi_rtti_guide  完整使用指南（非 OpenCode 兜底）   │   │
+│  │  └── delphi_rtti_guide  complete usage guide (non-OpenCode fallback)   │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                           │                                      │
 │                           ▼                                      │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │ rtti_bridge.py                                          │   │
-│  │  ├── DelphiRttiBridge(保持长连接)                        │   │
+│  │  ├── DelphiRttiBridge(maintain long connection)                        │   │
 │  │  ├── discover_capabilities(app_path, class_name?)       │   │
 │  │  ├── call_method(app_path, class, method, params)       │   │
 │  │  └── format_as_mcp_schema(rtti_json) → MCP Tool[]       │   │
 │  └──────────────────┬───────────────────────────────────────┘   │
-│                     │ 命名管道 \\.\pipe\daofy_auto              │
-│                     ▼ JSON 请求/响应                             │
+│                     │ named pipe \\.\pipe\daofy_auto              │
+│                     ▼ JSON request/response                             │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │ Delphi Application                                      │   │
 │  │  ┌──────────────────────────────────────────────────┐   │   │
 │  │  │ DaofyAutomation Unit                              │   │   │
-│  │  │  ├── rcall / rget / rset / rinspect（已有）       │   │   │
-│  │  │  └── rtti_discover  ◄── 新增                      │   │   │
+│  │  │  ├── rcall / rget / rset / rinspect(existing)       │   │   │
+│  │  │  └── rtti_discover  ◄── new                      │   │   │
 │  │  │       └── TRttiDiscoverer                         │   │   │
 │  │  │            ├── ScanMethods → JSON Schema           │   │   │
 │  │  │            ├── ScanProperties → JSON               │   │   │
-│  │  │            └── TypeToSchema(递归)                  │   │   │
+│  │  │            └── TypeToSchema(recursive)                  │   │   │
 │  │  └──────────────────────────────────────────────────┘   │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 三层 Token 保护
+### 3.2 Three-layer Token Protection
 
-| 层 | 机制 | 固定消耗 | 触发条件 |
+| Layer | Mechanism | Fixed Cost | Trigger Condition |
 |----|------|---------|---------|
-| **L1** | Tool description（`list_tools()`） | ~200 tokens | 每次 MCP 连接 |
-| **L2** | Skill frontmatter（name+description） | ~50 tokens | 每次 AI 会话启动 |
-| **L3** | SKILL.md body / `action=guide` | ~2-5K tokens | AI 判定需要时按需加载 |
+| **L1** | Tool description (`list_tools()`) | ~200 tokens | Every MCP connection |
+| **L2** | Skill frontmatter (name+description) | ~50 tokens | Every AI session startup |
+| **L3** | SKILL.md body / `action=guide` | ~2-5K tokens | Loaded on demand when AI determines it is needed |
 
-**核心优势**：在 AI 不使用 Delphi RTTI 能力的会话中，固定消耗仅 ~250 tokens（L1+L2）。
+**Core advantage**: In sessions where AI does not use Delphi RTTI capabilities, the fixed cost is only ~250 tokens (L1+L2).
 
-### 3.3 跨 Agent 兼容策略
+### 3.3 Cross-Agent Compatibility Strategy
 
-| Agent 类型 | 发现机制 | Skill 加载 | 兜底 |
+| Agent Type | Discovery Mechanism | Skill Loading | Fallback |
 |-----------|---------|-----------|------|
-| Claude Code | `.claude/skills/` 自动发现 | `skill("delphi-rtti-bridge")` | Tool description |
-| OpenCode | `.opencode/skills/` 自动发现 | `skill("delphi-rtti-bridge")` | Tool description |
-| Cursor | `.cursor/rules/` 自动发现 | @-mention 规则文件 | Tool description |
-| Windsurf | `.windsurfrules` | 规则文件 | Tool description |
-| Claude Desktop | MCP Prompts `get_prompt()` | Prompt 注入 | Tool description + `action=guide` |
-| Trae Solo | Skill 市场安装 | 市场安装 | Tool description |
-| Codex CLI | `~/.codex/skills/` 自动发现 | `skill()` | Tool description |
-| 其他 MCP 客户端 | 无 | 无 | `action=guide` 返回完整文档 |
+| Claude Code | `.claude/skills/` auto-discovery | `skill("delphi-rtti-bridge")` | Tool description |
+| OpenCode | `.opencode/skills/` auto-discovery | `skill("delphi-rtti-bridge")` | Tool description |
+| Cursor | `.cursor/rules/` auto-discovery | @-mention rule file | Tool description |
+| Windsurf | `.windsurfrules` | Rule file | Tool description |
+| Claude Desktop | MCP Prompts `get_prompt()` | Prompt injection | Tool description + `action=guide` |
+| Trae Solo | Skill marketplace installation | Marketplace installation | Tool description |
+| Codex CLI | `~/.codex/skills/` auto-discovery | `skill()` | Tool description |
+| Other MCP clients | None | None | `action=guide` returns complete documentation |
 
 ---
 
-## 4. Phase 0 — Delphi 端 RTTI 发现协议
+## 4. Phase 0 — Delphi-side RTTI Discovery Protocol
 
-### 4.1 新增命令：`rtti_discover`
+### 4.1 New Command: `rtti_discover`
 
-**请求格式：**
+**Request format:**
 
 ```json
 {
@@ -218,10 +218,10 @@ skill-name/
 }
 ```
 
-- `target` 可选，不传时返回所有已注册的 RTTI 类
-- `target` 指定时只返回该类的 RTTI 信息
+- `target` is optional; when omitted, returns all registered RTTI classes
+- When `target` is specified, returns only that class's RTTI information
 
-**响应格式：**
+**Response format:**
 
 ```json
 {
@@ -283,7 +283,7 @@ skill-name/
 }
 ```
 
-### 4.2 TRttiDiscoverer 核心设计
+### 4.2 TRttiDiscoverer Core Design
 
 ```pascal
 unit DaofyAutomation.RttiDiscovery;
@@ -296,23 +296,23 @@ type
   TRttiDiscoverer = class
   public
     /// <summary>
-    /// 扫描 TClass 的 RTTI，返回 JSON Schema 格式的能力描述
+    /// Scans the RTTI of TClass and returns capability description in JSON Schema format
     /// </summary>
     class function DiscoverClass(AClass: TClass; 
       AName: string = ''): TJSONObject;
 
     /// <summary>
-    /// 扫描所有已注册的 RTTI 类
+    /// Scans all registered RTTI classes
     /// </summary>
     class function DiscoverAllClasses: TJSONArray;
 
     /// <summary>
-    /// 将 Delphi 类型映射为 JSON Schema
+    /// Maps Delphi types to JSON Schema
     /// </summary>
     class function TypeToSchema(AType: TRttiType): TJSONObject;
 
     /// <summary>
-    /// 检查方法是否需要暴露（可基于自定义属性）
+    /// Checks whether a method needs to be exposed (can be based on custom attributes)
     /// </summary>
     class function ShouldExpose(AMethod: TRttiMethod): Boolean;
   end;
@@ -345,7 +345,7 @@ begin
     Result.AddPair('ancestor', 
       TJSONString.Create(AClass.ClassParent.ClassName));
 
-    // 扫描 published 方法
+    // Scan published methods
     Tools := TJSONArray.Create;
     for Method in RType.GetMethods do
     begin
@@ -355,11 +355,11 @@ begin
       ToolObj := TJSONObject.Create;
       ToolObj.AddPair('name', TJSONString.Create(Method.Name));
 
-      // 从自定义属性读取描述
+      // Read description from custom attributes
       ToolObj.AddPair('description', 
         TJSONString.Create(GetMethodDescription(Method)));
 
-      // 参数 JSON Schema
+      // Parameter JSON Schema
       Props := TJSONObject.Create;
       Required := TJSONArray.Create;
       for Param in Method.GetParameters do
@@ -378,8 +378,8 @@ begin
     end;
     Result.AddPair('tools', Tools);
 
-    // 扫描 published 属性 → Resources
-    // ...（类似逻辑）
+    // Scan published properties → Resources
+    // ... (similar logic)
   finally
     Ctx.Free;
   end;
@@ -392,7 +392,7 @@ begin
     tkInteger, tkInt64:
       begin
         Result.AddPair('type', 'integer');
-        // 枚举子类型识别：Boolean, Byte, Cardinal, etc.
+        // Enum subtype recognition: Boolean, Byte, Cardinal, etc.
       end;
     tkFloat:
       if AType.Handle.Name = 'TDateTime' then
@@ -424,20 +424,20 @@ begin
     tkRecord:
       begin
         Result.AddPair('type', 'object');
-        // 递归扫描 record 字段
+        // Recursively scan record fields
       end;
-    // 其他类型...
+    // Other types...
   end;
 end;
 ```
 
-### 4.3 自定义属性支持（可选增强）
+### 4.3 Custom Attribute Support (Optional Enhancement)
 
 ```pascal
 type
   /// <summary>
-  /// 标记一个 published 方法为 RTTI 可调用，
-  /// 可指定显示名和描述
+  /// Marks a published method as RTTI-callable,
+  /// can specify display name and description
   /// </summary>
   RttiExposeAttribute = class(TCustomAttribute)
   private
@@ -451,7 +451,7 @@ type
   end;
 
   /// <summary>
-  /// 标记参数描述
+  /// Marks parameter description
   /// </summary>
   RttiParamAttribute = class(TCustomAttribute)
   private
@@ -461,7 +461,7 @@ type
     property Description: string read FDescription;
   end;
 
-// 使用示例
+// Usage example
 type
   TMyService = class
   published
@@ -477,21 +477,21 @@ type
   end;
 ```
 
-### 4.4 安全过滤
+### 4.4 Security Filtering
 
-`rtti_discover` 支持两种过滤模式：
+`rtti_discover` supports two filtering modes:
 
-| 模式 | 机制 | 使用场景 |
+| Mode | Mechanism | Use Case |
 |------|------|---------|
-| **白名单** | 仅暴露标记了 `RttiExposeAttribute` 的方法 | 生产环境，精确控制暴露面 |
-| **黑名单** | 排除标记了 `RttiIgnoreAttribute` 的方法，其余全部暴露 | 开发/调试环境 |
+| **Whitelist** | Expose only methods marked with `RttiExposeAttribute` | Production environment, precise exposure surface control |
+| **Blacklist** | Exclude methods marked with `RttiIgnoreAttribute`; expose all others | Development/debugging environment |
 
-在 `TRttiDiscoverer.ShouldExpose` 中实现：
+Implement in `TRttiDiscoverer.ShouldExpose`:
 
 ```pascal
 class function TRttiDiscoverer.ShouldExpose(AMethod: TRttiMethod): Boolean;
 begin
-  // 检查安全配置
+  // Check security configuration
   if SecurityMode = smWhitelist then
     Result := HasAttribute(AMethod, 'RttiExposeAttribute')
   else
@@ -503,9 +503,9 @@ end;
 
 ## 5. Phase 1 — MCP Tool: delphi_rtti
 
-### 5.1 Tool 定义
+### 5.1 Tool Definition
 
-在 `server.py` 的 `list_tools()` 中注册一个工具：
+Register one tool in `list_tools()` of `server.py`:
 
 ```python
 Tool(
@@ -553,17 +553,17 @@ Tool(
 )
 ```
 
-### 5.2 新增文件
+### 5.2 New Files
 
 ```
 src/
 ├── services/
-│   └── rtti_bridge.py          # RTTI 桥接服务
+│   └── rtti_bridge.py          # RTTI bridge service
 ├── tools/
 │   └── delphi_rtti.py          # MCP Tool handler
 ```
 
-#### `src/services/rtti_bridge.py` 核心设计
+#### `src/services/rtti_bridge.py` Core Design
 
 ```python
 """
@@ -594,13 +594,13 @@ class RttiDiscoveryResult:
     def __init__(self, data: dict):
         self.class_name = data.get("className", "")
         self.ancestor = data.get("ancestor", "")
-        self.tools = data.get("tools", [])        # published 方法列表
-        self.resources = data.get("resources", []) # published 属性列表
+        self.tools = data.get("tools", [])        # published method list
+        self.resources = data.get("resources", []) # published property list
         self.definitions = data.get("definitions", {})
 
     def to_mcp_tool_list(self, prefix: str = "") -> list:
         """转换为 MCP Tool 列表（供 list_tools 动态注入）。"""
-        # 此处可用于 Phase 2 增强
+        # This can be used for Phase 2 enhancements
         return []
 
 
@@ -614,7 +614,7 @@ class RttiBridge:
     def __init__(self):
         self._cache: dict[str, dict] = {}  # app_path → discovery result
         self._cache_time: dict[str, float] = {}
-        self._cache_ttl: float = 300  # 缓存 5 分钟
+        self._cache_ttl: float = 300  # Cache for 5 minutes
 
     def _is_cache_valid(self, app_path: str) -> bool:
         if app_path not in self._cache:
@@ -641,7 +641,7 @@ class RttiBridge:
         Returns:
             dict: 包含 classes/tools/resources 的 JSON Schema
         """
-        # 缓存命中
+        # Cache hit
         if not force and self._is_cache_valid(app_path):
             cached = self._cache[app_path]
             if class_name:
@@ -651,7 +651,7 @@ class RttiBridge:
                 return {"status": "ok", "classes": cached.get("classes", [])}
             return {"status": "ok", **cached}
 
-        # 发送 rtti_discover 命令
+        # Send rtti_discover command
         req = {
             "reqId": f"disc_{int(time.time()*1000)}",
             "cmd": "rtti_discover",
@@ -666,7 +666,7 @@ class RttiBridge:
         if resp.get("status") != "ok":
             return {"status": "error", "message": resp.get("data", "未知错误")}
 
-        # 更新缓存
+        # Update cache
         if not class_name:
             self._cache[app_path] = {
                 "classes": resp.get("classes", []),
@@ -717,7 +717,7 @@ class RttiBridge:
             self._cache_time.clear()
 
 
-# 全局单例
+# Global singleton
 _rtti_bridge = RttiBridge()
 
 
@@ -725,14 +725,14 @@ def get_rtti_bridge() -> RttiBridge:
     return _rtti_bridge
 ```
 
-#### `src/tools/delphi_rtti.py` 核心设计
+#### `src/tools/delphi_rtti.py` Core Design
 
 ```python
 """MCP Tool: delphi_rtti — Delphi RTTI 桥接"""
 
 from src.services.rtti_bridge import get_rtti_bridge
 
-# 完整使用指南（约 2K 字符，按需返回）
+# Complete usage guide (about 2K characters, returned on demand)
 RTTI_GUIDE = """\
 # Delphi RTTI 桥接 — 使用指南
 
@@ -847,22 +847,22 @@ async def handle_delphi_rtti(arguments: dict) -> dict:
     }
 ```
 
-### 5.3 在 server.py 注册
+### 5.3 Register in server.py
 
 ```python
-# imports 新增
+# Add imports
 from src.tools.delphi_rtti import handle_delphi_rtti
 
-# 在 list_tools() 添加上述 Tool 定义
+# Add the above Tool definition in list_tools()
 
-# 在 call_tool() 分发添加路由
+# Add routing in call_tool() dispatch
 if name == "delphi_rtti":
     result = await handle_delphi_rtti(arguments)
     return CallToolResult(content=[TextContent(text=result["content"][0]["text"])],
                           isError=result["isError"])
 ```
 
-### 5.4 MCP Prompt 注册（Claude Desktop 兜底）
+### 5.4 MCP Prompt Registration (Claude Desktop Fallback)
 
 ```python
 @server.list_prompts()
@@ -896,12 +896,12 @@ async def get_prompt(name: str, arguments: dict = None):
 ---
 name: delphi-rtti-bridge
 description: >-
-  通过 Delphi RTTI 发现和调用 Delphi 应用程序的运行时能力。
-  当你需要读取 Delphi 应用的运行时数据、调用其业务方法、
-  或将 Delphi 应用作为 AI 数据源时使用此技能。
-  典型场景：通过 Daofy MCP Server 的 delphi_rtti 工具操作 Delphi 应用。
-  先使用 delphi_rtti(action='discover') 扫描能力，
-  再使用 delphi_rtti(action='call') 调用方法。
+  Discover and call the runtime capabilities of Delphi applications through Delphi RTTI.
+  Use this skill when you need to read runtime data from a Delphi application, call its business methods,
+  or use a Delphi application as an AI data source.
+  Typical scenario: operate a Delphi application through the delphi_rtti tool of the Daofy MCP Server.
+  First use delphi_rtti(action='discover') to scan capabilities,
+  then use delphi_rtti(action='call') to call methods.
 license: MIT
 compatibility: claude-code, opencode, cursor
 metadata:
@@ -912,24 +912,24 @@ metadata:
 
 # Delphi RTTI Bridge
 
-## 概述
+## Overview
 
-通过 Delphi Enhanced RTTI 将 Delphi 应用程序暴露为 AI 可发现和调用的能力源。
-此技能配合 Daofy MCP Server 的 `delphi_rtti` 工具使用。
+Expose a Delphi application as an AI-discoverable and callable capability source through Delphi Enhanced RTTI.
+This skill works with the `delphi_rtti` tool of the Daofy MCP Server.
 
-## 使用流程
+## Usage Flow
 
-### 第一步：连接并发现能力
+### Step 1: Connect and Discover Capabilities
 
 ```json
 delphi_rtti(action="discover", app_path="C:\\App\\MyApp.exe")
 ```
 
-返回该应用所有类的 published 方法清单，包含 JSON Schema 格式的参数定义。
+Returns the list of published methods for all classes in the application, including parameter definitions in JSON Schema format.
 
-### 第二步：理解能力清单
+### Step 2: Understand the Capability List
 
-返回的 JSON 结构：
+The returned JSON structure:
 
 ```json
 {
@@ -955,7 +955,7 @@ delphi_rtti(action="discover", app_path="C:\\App\\MyApp.exe")
 }
 ```
 
-### 第三步：调用方法
+### Step 3: Call Methods
 
 ```json
 delphi_rtti(
@@ -970,91 +970,91 @@ delphi_rtti(
 )
 ```
 
-## 类型映射
+## Type Mapping
 
-| Delphi 类型 | JSON 类型 | 说明 |
-|------------|----------|------|
-| string / UnicodeString | string | 默认 UTF-8 |
-| Integer / Int64 | integer | 32/64 位有符号整数 |
-| Single / Double / Currency | number | 浮点数/货币 |
+| Delphi Type | JSON Type | Description |
+|------------|----------|-------------|
+| string / UnicodeString | string | Default UTF-8 |
+| Integer / Int64 | integer | 32/64-bit signed integer |
+| Single / Double / Currency | number | Floating point/currency |
 | Boolean / ByteBool | boolean | |
-| TDateTime | string (date-time) | ISO 8601 格式 |
-| 枚举 | string (enum) | 带可选值列表 |
-| TObject / TPersistent | object | 子对象 |
-| 动态数组 / TArray\<T\> | array | 递归映射元素类型 |
+| TDateTime | string (date-time) | ISO 8601 format |
+| Enum | string (enum) | With optional value list |
+| TObject / TPersistent | object | Sub-object |
+| Dynamic array / TArray\<T\> | array | Recursively map element type |
 | TStrings / TStringList | array of string | |
-| Variant | any | 动态类型 |
+| Variant | any | Dynamic type |
 
-## 最佳实践
+## Best Practices
 
-### 先 discover 再 call
-始终先 discover 获取完整能力清单，确认方法签名后再调用。
+### Discover first, then call
+Always call discover first to obtain the complete capability list, confirm the method signature, and then call.
 
-### 缓存发现结果
-同一 Delphi 应用进程生命周期内 RTTI 能力不变，discover 一次即可。
+### Cache discovery results
+RTTI capabilities do not change during the lifecycle of the same Delphi application process, so one discover call is sufficient.
 
-### 使用 keep_alive
-如需多次调用，在首次 discover 时使用 keep_alive=True 保持进程运行。
+### Use keep_alive
+If multiple calls are needed, use keep_alive=True during the first discover to keep the process running.
 
-### 参数匹配
-- 确保参数名与 discover 返回的完全一致（大小写敏感）
-- 确保参数类型符合类型映射表
-- 必填参数（required 数组中的）不能省略
+### Parameter matching
+- Ensure parameter names exactly match those returned by discover (case-sensitive)
+- Ensure parameter types conform to the type mapping table
+- Required parameters (in the required array) cannot be omitted
 
-### 安全
-- 开发环境可用黑名单模式，默认排除敏感方法
-- 生产环境建议白名单模式，仅暴露标记了 `RttiExpose` 属性的方法
+### Security
+- Development environments can use blacklist mode to exclude sensitive methods by default
+- Production environments should use whitelist mode, exposing only methods marked with the `RttiExpose` attribute
 
-## 故障排除
+## Troubleshooting
 
 ### "pipe_unavailable"
-Delphi 应用未启动或未链接 DaofyAutomation 单元。
-确认应用已编译并包含 DaofyAutomation 单元。
+The Delphi application is not started or is not linked with the DaofyAutomation unit.
+Confirm that the application is compiled and includes the DaofyAutomation unit.
 
-### 方法调用失败
-检查：
-1. 方法名是否与 discover 返回的完全一致
-2. 参数名是否匹配
-3. 参数类型是否符合映射表
-4. 该方法是否为 published
+### Method call fails
+Check:
+1. Whether the method name exactly matches that returned by discover
+2. Whether the parameter names match
+3. Whether the parameter types conform to the mapping table
+4. Whether the method is published
 
-### 空返回
-检查目标类的方法是否标记为 `published`。
-只有 published 区段的方法才能被 RTTI 发现。
+### Empty return
+Check whether the target class's methods are marked as `published`.
+Only methods in the published section can be discovered by RTTI.
 
-### discover 返回为空
-确认：
-1. Delphi 应用版本 >= Delphi 2010（支持 Enhanced RTTI）
-2. 编译时启用了 `$METHODINFO ON`（默认开启）
-3. 类定义中确实有 published 方法
+### discover returns empty
+Confirm:
+1. Delphi application version >= Delphi 2010 (supports Enhanced RTTI)
+2. `$METHODINFO ON` is enabled at compile time (enabled by default)
+3. The class definition indeed has published methods
 
-## 参考
+## References
 
-完整技术细节见：
+For complete technical details, see:
 - `docs/rtti-mcp-bridge-design.md`
 - `src/services/rtti_bridge.py`
 - `src/tools/delphi_rtti.py`
 ```
 
-### 6.2 Skill 文件目录结构
+### 6.2 Skill File Directory Structure
 
 ```
 .opencode/skills/delphi-rtti-bridge/
-├── SKILL.md                    # 核心指令（本文件）
+├── SKILL.md                    # Core instructions (this file)
 ├── references/
-│   ├── type-mapping.md         # 详细类型映射参考
-│   └── examples.md             # 更多调用示例
+│   ├── type-mapping.md         # Detailed type mapping reference
+│   └── examples.md             # More invocation examples
 └── scripts/
-    └── discover_and_call.py    # 可选：辅助脚本
+    └── discover_and_call.py    # Optional: helper script
 ```
 
 ---
 
-## 7. Phase 3 — 多平台 Skill 分发
+## 7. Phase 3 — Multi-platform Skill Distribution
 
-### 7.1 自动分发脚本
+### 7.1 Automatic Distribution Script
 
-创建一个构建脚本 `scripts/build-skills.py`，从权威源 SKILL.md 自动派发到各平台：
+Create a build script `scripts/build-skills.py` to automatically distribute from the authoritative SKILL.md source to each platform:
 
 ```python
 """
@@ -1082,139 +1082,139 @@ if __name__ == "__main__":
     distribute()
 ```
 
-### 7.2 各平台路径对照
+### 7.2 Platform Path Comparison
 
-| 平台 | 路径 | 生效方式 |
+| Platform | Path | Activation Method |
 |------|------|---------|
-| Claude Code | `.claude/skills/delphi-rtti-bridge/SKILL.md` | 自动发现，/delphi-rtti-bridge 或自动触发 |
-| OpenCode | `.opencode/skills/delphi-rtti-bridge/SKILL.md` | 自动发现，skill("delphi-rtti-bridge") |
-| Cursor | `.cursor/rules/delphi-rtti-bridge.mdc` | @-mention 或自动触发 |
-| Windsurf | `.windsurfrules` | 自动读取 |
-| Codex CLI | 不放在项目目录，用户自行安装 | ~/.codex/skills/ |
-| Trae Solo | 通过市场安装 | 市场搜索安装 |
+| Claude Code | `.claude/skills/delphi-rtti-bridge/SKILL.md` | Auto-discovery, /delphi-rtti-bridge or automatic trigger |
+| OpenCode | `.opencode/skills/delphi-rtti-bridge/SKILL.md` | Auto-discovery, skill("delphi-rtti-bridge") |
+| Cursor | `.cursor/rules/delphi-rtti-bridge.mdc` | @-mention or automatic trigger |
+| Windsurf | `.windsurfrules` | Automatically read |
+| Codex CLI | Not placed in project directory; users install manually | ~/.codex/skills/ |
+| Trae Solo | Installed through marketplace | Search and install in marketplace |
 
 ---
 
-## 8. 类型映射表
+## 8. Type Mapping Table
 
-### 8.1 基本类型映射
+### 8.1 Basic Type Mapping
 
-| Delphi 类型种类 | Delphi 类型 | JSON Schema | 示例值 |
+| Delphi Type Kind | Delphi Type | JSON Schema | Example Value |
 |----------------|------------|-------------|--------|
-| 字符串 | `string`, `UnicodeString`, `AnsiString`, `WideString` | `{"type": "string"}` | `"你好"` |
-| 有符号整数 | `Integer`, `SmallInt`, `ShortInt`, `Int64` | `{"type": "integer"}` | `42` |
-| 无符号整数 | `Cardinal`, `Byte`, `Word`, `UInt64` | `{"type": "integer", "minimum": 0}` | `42` |
-| 浮点 | `Single`, `Double`, `Extended` | `{"type": "number"}` | `3.14` |
-| 货币 | `Currency` | `{"type": "number"}` | `99.99` |
-| 布尔 | `Boolean`, `ByteBool`, `WordBool`, `LongBool` | `{"type": "boolean"}` | `true` |
-| 日期时间 | `TDateTime` | `{"type": "string", "format": "date-time"}` | `"2026-06-13T10:30:00"` |
-| 枚举 | `TAlignment`, `TFormStyle` 等 | `{"type": "string", "enum": ["val1", "val2"]}` | `"taLeftJustify"` |
-| 集合 | `TFontStyles` 等 | `{"type": "array", "items": {"type": "string"}}` | `["fsBold", "fsItalic"]` |
+| String | `string`, `UnicodeString`, `AnsiString`, `WideString` | `{"type": "string"}` | `"你好"` |
+| Signed integer | `Integer`, `SmallInt`, `ShortInt`, `Int64` | `{"type": "integer"}` | `42` |
+| Unsigned integer | `Cardinal`, `Byte`, `Word`, `UInt64` | `{"type": "integer", "minimum": 0}` | `42` |
+| Floating point | `Single`, `Double`, `Extended` | `{"type": "number"}` | `3.14` |
+| Currency | `Currency` | `{"type": "number"}` | `99.99` |
+| Boolean | `Boolean`, `ByteBool`, `WordBool`, `LongBool` | `{"type": "boolean"}` | `true` |
+| Date/time | `TDateTime` | `{"type": "string", "format": "date-time"}` | `"2026-06-13T10:30:00"` |
+| Enum | `TAlignment`, `TFormStyle`, etc. | `{"type": "string", "enum": ["val1", "val2"]}` | `"taLeftJustify"` |
+| Set | `TFontStyles`, etc. | `{"type": "array", "items": {"type": "string"}}` | `["fsBold", "fsItalic"]` |
 
-### 8.2 复杂类型映射
+### 8.2 Complex Type Mapping
 
-| Delphi 类型 | JSON Schema | 说明 |
+| Delphi Type | JSON Schema | Description |
 |------------|-------------|------|
-| `TArray<Integer>` | `{"type": "array", "items": {"type": "integer"}}` | 泛型数组 |
-| `array of string` | `{"type": "array", "items": {"type": "string"}}` | 动态数组 |
-| `TStrings` | `{"type": "array", "items": {"type": "string"}}` | 字符串列表 |
-| `TList<TObject>` | `{"type": "array", "items": {"type": "object"}}` | 对象列表（有限支持） |
-| `record` / 结构体 | `{"type": "object", "properties": {...}}` | 递归扫描字段 |
-| `TObject` 子类 | `{"type": "object", "description": "ClassName"}` | 输出完整类型名 |
-| `Variant` | `{"type": ["string", "number", "boolean", "null"]}` | 动态类型 |
-| `TStream` 子类 | `{"type": "string", "contentEncoding": "base64"}` | 二进制流 |
+| `TArray<Integer>` | `{"type": "array", "items": {"type": "integer"}}` | Generic array |
+| `array of string` | `{"type": "array", "items": {"type": "string"}}` | Dynamic array |
+| `TStrings` | `{"type": "array", "items": {"type": "string"}}` | String list |
+| `TList<TObject>` | `{"type": "array", "items": {"type": "object"}}` | Object list (limited support) |
+| `record` / structure | `{"type": "object", "properties": {...}}` | Recursively scan fields |
+| `TObject` subclass | `{"type": "object", "description": "ClassName"}` | Output full type name |
+| `Variant` | `{"type": ["string", "number", "boolean", "null"]}` | Dynamic type |
+| `TStream` subclass | `{"type": "string", "contentEncoding": "base64"}` | Binary stream |
 
-### 8.3 类型映射优先级
+### 8.3 Type Mapping Priority
 
-当类型识别存在歧义时，优先使用自定义属性提供的类型信息：
+When type recognition is ambiguous, prioritize type information provided by custom attributes:
 
-1. `RttiParamAttribute` 或 `RttiExposeAttribute` 中声明的类型
-2. Delphi RTTI 类型信息
-3. 默认类型推断（如 `Integer → integer`）
+1. Type declared in `RttiParamAttribute` or `RttiExposeAttribute`
+2. Delphi RTTI type information
+3. Default type inference (e.g. `Integer → integer`)
 
 ---
 
-## 9. 文件清单与实施顺序
+## 9. File List and Implementation Order
 
-### 9.1 完整文件清单
+### 9.1 Complete File List
 
-| 文件 | 所属 Phase | 说明 |
+| File | Phase | Description |
 |------|-----------|------|
-| Delphi: `DaofyAutomation.RttiDiscovery.pas` | Phase 0 | TRttiDiscoverer 实现 |
-| Delphi: `DaofyAutomation.pas`（修改） | Phase 0 | 新增 `rtti_discover` 命令路由 |
-| Python: `src/services/rtti_bridge.py` | Phase 1 | RttiBridge 桥接服务 |
+| Delphi: `DaofyAutomation.RttiDiscovery.pas` | Phase 0 | TRttiDiscoverer implementation |
+| Delphi: `DaofyAutomation.pas` (modified) | Phase 0 | Add `rtti_discover` command routing |
+| Python: `src/services/rtti_bridge.py` | Phase 1 | RttiBridge bridge service |
 | Python: `src/tools/delphi_rtti.py` | Phase 1 | MCP Tool handler |
-| Python: `src/server.py`（修改） | Phase 1 | 注册工具和 Prompt |
-| Python: `src/tool_docs.py`（修改） | Phase 1 | 添加 delphi_rtti 帮助文档 |
-| Markdown: `.opencode/skills/delphi-rtti-bridge/SKILL.md` | Phase 2 | 权威 SKILL.md |
-| Markdown: `.opencode/skills/delphi-rtti-bridge/references/type-mapping.md` | Phase 2 | 详细类型映射 |
-| Markdown: `.opencode/skills/delphi-rtti-bridge/references/examples.md` | Phase 2 | 示例参考 |
-| Python: `scripts/build-skills.py` | Phase 3 | 多平台分发脚本 |
-| Markdown: `.claude/skills/delphi-rtti-bridge/SKILL.md` | Phase 3 | Claude Code 副本 |
-| MDC: `.cursor/rules/delphi-rtti-bridge.mdc` | Phase 3 | Cursor 副本 |
-| Markdown: `docs/rtti-mcp-bridge-design.md` | — | 本文档 |
+| Python: `src/server.py` (modified) | Phase 1 | Register tool and Prompt |
+| Python: `src/tool_docs.py` (modified) | Phase 1 | Add delphi_rtti help documentation |
+| Markdown: `.opencode/skills/delphi-rtti-bridge/SKILL.md` | Phase 2 | Authoritative SKILL.md |
+| Markdown: `.opencode/skills/delphi-rtti-bridge/references/type-mapping.md` | Phase 2 | Detailed type mapping |
+| Markdown: `.opencode/skills/delphi-rtti-bridge/references/examples.md` | Phase 2 | Example reference |
+| Python: `scripts/build-skills.py` | Phase 3 | Multi-platform distribution script |
+| Markdown: `.claude/skills/delphi-rtti-bridge/SKILL.md` | Phase 3 | Claude Code copy |
+| MDC: `.cursor/rules/delphi-rtti-bridge.mdc` | Phase 3 | Cursor copy |
+| Markdown: `docs/rtti-mcp-bridge-design.md` | — | This document |
 
-### 9.2 实施顺序
+### 9.2 Implementation Order
 
 ```mermaid
 gantt
-    title Delphi RTTI → MCP 桥接实施计划
+    title Delphi RTTI → MCP Bridge Implementation Plan
     dateFormat  YYYY-MM-DD
     
-    section Phase 0 — Delphi RTTI 发现
-    TRttiDiscoverer 实现          :a1, 2026-06-14, 1d
-    rtti_discover 命令集成         :a2, after a1, 0.5d
-    测试 RTTI 扫描 + 参数分发现   :a3, after a2, 0.5d
+    section Phase 0 — Delphi RTTI Discovery
+    TRttiDiscoverer implementation          :a1, 2026-06-14, 1d
+    rtti_discover command integration         :a2, after a1, 0.5d
+    Test RTTI scanning + parameter discovery   :a3, after a2, 0.5d
 
-    section Phase 1 — Python 桥接层
-    rtti_bridge.py 服务实现        :b1, 2026-06-14, 1d
-    delphi_rtti.py 工具 handler    :b2, after b1, 0.5d
-    server.py 注册 + Prompt        :b3, after b2, 0.5d
-    集成测试（Mock Delphi）        :b4, after b2, 0.5d
+    section Phase 1 — Python Bridge Layer
+    rtti_bridge.py service implementation        :b1, 2026-06-14, 1d
+    delphi_rtti.py tool handler    :b2, after b1, 0.5d
+    server.py registration + Prompt        :b3, after b2, 0.5d
+    Integration test (Mock Delphi)        :b4, after b2, 0.5d
 
     section Phase 2 — SKILL.md
-    SKILL.md 编写                  :c1, 2026-06-15, 0.5d
-    引用文件和示例编写              :c2, after c1, 0.5d
+    SKILL.md writing                  :c1, 2026-06-15, 0.5d
+    Reference files and examples writing              :c2, after c1, 0.5d
 
-    section Phase 3 — 多平台分发
-    分发脚本 + 平台文件生成         :d1, 2026-06-15, 0.5d
-    AGENTS.md 更新                :d2, after d1, 0.5d
+    section Phase 3 — Multi-platform Distribution
+    Distribution script + platform file generation         :d1, 2026-06-15, 0.5d
+    AGENTS.md update                :d2, after d1, 0.5d
 ```
 
-### 9.3 测试策略
+### 9.3 Testing Strategy
 
-| Phase | 测试内容 | 方法 |
+| Phase | Test Content | Method |
 |-------|---------|------|
-| Phase 0 | RTTI 扫描是否返回正确 JSON Schema | Delphi 端编写测试 Form，调用 `rtti_discover` 验证输出 |
-| Phase 0 | 类型映射是否正确 | 覆盖所有 Delphi 基本类型 + 常见复杂类型 |
-| Phase 1 | 工具是否能正确分发 action | Python unittest, mock 命名管道响应 |
-| Phase 1 | `discover` 缓存逻辑 | 多次调用是否命中缓存、force 参数是否强制刷新 |
-| Phase 1 | `call` 参数传递 | JSON 序列化/反序列化是否一致 |
-| Phase 2 | Skill 能否被 AI 正确触发 | 实际在 Claude Code / OpenCode 中测试 |
-| Phase 3 | 各平台分发是否正确 | 检查各路径文件是否存在 |
+| Phase 0 | Whether RTTI scanning returns correct JSON Schema | Write a test Form on Delphi side, call `rtti_discover` to verify output |
+| Phase 0 | Whether type mapping is correct | Cover all Delphi basic types + common complex types |
+| Phase 1 | Whether the tool correctly dispatches actions | Python unittest, mock named pipe responses |
+| Phase 1 | `discover` cache logic | Whether repeated calls hit cache, whether force parameter forces refresh |
+| Phase 1 | `call` parameter passing | Whether JSON serialization/deserialization is consistent |
+| Phase 2 | Whether Skill can be correctly triggered by AI | Actually test in Claude Code / OpenCode |
+| Phase 3 | Whether distribution to each platform is correct | Check whether files exist at each path |
 
 ---
 
-## 10. 参考资源
+## 10. References
 
-### 标准与规范
-- **Agent Skills 开放标准**: [agentskills.io](https://agentskills.io)
+### Standards and Specifications
+- **Agent Skills Open Standard**: [agentskills.io](https://agentskills.io)
 - **Agent Skills Specification**: [agentskills.io/specification](https://agentskills.io/specification)
 - **Anthropic Official Skills**: [github.com/anthropics/skills](https://github.com/anthropics/skills)
 - **MCP Specification**: [modelcontextprotocol.io](https://modelcontextprotocol.io)
 
-### 技能市场
-- **SkillsMP** (170万+ skills): [skillsmp.com](https://skillsmp.com)
+### Skill Marketplaces
+- **SkillsMP** (1.7M+ skills): [skillsmp.com](https://skillsmp.com)
 - **Agensi**: [agensi.io](https://agensi.io)
 - **SkillsMD**: [skillsmd.dev](https://skillsmd.dev)
 
-### 相关实现
-- **Daofy MCP Server**: 本项目
-- **mcp-server-delphi** (danieleteti): 另一个使用 RTTI 的 Delphi MCP 实现，但方式不同——它在 Delphi 端实现 MCP Server，而我们用 Python 端做桥接
-- **SQLAny_DelphiMCP**: 使用 `MCPToolAttribute` 通过 RTTI 自动发现方法的框架
+### Related Implementations
+- **Daofy MCP Server**: This project
+- **mcp-server-delphi** (danieleteti): Another Delphi MCP implementation using RTTI, but with a different approach—it implements the MCP Server on the Delphi side, while we bridge on the Python side
+- **SQLAny_DelphiMCP**: A framework that uses `MCPToolAttribute` to automatically discover methods through RTTI
 
-### 学习资源
-- **Anthropic 官方 Skill 构建指南**: [resources.anthropic.com/.../The-Complete-Guide-to-Building-Skill-for-Claude.pdf](https://resources.anthropic.com/hubfs/The-Complete-Guide-to-Building-Skill-for-Claude.pdf)
-- **Claude Code 技能文档**: [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills)
-- **DeepLearning.AI 课程**: Agent Skills with Anthropic (免费)
-- **Agent Skills 跨平台移植**: [codex.danielvaughan.com/.../agent-skills-open-standard](https://codex.danielvaughan.com/2026/05/05/agent-skills-open-standard-portable-skills-codex-cli-cross-agent/)
+### Learning Resources
+- **Anthropic Official Skill Building Guide**: [resources.anthropic.com/.../The-Complete-Guide-to-Building-Skill-for-Claude.pdf](https://resources.anthropic.com/hubfs/The-Complete-Guide-to-Building-Skill-for-Claude.pdf)
+- **Claude Code Skills Documentation**: [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills)
+- **DeepLearning.AI Course**: Agent Skills with Anthropic (free)
+- **Agent Skills Cross-platform Porting**: [codex.danielvaughan.com/.../agent-skills-open-standard](https://codex.danielvaughan.com/2026/05/05/agent-skills-open-standard-portable-skills-codex-cli-cross-agent/)

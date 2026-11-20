@@ -1,297 +1,297 @@
-# Callgraph 语义增强路线图（基于 daudit）
+# Callgraph Semantic Enhancement Roadmap (based on daudit)
 
-**计划状态**: Roadmap  
-**计划日期**: 2026-07-04  
-**适用范围**: `callgraph` / `callgraph_impact` / `callgraph_select_tests` / `callgraph_boundary_check` / `callgraph_refactor_check` / `callgraph_orphan_candidates` / `callgraph_explain_exception`，以及后续 daudit AST/语义分析结果到调用图的融合。  
-**前置依赖**: daudit AST 解析、项目级符号索引、引用追踪和增量缓存稳定后实施。
+**Plan Status**: Roadmap  
+**Plan Date**: 2026-07-04  
+**Scope**: `callgraph` / `callgraph_impact` / `callgraph_select_tests` / `callgraph_boundary_check` / `callgraph_refactor_check` / `callgraph_orphan_candidates` / `callgraph_explain_exception`, as well as the subsequent fusion of daudit AST/semantic analysis results into the call graph.  
+**Prerequisite**: To be implemented after daudit AST parsing, project-level symbol index, reference tracing and incremental cache are stable.
 
-相关文档：
+Related documents:
 
-- `docs/ast-audit-engine-spec.md`: daudit AST、语义分析、审计规则和 KB 集成规格。
-- `docs/callgraph-enhancement-plan.md`: 当前二进制 direct-call callgraph、用途层命令和 Win64 支持记录。
-- `docs/stacktrace-migration-plan.md`: `StackTrace.pas` 运行时诊断、MAPDATA、token 化和 callgraph facade 迁移记录。
+- `docs/ast-audit-engine-spec.md`: daudit AST, semantic analysis, audit rules and KB integration specification.
+- `docs/callgraph-enhancement-plan.md`: current binary direct-call callgraph, use-layer commands and Win64 support records.
+- `docs/stacktrace-migration-plan.md`: `StackTrace.pas` runtime diagnostics, MAPDATA, tokenization and callgraph facade migration records.
 
-## 1. 背景
+## 1. Background
 
-当前 callgraph 已经能基于 `StackTrace.pas` 的 MAPDATA 和 `.text` direct `E8 rel32` 扫描返回正向、反向、路径、影响分析和用途层诊断结果。这个能力适合确认“编译产物里确实存在的直接调用边”，但无法完整覆盖 Delphi 源码里的高层语义：
+The current callgraph can already return forward, reverse, path, impact analysis and use-layer diagnostic results based on MAPDATA and `.text` direct `E8 rel32` scanning in `StackTrace.pas`. This capability is suitable for confirming "direct call edges that actually exist in the compiled artifact", but it cannot fully cover high-level semantics in Delphi source code:
 
-- DFM 事件绑定、Action 绑定和运行时事件赋值。
-- 虚方法、接口调用、回调、匿名方法、消息分发、RTTI/反射调用。
-- `Obj.Save` 这类需要追溯接收者类型的成员调用。
-- property getter/setter、constructor/destructor、`inherited`、overload/default 参数等源码级语义。
+- DFM event binding, Action binding, and runtime event assignment.
+- Virtual methods, interface calls, callbacks, anonymous methods, message dispatch, and RTTI/reflection calls.
+- Member calls such as `Obj.Save` that require tracing the receiver type.
+- Property getter/setter, constructor/destructor, `inherited`, overload/default parameters, and other source-level semantics.
 
-因此后续方向不是把 `StackTrace.pas` 扩成反汇编器，而是在 daudit 完成后，把 AST/语义分析作为主图来源；现有二进制扫描保留为“编译确认层”和运行时诊断补充。
+Therefore the subsequent direction is not to expand `StackTrace.pas` into a disassembler, but, after daudit is completed, to use AST/semantic analysis as the primary graph source; the existing binary scanning is retained as the "compile confirmation layer" and runtime diagnostic supplement.
 
-## 2. 目标
+## 2. Goals
 
-1. 建立多来源语义调用图：AST、DFM、MAPDATA/binary、RTTI、运行时观测和可选 LLM 辅助都归一到同一图模型。
-2. 让所有调用边都带来源、证据、置信度和失败语义，避免把候选边误当成确定调用。
-3. 在 daudit 稳定后，将影响分析、测试选择、边界审计、重构检查、孤岛候选和异常解释升级到语义图。
-4. 保持现有 `cmd=callgraph` 默认行为兼容；语义图通过显式 `sources` / `mode` 或新封装逐步启用。
+1. Establish a multi-source semantic call graph: AST, DFM, MAPDATA/binary, RTTI, runtime observation, and optional LLM assistance are all normalized into the same graph model.
+2. Make all call edges carry source, evidence, confidence, and failure semantics, avoiding mistaking candidate edges for definite calls.
+3. After daudit stabilizes, upgrade impact analysis, test selection, boundary audit, refactor check, orphan candidates, and exception explanation to the semantic graph.
+4. Keep the existing `cmd=callgraph` default behavior compatible; the semantic graph is gradually enabled through explicit `sources` / `mode` or new wrappers.
 
-## 3. 非目标
+## 3. Non-goals
 
-1. 不在 `StackTrace.pas` 中实现完整反汇编、虚表恢复或接口分派恢复。
-2. 不宣称无运行时证据时可以精确解析所有动态目标。
-3. 不用 LLM 直接生成高置信调用图；LLM 只能作为歧义解释器或候选排序器。
-4. 不在 daudit AST 未稳定前重写当前已验证的二进制 callgraph 路径。
+1. Do not implement full disassembly, vtable recovery, or interface dispatch recovery in `StackTrace.pas`.
+2. Do not claim that all dynamic targets can be precisely resolved when there is no runtime evidence.
+3. Do not use an LLM to directly generate a high-confidence call graph; an LLM can only serve as an ambiguity interpreter or candidate ranker.
+4. Do not rewrite the current verified binary callgraph path before the daudit AST is stable.
 
-## 4. daudit 依赖顺序
+## 4. daudit Dependency Order
 
-| 依赖阶段 | daudit 能力 | callgraph 可推进内容 |
+| Dependency phase | daudit capability | callgraph content that can advance |
 |----------|-------------|----------------------|
-| D0 | 单文件 AST JSON 稳定，routine/class/interface/record/property/field 基础节点完整 | 定义语义调用图 schema，建立 AST 节点到 callgraph 节点的 adapter |
-| D1 | 作用域、uses、类型绑定、方法归属、overload 基础解析可用 | 生成 direct procedure/function call、同类方法调用、`Self.Xxx`、`inherited` 边 |
-| D2 | 项目级索引和增量缓存稳定，跨 unit 引用可解析 | 建立全项目 semantic graph cache，支持 file/line 到 routine 的稳定映射 |
-| D3 | 引用追踪输出可区分 identifier、member access、property access、constructor、assignment | 支持 `Obj.Save` 接收者追溯、property getter/setter、运行时事件赋值 |
-| D4 | DFM 解析或 DFM 事件绑定表可用 | 合并 `OnClick=Handler`、Action/OnExecute、Form/Frame 入口边 |
-| D5 | 继承链、接口实现、虚方法 override 关系稳定 | 生成 virtual/interface candidate 边，并按静态接收者类型收窄候选集 |
-| D6 | 审计规则和引用图可复用到 MCP 层 | 用语义图驱动影响分析、测试选择、边界审计和重构检查 |
+| D0 | Single-file AST JSON stable, basic routine/class/interface/record/property/field nodes complete | Define the semantic call graph schema and establish an adapter from AST nodes to callgraph nodes |
+| D1 | Scope, uses, type binding, method ownership, and basic overload resolution available | Generate direct procedure/function call, same-class method call, `Self.Xxx`, and `inherited` edges |
+| D2 | Project-level index and incremental cache stable, cross-unit references resolvable | Establish a full-project semantic graph cache, supporting stable mapping from file/line to routine |
+| D3 | Reference tracing output can distinguish identifier, member access, property access, constructor, and assignment | Support receiver tracing for `Obj.Save`, property getter/setter, and runtime event assignment |
+| D4 | DFM parsing or a DFM event binding table available | Merge `OnClick=Handler`, Action/OnExecute, and Form/Frame entry edges |
+| D5 | Inheritance chain, interface implementation, and virtual method override relationships stable | Generate virtual/interface candidate edges and narrow the candidate set by static receiver type |
+| D6 | Audit rules and reference graph reusable at the MCP layer | Use the semantic graph to drive impact analysis, test selection, boundary audit, and refactor check |
 
-## 5. 图模型
+## 5. Graph Model
 
-### 5.1 节点
+### 5.1 Nodes
 
-调用图节点统一表示“可执行入口”，而不是只表示二进制符号：
+Call graph nodes uniformly represent "executable entries", rather than only binary symbols:
 
-- `routine`: 全局 procedure/function。
-- `method`: class/record/interface method。
-- `constructor` / `destructor`。
-- `property_accessor`: getter/setter 归一后的入口。
-- `event_handler`: DFM 或运行时事件绑定的 handler。
-- `message_handler`: `message WM_*` 或消息映射入口。
-- `anonymous_callback`: 匿名方法、回调参数、timer/thread callback 等候选入口。
-- `external_symbol`: RTL/VCL/第三方/系统 API。
+- `routine`: global procedure/function.
+- `method`: class/record/interface method.
+- `constructor` / `destructor`.
+- `property_accessor`: entry after normalizing getter/setter.
+- `event_handler`: handler bound by DFM or runtime event.
+- `message_handler`: `message WM_*` or message map entry.
+- `anonymous_callback`: anonymous method, callback parameters, timer/thread callback and other candidate entries.
+- `external_symbol`: RTL/VCL/third-party/system API.
 
-### 5.2 边
+### 5.2 Edges
 
-每条边至少包含：
+Each edge contains at least:
 
-| 字段 | 说明 |
+| Field | Description |
 |------|------|
-| `from` / `to` | 规范化节点 ID，优先 `unit.scope.name(signature)` |
-| `edge_kind` | `direct_call`、`method_call`、`property_access`、`constructor_call`、`event_binding`、`runtime_event_assignment`、`virtual_candidate`、`interface_candidate`、`callback_candidate`、`message_dispatch`、`reflection_candidate`、`binary_confirmed`、`runtime_observed` |
-| `sources` | `ast`、`dfm`、`binary`、`mapdata`、`rtti`、`runtime_stack`、`runtime_trace`、`llm` |
-| `confidence` | `exact`、`high`、`medium`、`low`、`candidate` |
-| `evidence` | 文件、行号、列号、AST node id、DFM object/property、callsite address、runtime frame 等 |
-| `resolution` | receiver 类型、overload 选择、继承链、接口实现候选、未解析原因 |
-| `warnings` | `ambiguous_receiver`、`dynamic_dispatch`、`missing_dfm`、`missing_unit`、`binary_not_confirmed`、`llm_only` 等 |
+| `from` / `to` | Normalized node ID, preferably `unit.scope.name(signature)` |
+| `edge_kind` | `direct_call`, `method_call`, `property_access`, `constructor_call`, `event_binding`, `runtime_event_assignment`, `virtual_candidate`, `interface_candidate`, `callback_candidate`, `message_dispatch`, `reflection_candidate`, `binary_confirmed`, `runtime_observed` |
+| `sources` | `ast`, `dfm`, `binary`, `mapdata`, `rtti`, `runtime_stack`, `runtime_trace`, `llm` |
+| `confidence` | `exact`, `high`, `medium`, `low`, `candidate` |
+| `evidence` | File, line, column, AST node id, DFM object/property, callsite address, runtime frame, etc. |
+| `resolution` | Receiver type, overload selection, inheritance chain, interface implementation candidates, unresolved reason |
+| `warnings` | `ambiguous_receiver`, `dynamic_dispatch`, `missing_dfm`, `missing_unit`, `binary_not_confirmed`, `llm_only`, etc. |
 
-高置信边必须有可复查证据。没有证据的边只能进入候选集，不能影响“可安全重构”这类结论。
+High-confidence edges must have reviewable evidence. Edges without evidence can only enter the candidate set and cannot affect conclusions such as "safe to refactor".
 
-## 6. 多来源融合策略
+## 6. Multi-source Fusion Strategy
 
-| 来源 | 用途 | 置信度规则 |
+| Source | Purpose | Confidence rules |
 |------|------|------------|
-| daudit AST | 主图来源，解析源码调用、类型、作用域、引用 | direct call 且唯一解析为 `exact/high`；接收者不明为 `candidate` |
-| DFM | UI 入口、设计期事件、Action 绑定 | handler 存在且签名匹配为 `exact/high`；缺失源码为 `medium` 并记录 warning |
-| MAPDATA/binary | 编译确认、第三方/DCU、异常地址映射 | 与 AST 边匹配时提升为 `binary_confirmed`；单独发现的 direct call 为 `medium/high` |
-| RTTI | published 方法、类型清单、部分方法地址辅助 | 用于收窄候选，不单独把虚调用标成 exact |
-| runtime stack/trace | 异常栈、测试运行期间观测到的真实路径 | 观测边为 `runtime_observed`，可提升相关候选置信度 |
-| LLM | 歧义解释、候选排序、源代码语义补充 | 只作为 advisory；没有 AST/DFM/运行时证据不得进入 high/exact |
+| daudit AST | Primary graph source, parses source calls, types, scopes, references | direct call uniquely resolved to `exact/high`; unclear receiver is `candidate` |
+| DFM | UI entries, design-time events, Action bindings | handler exists and signature matches is `exact/high`; missing source is `medium` and records warning |
+| MAPDATA/binary | Compile confirmation, third-party/DCU, exception address mapping | when matched with an AST edge promoted to `binary_confirmed`; standalone direct call found is `medium/high` |
+| RTTI | Published methods, type lists, partial method address assistance | used to narrow candidates, does not alone mark virtual calls as exact |
+| runtime stack/trace | Exception stack, real paths observed during test runs | observed edge is `runtime_observed`, can raise confidence of related candidates |
+| LLM | Ambiguity explanation, candidate ranking, source code semantic supplementation | advisory only; without AST/DFM/runtime evidence must not enter high/exact |
 
-冲突处理：
+Conflict handling:
 
-1. AST exact + binary confirmed：确定边。
-2. AST exact 但 binary 未确认：保留为源码边，标记 `binary_not_confirmed`，可能由 inline、优化、未编译路径或 map 缺失导致。
-3. binary direct call 无 AST 边：保留为编译边，标记 `source_unresolved`，用于第三方/DCU/编译器生成代码。
-4. DFM handler 无 AST routine：保留入口节点，标记 `handler_not_found`，供项目修复或路径检查。
-5. 多候选动态边：全部保留为 candidate，路径查询默认可配置是否纳入。
+1. AST exact + binary confirmed: definite edge.
+2. AST exact but binary not confirmed: keep as a source edge, mark `binary_not_confirmed`, possibly caused by inline, optimization, an uncompiled path, or a missing map.
+3. binary direct call with no AST edge: keep as a compiled edge, mark `source_unresolved`, for third-party/DCU/compiler-generated code.
+4. DFM handler with no AST routine: keep the entry node, mark `handler_not_found`, for project repair or path checking.
+5. Multiple-candidate dynamic edges: keep all as candidates; path queries can by default be configured whether to include them.
 
-## 7. 实施里程碑
+## 7. Implementation Milestones
 
-### R0 - Schema 与兼容层
+### R0 - Schema and Compatibility Layer
 
-目标：先把图模型定下来，不改变当前 callgraph 默认行为。
+Goal: first settle the graph model without changing current callgraph default behavior.
 
-任务：
+Tasks:
 
-- 定义 semantic graph JSON schema 和 edge confidence 规则。
-- 给当前 binary callgraph 增加 adapter，把 direct-call 边映射到新 schema。
-- Python 层增加 `sources` / `confidence_min` / `include_candidates` 参数设计，但默认保持旧行为。
-- 增加 schema golden tests，保证旧响应和新语义响应可以并存。
+- Define the semantic graph JSON schema and edge confidence rules.
+- Add an adapter to the current binary callgraph, mapping direct-call edges to the new schema.
+- Add `sources` / `confidence_min` / `include_candidates` parameter design at the Python layer, but keep the old behavior by default.
+- Add schema golden tests to ensure old responses and new semantic responses can coexist.
 
-验收：
+Acceptance:
 
-- 现有 `callgraph`、`callgraph_path`、`callgraph_impact` 测试不回退。
-- 新 schema 中每条边都有 `sources`、`confidence`、`evidence`。
+- Existing `callgraph`, `callgraph_path`, and `callgraph_impact` tests do not regress.
+- In the new schema, every edge has `sources`, `confidence`, and `evidence`.
 
-### R1 - AST 静态调用图
+### R1 - AST Static Call Graph
 
-目标：以 daudit AST 项目索引为主来源，生成源码级 direct graph。
+Goal: use the daudit AST project index as the main source to generate a source-level direct graph.
 
-任务：
+Tasks:
 
-- 从 daudit routine/entity/ref 输出建立节点表。
-- 解析全局函数调用、同 unit 方法调用、`Self.Xxx`、`ClassName.Xxx`、constructor/destructor、`inherited`。
-- 支持 overload 基础选择；无法唯一选择时输出候选和原因。
-- file/line 输入优先通过 daudit routine range 定位，不再只依赖 map 行号。
+- Build the node table from daudit routine/entity/ref output.
+- Parse global function calls, same-unit method calls, `Self.Xxx`, `ClassName.Xxx`, constructor/destructor, and `inherited`.
+- Support basic overload selection; when unable to select uniquely, output candidates and the reason.
+- For file/line input, prioritize locating by daudit routine range, no longer relying only on map line numbers.
 
-验收：
+Acceptance:
 
-- fixture 覆盖 global call、method call、constructor、destructor、overload、inherited。
-- 对同一 fixture，AST 图与 binary direct-call 图可做交叉确认。
+- fixture covers global call, method call, constructor, destructor, overload, inherited.
+- For the same fixture, the AST graph and binary direct-call graph can cross-confirm.
 
-### R2 - DFM / Action / 事件入口
+### R2 - DFM / Action / Event Entries
 
-目标：把 UI 入口补进图，解决当前纯二进制扫描无法知道入口来源的问题。
+Goal: add UI entries to the graph, solving the problem that current pure binary scanning cannot know entry sources.
 
-任务：
+Tasks:
 
-- 解析 `.dfm` / `.fmx` 中 `OnXxx = Handler`。
-- 解析 `TAction.OnExecute`、ActionList、菜单、工具栏等常见入口绑定。
-- 从 AST 中识别运行时事件赋值：`Obj.OnXxx := Handler`。
-- 将事件绑定建成 `event_binding` 或 `runtime_event_assignment` 边。
+- Parse `OnXxx = Handler` in `.dfm` / `.fmx`.
+- Parse common entry bindings such as `TAction.OnExecute`, ActionList, menus, and toolbars.
+- Identify runtime event assignments from AST: `Obj.OnXxx := Handler`.
+- Build event bindings as `event_binding` or `runtime_event_assignment` edges.
 
-验收：
+Acceptance:
 
-- QLangEditor 设计期事件入口覆盖率达到 95% 以上。
-- DFM handler 缺失时输出结构化 warning，不静默丢边。
+- QLangEditor design-time event entry coverage reaches 95% or above.
+- When a DFM handler is missing, output a structured warning and do not silently drop the edge.
 
-### R3 - 接收者类型追溯
+### R3 - Receiver Type Tracing
 
-目标：提升 `Obj.Save` 这类成员调用的可解析比例。
+Goal: improve the resolvable ratio for member calls such as `Obj.Save`.
 
-任务：
+Tasks:
 
-- 追溯局部变量、参数、字段、`Self`、`Result` 的声明类型。
-- 识别简单构造赋值：`Obj := TProject.Create`、factory 返回类型、`as` 类型转换。
-- 处理 `with`、属性链、泛型容器、默认属性时输出候选和不确定原因。
-- 对 property getter/setter 建立显式边。
+- Trace the declaration types of local variables, parameters, fields, `Self`, and `Result`.
+- Identify simple construction assignments: `Obj := TProject.Create`, factory return type, `as` type conversion.
+- When handling `with`, property chains, generic containers, and default properties, output candidates and uncertainty reasons.
+- Establish explicit edges for property getter/setter.
 
-验收：
+Acceptance:
 
-- fixture 覆盖 locals/params/fields/Self/Result/constructor/factory/property。
-- QLangEditor 业务调用链 high-confidence 覆盖率达到 85% 以上。
+- fixture covers locals/params/fields/Self/Result/constructor/factory/property.
+- QLangEditor business call chain high-confidence coverage reaches 85% or above.
 
-### R4 - 动态分派候选
+### R4 - Dynamic Dispatch Candidates
 
-目标：对虚方法、接口、回调、消息和反射给出“可解释候选”，不误报为确定边。
+Goal: provide "explainable candidates" for virtual methods, interfaces, callbacks, messages, and reflection, without false reporting them as definite edges.
 
-任务：
+Tasks:
 
-- 基于继承链和 override 表生成 `virtual_candidate`。
-- 基于接口实现表生成 `interface_candidate`。
-- 识别回调参数、匿名方法、线程/timer/message handler 常见模式。
-- 识别 `message WM_*` 分派入口。
-- 对 RTTI/published 方法和 `MethodAddress` 等反射路径生成 `reflection_candidate`。
+- Generate `virtual_candidate` based on inheritance chain and override table.
+- Generate `interface_candidate` based on interface implementation table.
+- Identify common patterns of callback parameters, anonymous methods, thread/timer/message handlers.
+- Identify `message WM_*` dispatch entries.
+- Generate `reflection_candidate` for RTTI/published methods and reflection paths such as `MethodAddress`.
 
-验收：
+Acceptance:
 
-- 每个动态候选都必须带候选集合、来源、置信度和未能精确解析的原因。
-- `refactor_check` 遇到动态候选时不能给出“安全”结论，只能降级为需人工确认。
+- Every dynamic candidate must carry the candidate set, source, confidence, and reason for not being precisely resolved.
+- When `refactor_check` encounters dynamic candidates, it cannot give a "safe" conclusion, only downgrade to manual confirmation.
 
-### R5 - 融合与置信度引擎
+### R5 - Fusion and Confidence Engine
 
-目标：把 AST、DFM、binary、RTTI、runtime 合成统一图，并为用途层提供稳定过滤。
+Goal: combine AST, DFM, binary, RTTI, and runtime into a unified graph and provide stable filtering for the use layer.
 
-任务：
+Tasks:
 
-- 实现 edge merge：同一 from/to/kind 的多来源证据合并。
-- 实现 `confidence_min`、`include_candidates`、`source_filter`。
-- `callgraph_path` 支持按置信度找路径，默认排除低置信候选。
-- `callgraph_diff` 默认按稳定节点 ID 比较，地址变化只作为附加 evidence 变化。
+- Implement edge merge: merge multi-source evidence for the same from/to/kind.
+- Implement `confidence_min`, `include_candidates`, `source_filter`.
+- `callgraph_path` supports finding paths by confidence, excluding low-confidence candidates by default.
+- `callgraph_diff` compares by stable node ID by default, with address changes only as additional evidence changes.
 
-验收：
+Acceptance:
 
-- 高置信路径不包含无证据 LLM 边或低置信动态候选。
-- diff 不因重编译地址变化产生大面积噪音。
+- High-confidence paths do not contain LLM edges without evidence or low-confidence dynamic candidates.
+- diff does not produce large noise due to recompilation address changes.
 
-### R6 - 用途层升级
+### R6 - Use-layer Upgrade
 
-目标：让已有 U1-U8 命令消费语义图，而不是只消费 direct-call 图。
+Goal: let existing U1-U8 commands consume the semantic graph rather than only the direct-call graph.
 
-任务：
+Tasks:
 
-- `callgraph_impact`: 优先使用 AST file/line 定位和语义 callers。
-- `callgraph_select_tests`: 引入 DFM/UI 入口、Action 入口和候选路径说明。
-- `callgraph_boundary_check`: 从前缀规则升级到 unit/class/category/namespace 规则。
-- `callgraph_refactor_check`: 输出 exact/high/candidate 分层风险。
-- `callgraph_orphan_candidates`: 纳入 DFM、runtime event、RTTI 和动态候选，减少误判。
-- `callgraph_explain_exception`: 用异常栈地址回连语义图，区分真实运行路径和静态可达路径。
+- `callgraph_impact`: prioritize AST file/line location and semantic callers.
+- `callgraph_select_tests`: introduce DFM/UI entries, Action entries, and candidate path explanations.
+- `callgraph_boundary_check`: upgrade from prefix rules to unit/class/category/namespace rules.
+- `callgraph_refactor_check`: output exact/high/candidate layered risks.
+- `callgraph_orphan_candidates`: include DFM, runtime event, RTTI, and dynamic candidates, reducing false positives.
+- `callgraph_explain_exception`: use exception stack addresses to reconnect to the semantic graph, distinguishing real runtime paths and static reachable paths.
 
-验收：
+Acceptance:
 
-- 每个用途命令都有“只看 high-confidence”和“包含 candidate”的测试。
-- 不完整图只能输出风险和待确认项，不能输出绝对安全结论。
+- Every use command has tests for "only look at high-confidence" and "include candidates".
+- An incomplete graph can only output risks and pending confirmation items; it cannot output absolute safety conclusions.
 
-### R7 - QLangEditor 验证基线
+### R7 - QLangEditor Validation Baseline
 
-目标：用 `C:\user\qlang\editor` 做真实项目基线，验证语义图实际价值。
+Goal: use `C:\user\qlang\editor` as a real project baseline to verify the actual value of the semantic graph.
 
-基线目标：
+Baseline goals:
 
-- UI/DFM 入口覆盖率：>= 95%。
-- 项目业务调用链 high-confidence 覆盖率：>= 85%。
-- high-confidence + candidate 覆盖率：>= 90%。
-- 所有 unresolved 项都必须有原因分类。
-- 语义图构建和增量刷新时间要可记录，避免黑盒测试时产生不可控开销。
+- UI/DFM entry coverage: >= 95%.
+- Project business call chain high-confidence coverage: >= 85%.
+- high-confidence + candidate coverage: >= 90%.
+- All unresolved items must have cause classification.
+- Semantic graph construction and incremental refresh time must be recordable, avoiding uncontrollable overhead during black-box testing.
 
-重点用例：
+Key use cases:
 
-- `actNewProjectExecute` 下游路径。
-- `SaveIfModified` 上游 callers 和 dirty-close/save 相关脚本选择。
-- `actSmartTranslateExecute`、`actTranslateCurrentExecute` 的业务调用链。
-- `SourceResEditor` 相关运行时事件赋值。
-- Action/菜单/工具栏入口到 handler 的映射。
+- `actNewProjectExecute` downstream path.
+- `SaveIfModified` upstream callers and dirty-close/save related script selection.
+- Business call chains of `actSmartTranslateExecute`, `actTranslateCurrentExecute`.
+- Runtime event assignments related to `SourceResEditor`.
+- Mapping from Action/menu/toolbar entries to handlers.
 
-### R8 - 增量缓存与 CI 集成
+### R8 - Incremental Cache and CI Integration
 
-目标：让语义图可以长期用于审计和回归，不要求每次全量解析。
+Goal: make the semantic graph usable long-term for audit and regression, without requiring full parsing every time.
 
-任务：
+Tasks:
 
-- graph cache 按 file hash、daudit version、MAPDATA id、compiler target 分层。
-- 支持 changed file -> affected graph partition 增量刷新。
-- CI 中输出 semantic graph snapshot，支持 PR diff。
-- 将图构建失败降级为结构化 diagnostic，不阻断基础编译/自动化流程。
+- graph cache layered by file hash, daudit version, MAPDATA id, compiler target.
+- Support incremental refresh from changed file -> affected graph partition.
+- Output a semantic graph snapshot in CI, supporting PR diff.
+- Degrade graph construction failure to a structured diagnostic, without blocking the basic compile/automation flow.
 
-验收：
+Acceptance:
 
-- 修改单个 `.pas` 后只刷新相关 unit 和依赖边。
-- snapshot 可用于 `callgraph_diff`，且路径安全沿用 `snapshots_dir` 约束。
+- After modifying a single `.pas`, only refresh the related unit and dependency edges.
+- snapshot can be used for `callgraph_diff`, and path safety follows `snapshots_dir` constraints.
 
-## 8. 测试矩阵
+## 8. Test Matrix
 
-| 层级 | 测试内容 |
+| Layer | Test content |
 |------|----------|
-| daudit fixture | AST JSON golden、routine range、refs、types、inheritance、interface impl |
-| graph builder | 节点规范化、edge merge、confidence 计算、unresolved 分类 |
-| DFM fixture | OnClick、OnExecute、ActionList、Frame、缺失 handler |
-| type tracing fixture | locals、params、fields、Self、Result、constructor、factory、property |
+| daudit fixture | AST JSON golden, routine range, refs, types, inheritance, interface impl |
+| graph builder | node normalization, edge merge, confidence calculation, unresolved classification |
+| DFM fixture | OnClick, OnExecute, ActionList, Frame, missing handler |
+| type tracing fixture | locals, params, fields, Self, Result, constructor, factory, property |
 | dynamic fixture | virtual/interface/callback/anonymous/message/reflection candidate |
-| binary confirmation | AST 边与 MAPDATA/binary direct-call 边合并 |
-| Python protocol | 参数校验、旧行为兼容、新 schema 响应、错误降级 |
-| QLangEditor smoke | Win32/Win64 Debug，重点入口和业务链路覆盖 |
+| binary confirmation | merge AST edges with MAPDATA/binary direct-call edges |
+| Python protocol | parameter validation, old behavior compatibility, new schema response, error degradation |
+| QLangEditor smoke | Win32/Win64 Debug, key entries and business link coverage |
 
-## 9. 风险与约束
+## 9. Risks and Constraints
 
-| 风险 | 处理策略 |
+| Risk | Handling strategy |
 |------|----------|
-| daudit AST 输出还不稳定 | R0 只做 schema 和 adapter；R1 以后依赖 daudit golden tests |
-| 动态分派误判 | 默认 candidate，不进入高置信路径；用途层必须显示风险 |
-| DFM 与源码不同步 | DFM handler 缺失或签名不匹配必须输出 warning |
-| `with` / overload / 泛型导致歧义 | 输出候选和 unresolved reason，不猜唯一目标 |
-| LLM 结果不可复现 | 只用于解释和候选排序，不写入 high-confidence 图 |
-| 大项目性能 | 项目级缓存、增量刷新、edge limit、按 source/confidence 过滤 |
-| 与当前 callgraph 兼容性 | 默认保持二进制 direct-call 行为；语义图显式启用 |
+| daudit AST output is not yet stable | R0 only does schema and adapter; R1 onward depends on daudit golden tests |
+| Dynamic dispatch misjudgment | Default to candidate, do not enter high-confidence paths; the use layer must display risk |
+| DFM and source out of sync | A missing DFM handler or signature mismatch must output a warning |
+| `with` / overload / generics causing ambiguity | Output candidates and unresolved reason; do not guess a unique target |
+| LLM results are not reproducible | Only for explanation and candidate ranking; do not write into the high-confidence graph |
+| Large project performance | Project-level cache, incremental refresh, edge limit, filtering by source/confidence |
+| Compatibility with the current callgraph | Keep binary direct-call behavior by default; semantic graph explicitly enabled |
 
-## 10. 完成定义
+## 10. Definition of Done
 
-后续 daudit 完成后，本路线图完成需要同时满足：
+After subsequent daudit completion, this roadmap is complete only when all of the following are satisfied:
 
-1. `callgraph` 能在显式语义模式下返回统一 schema，且旧模式兼容。
-2. AST、DFM、binary、runtime 来源能融合到同一节点/边模型。
-3. 所有边都有 evidence、confidence 和 source；高置信边没有无证据项。
-4. 动态分派、回调、反射只作为候选输出，除非有运行时证据确认。
-5. U1-U8 用途层命令都能按置信度工作，并能解释 unresolved。
-6. QLangEditor 验证达到 R7 覆盖率目标，并记录 Win32/Win64 smoke 结果。
-7. 全量 Python 测试和相关 Delphi fixture 编译/运行测试通过。
+1. `callgraph` can return the unified schema in explicit semantic mode, and the old mode remains compatible.
+2. AST, DFM, binary, and runtime sources can fuse into the same node/edge model.
+3. All edges have evidence, confidence, and source; high-confidence edges have no unsupported items.
+4. Dynamic dispatch, callbacks, and reflection are only output as candidates unless confirmed by runtime evidence.
+5. U1-U8 use-layer commands can work by confidence and can explain unresolved.
+6. QLangEditor validation reaches the R7 coverage goals, and Win32/Win64 smoke results are recorded.
+7. Full Python tests and related Delphi fixture compile/run tests pass.
 
-## 11. 建议执行顺序
+## 11. Suggested Execution Order
 
-1. 等 daudit D0-D2 稳定后先实施 R0-R1，确保 schema、节点 ID 和 AST direct graph 可用。
-2. daudit D4 可用后实施 R2，优先补 UI/DFM 入口，因为这对黑盒自动化和测试选择收益最大。
-3. daudit D3/D5 稳定后实施 R3-R4，逐步提升成员调用和动态候选覆盖。
-4. 完成 R5 后再升级 U1-U8，避免用途层各自实现不一致的置信度逻辑。
-5. 最后用 QLangEditor 和 fixture 项目做 R7/R8 收口，把性能、缓存、CI snapshot 和差异报告稳定下来。
+1. After daudit D0-D2 are stable, implement R0-R1 first, ensuring the schema, node ID, and AST direct graph are usable.
+2. After daudit D4 is available, implement R2, prioritizing UI/DFM entries, because this benefits black-box automation and test selection the most.
+3. After daudit D3/D5 are stable, implement R3-R4, gradually improving member call and dynamic candidate coverage.
+4. After completing R5, upgrade U1-U8, avoiding inconsistent confidence logic implemented separately in each use layer.
+5. Finally use QLangEditor and fixture projects for R7/R8 closure, stabilizing performance, cache, CI snapshot, and diff reports.

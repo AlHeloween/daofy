@@ -1,225 +1,225 @@
-# UI 布局完整性检测 — 技术调研与方案设计
+# UI Layout Completeness Detection — Technical Research and Solution Design
 
-> 目标：从 UI 截图自动检测完整的布局结构信息（元素类型、位置、文本、层次关系），
-> 输出结构化 JSON/DFM，供大模型引用以生成 Delphi 界面代码。
+> Goal: Automatically detect complete layout structure information from UI screenshots (element type, position, text, hierarchy),
+> output structured JSON/DFM, for LLMs to reference when generating Delphi interface code.
 
 ---
 
-## 1. 背景与动机
+## 1. Background and Motivation
 
-当前项目已具备：
+The current project already has:
 
-| 能力 | 工具 | 局限性 |
+| Capability | Tool | Limitation |
 |------|------|--------|
-| PP-OCRv6 文字识别 | `ocr` tool | 只识别文字，不理解元素类型和结构 |
-| 文本边界捕获 | `textbounds` (paint-hook) | 只捕获 GDI/GDI+ 文本，不区分元素类型 |
-| 图像差异对比 | `ocr diff` | 只能比较两图差异，不分析单张布局 |
-| 静态 DFM 审计 | `layout_audit` | 需要 DFM 源码，不能从截图工作 |
-| 控件树提取 | `dumpstate` / `formsum` | 需要 Delphi 运行时，不能从截图工作 |
-| DFM 生成 | `manage_component` / `create_component_dfm` | 需要 Pascal 代码，不能从截图工作 |
+| PP-OCRv6 text recognition | `ocr` tool | Only recognizes text, does not understand element types and structure |
+| Text boundary capture | `textbounds` (paint-hook) | Only captures GDI/GDI+ text, does not distinguish element types |
+| Image difference comparison | `ocr diff` | Can only compare differences between two images, does not analyze a single layout |
+| Static DFM audit | `layout_audit` | Requires DFM source code, cannot work from screenshots |
+| Control tree extraction | `dumpstate` / `formsum` | Requires Delphi runtime, cannot work from screenshots |
+| DFM generation | `manage_component` / `create_component_dfm` | Requires Pascal code, cannot work from screenshots |
 
-**核心缺失**：截图 → DFM 的逆向管线，即从一张 UI 截图反推出 Delphi DFM 描述文件。
+**Core gap**: the reverse pipeline from screenshot → DFM, i.e. inferring a Delphi DFM description file from a UI screenshot.
 
-与"截图中检测元素"的一般 CV 任务不同，Delphi DFM 包含大量**无法从像素推断**的信息：
+Unlike general CV tasks of "detecting elements in screenshots", Delphi DFM contains a large amount of information that **cannot be inferred from pixels**:
 
-| 信息 | 从截图恢复难度 | 来源 |
+| Information | Difficulty of recovery from screenshot | Source |
 |------|:-------------:|------|
-| **位置 / 尺寸** (Left/Top/Width/Height) | ⭐ 容易 | 像素坐标精确测量 |
-| **文字内容** (Caption/Text/Items) | ⭐⭐ | OCR 提取，需匹配到控件 |
-| **层次结构**（Panel→GroupBox→Button） | ⭐⭐ | 空间包含 + 间距分析推断 |
-| **控件类型**（TButton/TcxGrid...） | ⭐⭐⭐ | 视觉风格 → 分类（需训练） |
-| **属性值**（Enabled/ReadOnly/Visible） | ⭐⭐⭐⭐ | 颜色/灰度暗示，不完全可靠 |
-| **事件绑定**（OnClick 等） | ⭐⭐⭐⭐⭐ | 纯代码逻辑，截图不可见 |
-| **控件名称**（Name 属性） | ⭐⭐⭐⭐⭐ | 无命名规范则无法推断 |
+| **Position / Size** (Left/Top/Width/Height) | ⭐ Easy | Precise measurement of pixel coordinates |
+| **Text content** (Caption/Text/Items) | ⭐⭐ | OCR extraction, needs matching to controls |
+| **Hierarchy** (Panel→GroupBox→Button) | ⭐⭐ | Spatial containment + spacing analysis inference |
+| **Control type** (TButton/TcxGrid...) | ⭐⭐⭐ | Visual style → classification (requires training) |
+| **Property values** (Enabled/ReadOnly/Visible) | ⭐⭐⭐⭐ | Color/grayscale hints, not fully reliable |
+| **Event bindings** (OnClick etc.) | ⭐⭐⭐⭐⭐ | Pure code logic, invisible in screenshots |
+| **Control name** (Name property) | ⭐⭐⭐⭐⭐ | Cannot be inferred without naming convention |
 
 ---
 
-## 2. 推荐方案：合成数据 + ONNX 推理
+## 2. Recommended Solution: Synthetic Data + ONNX Inference
 
-### 2.1 核心思路
+### 2.1 Core Idea
 
-项目独特的优势是 **`dumpstate` + `capture` 可以零成本自动生成标注数据**：
+The project's unique advantage is that **`dumpstate` + `capture` can automatically generate annotated data at zero cost**:
 
 ```
-训练数据生成（只需跑一次）:
+Training data generation (only needs to run once):
   capture(screenshot) + dumpstate(labels)
         ↓                        ↓
-    截图 (PNG) ∪ 精确标签 (控件类型 + bbox + 文本 + 层次)
+    screenshot (PNG) ∪ precise labels (control type + bbox + text + hierarchy)
         ↓
-    训练 YOLO → 导出 ONNX → 推理时仅需 11MB 权重
+    train YOLO → export ONNX → inference only needs 11MB weights
 
-推理管线（每次调用）:
-  new_screenshot → YOLOv11n ONNX → 元素框 + 类型 → OCR → 层次推理 → DFM
+Inference pipeline (each call):
+  new_screenshot → YOLOv11n ONNX → element boxes + types → OCR → hierarchy inference → DFM
 ```
 
-### 2.2 管线架构
+### 2.2 Pipeline Architecture
 
 ```
-输入：UI 截图 (PNG/JPEG)
+Input: UI screenshot (PNG/JPEG)
          │
          ▼
 ┌─────────────────────────────────────────┐
-│ Layer 1: 元素检测                        │
+│ Layer 1: Element detection               │
 │ ───────────────────────                  │
-│ 方法 A: 传统 CV (OpenCV) — 零依赖基线     │
-│   Sobel/Canny → 形态学闭运算 → 轮廓提取    │
-│   → 按宽高比/面积分类                     │
+│ Method A: Traditional CV (OpenCV) — zero-dependency baseline │
+│   Sobel/Canny → morphological closing → contour extraction │
+│   → classify by aspect ratio/area        │
 │                                          │
-│ 方法 B: YOLOv11n ONNX — 精确检测 (推荐)    │
-│   onnxruntime 推理 → 8400 候选框 → NMS   │
-│   → 输出元素类型 + bbox + 置信度           │
+│ Method B: YOLOv11n ONNX — precise detection (recommended) │
+│   onnxruntime inference → 8400 candidates → NMS │
+│   → output element types + bbox + confidence │
 │                                          │
-│ → 输出: [{class_id, bbox, confidence},...]│
+│ → Output: [{class_id, bbox, confidence},...]│
 ├─────────────────────────────────────────┤
-│ Layer 2: 文字提取                         │
+│ Layer 2: Text extraction                 │
 │ ─────────────────────                    │
-│ PP-OCRv6 (项目已有)                      │
-│   对每个检测到的元素区域 → OCR 识别文字     │
-│   匹配文字到对应元素                       │
+│ PP-OCRv6 (already in project)            │
+│   for each detected element region → OCR text │
+│   match text to corresponding element    │
 │                                          │
-│ → 输出: [{..., text}, ...]               │
+│ → Output: [{..., text}, ...]             │
 ├─────────────────────────────────────────┤
-│ Layer 3: 层次结构推理                      │
+│ Layer 3: Hierarchy inference             │
 │ ───────────────────────                  │
-│ 空间包含分析 → 容器-子元素关系             │
-│ 对齐集群分析 → HStack/VStack/Grid         │
-│ 间距分析 → 等距推断布局类型                │
-│ 表单配对 → Label-Input 关联               │
+│ spatial containment analysis → container-child element relationships │
+│ alignment cluster analysis → HStack/VStack/Grid │
+│ spacing analysis → infer equal-spacing layout type │
+│ form pairing → Label-Input association   │
 │                                          │
-│ → 输出: 层次化布局树                       │
+│ → Output: hierarchical layout tree       │
 ├─────────────────────────────────────────┤
-│ Layer 4: DFM 生成                         │
+│ Layer 4: DFM generation                  │
 │ ─────────────────                        │
-│ 用 DfmComponent 数据结构构建 DFM 树        │
-│ 控件类型 → Delphi 类名映射                │
-│ 默认属性填充 (TabOrder, Align, Anchors...) │
-│ serialize_component() → DFM 文本          │
+│ build DFM tree with DfmComponent data structure │
+│ control type → Delphi class name mapping │
+│ default property filling (TabOrder, Align, Anchors...) │
+│ serialize_component() → DFM text         │
 │                                          │
-│ → 输出: DFM 文本 (可直接编译)              │
+│ → Output: DFM text (directly compilable) │
 └─────────────────────────────────────────┘
 ```
 
-### 2.3 三种方案的依赖与精度对比
+### 2.3 Dependency and Accuracy Comparison of Three Solutions
 
-| 方案 | 新增依赖 | 磁盘增量 | 精度 | 适用场景 |
+| Solution | New dependency | Disk increment | Accuracy | Applicable scenarios |
 |------|---------|:--------:|:----:|---------|
-| **传统 CV** (OpenCV 形态学) | 无（已有）| **0 MB** | 60-70% | 基线、粗糙定位 |
-| **YOLOv11n ONNX** ⭐ | `onnx` + 权重 | **~19 MB** | 85-95%* | **推荐——轻量精确** |
-| **YOLOv11n + PyTorch 全量** | `torch` + `torchvision` | **~1.2 GB** | 85-95%* | 仅训练时需要，推理没必要 |
+| **Traditional CV** (OpenCV morphology) | None (already available) | **0 MB** | 60-70% | Baseline, rough positioning |
+| **YOLOv11n ONNX** ⭐ | `onnx` + weights | **~19 MB** | 85-95%* | **Recommended — lightweight and precise** |
+| **YOLOv11n + PyTorch full** | `torch` + `torchvision` | **~1.2 GB** | 85-95%* | Only needed for training, unnecessary for inference |
 
-*标注：85-95% 指用 Delphi 合成数据训练后的精度。如果用通用 Rico 预训练权重（不含 Delphi 控件），精度会显著降低。
+*Note: 85-95% refers to accuracy after training with Delphi synthetic data. If using general Rico pretrained weights (without Delphi controls), accuracy will decrease significantly.
 
 ---
 
-## 3. 合成数据生成流水线
+## 3. Synthetic Data Generation Pipeline
 
-这是本方案的核心竞争力——**不需要人工标注**。
+This is the core competitiveness of this solution — **no manual annotation required**.
 
-### 3.1 原理
+### 3.1 Principle
 
-利用项目已有的 `automate_delphi` 能力，自动执行：
+Using the project's existing `automate_delphi` capability, automatically execute:
 
 ```python
-# 合成数据生成伪代码
+# Synthetic data generation pseudocode
 for form_name in all_forms:
-    for state in states:           # 不同数据填充
-        for dpi in dpis:           # DPI 变体
-            # 1. 导航到窗体
+    for state in states:           # different data filling
+        for dpi in dpis:           # DPI variants
+            # 1. Navigate to form
             cmd_goto(form_name)
             
-            # 2. 填充不同数据
+            # 2. Fill different data
             type_data(state.data)
             
-            # 3. 截图 + dumpstate 同步采集
-            screenshot = capture(form_name)     # → 训练图片
+            # 3. Synchronously collect screenshot + dumpstate
+            screenshot = capture(form_name)     # → training image
             labels = dumpstate(form_name)       # → ground truth
             
-            # 4. 标签格式转换: dumpstate → YOLO 格式
+            # 4. Label format conversion: dumpstate → YOLO format
             yolo_labels = convert_to_yolo(labels)
             save(screenshot, yolo_labels)
 ```
 
-### 3.2 每窗体的标注产出
+### 3.2 Annotation Output per Form
 
-以典型客户管理窗体为例：
+Using a typical customer management form as an example:
 
-| dumpstate 字段 | YOLO 标签用途 |
+| dumpstate field | YOLO label usage |
 |----------------|--------------|
-| `class`: "TcxButton" → `category_id: 1` | 元素类型 |
-| `props.Left / Top / Width / Height` → `[cx, cy, w, h]` | 归一化 bbox |
-| `props.Caption`: "保存" → 训练时忽略（推理时用 OCR 替代） | 文本内容 |
-| `props.Enabled`: True/False → 可额外标注 disabled 态 | 状态属性 |
-| `children[...]` 嵌套关系 → 训练层次并非 YOLO 任务（留给 Phase 3 做） | 布局结构 |
+| `class`: "TcxButton" → `category_id: 1` | Element type |
+| `props.Left / Top / Width / Height` → `[cx, cy, w, h]` | Normalized bbox |
+| `props.Caption`: "Save" → ignored during training (OCR used instead at inference) | Text content |
+| `props.Enabled`: True/False → can additionally annotate disabled state | State property |
+| `children[...]` nesting relationship → training hierarchy is not a YOLO task (leave for Phase 3) | Layout structure |
 
-### 3.3 产量估算
+### 3.3 Production Estimate
 
-| 数据来源 | 每窗产能 |
+| Data source | Output per form |
 |----------|---------|
-| 控件实例 | 30-80 个（因窗体复杂度不同） |
-| 状态变体 | 3 种（空数据 / 少量数据 / 大量数据） |
-| DPI 变体 | 2 种（100% / 150%） |
-| **每窗合计** | **~180-480 标注实例** |
+| Control instances | 30-80 (depending on form complexity) |
+| State variants | 3 (empty data / little data / large data) |
+| DPI variants | 2 (100% / 150%) |
+| **Total per form** | **~180-480 annotated instances** |
 
-**生成速度**：每个窗体约 500ms（goto + capture + dumpstate + 格式转换）
+**Generation speed**: about 500ms per form (goto + capture + dumpstate + format conversion)
 
 ```
-50 窗体 × 3 状态 × 2 DPI × 0.5s = 150s ≈ 2.5 分钟
-产出: ~9,000-24,000 个标注实例
+50 forms × 3 states × 2 DPI × 0.5s = 150s ≈ 2.5 minutes
+Output: ~9,000-24,000 annotated instances
 ```
 
-**2.5 分钟即可产出数万级 Delphi 专用标注数据**。
+**2.5 minutes is enough to produce tens of thousands of Delphi-specific annotated data**.
 
-### 3.4 Delphi 控件 → YOLO 类别映射（示例）
+### 3.4 Delphi Control → YOLO Class Mapping (Example)
 
-初次训练建议覆盖最常用的 15-20 种控件类型：
+Initial training recommends covering the 15-20 most common control types:
 
-| class_id | Delphi 控件类 | 视觉特征 | 对应 DFM 属性 |
+| class_id | Delphi control class | Visual features | Corresponding DFM properties |
 |:--------:|--------------|---------|--------------|
-| 0 | `background`（背景）| 整个截图的背景区域 | — |
-| 1 | `TButton` / `TcxButton` / `TBitBtn` | 矩形凸起按钮 | Caption, ModalResult |
-| 2 | `TEdit` / `TcxTextEdit` / `TMaskEdit` | 空心矩形输入框 | Text, MaxLength |
-| 3 | `TLabel` / `TcxLabel` / `TStaticText` | 纯文字标签 | Caption, FocusControl |
-| 4 | `TComboBox` / `TcxComboBox` | 带下拉箭头的框 | Items, ItemIndex |
-| 5 | `TCheckBox` / `TcxCheckBox` | 带勾选方块 | Checked, State |
-| 6 | `TRadioButton` / `TcxRadioButton` | 圆形单选钮 | Checked |
-| 7 | `TListBox` / `TcxListBox` | 列表区域 | Items, ItemIndex |
-| 8 | `TMemo` / `TRichEdit` / `TcxMemo` | 多行文本区 | Lines, ScrollBars |
-| 9 | `TPanel` / `TcxGroupBox` / `TGroupBox` | 容器/面板 | Caption, Align |
-| 10 | `TPageControl` / `TcxPageControl` | 页签条 | Pages, ActivePage |
-| 11 | `TStringGrid` / `TcxGrid` / `TDBGrid` | 表格 | Cells, ColCount |
-| 12 | `TTreeView` / `TcxTreeList` | 树形控件 | Items, Selected |
-| 13 | `TDateTimePicker` / `TcxDateEdit` | 日期/时间选择 | Date, Time |
-| 14 | `TProgressBar` / `TcxProgressBar` | 进度条 | Position, Max |
-| 15 | `TScrollBar` / 滚动条 | 滚动条 | Position, Min, Max |
-| 16 | `TMainMenu` / 菜单栏 | 顶部菜单 | Items |
-| 17 | `TToolBar` / `TCoolBar` / 工具栏 | 按钮条 | Buttons |
-| 18 | `TStatusBar` | 底部状态栏 | Panels |
-| 19 | `TImage` / `TcxImage` | 图片/图标 | Picture |
-| 20+ | 其他第三方控件 | 各具特征 | 按需扩展 |
+| 0 | `background` (background) | background region of the entire screenshot | — |
+| 1 | `TButton` / `TcxButton` / `TBitBtn` | rectangular raised button | Caption, ModalResult |
+| 2 | `TEdit` / `TcxTextEdit` / `TMaskEdit` | hollow rectangular input box | Text, MaxLength |
+| 3 | `TLabel` / `TcxLabel` / `TStaticText` | pure text label | Caption, FocusControl |
+| 4 | `TComboBox` / `TcxComboBox` | box with drop-down arrow | Items, ItemIndex |
+| 5 | `TCheckBox` / `TcxCheckBox` | with check box | Checked, State |
+| 6 | `TRadioButton` / `TcxRadioButton` | circular radio button | Checked |
+| 7 | `TListBox` / `TcxListBox` | list area | Items, ItemIndex |
+| 8 | `TMemo` / `TRichEdit` / `TcxMemo` | multi-line text area | Lines, ScrollBars |
+| 9 | `TPanel` / `TcxGroupBox` / `TGroupBox` | container/panel | Caption, Align |
+| 10 | `TPageControl` / `TcxPageControl` | tab strip | Pages, ActivePage |
+| 11 | `TStringGrid` / `TcxGrid` / `TDBGrid` | table | Cells, ColCount |
+| 12 | `TTreeView` / `TcxTreeList` | tree control | Items, Selected |
+| 13 | `TDateTimePicker` / `TcxDateEdit` | date/time picker | Date, Time |
+| 14 | `TProgressBar` / `TcxProgressBar` | progress bar | Position, Max |
+| 15 | `TScrollBar` / scrollbar | scrollbar | Position, Min, Max |
+| 16 | `TMainMenu` / menu bar | top menu | Items |
+| 17 | `TToolBar` / `TCoolBar` / toolbar | button strip | Buttons |
+| 18 | `TStatusBar` | bottom status bar | Panels |
+| 19 | `TImage` / `TcxImage` | image/icon | Picture |
+| 20+ | other third-party controls | each has its own features | extend as needed |
 
-### 3.5 训练流程（需 PyTorch 环境，可在另一台机器做）
+### 3.5 Training Process (Requires PyTorch Environment, Can Be Done on Another Machine)
 
 ```
-训练阶段（需要 GPU / 或 CPU 慢跑）:
+Training phase (requires GPU / or slow CPU run):
   ┌─────────────────────────────────────────────┐
   │ conda create -n yolo-train python=3.11        │
-  │ pip install ultralytics torch torchvision     │  ← ~1.2 GB，仅训练用
+  │ pip install ultralytics torch torchvision     │  ← ~1.2 GB, training only
   │                                               │
   │ yolo train                                     │
-  │   model=yolo11n.pt                             │  ← 从 COCO 预训练迁移
+  │   model=yolo11n.pt                             │  ← transfer from COCO pretraining
   │   data=delphi_dataset.yaml                     │
   │   epochs=200                                   │
   │   imgsz=640                                    │
   │                                               │
-  │ 输出: best.pt → 导出 best.onnx (~11MB)         │
+  │ Output: best.pt → export best.onnx (~11MB)     │
   └─────────────────────────────────────────────┘
 
-推理阶段（ONNX only，无 PyTorch）:
+Inference phase (ONNX only, no PyTorch):
   ┌─────────────────────────────────────────────┐
-  │ pip install onnxruntime onnx                  │  ← +~15 MB 仅需一次
+  │ pip install onnxruntime onnx                  │  ← +~15 MB, only needed once
   │ download best.onnx (~11MB)                    │
   │                                               │
-  │ # onnxruntime 推理，无需 torch                 │
+  │ # onnxruntime inference, no torch needed      │
   │ session = ort.InferenceSession("best.onnx")    │
   │ outputs = session.run(None, {input_name: img}) │
   └─────────────────────────────────────────────┘
@@ -227,16 +227,16 @@ for form_name in all_forms:
 
 ---
 
-## 4. 层次结构推理算法
+## 4. Hierarchy Inference Algorithm
 
-YOLO 检测输出是**扁平的 bbox 列表**，需要后处理构建层次树。
+YOLO detection output is a **flat bbox list**, which needs post-processing to build a hierarchy tree.
 
-### 4.1 空间包含检测
+### 4.1 Spatial Containment Detection
 
 ```python
 def build_hierarchy(detections: list[Detection]) -> TreeNode:
-    """通过空间包含关系构建元素树。"""
-    # 按面积降序排序（保证容器先处理）
+    """Build element tree via spatial containment relationships."""
+    # Sort by area descending (ensure containers are processed first)
     sorted_dets = sorted(detections, key=lambda d: d.area, reverse=True)
     roots = []
     
@@ -249,25 +249,25 @@ def build_hierarchy(detections: list[Detection]) -> TreeNode:
     return roots
 
 def find_container(det: Detection, roots: list[TreeNode]) -> TreeNode | None:
-    """找包含 det 的最小容器。"""
+    """Find the smallest container that contains det."""
     candidates = []
     for root in roots:
         if contains(root.bbox, det.bbox):
-            # 递归在子树中查找更精确的父容器
+            # Recursively search subtrees for a more precise parent container
             sub = find_container_in_tree(det, root)
             if sub:
                 candidates.append(sub)
             else:
                 candidates.append(root)
-    # 返回面积最小（最精确）的容器
+    # Return the smallest (most precise) container
     return min(candidates, key=lambda n: n.area) if candidates else None
 ```
 
-### 4.2 布局类型推断
+### 4.2 Layout Type Inference
 
 ```python
 def infer_layout_type(elements: list[Detection]) -> str:
-    """推断一组子元素的布局排列。"""
+    """Infer the layout arrangement of a group of child elements."""
     if len(elements) < 2:
         return "single"
     
@@ -281,29 +281,29 @@ def infer_layout_type(elements: list[Detection]) -> str:
     avg_h = sum(e.h for e in elements) / len(elements)
     avg_w = sum(e.w for e in elements) / len(elements)
     
-    # HStack: Y 中心接近
+    # HStack: Y centers are close
     if y_spread < avg_h * 0.5:
         return "hstack"
-    # VStack: X 中心接近
+    # VStack: X centers are close
     if x_spread < avg_w * 0.5:
         return "vstack"
-    # Grid: 检查行列间距一致性
+    # Grid: check row/column spacing consistency
     if is_uniform_spacing(tops, lefts):
         return "grid"
     return "zstack"
 ```
 
-### 4.3 表单项配对（Label-Input 关联）
+### 4.3 Form Field Pairing (Label-Input Association)
 
 ```python
 def pair_form_fields(elements: list[Detection]) -> list[FormField]:
-    """识别标签+输入框配对。"""
+    """Identify label + input box pairs."""
     labels = [e for e in elements if e.class_id == 3]   # TLabel
     inputs = [e for e in elements if e.class_id in (2, 4)]  # TEdit, TComboBox
     
     pairs = []
     for label in labels:
-        # 在标签右方或正下方找最近的输入框
+        # Find the nearest input box to the right of or directly below the label
         nearest = find_nearest_right_below(label, inputs)
         if nearest and vertical_align_tolerance(label, nearest, pixels=5):
             pairs.append(FormField(label=label, input=nearest))
@@ -312,10 +312,10 @@ def pair_form_fields(elements: list[Detection]) -> list[FormField]:
 
 ---
 
-## 5. ONNX 推理代码模板
+## 5. ONNX Inference Code Template
 
 ```python
-"""src/detection/yolo_onnx.py — YOLOv11n ONNX 推理封装"""
+"""src/detection/yolo_onnx.py — YOLOv11n ONNX inference wrapper"""
 
 import numpy as np
 import cv2
@@ -332,48 +332,48 @@ class Detection:
     h: int      # height
 
 class YOLOONNXDetector:
-    """纯 ONNX Runtime 的 YOLO 检测器，无 PyTorch 依赖。"""
+    """Pure ONNX Runtime YOLO detector, no PyTorch dependency."""
     
     def __init__(self, model_path: str, conf_thresh: float = 0.25):
         self.session = ort.InferenceSession(model_path)
         self.input_name = self.session.get_inputs()[0].name
         self.conf_thresh = conf_thresh
         
-        # YOLOv11n 输出形状: [1, 84, 8400] (cx,cy,w,h + 80 COCO class probs)
-        # 我们替换为自定义类别后输出形状: [1, N+4, 8400]
+        # YOLOv11n output shape: [1, 84, 8400] (cx,cy,w,h + 80 COCO class probs)
+        # After replacing with custom classes, output shape: [1, N+4, 8400]
     
     def preprocess(self, image: np.ndarray) -> np.ndarray:
-        """预处理：resize 到 640×640 + 归一化。"""
+        """Preprocess: resize to 640×640 + normalization."""
         h, w = image.shape[:2]
         scale = min(640 / w, 640 / h)
         nw, nh = int(w * scale), int(h * scale)
         resized = cv2.resize(image, (nw, nh))
         
-        # pad 到 640×640
+        # pad to 640×640
         dw, dh = (640 - nw) // 2, (640 - nh) // 2
         padded = cv2.copyMakeBorder(
             resized, dh, dh + (640 - nh) % 2,
             dw, dw + (640 - nw) % 2,
             cv2.BORDER_CONSTANT, value=(114, 114, 114)
         )
-        # HWC → CHW, BGR → RGB, 归一化
+        # HWC → CHW, BGR → RGB, normalization
         blob = padded.astype(np.float32) / 255.0
         blob = np.transpose(blob, (2, 0, 1))[np.newaxis, ...]
         return blob, scale, dw, dh
     
     def postprocess(self, outputs: np.ndarray, scale: float, dw: int, dh: int,
                     orig_shape: tuple) -> list[Detection]:
-        """后处理：解算 bbox + NMS。"""
+        """Postprocess: decode bbox + NMS."""
         # outputs shape: [1, 84+N, 8400]
         outputs = outputs[0]  # [84+N, 8400]
         
-        # 提取 bbox (cx, cy, w, h) 和 class probs
+        # Extract bbox (cx, cy, w, h) and class probs
         bboxes = outputs[:4, :]    # [4, 8400]
         scores = outputs[4:, :]    # [N, 8400]
         class_ids = scores.argmax(axis=0)
         confs = scores.max(axis=0)
         
-        # 过滤低置信度
+        # Filter low confidence
         mask = confs > self.conf_thresh
         if not mask.any():
             return []
@@ -382,11 +382,11 @@ class YOLOONNXDetector:
         class_ids = class_ids[mask]
         confs = confs[mask]
         
-        # 反算回原始坐标
+        # Convert back to original coordinates
         detections = []
         for i in range(len(class_ids)):
             cx, cy, w, h = bboxes[:, i]
-            # 去除 padding
+            # Remove padding
             cx = (cx - dw) / scale
             cy = (cy - dh) / scale
             w = w / scale
@@ -402,11 +402,11 @@ class YOLOONNXDetector:
                 w=int(w), h=int(h),
             ))
         
-        # NMS 去重
+        # NMS deduplication
         return self._nms(detections)
     
     def detect(self, image_path: str) -> list[Detection]:
-        """完整推理管线。"""
+        """Complete inference pipeline."""
         img = cv2.imread(image_path)
         orig = img.shape[:2]
         blob, scale, dw, dh = self.preprocess(img)
@@ -416,14 +416,14 @@ class YOLOONNXDetector:
 
 ---
 
-## 6. DFM 生成（检测结果 → DFM 文本）
+## 6. DFM Generation (Detection Results → DFM Text)
 
 ```python
-"""src/detection/dfm_generator.py — 检测结果 → DFM 转换"""
+"""src/detection/dfm_generator.py — Detection results → DFM conversion"""
 
 from src.tools.dfm_parser import DfmComponent, DfmProperty, serialize_component
 
-# Delphi 控件类名映射
+# Delphi control class name mapping
 CLASS_MAP = {
     1:  "TButton",   2:  "TEdit",      3:  "TLabel",
     4:  "TComboBox", 5:  "TCheckBox",  6:  "TRadioButton",
@@ -435,7 +435,7 @@ CLASS_MAP = {
 def detections_to_dfm(detections: list[Detection],
                       hierarchy: list[TreeNode],
                       screen_w: int, screen_h: int) -> str:
-    """将检测结果转为 DFM 文本。"""
+    """Convert detection results to DFM text."""
     
     def build(node) -> DfmComponent:
         det = node.element
@@ -448,7 +448,7 @@ def detections_to_dfm(detections: list[Detection],
                 DfmProperty(name="Top",    raw_value=str(det.y)),
                 DfmProperty(name="Width",  raw_value=str(det.w)),
                 DfmProperty(name="Height", raw_value=str(det.h)),
-                DfmProperty(name="TabOrder", raw_value="0"),  # 默认，需调整
+                DfmProperty(name="TabOrder", raw_value="0"),  # Default, needs adjustment
             ]
         )
         if cls_name in ("TButton", "TLabel", "TCheckBox", "TRadioButton"):
@@ -461,7 +461,7 @@ def detections_to_dfm(detections: list[Detection],
             comp.children.append(build(child))
         return comp
     
-    # 创建 Form 根节点
+    # Create Form root node
     form = DfmComponent(
         name="Form1", class_name="TForm",
         properties=[
@@ -477,15 +477,15 @@ def detections_to_dfm(detections: list[Detection],
     return serialize_component(form)
 
 def _gen_name(cls_name: str, node) -> str:
-    """生成控件名称（去掉 T 前缀 + 序号）。"""
+    """Generate control name (remove T prefix + sequence number)."""
     prefix = cls_name[1:] if cls_name.startswith("T") else cls_name
-    # 简单实现：用全局计数器
+    # Simple implementation: use global counter
     return f"{prefix}{_name_counter[cls_name]}"
 ```
 
 ---
 
-## 7. 输出 JSON Schema（供大模型引用）
+## 7. Output JSON Schema (for LLM Reference)
 
 ```json
 {
@@ -538,198 +538,198 @@ def _gen_name(cls_name: str, node) -> str:
 
 ---
 
-## 8. 依赖变更
+## 8. Dependency Changes
 
-### pyproject.toml 增量
+### pyproject.toml Increment
 
 ```toml
-# 新增可选依赖组
+# Add optional dependency group
 [project.optional-dependencies]
-# ... 现有依赖 ...
+# ... existing dependencies ...
 
-# 布局检测 — ONNX YOLO 推理
+# Layout detection — ONNX YOLO inference
 layout = [
     "onnx>=1.16.0",
 ]
 
-# 布局检测 — 完整（含训练能力，需 GPU 或另一台机器）
+# Layout detection — full (including training capability, requires GPU or another machine)
 layout-full = [
     "daofy-for-delphi[layout]",
-    # 训练需 PyTorch，但在另一台机器做，不包含在此
+    # Training requires PyTorch, but it is done on another machine and is not included here
 ]
 ```
 
-### 安装步骤
+### Installation Steps
 
 ```bash
-# 推理环境（MCP Server 所在机器）
+# Inference environment (machine where MCP Server runs)
 pip install daofy-for-delphi[layout]
 
-# 下载 ONNX 权重（约 11MB）
-# 方式 1：从训练结果下载 best.onnx
-# 方式 2：使用我们提供的预训练权重（在 releases 中附带）
+# Download ONNX weights (about 11MB)
+# Method 1: download best.onnx from training results
+# Method 2: use our provided pretrained weights (included in releases)
 
-# 训练环境（另一台有 GPU 的机器，或 CPU 慢跑）
+# Training environment (another machine with GPU, or slow CPU run)
 conda create -n yolo-train python=3.11
 pip install ultralytics torch torchvision
 yolo train model=yolo11n.pt data=delphi_dataset.yaml epochs=200
 yolo export model=runs/train/exp/weights/best.pt format=onnx
 ```
 
-### 新增模块结构
+### New Module Structure
 
 ```
 src/
-├── detection/                     # 新增：布局检测模块
-│   ├── __init__.py                # analyze_layout() 入口
-│   ├── yolo_onnx.py               # ONNX YOLO 推理封装（无 torch 依赖）
-│   ├── opencv_detector.py         # 传统 CV 检测（零额外依赖基线）
-│   ├── layout_parser.py           # 层次结构推理
-│   ├── dfm_generator.py           # 检测结果 → DFM 转换
-│   ├── text_extractor.py          # 文字提取（调用现有 OCR 服务）
-│   └── weights/                   # ONNX 权重缓存（.gitignore 排除）
+├── detection/                     # New: layout detection module
+│   ├── __init__.py                # analyze_layout() entry point
+│   ├── yolo_onnx.py               # ONNX YOLO inference wrapper (no torch dependency)
+│   ├── opencv_detector.py         # Traditional CV detection (zero extra dependency baseline)
+│   ├── layout_parser.py           # Hierarchy inference
+│   ├── dfm_generator.py           # Detection results → DFM conversion
+│   ├── text_extractor.py          # Text extraction (calls existing OCR service)
+│   └── weights/                   # ONNX weight cache (excluded by .gitignore)
 │       └── .gitkeep
 ```
 
 ---
 
-## 9. 实现路径
+## 9. Implementation Path
 
-### Phase 1：合成数据生成 + 传统 CV 基线（3-5 人天）
+### Phase 1: Synthetic Data Generation + Traditional CV Baseline (3-5 person-days)
 
-| 任务 | 产出 |
+| Task | Output |
 |------|------|
-| 合成数据脚本 | `generate_training_data.py` — 自动截图+dumpstate 采集标注 |
-| YOLO 格式转换器 | dumpstate JSON → COCO/YOLO 标签格式 |
-| OpenCV 元素检测 | Sobel/Canny + 轮廓 + 矩形过滤 → bbox |
-| 元素分类启发式 | 按宽高比/面积/位置分类（Button/Input/Label/Panel） |
-| 简单布局推理 | 空间包含 + 对齐集群 |
+| Synthetic data script | `generate_training_data.py` — automatically capture screenshots + dumpstate collect annotations |
+| YOLO format converter | dumpstate JSON → COCO/YOLO label format |
+| OpenCV element detection | Sobel/Canny + contours + rectangle filtering → bbox |
+| Element classification heuristics | Classify by aspect ratio/area/position (Button/Input/Label/Panel) |
+| Simple layout inference | Spatial containment + alignment clustering |
 
-**依赖增量**：0 MB（全部已有）
+**Dependency increment**: 0 MB (all already available)
 
-### Phase 2：ONNX YOLO 训练与集成（5-8 人天，需另一台机器做训练）
+### Phase 2: ONNX YOLO Training and Integration (5-8 person-days, training done on another machine)
 
-| 任务 | 产出 |
+| Task | Output |
 |------|------|
-| 安装 `ultralytics` + `torch`（训练机）| 训练环境 |
-| 准备 Delphi 数据集（Phase 1 产出）| `dataset.yaml` + 标注文件 |
-| 训练 YOLOv11n | `best.pt` + `best.onnx` |
-| `yolo_onnx.py` ONNX 推理封装 | 纯 `onnxruntime` 推理，无 torch |
-| 双后端融合 | CV + YOLO 结果置信度融合 |
+| Install `ultralytics` + `torch` (training machine) | Training environment |
+| Prepare Delphi dataset (Phase 1 output) | `dataset.yaml` + annotation files |
+| Train YOLOv11n | `best.pt` + `best.onnx` |
+| `yolo_onnx.py` ONNX inference wrapper | Pure `onnxruntime` inference, no torch |
+| Dual-backend fusion | CV + YOLO result confidence fusion |
 
-**依赖增量（推理机）**：~19 MB（onnx + 权重）
+**Dependency increment (inference machine)**: ~19 MB (onnx + weights)
 
-### Phase 3：层次推理 + DFM 生成（3-5 人天）
+### Phase 3: Hierarchy Inference + DFM Generation (3-5 person-days)
 
-| 任务 | 产出 |
+| Task | Output |
 |------|------|
-| `layout_parser.py` | 空间包含 + 对齐 + 表单配对 → 层次树 |
-| `dfm_generator.py` | 检测结果 → DFM 文本 |
-| Schema 设计 | 供 LLM 引用的结构化 JSON 输出 |
-| 属性默认值优化 | TabOrder/Align/Anchors 等合理默认值 |
+| `layout_parser.py` | Spatial containment + alignment + form pairing → hierarchy tree |
+| `dfm_generator.py` | Detection results → DFM text |
+| Schema design | Structured JSON output for LLM reference |
+| Property default optimization | Reasonable defaults for TabOrder/Align/Anchors etc. |
 
-### Phase 4：迭代优化（持续）
+### Phase 4: Iterative Optimization (ongoing)
 
-| 任务 | 产出 |
+| Task | Output |
 |------|------|
-| 扩充训练数据类别 | 覆盖更多第三方控件（DevExpress, TMS, JVCL） |
-| 布局类型精度提升 | 改进 Grid/复杂嵌套的推断 |
-| 文本-控件匹配 | OCR 文字正确归属于对应的控件 |
-| 事件推断 | 按钮点击行为等（VLM 辅助） |
+| Expand training data categories | Cover more third-party controls (DevExpress, TMS, JVCL) |
+| Improve layout type accuracy | Improve inference for Grid/complex nesting |
+| Text-control matching | OCR text correctly attributed to corresponding controls |
+| Event inference | Button click behavior etc. (VLM assisted) |
 
 ---
 
-## 10. 与现有工具的协同
+## 10. Collaboration with Existing Tools
 
 ```
-截图 → 布局检测 → JSON → 大模型 → DFM + PAS 代码
+Screenshot → layout detection → JSON → LLM → DFM + PAS code
                             ↓
-                     manage_component → 精确插入到现有 DFM
+                     manage_component → precisely insert into existing DFM
                             ↓
-                     create_component_dfm → 验证生成的 DFM 可编译
+                     create_component_dfm → verify generated DFM compiles
                             ↓
-                     layout_audit → 检查布局质量（重叠/对齐/间距）
+                     layout_audit → check layout quality (overlap/alignment/spacing)
 ```
 
 ---
 
-## 11. 参考资源
+## 11. Reference Resources
 
-| 资源 | 链接 |
+| Resource | Link |
 |------|------|
 | YOLOv11 (Ultralytics) | https://docs.ultralytics.com/models/yolo11/ |
 | ONNX Runtime | https://onnxruntime.ai/ |
-| ONNX 导出文档 | https://docs.ultralytics.com/integrations/onnx |
-| UIED (传统 CV 参考) | https://github.com/MulongXie/UIED |
+| ONNX export documentation | https://docs.ultralytics.com/integrations/onnx |
+| UIED (traditional CV reference) | https://github.com/MulongXie/UIED |
 | Rico Dataset | https://interactionmining.org/archive/rico |
-| PP-OCRv6 (项目已有) | `src/services/ocr_service.py` |
-| DFM Parser (项目已有) | `src/tools/dfm_parser.py` |
-| Layout Audit (项目已有) | `src/tools/layout_audit.py` |
-| create_component_dfm (项目已有) | `src/tools/create_component_dfm.py` |
+| PP-OCRv6 (already in project) | `src/services/ocr_service.py` |
+| DFM Parser (already in project) | `src/tools/dfm_parser.py` |
+| Layout Audit (already in project) | `src/tools/layout_audit.py` |
+| create_component_dfm (already in project) | `src/tools/create_component_dfm.py` |
 
 ---
 
-## 12. 结论
+## 12. Conclusion
 
-**推荐方案：合成数据驱动的 YOLOv11n ONNX 推理**，原因：
+**Recommended solution: synthetic-data-driven YOLOv11n ONNX inference**, for the following reasons:
 
-1. **合成数据零成本** — `dumpstate` + `capture` 可在 2.5 分钟产出数万级 Delphi 专用标注
-2. **推理依赖仅 +19 MB** — `onnxruntime` 项目已预装，只需加 `onnx` 包和 ~11MB ONNX 权重
-3. **无需 GPU** — ONNX 推理在 CPU 上跑，~30-100ms/图
-4. **Phase 1 零增量依赖即可开工** — OpenCV + NumPy 已装好
-5. **DFM 生成复用现有工具** — `dfm_parser.serialize_component()` 直接产出 DFM 文本
+1. **Zero-cost synthetic data** — `dumpstate` + `capture` can produce tens of thousands of Delphi-specific annotations in 2.5 minutes
+2. **Inference dependency only +19 MB** — `onnxruntime` is already preinstalled in the project, only need to add `onnx` package and ~11MB ONNX weights
+3. **No GPU required** — ONNX inference runs on CPU, ~30-100ms/image
+4. **Phase 1 can start with zero incremental dependencies** — OpenCV + NumPy already installed
+5. **DFM generation reuses existing tools** — `dfm_parser.serialize_component()` directly produces DFM text
 
 ---
 
-## 13. 审计发现与方案改进
+## 13. Audit Findings and Solution Improvements
 
-### 13.1 ✅ 已验证的假设
+### 13.1 ✅ Verified Assumptions
 
-| 假设 | 结果 | 证据 |
+| Assumption | Result | Evidence |
 |------|:----:|------|
-| YOLO ONNX 输出格式 `[1, 4+N, 8400]` | ✅ 正确 | Ultralytics 文档确认，代码模板中的 post-processing 流程无误 |
-| 可导出 NMS 内嵌的 ONNX (`nms=True`) | ✅ 可行 | 导出时加 `nms=True`，输出简化 `[1, max_det, 6]`，省去 Python 端 NMS |
-| 合成数据可控制类别分布 | ✅ 可行 | 训练时通过 dataset.yaml 的采样权重或生成脚本控制 |
-| `onnxruntime` 已安装 | ✅ 项目已装 | `onnxruntime 1.27.0` 已存在于 OCR 可选依赖中 |
-| **`onnx` 包在推理侧不需要** | ✅ 确认 | `onnxruntime` 直接加载 `.onnx` 文件推理，`onnx` 包仅用于训练后的模型验证 |
+| YOLO ONNX output format `[1, 4+N, 8400]` | ✅ Correct | Ultralytics documentation confirms; post-processing flow in code template is correct |
+| Can export ONNX with embedded NMS (`nms=True`) | ✅ Feasible | Add `nms=True` during export; output simplifies to `[1, max_det, 6]`, eliminating Python-side NMS |
+| Synthetic data can control class distribution | ✅ Feasible | Control via sampling weights in dataset.yaml or generation script during training |
+| `onnxruntime` already installed | ✅ Already installed in project | `onnxruntime 1.27.0` already exists in OCR optional dependencies |
+| **`onnx` package not needed on inference side** | ✅ Confirmed | `onnxruntime` directly loads `.onnx` files for inference; `onnx` package is only for model validation after training |
 
-### 13.2 ⚠️ 审计问题汇总
+### 13.2 ⚠️ Audit Issue Summary
 
-#### 问题 1：小控件检测（已解决）
+#### Issue 1: Small control detection (resolved)
 
-**问题**：YOLOv11n 默认输入 640×640，若原始截图为 1920×1080 则缩放比 ~0.33，16×16 图标变为 ~5px → 不可检测。
+**Problem**: YOLOv11n default input 640×640; if the original screenshot is 1920×1080, scale ratio ~0.33, a 16×16 icon becomes ~5px → undetectable.
 
-**解决方案（用户提供）**：合成数据生成时**主动将窗体截图 resize 到 640×480**（标准 VCL 客户区大小），再送入 YOLO。此时缩放比为 1.0，16×16 图标仍为 16×16 像素，在 P3 特征层（stride 8）覆盖 2×2 网格——**绰绰有余**。
+**Solution (provided by user)**: During synthetic data generation, **actively resize form screenshots to 640×480** (standard VCL client area size), then feed to YOLO. At this point the scale ratio is 1.0, a 16×16 icon is still 16×16 pixels, covering a 2×2 grid at the P3 feature layer (stride 8) — **more than enough**.
 
 ```
-特征层   Stride   网格     16×16 覆盖格数   可检测？
+Feature layer   Stride   Grid     16×16 coverage cells   Detectable?
 P3        8      80×80    2×2             ✅
 P4       16      40×40    1×1             ✅
-P5       32      20×20    0.5×0.5         ❌ (但不依赖此层)
+P5       32      20×20    0.5×0.5         ❌ (but this layer is not relied upon)
 ```
 
-**注意**：训练数据和推理数据的预处理必须一致——都先 resize 到 640×480，再 pad 到 640×640。
+**Note**: Preprocessing for training data and inference data must be consistent — both first resize to 640×480, then pad to 640×640.
 
-#### 问题 2：依赖增量可进一步缩减
+#### Issue 2: Dependency increment can be further reduced
 
-原方案写了需安装 `onnx` 包（~8MB）。审计发现**推理侧不需要 `onnx` 包**——`onnxruntime` 可以直接加载 `.onnx` 模型文件：
+The original solution wrote that the `onnx` package (~8MB) needs to be installed. Audit found that **the inference side does not need the `onnx` package** — `onnxruntime` can directly load `.onnx` model files:
 
 ```python
 import onnxruntime as ort
-session = ort.InferenceSession("yolo11n.onnx")  # OK，无需 onnx 包
+session = ort.InferenceSession("yolo11n.onnx")  # OK, no onnx package needed
 ```
 
-因此推理侧**实际新增依赖为 0 个包**，仅需下载 ~11MB 的 ONNX 权重文件。
+Therefore, the **actual new dependency on the inference side is 0 packages**; only the ~11MB ONNX weight file needs to be downloaded.
 
 ```diff
 - layout = ["onnx>=1.16.0"]
-+ # 推理侧无需新增包，onnxruntime 已装
-+ # 仅需下载 weights/best.onnx (~11MB)
++ # No new packages are needed on the inference side; onnxruntime is already installed
++ # Only need to download weights/best.onnx (~11MB)
 ```
 
-#### 问题 3：`_gen_name` 控件命名实现有 Bug
+#### Issue 3: `_gen_name` control naming implementation has a bug
 
-原代码使用了未初始化且未递增的全局 `_name_counter` 字典。修正：
+The original code used an uninitialized and unincremented global `_name_counter` dictionary. Fix:
 
 ```python
 def _gen_name(cls_name: str, seen_names: set[str]) -> str:
@@ -742,61 +742,62 @@ def _gen_name(cls_name: str, seen_names: set[str]) -> str:
     return name
 ```
 
-#### 问题 4：ONNX 导出推荐 `nms=True`
+#### Issue 4: ONNX export recommends `nms=True`
 
-`model.export(format="onnx", nms=True)` 导出时内嵌 NMS，输出简化为 `[1, max_det, 6]`，不需要在 Python 端实现 NMS 算法。
+`model.export(format="onnx", nms=True)` embeds NMS during export, and the output simplifies to `[1, max_det, 6]`; there is no need to implement the NMS algorithm on the Python side.
 
-#### 问题 5：缺少量化验证指标
+#### Issue 5: Missing quantitative validation metrics
 
-需要定义清晰的精度目标，用于判断训练是否收敛：
+Need to define clear accuracy targets for judging whether training has converged:
 
 ```yaml
-# 评估指标
-mAP@0.5:      > 0.85   # 目标
-mAP@0.5:0.95: > 0.65   # 目标
-Recall:       > 0.90   # 不要漏检控件
-Precision:    > 0.85   # 不要误报
-Small_AP:     > 0.60   # 小控件（面积<32²）的精度
-Container_AP: > 0.80   # 容器类（TPanel）的精度
+# Evaluation metrics
+mAP@0.5:      > 0.85   # Target
+mAP@0.5:0.95: > 0.65   # Target
+Recall:       > 0.90   # Do not miss controls
+Precision:    > 0.85   # Do not false positive
+Small_AP:     > 0.60   # Accuracy for small controls (area <32²)
+Container_AP: > 0.80   # Accuracy for container classes (TPanel)
 ```
 
-#### 问题 6：需要 Plan B 备选方案
+#### Issue 6: Need Plan B alternative
 
-如果 YOLO 训练收敛不理想（数据集太小、类别分布不均衡），备选方案是纯传统 CV：
+If YOLO training convergence is not ideal (dataset too small, class distribution unbalanced), the backup solution is pure traditional CV:
 
 ```
-截图 → OpenCV 形态学 → 轮廓 → 矩形区域
-     → 按宽高比/面积启发式分类
-     → OCR 文字提取
-     → 空间包含 → 层次树
-     → DFM 生成
+Screenshot → OpenCV morphology → contours → rectangular regions
+     → classify by aspect ratio/area heuristics
+     → OCR text extraction
+     → spatial containment → hierarchy tree
+     → DFM generation
 ```
 
-精度较低（~60-70%）但**零额外依赖、零训练、零等待**。
+Accuracy is lower (~60-70%) but **zero extra dependencies, zero training, zero waiting**.
 
-#### 问题 7：数据增强策略需针对 UI 优化
+#### Issue 7: Data augmentation strategy needs UI-specific optimization
 
-UI 截图不是自然图像。以下增强**禁止**使用：
+UI screenshots are not natural images. The following augmentations are **forbidden**:
 
-| 禁止的增强 | 原因 |
+| Forbidden augmentation | Reason |
 |-----------|------|
-| GaussianBlur / noise | 模糊文字笔画，破坏 OCR |
-| Heavy color jitter | 改变按钮颜色，影响类型判断 |
-| Random rotation | UI 控件从不旋转 |
+| GaussianBlur / noise | Blurs text strokes, damages OCR |
+| Heavy color jitter | Changes button colors, affects type judgment |
+| Random rotation | UI controls never rotate |
 
-推荐的结构保持增强：
+Recommended structure-preserving augmentations:
 
-| 增强 | 说明 |
+| Augmentation | Description |
 |------|------|
-| Random crop (0.6-1.0) | 模拟不同位置的局部截图 |
-| Horizontal flip (p=0.5) | Delphi UI 偶尔对称 |
-| Brightness ±20% | 模拟不同显示器亮度 |
-| Mosaic (p=0.5) | 拼图增强上下文多样性 |
-| Scale ±10% | 模拟不同 DPI |
-| Random erasing (p=0.1) | 模拟控件被遮挡 |
+| Random crop (0.6-1.0) | Simulates local screenshots at different positions |
+| Horizontal flip (p=0.5) | Delphi UI is occasionally symmetric |
+| Brightness ±20% | Simulates different monitor brightness |
+| Mosaic (p=0.5) | Mosaic augmentation for context diversity |
+| Scale ±10% | Simulates different DPI |
+| Random erasing (p=0.1) | Simulates controls being occluded |
 
-#### 问题 8：训练数据去重
+#### Issue 8: Training data deduplication
 
-不同窗体可能共享相同视觉的控件（如 50 个窗体共用同一个 `TFindUnitDialog`）。直接混合训练会造成分布偏差。
+Different forms may share controls with identical visual appearance (e.g., 50 forms share the same `TFindUnitDialog`). Mixing them directly for training will cause distribution bias.
 
-**建议**：生成数据时对每个控件的布局特征（位置+尺寸+类型）做哈希去重，确保训练集不偏向重复出现的控件。
+**Recommendation**: When generating data, hash the layout features (position + size + type) of each control for deduplication, ensuring the training set does not favor repeatedly appearing controls.
+

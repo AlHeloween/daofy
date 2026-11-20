@@ -1,133 +1,137 @@
-# UIA 集成实施计划 — Python 纯端方案 v3.0
+# UIA Integration Implementation Plan — Pure Python-Side Approach v3.0
 
-> **版本历史：**
-> - v1.0 (`uia-integration-plan.md`) — 原始计划：Delphi 端 COM UIA + 6 个 UIA 命令
-> - v2.0 — 审计修订版：修复 6 项遗漏（COM Apartment、VTBL、Python 分支等）
-> - **v3.0（当前） — 架构变更：删除所有 Delphi 端修改，纯 Python 端通过 `uiautomation` 库实现 UIA**
+> **Version history:**
+> - v1.0 (`uia-integration-plan.md`) — Original plan: Delphi-side COM UIA + 6 UIA commands
+> - v2.0 — Audit revision: fixed 6 omissions (COM Apartment, VTBL, Python branches, etc.)
+> - **v3.0 (current) — Architecture change: remove all Delphi-side modifications; implement UIA purely on the Python side via the `uiautomation` library**
 
-> **架构决策记录：** 之所以从 Delphi 端（v2.0）改为 Python 端（v3.0），是因为 RTTI 和 UIA 作用于完全不同的对象域——RTTI 操作进程内 Delphi 组件树，UIA 操作跨进程 Windows 窗口。Delphi 进程内不需要 UIA（RTTI 更强），UIA 的唯一天然位置是 Python 端。详见下方「架构论证」章节。
+> **Architecture decision record:** The reason for changing from the Delphi side (v2.0) to the Python side (v3.0) is that RTTI and UIA operate on completely different object domains—RTTI operates on the in-process Delphi component tree, while UIA operates on cross-process Windows windows. The Delphi process does not need UIA (RTTI is stronger); the only natural place for UIA is the Python side. See the "Architecture Argument" section below for details.
 
 ---
 
-## 架构论证：为什么纯 Python 端是正确的
+## Architecture Argument: Why Pure Python Side Is Correct
 
-### 三个对象域，三种技术
+### Three Object Domains, Three Technologies
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  对象域 A：Delphi 进程内组件树                               │
-│  ───────────────────────────────                             │
-│  技术：RTTI（rget/rset/rcall/rinspect）                      │
-│  标识：Delphi Name 属性（如 "Button1"）                      │
-│  访问：FindChildControl + TRttiContext                      │
-│  覆盖：全部 published+public 属性/方法                       │
-│                                                            │
-│  → 由 Delphi 端 Vcl/Fmx.DaofyAutomation 完成               │
-│  → UIA 在此域是降级（属性少、速度慢）                        │
+│  Object Domain A: Delphi in-process component tree          │
+│  ───────────────────────────────                            │
+│  Technology: RTTI (rget/rset/rcall/rinspect)                │
+│  Identifier: Delphi Name property (e.g. "Button1")          │
+│  Access: FindChildControl + TRttiContext                    │
+│  Coverage: all published+public properties/methods          │
+│                                                             │
+│  → Completed by Delphi side Vcl/Fmx.DaofyAutomation        │
+│  → UIA is a downgrade in this domain (fewer properties,     │
+│    slower)                                                  │
 ├─────────────────────────────────────────────────────────────┤
-│  对象域 B：跨进程 Windows 标准控件                            │
-│  ────────────────────────────────────────                    │
-│  技术：Windows UI Automation (UIA)                           │
-│  标识：AutomationId / Name / ControlType                    │
-│  访问：跨进程 COM（UIAutomationCore.dll）                    │
-│  覆盖：有限属性集 + Control Pattern                          │
-│                                                            │
-│  → 这是 Python 端加 UIA 的真正价值域                         │
-│  → 典型场景：打开文件对话框、系统弹窗、第三方窗口               │
+│  Object Domain B: Cross-process Windows standard controls   │
+│  ────────────────────────────────────────                   │
+│  Technology: Windows UI Automation (UIA)                    │
+│  Identifier: AutomationId / Name / ControlType              │
+│  Access: cross-process COM (UIAutomationCore.dll)           │
+│  Coverage: limited property set + Control Pattern           │
+│                                                             │
+│  → This is the real value domain for adding UIA on the      │
+│    Python side                                              │
+│  → Typical scenarios: open file dialog, system popup,       │
+│    third-party windows                                      │
 ├─────────────────────────────────────────────────────────────┤
-│  对象域 C：Windows 消息层操作                                 │
-│  ─────────────────────────────                                │
-│  技术：Win32 消息（FindWindow/SendMessage）                  │
-│  当前在 Delphi 基类实现：msgscan/msgclick/msgclose/dlgfile  │
-│  → 与 UIA 互补，不在本次范围内                               │
+│  Object Domain C: Windows message-layer operations          │
+│  ─────────────────────────────                               │
+│  Technology: Win32 messages (FindWindow/SendMessage)        │
+│  Currently implemented in Delphi base class:                │
+│  msgscan/msgclick/msgclose/dlgfile                          │
+│  → Complementary to UIA, outside this scope                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 纯 Python 端 UIA 的优势
+### Advantages of Pure Python-Side UIA
 
-| 维度 | v2.0（Delphi 端） | v3.0（Python 端） |
+| Dimension | v2.0 (Delphi side) | v3.0 (Python side) |
 |------|:-:|:-:|
-| COM 线程模型 | 需手动 `CoInitializeEx(COINIT_STA)` | `comtypes` 自动管理 |
-| VTBL 接口风险 | 50+ 方法 VTBL 偏移错一个就 AV | 由 `uiautomation` 库封装 ctypes 调用 |
-| Delphi 编译器兼容性 | 需条件编译区分 Delphi 版本 | 无依赖 |
-| 测试/调试 | Delphi AV → IDE 断点调试 | Python 异常 → 直接看调用栈 |
-| 维护负担 | Delphi + Python 两端改 | 只改 Python |
-| 团队能力要求 | Delphi COM + Python 双栈 | Python 单栈 |
-| 可选依赖 | 无（编译进 exe） | `pip install daofy-for-delphi[uia]` |
+| COM thread model | Manual `CoInitializeEx(COINIT_STA)` required | Automatically managed by `comtypes` |
+| VTBL interface risk | 50+ methods; one wrong VTBL offset causes AV | `uiautomation` library wraps ctypes calls |
+| Delphi compiler compatibility | Conditional compilation required for Delphi versions | No dependency |
+| Testing/debugging | Delphi AV → IDE breakpoint debugging | Python exception → inspect call stack directly |
+| Maintenance burden | Changes on both Delphi + Python sides | Change Python only |
+| Team skill requirements | Dual stack: Delphi COM + Python | Python single stack |
+| Optional dependency | None (compiled into exe) | `pip install daofy-for-delphi[uia]` |
 
-### 关键结论
+### Key Conclusion
 
-> **Delphi 侧永远不需要 UIA。** RTTI 在进程内组件访问上全面优于 UIA（全部属性/方法、无跨进程开销、无 stale element）。UIA 的唯一天然位置在 Python 端——它覆盖的是 Delphi 端无法触及的跨进程场景。将 UIA 放在 Python 端既是架构上的正确决定，也消除了原计划中风险最高的 COM 线程模型和 VTBL 接口偏移问题。
+> **The Delphi side never needs UIA.** RTTI is comprehensively superior to UIA for in-process component access (all properties/methods, no cross-process overhead, no stale element). The only natural place for UIA is the Python side—it covers cross-process scenarios that the Delphi side cannot reach. Putting UIA on the Python side is both the architecturally correct decision and eliminates the highest-risk issues in the original plan: the COM thread model and VTBL interface offsets.
 
 ---
 
-## 修订后架构
+## Revised Architecture
 
 ```
-现有架构（不变）：
-  Python 层:
-    automation_service.py  ← _execute_script_unlocked 主循环
-      │ 命名管道 ↓
-  Delphi 层:
-    TAutomationProcessorBase.ExecCmd → 现有 20+ 个 if/elif 分支（不变）
-    ├── Vcl.TAutomationProcessor  （不变）
-    └── Fmx.TAutomationProcessor  （不变）
+Existing architecture (unchanged):
+  Python layer:
+    automation_service.py  ← _execute_script_unlocked main loop
+      │ named pipe ↓
+  Delphi layer:
+    TAutomationProcessorBase.ExecCmd → existing 20+ if/elif branches (unchanged)
+    ├── Vcl.TAutomationProcessor  (unchanged)
+    └── Fmx.TAutomationProcessor  (unchanged)
 
-v3.0 新增（Python 层内，不碰 Delphi 一行代码）：
-  Python 层:
+v3.0 additions (inside Python layer, without touching a single line of Delphi code):
+  Python layer:
     automation_service.py
-      ├── _UIA_MODULE / _UIA_AVAILABLE  ← 新增：模块级延迟导入
-      ├── _execute_uia_step()           ← 新增：在 Python 端直接调用 uiautomation
-      ├── _walk_uia_tree()              ← 新增：UIA 树遍历（供 uiascan）
-      ├── _UIA_CAPABLE_CMDS             ← 新增：可路由到 UIA 的命令集合
-      ├── _UIA_PREFIX_CMDS              ← 新增：uia 前缀命令集合
-      └── _should_use_uia()             ← 新增：判断用 UIA 还是走管道
+      ├── _UIA_MODULE / _UIA_AVAILABLE  ← new: module-level lazy import
+      ├── _execute_uia_step()           ← new: call uiautomation directly on Python side
+      ├── _walk_uia_tree()              ← new: UIA tree traversal (for uiascan)
+      ├── _UIA_CAPABLE_CMDS             ← new: command set routable to UIA
+      ├── _UIA_PREFIX_CMDS              ← new: uia-prefixed command set
+      └── _should_use_uia()             ← new: determine whether to use UIA or pipeline
 
-  Delphi 层:
-    ────────────────── 零修改 ──────────────────
+  Delphi layer:
+    ────────────────── zero modifications ──────────────────
 ```
 
-### 命令路由逻辑
+### Command Routing Logic
 
 ```
-_execute_script_unlocked 对每个 step:
+_execute_script_unlocked for each step:
   │
-  ├─ cmd 以 'uia' 开头（如 uiagoto/uiaclick/uiascan）?
-  │   → _execute_uia_step(step)       ← Python 端直接调用 uiautomation
+  ├─ cmd starts with 'uia' (e.g. uiagoto/uiaclick/uiascan)?
+  │   → _execute_uia_step(step)       ← Python side calls uiautomation directly
   │
-  ├─ cmd 在 _UIA_CAPABLE_CMDS 中，且 _should_use_uia() 为 True?
-  │   → _execute_uia_step(step)       ← Python 端直接调用 uiautomation
+  ├─ cmd is in _UIA_CAPABLE_CMDS and _should_use_uia() is True?
+  │   → _execute_uia_step(step)       ← Python side calls uiautomation directly
   │
-  └─ 否则
-      → 走现有命名管道路径（不变）
+  └─ otherwise
+      → use the existing named pipe path (unchanged)
 ```
 
-注意：`_UIA_CAPABLE_CMDS` 内的命令（如 `click/goto`）加上 `"via": "uia"` 后走 UIA 路径。
+Note: commands in `_UIA_CAPABLE_CMDS` (such as `click/goto`) go through the UIA path when `"via": "uia"` is added.
 
 ---
 
-## 实施任务（4 个子任务，约 3 人天）
+## Implementation Tasks (4 subtasks, approximately 3 person-days)
 
-### T1. `automation_service.py` 增加 UIA 命令分发（1 人天）
+### T1. Add UIA command dispatch to `automation_service.py` (1 person-day)
 
-#### T1a. 新增命令集合和判断函数
+#### T1a. Add command sets and decision function
 
 ```python
-# ── 在 _ASYNC_CMDS / _UI_ASYNC_CMDS 之后增加 ──
+# ── Add after _ASYNC_CMDS / _UI_ASYNC_CMDS ──
 
-# 命名带 uia 前缀的命令（全部走 Python 端 UIA，不走 Delphi 管道）
+# Commands with the uia prefix (all go through Python-side UIA, not the Delphi pipeline)
 _UIA_PREFIX_CMDS = frozenset({
     'uiagoto', 'uiaclick', 'uiaget', 'uiascan', 'uiawait', 'uiaset',
-    # 注：uiaclick 和 uiaset 在 Python 端是同步的（不走 peekresult 轮询）
+    # Note: uiaclick and uiaset are synchronous on the Python side (no peekresult polling)
 })
 
-# 既支持管道又支持 UIA 的命令（通过 "via": "uia" 显式指定走 UIA）
+# Commands that support both the pipeline and UIA (explicitly specify UIA via "via": "uia")
 _UIA_CAPABLE_CMDS = frozenset({
     'goto', 'click', 'get', 'set', 'wait', 'scan',
-    # 可扩展：type, key 等
+    # Extensible: type, key, etc.
 })
 
-# ── UIA 模块延迟导入 ──
+# ── UIA module lazy import ──
 _UIA_AVAILABLE = False
 _UIA_MODULE: Any | None = None
 try:
@@ -137,21 +141,21 @@ except ImportError:
     pass
 ```
 
-#### T1b. `_execute_script_unlocked` 主循环增加路由分支
+#### T1b. Add routing branch to the `_execute_script_unlocked` main loop
 
 ```python
-# 在第 1134 行（req['target'] = target 赋值后）、第 1136 行（cmd 分派 if/elif 链前）之间插入：
+# Insert between line 1134 (after req['target'] = target assignment) and line 1136 (before cmd dispatch if/elif chain):
 
-# ── UIA 命令路由 ──
+# ── UIA command routing ──
 _via = step.get('via', '')
 if cmd in _UIA_PREFIX_CMDS or (_via == 'uia' and cmd in _UIA_CAPABLE_CMDS):
-    # 获取 _gui_execution_lock（与管道命令共用同一锁，确保串行执行）
+    # Acquire _gui_execution_lock (shared with pipeline commands to ensure serial execution)
     with _gui_execution_lock:
-        # Python 端直接执行 UIA 操作，不走 Delphi 管道
+        # Python side directly executes UIA operations; does not go through the Delphi pipeline
         resp_json, step_ok, ok = _execute_uia_step(step, req, req_id)
 
-    # 注意：UIA 分支不支持 capture 字段。如需在 UIA 操作后截图，
-    # 在脚本中紧随 UIA step 之后添加独立的 capture step（走现有 Delphi 管道路径）。
+    # Note: the UIA branch does not support the capture field. If a screenshot is needed after a UIA operation,
+    # add an independent capture step immediately after the UIA step in the script (using the existing Delphi pipeline path).
     
     results.append({
         'step': step, 'command': cmd_str,
@@ -159,7 +163,7 @@ if cmd in _UIA_PREFIX_CMDS or (_via == 'uia' and cmd in _UIA_CAPABLE_CMDS):
         'status': 'ok' if step_ok else 'error',
         'uia_resolved': True,
     })
-    # 跳过后面的管道发送/peekresult/后处理，直接进入 assert 检查
+    # Skip the following pipeline send/peekresult/post-processing and go directly to the assert check
     assert_result = _check_assert(step, resp_json)
     results[-1]['assert_result'] = assert_result
     if not assert_result.get('passed', True):
@@ -172,46 +176,46 @@ if cmd in _UIA_PREFIX_CMDS or (_via == 'uia' and cmd in _UIA_CAPABLE_CMDS):
     continue
 ```
 
-#### T1c. 新增 `_should_use_uia` 判断（自动 fallback 入口，Phase 2 实现）
+#### T1c. Add `_should_use_uia` decision (automatic fallback entry, implemented in Phase 2)
 
 ```python
 def _should_use_uia(app_path: str, cmd: str) -> bool:
-    """判断是否应该用 UIA 代替管道执行命令。
+    """Determine whether UIA should be used instead of the pipeline to execute a command.
     
-    Phase 1（当前）: 仅当脚本显式指定 via='uia' 时走 UIA
-    Phase 2（后续）: 自动检测——管道连接失败时降级到 UIA
+    Phase 1 (current): use UIA only when the script explicitly specifies via='uia'
+    Phase 2 (future): automatic detection—fall back to UIA when the pipeline connection fails
     """
-    # Phase 1: 显式指定 only
-    return False  # 由 _execute_script_unlocked 中的 via 判断做决定
+    # Phase 1: explicit specification only
+    return False  # Decided by the via check in _execute_script_unlocked
 ```
 
 ---
 
-### T2. Python 端 6 个 UIA 命令实现（1 人天）
+### T2. Implement 6 UIA commands on the Python side (1 person-day)
 
-> **⚠️ DPI / 坐标处理**  
-> `uiautomation` 库在启动时自动通过 `SetProcessDPIAware` 声明系统 DPI 感知，因此交互命令（`Click`、`SetValue` 等）的坐标转换由库内部处理，无需手动缩放。  
-> 但 `BoundingRectangle` 返回的是**物理像素坐标**（非逻辑缩放值）。在以下场景需注意：
-> - `uiaget Rect`：返回的是物理像素，消费者（如记录到日志、传给其他工具）需自行换算 DPI 缩放
-> - `_walk_uia_tree` 中的 `Rect` 字段同理，仅用于信息展示而非驱动输入
-> - 如果将来需要将 UIA 坐标传给 Win32 消息 API（如 `mouse_event`），需先通过 `ctypes.windll.shcore.GetScaleFactorForMonitor` 获取缩放比后换算
+> **⚠️ DPI / Coordinate Handling**
+> The `uiautomation` library automatically declares system DPI awareness via `SetProcessDPIAware` at startup, so coordinate conversion for interactive commands (`Click`, `SetValue`, etc.) is handled internally by the library and does not need manual scaling.
+> However, `BoundingRectangle` returns **physical pixel coordinates** (not logical scaled values). Pay attention in the following scenarios:
+> - `uiaget Rect`: returns physical pixels; consumers (e.g. logging, passing to other tools) must convert DPI scaling themselves
+> - The `Rect` field in `_walk_uia_tree` is the same; it is only for informational display and not for driving input
+> - If UIA coordinates need to be passed to Win32 message APIs in the future (such as `mouse_event`), first obtain the scale factor via `ctypes.windll.shcore.GetScaleFactorForMonitor` and convert
 
-新增 `_execute_uia_step` 函数，内部使用 `uiautomation` 库：
+Add a new `_execute_uia_step` function that uses the `uiautomation` library internally:
 
 ```python
 def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple[dict, bool, bool]:
-    """Python 端直接调用 Windows UIA 执行自动化命令。
+    """Call Windows UIA directly on the Python side to execute automation commands.
     
     Returns:
-        (resp_json, step_ok, ok) 与管道路径返回值兼容
+        (resp_json, step_ok, ok) compatible with the pipeline path return values
     """
-    # 使用模块级 _UIA_MODULE 别名（在 imports 区统一赋值，避免重复 import）
+    # Use module-level _UIA_MODULE alias (assigned in imports area to avoid repeated import)
     if not _UIA_AVAILABLE:
         return ({'reqId': req_id, 'status': 'err', 'data': 'UIA_unavailable: pip install daofy-for-delphi[uia]'}, False, False)
     auto = _UIA_MODULE
     
     cmd = step.get('cmd', '')
-    # 统一处理 uia 前缀：uiagoto → goto
+    # Uniformly handle uia prefix: uiagoto → goto
     uia_cmd = cmd[3:] if cmd.startswith('uia') else cmd
     target = step.get('target', '')
     resp: dict = {'reqId': req_id, 'status': 'err', 'data': ''}
@@ -220,7 +224,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple[dict, bool, b
     
     try:
         if uia_cmd == 'goto':
-            # uiagoto/goto via uia：按名称激活窗口
+            # uiagoto/goto via uia: activate window by name
             w = auto.WindowControl(searchDepth=1, Name=target)
             if w.Exists(maxSearchSeconds=3, searchIntervalSeconds=0.5):
                 w.SetActive()
@@ -255,13 +259,13 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple[dict, bool, b
                 except Exception:
                     val = ''
             elif prop == 'Rect':
-                r = ctrl.BoundingRectangle  # 物理像素坐标（非逻辑值），DPI 感知需消费者自行换算
+                r = ctrl.BoundingRectangle  # physical pixel coordinates (not logical values); DPI awareness requires consumers to convert themselves
                 val = f'{r.left},{r.top},{r.right},{r.bottom}'
             else:
-                # 未知属性：记录 warning 而非静默 fallback，让用户知道
+                # Unknown property: log a warning instead of silently falling back, so the user knows
                 _logger.warning(f"[UIA] unknown prop '{prop}' for cmd=get, falling back to Name")
                 val = ctrl.Name
-            # 统一 JSON 序列化：确保 val 为字符串
+            # Uniform JSON serialization: ensure val is a string
             resp = {'reqId': req_id, 'status': 'ok', 'data': str(val)}
         
         elif uia_cmd == 'set':
@@ -330,13 +334,13 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple[dict, bool, b
     return resp, ok, ok
 ```
 
-#### `_walk_uia_tree` 辅助函数
+#### `_walk_uia_tree` helper function
 
 ```python
 def _walk_uia_tree(ctrl, max_depth: int = 3, current_depth: int = 0) -> dict:
-    """递归遍历 UIA 控件树，返回 JSON-compatible dict。
+    """Recursively traverse the UIA control tree and return a JSON-compatible dict.
     
-    仅提取关键属性，限制深度防止 OOM。
+    Extract only key properties and limit depth to prevent OOM.
     """
     if current_depth > max_depth:
         return {'type': '...truncated...'}
@@ -346,7 +350,7 @@ def _walk_uia_tree(ctrl, max_depth: int = 3, current_depth: int = 0) -> dict:
         result['Name'] = ctrl.Name
         result['AutomationId'] = ctrl.AutomationId
         result['ControlType'] = ctrl.ControlTypeName
-        r = ctrl.BoundingRectangle  # 物理像素，见 T2 DPI 说明
+        r = ctrl.BoundingRectangle  # physical pixels, see T2 DPI note
         result['Rect'] = f'{r.left},{r.top},{r.right},{r.bottom}'
     except Exception:
         pass  # stale element / access denied
@@ -359,7 +363,7 @@ def _walk_uia_tree(ctrl, max_depth: int = 3, current_depth: int = 0) -> dict:
                 for child in children:
                     child_dict = _walk_uia_tree(child, max_depth, current_depth + 1)
                     result['children'].append(child_dict)
-                    # 安全限流：单层最多 200 个孩子
+                    # Safety throttling: at most 200 children per level
                     if len(result['children']) >= 200:
                         result['children'].append({'type': '...truncated(200)...'})
                         break
@@ -371,15 +375,15 @@ def _walk_uia_tree(ctrl, max_depth: int = 3, current_depth: int = 0) -> dict:
 
 ---
 
-### T3. 命令映射 + 依赖管理 + 测试（1 人天）
+### T3. Command mapping + dependency management + testing (1 person-day)
 
-#### T3a. `_extract_actual` 增加 UIA 命令分支
+#### T3a. Add UIA command branches to `_extract_actual`
 
 ```python
 def _extract_actual(cmd: str, resp: dict) -> str:
-    # ... 现有分支 ...
+    # ... existing branches ...
     
-    # ── UIA 命令分支 ──
+    # ── UIA command branches ──
     if cmd in ('uiaget',):
         return str(resp.get('data', ''))
     if cmd in ('uiascan',):
@@ -392,19 +396,19 @@ def _extract_actual(cmd: str, resp: dict) -> str:
     if cmd in ('uiaclick', 'uiaset', 'uiagoto', 'uiawait'):
         return resp.get('status', '')
     
-    # ... 后续分支 ...
+    # ... subsequent branches ...
 ```
 
-#### T3b. `_failure_signal` 增加 UIA 信号
+#### T3b. Add UIA signals to `_failure_signal`
 
 ```python
 def _failure_signal(result: dict) -> str:
-    # ... 现有分支 ...
-    # result['response'] 是 _execute_uia_step 返回的 resp dict
+    # ... existing branches ...
+    # result['response'] is the resp dict returned by _execute_uia_step
     response = result.get('response', {})
     data = str(response.get('data', '')) if isinstance(response, dict) else ''
     
-    # 提取 UIA 命令名（result['step'] 是原始 step dict）
+    # Extract UIA command name (result['step'] is the original step dict)
     step = result.get('step', {})
     cmd = step.get('cmd', '')
     
@@ -413,10 +417,10 @@ def _failure_signal(result: dict) -> str:
     if data.startswith('NF:') and (cmd.startswith('uia') or step.get('via') == 'uia'):
         return 'uia_target_not_found'
     
-    # ... 后续分支 ...
+    # ... subsequent branches ...
 ```
 
-`_failure_recommendations` 同步增加：
+Add corresponding entries to `_failure_recommendations`:
 
 ```python
 'uia_error': [
@@ -431,15 +435,15 @@ def _failure_signal(result: dict) -> str:
 ],
 ```
 
-#### T3c. Python 端 `uiascan`/`scan` JSON 自动解析
+#### T3c. Python-side automatic `uiascan`/`scan` JSON parsing
 
-在 `_execute_script_unlocked` 的 resp_json 后处理段（介于现有第 1248 行的 dumpstate/dlgscan 后处理与第 1278 行的 `results.append` 之间）增加：
+In the `resp_json` post-processing section of `_execute_script_unlocked` (between the existing dumpstate/dlgscan post-processing at line 1248 and the `results.append` at line 1278), add:
 
 ```python
-# 紧接在现有 dumpstate/dlgscan 后处理（if cmd in ('dumpstate', 'dlgscan'): ...）之后添加：
-# 注意：同时处理 uiascan（uia 前缀）和 scan via UIA（非前缀但 result 标记 uia）
+# Add immediately after the existing dumpstate/dlgscan post-processing (if cmd in ('dumpstate', 'dlgscan'): ...):
+# Note: handle both uiascan (uia prefix) and scan via UIA (non-prefixed but result marked uia)
 elif cmd in ('uiascan', 'scan') and ok and resp_json.get('data'):
-    # 只处理来自 UIA 路径的 scan 结果（管道路径的 scan 格式不同）
+    # Process only scan results coming from the UIA path (pipeline-path scan has a different format)
     if resp_json.get('status') == 'ok' and isinstance(resp_json.get('data'), str):
         try:
             parsed = json.loads(resp_json['data'])
@@ -448,22 +452,22 @@ elif cmd in ('uiascan', 'scan') and ok and resp_json.get('data'):
             pass
 ```
 
-#### T3d. 依赖管理
+#### T3d. Dependency management
 
-在 `pyproject.toml` 的 `[project.optional-dependencies]` 中增加：
+In `pyproject.toml` under `[project.optional-dependencies]`, add:
 
 ```toml
-# 可选: Windows UI Automation 跨进程操作
+# Optional: Windows UI Automation cross-process operations
 uia = [
     "uiautomation>=2.0.0",
 ]
 ```
 
-在 `automation_service.py` 顶部（与 `_UI_ASYNC_CMDS` 等常量一起）做延迟导入：
+At the top of `automation_service.py` (together with constants such as `_UI_ASYNC_CMDS`), perform lazy import:
 
 ```python
-# ── UIA 模块延迟导入（已统一在 T1a 常量区声明，此处仅为引用说明）──
-# 实际代码在 T1a 常量区统一声明：
+# ── UIA module lazy import (already uniformly declared in the T1a constants area; this is only a reference note) ──
+# Actual code is uniformly declared in the T1a constants area:
 #   _UIA_AVAILABLE = False
 #   _UIA_MODULE: Any | None = None
 #   try:
@@ -473,13 +477,13 @@ uia = [
 #       pass
 ```
 
-`_execute_uia_step` 内部入口处已包含 `_UIA_AVAILABLE` 守卫（见 T2），无需重复添加。
+The entry point of `_execute_uia_step` already includes the `_UIA_AVAILABLE` guard (see T2), so no duplicate addition is needed.
 
 ---
 
-### T4. 集成测试（0.5 人天）
+### T4. Integration testing (0.5 person-day)
 
-#### 测试脚本
+#### Test script
 
 ```json
 // tests/scripts/uia-basic-test.json
@@ -493,11 +497,11 @@ uia = [
 }
 ```
 
-#### 单元测试
+#### Unit tests
 
 ```python
 # tests/test_uia.py
-"""UIA 功能测试（需要 uiautomation 可选依赖）"""
+"""UIA function tests (requires the uiautomation optional dependency)"""
 
 import pytest
 
@@ -507,7 +511,7 @@ from src.services.automation_service import _execute_uia_step
 
 
 def test_uiascan_returns_json():
-    """uiascan 应返回 JSON 格式控件树"""
+    """uiascan should return a control tree in JSON format"""
     step = {"cmd": "uiascan"}
     req = {"reqId": "t1", "cmd": "uiascan"}
     resp, ok, _ = _execute_uia_step(step, req, "t1")
@@ -519,7 +523,7 @@ def test_uiascan_returns_json():
 
 
 def test_uiawait_taskbar():
-    """uiawait 应能找到 Taskbar"""
+    """uiawait should find Taskbar"""
     step = {"cmd": "uiawait", "condition": "exists:Taskbar", "timeout": 3000}
     req = {"reqId": "t2"}
     resp, ok, _ = _execute_uia_step(step, req, "t2")
@@ -527,9 +531,9 @@ def test_uiawait_taskbar():
 
 
 def test_uia_unavailable_without_dep():
-    """不安装 uiautomation 时 UIA 命令返回 UIA_unavailable"""
+    """When uiautomation is not installed, UIA commands return UIA_unavailable"""
     import sys
-    # 模拟未安装状态
+    # Simulate the not-installed state
     with pytest.MonkeyPatch.context() as m:
         m.setattr('src.services.automation_service._UIA_AVAILABLE', False)
         from src.services.automation_service import _execute_uia_step
@@ -540,242 +544,243 @@ def test_uia_unavailable_without_dep():
         assert "UIA_unavailable" in resp.get("data", "")
 ```
 
-#### 执行方式
+#### Execution method
 
 ```bash
-pip install daofy-for-delphi[uia]  # 安装 UIA 依赖
-pytest tests/test_uia.py -v        # 跑 UIA 测试
-pytest tests/ -v                    # 回归测试（不影响现有测试）
+pip install daofy-for-delphi[uia]  # Install UIA dependency
+pytest tests/test_uia.py -v        # Run UIA tests
+pytest tests/ -v                    # Regression tests (does not affect existing tests)
 ```
 
 ---
 
-## 工作量估算
+## Workload Estimate
 
-| 任务 | 人天 | 依赖 | 说明 |
+| Task | Person-days | Dependency | Description |
 |------|:---:|:----:|------|
-| T1. 命令路由 + `_execute_script_unlocked` 改造 | 1 | 无 | 新增 `_UIA_PREFIX_CMDS`、路由分支、`_execute_uia_step` 入口 |
-| T2. 6 个 UIA 命令实现 | 1 | T1 | 函数体 + `_walk_uia_tree` 辅助 |
-| T3. 断言/信号/后处理 + 依赖管理 | 0.5 | T2 | `_extract_actual`、`_failure_signal`、`pyproject.toml` |
-| T4. 集成测试 | 0.5 | T3 | 单元测试 + 脚本 + 文档更新 |
-| **合计** | **3 人天** | | **较 v2.0 减少 6.5 人天** |
+| T1. Command routing + `_execute_script_unlocked` modification | 1 | None | Add `_UIA_PREFIX_CMDS`, routing branch, `_execute_uia_step` entry |
+| T2. Implement 6 UIA commands | 1 | T1 | Function bodies + `_walk_uia_tree` helper |
+| T3. Assertions/signals/post-processing + dependency management | 0.5 | T2 | `_extract_actual`, `_failure_signal`, `pyproject.toml` |
+| T4. Integration testing | 0.5 | T3 | Unit tests + scripts + documentation update |
+| **Total** | **3 person-days** | | **6.5 person-days fewer than v2.0** |
 
-**相比 v2.0 的变化：**
+**Changes compared with v2.0:**
 
-| 任务 | v2.0 | v3.0 | 差异原因 |
+| Task | v2.0 | v3.0 | Reason for difference |
 |------|:----:|:----:|---------|
-| `DaofyAutomation.UIA.pas`（COM 接口导入） | 3 人天 | **0** | Python `uiautomation` 库已封装 |
-| `DaofyAutomation.UIA.Commands.pas`（6 命令） | 3 人天 | **0** | Python 端 `_execute_uia_step` 替代 |
-| `DaofyAutomation.Base.pas` 修改（ExecCmd + CoInit） | 1 人天 | **0** | Python 端路由替代 |
-| Python 端扩展 | 1.5 人天 | **2.5 人天** | 从命令映射扩展到完整实现 |
-| 集成测试 | 1 人天 | **0.5 人天** | Python-only 测试单栈，无需 Delphi 编译验证 |
-| VCL/FMX 修改 | 0 | 0 | 两版都不需要 |
-| **合计** | **9.5 人天** | **3 人天** | **减少 68%** |
+| `DaofyAutomation.UIA.pas` (COM interface import) | 3 person-days | **0** | Python `uiautomation` library already wraps it |
+| `DaofyAutomation.UIA.Commands.pas` (6 commands) | 3 person-days | **0** | Replaced by Python-side `_execute_uia_step` |
+| `DaofyAutomation.Base.pas` modification (ExecCmd + CoInit) | 1 person-day | **0** | Replaced by Python-side routing |
+| Python-side extension | 1.5 person-days | **2.5 person-days** | Expanded from command mapping to complete implementation |
+| Integration testing | 1 person-day | **0.5 person-day** | Python-only single-stack testing; no Delphi compile verification needed |
+| VCL/FMX modification | 0 | 0 | Neither version needs it |
+| **Total** | **9.5 person-days** | **3 person-days** | **68% reduction** |
 
 ---
 
-## 风险评估（v3.0 版）
+## Risk Assessment (v3.0)
 
-| 风险 | 概率 | 影响 | 缓解 |
+| Risk | Probability | Impact | Mitigation |
 |------|:----:|:----:|------|
-| **R1: `uiautomation` 库兼容性** — 特定 Windows 版本上行为异常 | 低 | 🟡 中 | 降级为 `pip uninstall uiautomation`，不影响现有功能。安装时不阻塞启动（延迟导入）。 |
-| **R2: 跨进程 Element 失效** — 目标窗口刷新导致 stale element | 中 | 🟡 中 | 每个命令内独立获取 Element（无状态设计），不跨命令缓存。`_walk_uia_tree` 内每层 `try/except` 保护。 |
-| **R3: UIA 操作速度** — 远程桌面/慢速环境下 `uiautomation` 调用慢 | 中 | 🟢 轻 | 所有 UIA 调用设 timeout（默认 `maxSearchSeconds=3`），超时返回 `TIMEOUT`。不影响管道命令。 |
-| **R4: Admin 权限窗口** — 以管理员身份运行的窗口无法通过 UIA 操作 | 低 | 🟡 中 | UIA 返回 `E_ACCESSDENIED` 时，Python 端返回 `UIA_ACCESS_DENIED`。用户改用 `msgclick`（Win32 消息）替代。 |
-| **R5: 脚本可移植性** — 测试脚本在中文/英文 Windows 上依赖的窗口名称不同 | 中 | 🟢 轻 | `uiascan` 先探查实际名称；`target` 支持 partial match 语义（默认 `SubName` 匹配）。 |
+| **R1: `uiautomation` library compatibility** — abnormal behavior on certain Windows versions | Low | 🟡 Medium | Degrade with `pip uninstall uiautomation`; does not affect existing functionality. Installation does not block startup (lazy import). |
+| **R2: Cross-process Element invalidation** — target window refresh causes stale element | Medium | 🟡 Medium | Acquire Element independently within each command (stateless design); do not cache across commands. Protect each level in `_walk_uia_tree` with `try/except`. |
+| **R3: UIA operation speed** — `uiautomation` calls are slow in Remote Desktop/slow environments | Medium | 🟢 Light | All UIA calls set timeouts (default `maxSearchSeconds=3`); timeout returns `TIMEOUT`. Does not affect pipeline commands. |
+| **R4: Admin-privileged windows** — windows running as administrator cannot be operated via UIA | Low | 🟡 Medium | When UIA returns `E_ACCESSDENIED`, the Python side returns `UIA_ACCESS_DENIED`. Users can switch to `msgclick` (Win32 messages) instead. |
+| **R5: Script portability** — window names used by test scripts differ on Chinese/English Windows | Medium | 🟢 Light | Run `uiascan` first to probe actual names; `target` supports partial match semantics (default `SubName` matching). |
 
 ---
 
-## 验证清单
+## Verification Checklist
 
 ```
-[ ] T1 路由验证:
-      脚本中 cmd="uiascan" → _execute_uia_step 被调用（不走管道）
-      脚本中 cmd="click" 且无 via → 走现有管道路径（不变）
+[ ] T1 routing verification:
+      Script cmd="uiascan" → _execute_uia_step is called (does not go through pipeline)
+      Script cmd="click" without via → goes through existing pipeline path (unchanged)
 
-[ ] T2 命令功能验证:
-      uiascan → 返回 JSON 格式控件树
-      uiawait → 能找到 Taskbar（always available）
-      uiaclick → 给定一个已知按钮，返回 ok/NF
+[ ] T2 command functionality verification:
+      uiascan → returns control tree in JSON format
+      uiawait → can find Taskbar (always available)
+      uiaclick → given a known button, returns ok/NF
 
-[ ] T2 unicode/中文验证:
-      uiascan 返回的 Name 字段中中文不乱码
-      uiawait condition="exists:计算器" 能匹配
+[ ] T2 unicode/Chinese verification:
+      Chinese in the Name field returned by uiascan is not garbled
+      uiawait condition="exists:Calculator" can match
 
-[ ] T3 断言验证:
-      uiaget 的 _extract_actual 返回 data 值
-      uiascan 的 JSON 响应自动解析为 resp_json['state']
+[ ] T3 assertion verification:
+      _extract_actual for uiaget returns data value
+      uiascan JSON response is automatically parsed into resp_json['state']
 
-[ ] T3 依赖降级验证:
-      未安装 uiautomation → UIA 命令返回 'UIA_unavailable: pip install...'
-      pytest 测试用 pytest.importorskip 跳过
+[ ] T3 dependency degradation verification:
+      uiautomation not installed → UIA command returns 'UIA_unavailable: pip install...'
+      pytest tests skip via pytest.importorskip
 
-[ ] T4 回归测试:
-      pytest tests/ -v 确认现有非 UIA 测试全部通过
+[ ] T4 regression testing:
+      pytest tests/ -v confirms all existing non-UIA tests pass
 
-[ ] 端到端验证（关键路径）:
-      Python 发送 uiascan → 返回 JSON 控件树 → Python 解析成功
-      Python 发送 uiawait → 找到目标窗口 → 返回 ok
+[ ] End-to-end verification (critical path):
+      Python sends uiascan → returns JSON control tree → Python parses successfully
+      Python sends uiawait → finds target window → returns ok
 ```
 
 ---
-## UIA 能力边界
+## UIA Capability Boundaries
 
-### 适用场景
+### Applicable Scenarios
 
-UIA（UI Automation）操作的是 **操作系统级的 UI 控件树**，不是浏览器的网页 DOM。
-以下表格标注了 UIA 在三种对象域中的实际能力：
+UIA (UI Automation) operates on the **OS-level UI control tree**, not the browser's web DOM.
+The following table marks UIA's actual capabilities across the three object domains:
 
-| 对象域 | UIA 能做什么 | UIA 不能做什么 | 推荐技术 |
+| Object Domain | What UIA can do | What UIA cannot do | Recommended technology |
 |--------|-------------|---------------|---------|
-| **A: Delphi 进程内组件** | —（本方案不走这条路） | 比 RTTI 属性少、速度慢、无方法调用 | **RTTI**（rget/rset/rcall） |
-| **B: 跨进程 Windows 窗口** | ✅ 窗口激活/聚焦 | ❌ 无法读取复杂控件属性树 | **UIA**（本方案） |
-| | ✅ 窗口标题读取 | ❌ 绕过 Admin 权限限制 | |
-| | ✅ 按钮点击（`Name` 匹配） | ❌ 跨进程控件缓存（每次重新搜索） | |
-| | ✅ 控件树遍历（`uiascan`） | ❌ 截图（需独立 `capture` step） | |
-| | ✅ 控件存在性等待（`uiawait`） | ❌ 性能：远程桌面下可能慢 | |
-| **C: 网页内容（浏览器 DOM）** | ✅ 浏览器 **Chrome 层** 操作 | ❌ **无法获取网页 DOM**（搜索框、链接、按钮文本） | **Playwright / Selenium** |
-| | — 地址栏（清空/输入/回车） | ❌ 无法读取页面标题 `<title>` | |
-| | — 工具栏按钮（返回/刷新/收藏） | ❌ 无法点击页面内链接 | |
-| | — 标签页切换 | ❌ 无法表单填充 | |
-| | — 扩展/设置菜单 | ❌ 无法执行 JavaScript | |
-| **D: Win32 消息层** | ✅ 与 UIA 互补 | ❌ 无 UIA 控件类型识别 | **msgscan/msgclick**（已有） |
+| **A: Delphi in-process components** | — (this plan does not take this path) | Fewer properties, slower, no method calls compared with RTTI | **RTTI** (rget/rset/rcall) |
+| **B: Cross-process Windows windows** | ✅ Window activation/focus | ❌ Cannot read complex control property trees | **UIA** (this plan) |
+| | ✅ Window title reading | ❌ Bypass Admin privilege restrictions | |
+| | ✅ Button click (`Name` matching) | ❌ Cross-process control caching (search again each time) | |
+| | ✅ Control tree traversal (`uiascan`) | ❌ Screenshots (requires independent `capture` step) | |
+| | ✅ Control existence waiting (`uiawait`) | ❌ Performance: may be slow under Remote Desktop | |
+| **C: Web content (browser DOM)** | ✅ Browser **Chrome layer** operations | ❌ **Cannot obtain web DOM** (search box, links, button text) | **Playwright / Selenium** |
+| | — Address bar (clear/input/enter) | ❌ Cannot read page title `<title>` | |
+| | — Toolbar buttons (back/refresh/bookmark) | ❌ Cannot click links inside the page | |
+| | — Tab switching | ❌ Cannot fill forms | |
+| | — Extensions/settings menu | ❌ Cannot execute JavaScript | |
+| **D: Win32 message layer** | ✅ Complementary to UIA | ❌ No UIA control type recognition | **msgscan/msgclick** (existing) |
 
-### 实际测试验证（Edge + 百度首页）
+### Actual Test Verification (Edge + Baidu Homepage)
 
-用 UIA 扫描 Edge 浏览器打开的 `baidu.com` 页面，确认了上述边界：
+Scanning the `baidu.com` page opened by the Edge browser with UIA confirmed the above boundaries:
 
 ```
-UIA 能获取的（145 个节点，全部是浏览器 chrome）：
-├── 窗口标题 "百度一下，你就知道 - Microsoft Edge"
-├── 地址栏（OmniboxViewViews，但 Value Pattern 不可读）
-├── 工具栏：返回/前进/刷新/主页/扩展/设置
-├── 标签栏：标签页搜索、新建标签页
-├── 收藏夹栏：收藏夹按钮
-└── 窗口控制：最小化/最大化/关闭
+What UIA can obtain (145 nodes, all browser chrome):
+├── Window title "Baidu, you will know - Microsoft Edge"
+├── Address bar (OmniboxViewViews, but Value Pattern is not readable)
+├── Toolbar: back/forward/refresh/home/extensions/settings
+├── Tab bar: tab search, new tab
+├── Favorites bar: favorites button
+└── Window controls: minimize/maximize/close
 
-UIA 无法获取的：
-├── 百度搜索输入框 ✗
-├── "百度一下" 搜索按钮 ✗
-├── 热搜词条 ✗
-├── 页面链接/图片 ✗
-└── 任何 HTML DOM 元素 ✗
+What UIA cannot obtain:
+├── Baidu search input box ✗
+├── "Baidu" search button ✗
+├── Trending search terms ✗
+├── Page links/images ✗
+└── Any HTML DOM element ✗
 ```
 
-### 为什么 UIA 拿不到网页 DOM
+### Why UIA Cannot Access Web DOM
 
-现代浏览器（Edge/Chrome）的渲染引擎运行在 **独立沙箱子进程** 中。UIA 可以访问浏览器主进程的 UI（Chrome 层），但：
-1. 网页渲染内容通过 **共享内存 + GPU 合成** 绘制，不是传统 UI 控件
-2. 浏览器仅在辅助功能（Screen Reader）场景下暴露有限的可访问性信息，且需要特定 UIA Pattern（TextPattern）
-3. 测试证实 Edge 对 baidu.com 的 UIA 树中不存在网页内容节点
+Modern browsers (Edge/Chrome) run their rendering engine in an **independent sandbox subprocess**. UIA can access the browser main process UI (Chrome layer), but:
+1. Web page rendering content is drawn via **shared memory + GPU composition**, not traditional UI controls
+2. Browsers expose limited accessibility information only in screen reader scenarios, and require specific UIA Patterns (TextPattern)
+3. Tests confirm that web content nodes do not exist in Edge's UIA tree for baidu.com
 
-### 正确的工具选择
+### Correct Tool Selection
 
-| 目标 | 工具 |
+| Goal | Tool |
 |------|------|
-| 操作 Delphi 应用（进程内） | `rget/rset/rcall/rinspect`（RTTI） |
-| 操作系统弹窗/第三方窗口（跨进程） | `uiascan/uiaclick/uiagoto/uiawait`（UIA） |
-| 操作浏览器网页 DOM | `Playwright` / `Selenium`（非本方案范围） |
-| 操作 Win32 消息 | `msgscan/msgclick/msgclose/dlgfile`（已有） |
+| Operate Delphi application (in-process) | `rget/rset/rcall/rinspect` (RTTI) |
+| Operate OS popups/third-party windows (cross-process) | `uiascan/uiaclick/uiagoto/uiawait` (UIA) |
+| Operate browser web DOM | `Playwright` / `Selenium` (outside this plan's scope) |
+| Operate Win32 messages | `msgscan/msgclick/msgclose/dlgfile` (existing) |
 
 ---
 
-## 已知限制（Phase 1 不覆盖）
+## Known Limitations (Phase 1 Does Not Cover)
 
-- **截图**：UIA step 不支持内联 `capture` 字段。如需截图，在脚本中 UIA step 之后添加独立的 `capture` step（走现有 Delphi 管道路径，截取 Delphi 应用窗口内容）。
-- **自动 fallback**：Phase 1 要求脚本显式写 `via: 'uia'` 或 `uia` 前缀命令。自动 fallback（管道失败→UIA）在 Phase 2。
-- **复杂控件模式**：不支持 `SelectionPattern` / `GridPattern` / `TablePattern`（Phase 1 不需要）。
-- **UIA Event 监听**：`uiawait` 用轮询而非事件驱动。事件监听留待 Phase 3。
-
----
+- **Screenshots**: UIA steps do not support inline `capture` fields. If a screenshot is needed, add an independent `capture` step after the UIA step in the script (using the existing Delphi pipeline path to capture Delphi application window content).
+- **Automatic fallback**: Phase 1 requires scripts to explicitly write `via: 'uia'` or use `uia`-prefixed commands. Automatic fallback (pipeline failure→UIA) is Phase 2.
+- **Complex control patterns**: Does not support `SelectionPattern` / `GridPattern` / `TablePattern` (not needed in Phase 1).
+- **UIA Event listening**: `uiawait` uses polling rather than event-driven behavior. Event listening is left for Phase 3.
 
 ---
 
-## 审计发现（v3.0 实施前修正 — 全部 9 项已修复 ✅）
+---
 
-对 v3.0 计划进行架构级和实现级审计，发现 **9 项需要修正的问题**，以下逐项说明修复状态。
+## Audit Findings (Pre-Implementation Fixes for v3.0 — All 9 Items Fixed ✅)
 
-### 🔴 严重（已修复 ✅）
+An architecture-level and implementation-level audit of the v3.0 plan found **9 issues requiring correction**; the fix status of each is described below.
 
-#### A1. `_UAL_CAPABLE_CMDS` 常量名拼写错误（已修复 ✅）
+### 🔴 Critical (Fixed ✅)
 
-✅ 全局搜索替换 `_UAL_CAPABLE_CMDS` → `_UIA_CAPABLE_CMDS` 已完成。
-定义（T1a）和路由分支（T1b）均已统一为 `_UIA_CAPABLE_CMDS`。
+#### A1. `_UAL_CAPABLE_CMDS` constant name typo (Fixed ✅)
 
-#### A2. UIA 路由分支跳过 `capture` 截图逻辑（已处理 ✅）
+✅ Global search-and-replace of `_UAL_CAPABLE_CMDS` → `_UIA_CAPABLE_CMDS` completed.
+Both the definition (T1a) and the routing branch (T1b) are now unified as `_UIA_CAPABLE_CMDS`.
 
-UIA step 不支持内联 `capture` 字段。如需截图，在脚本中 UIA step 之后添加独立的 `capture` step（走现有 Delphi 管道路径）。
-✅ T1b 路由分支中已移除截图处理代码，改为注释说明。
+#### A2. UIA routing branch skips `capture` screenshot logic (Handled ✅)
 
-### 🟡 中等（已修复 ✅）
+UIA steps do not support inline `capture` fields. If a screenshot is needed, add an independent `capture` step after the UIA step in the script (using the existing Delphi pipeline path).
+✅ Screenshot handling code has been removed from the T1b routing branch and replaced with an explanatory comment.
 
-#### A3. 缺少 `_gui_execution_lock` 保护（已修复 ✅）
+### 🟡 Medium (Fixed ✅)
 
-✅ `T1b` 的路由分支中已在外层包裹 `with _gui_execution_lock:`：
+#### A3. Missing `_gui_execution_lock` protection (Fixed ✅)
+
+✅ The routing branch in `T1b` now wraps the outer layer with `with _gui_execution_lock:`:
 ```python
 with _gui_execution_lock:
     resp_json, step_ok, ok = _execute_uia_step(step, req, req_id)
 ```
-锁在调用函数前获取、函数返回后释放，与管道路径串行执行的语义一致。
+The lock is acquired before calling the function and released after it returns, consistent with the serial execution semantics of the pipeline path.
 
-#### A4. `_execute_uia_step` 内部 `import uiautomation` 与模块级 `_UIA_AVAILABLE` 不一致（已修复 ✅）
+#### A4. `_execute_uia_step` internal `import uiautomation` inconsistent with module-level `_UIA_AVAILABLE` (Fixed ✅)
 
-✅ 采取了统一方案：
-1. **模块级**（T1a 常量区）：`try: import uiautomation as _UIA_MODULE; _UIA_AVAILABLE = True`
-2. **函数内**（T2 `_execute_uia_step` 入口）：`if not _UIA_AVAILABLE: return error; auto = _UIA_MODULE`
-3. **T3d 已修正**：不再建议重复 import，改为引用 T1a 的统一声明
+✅ Adopted a unified approach:
+1. **Module level** (T1a constants area): `try: import uiautomation as _UIA_MODULE; _UIA_AVAILABLE = True`
+2. **Inside function** (T2 `_execute_uia_step` entry): `if not _UIA_AVAILABLE: return error; auto = _UIA_MODULE`
+3. **T3d has been corrected**: no longer recommends duplicate import; changed to reference the unified declaration in T1a
 
-#### A5. UIA 路由分支与主循环后处理代码重复（已修复 ✅）
+#### A5. Duplication between UIA routing branch and main-loop post-processing (Fixed ✅)
 
-✅ `T1b` 路由分支中保留了必要的后处理（`_check_assert` / `results.append`），理由：
-- UIA 分支的 `resp_json` 格式与管道路径对齐，可直接复用 `_check_assert`
-- UIA 分支用 `continue` 跳过管道发送/peekresult，因此需要自己处理后处理和截图
-- 后处理逻辑精简到必要步骤（assert + results），无重复的管道通信代码
-- 如果后续发现仍有重复，可提取 `_finalize_step` 辅助函数（留作 Phase 2 优化）
+✅ The T1b routing branch retains necessary post-processing (`_check_assert` / `results.append`) because:
+- The UIA branch's `resp_json` format is aligned with the pipeline path and can directly reuse `_check_assert`
+- The UIA branch uses `continue` to skip pipeline send/peekresult, so it must handle post-processing and screenshots itself
+- Post-processing logic is reduced to necessary steps (assert + results), with no duplicated pipeline communication code
+- If duplication is still found later, extract a `_finalize_step` helper (left as a Phase 2 optimization)
 
-#### A6. `uiaget` 的未知 prop 静默 fallback（已修复 ✅）
+#### A6. `uiaget` unknown prop silent fallback (Fixed ✅)
 
-✅ `T2` 的 `_execute_uia_step` 中已改为：
+✅ In T2's `_execute_uia_step`, this has been changed to:
 ```python
 else:
     _logger.warning(f"[UIA] unknown prop '{prop}' for cmd=get, falling back to Name")
     val = ctrl.Name
 ```
-使用 `_logger.warning` 记录日志，让用户知晓属性不可用。选择 fallback 而非报错，因为 `ctrl.Name` 至少提供可读的调试信息，且不影响脚本继续执行。
+Use `_logger.warning` to record a log so the user knows the property is unavailable. Fallback is chosen instead of raising an error because `ctrl.Name` at least provides readable debugging information and does not affect script continuation.
 
-### 🟢 轻微（已修复 ✅）
+### 🟢 Minor (Fixed ✅)
 
-#### A7. 缺少 Trace 日志（已修复 ✅）
+#### A7. Missing trace logs (Fixed ✅)
 
-✅ `T2` 的 `_execute_uia_step` 中已在以下位置添加 `_logger.debug`：
-- 函数入口：`_logger.debug(f"[UIA] executing: cmd={cmd} target={target}")`
-- 函数出口：`_logger.debug(f"[UIA] result: cmd={cmd} status={resp.get('status')}")`
-- `T1b` 中额外：`_logger.debug(f"[UIA] step done: cmd={cmd} target={...} ok={step_ok}")`
+✅ In T2's `_execute_uia_step`, `_logger.debug` has been added at the following positions:
+- Function entry: `_logger.debug(f"[UIA] executing: cmd={cmd} target={target}")`
+- Function exit: `_logger.debug(f"[UIA] result: cmd={cmd} status={resp.get('status')}")`
+- Additionally in `T1b`: `_logger.debug(f"[UIA] step done: cmd={cmd} target={...} ok={step_ok}")`
 
-#### A8. `_walk_uia_tree` 返回类型注释不精确（已修复 ✅）
+#### A8. `_walk_uia_tree` return type annotation imprecise (Fixed ✅)
 
-✅ 签名已改为：`def _walk_uia_tree(...) -> dict:`
+✅ Signature has been changed to: `def _walk_uia_tree(...) -> dict:`
 
-#### A9. 未说明 `uiaget` 返回值的 JSON 编码处理（已修复 ✅）
+#### A9. Did not explain JSON encoding handling for `uiaget` return values (Fixed ✅)
 
-✅ `T2` 中统一使用 `str(val)` 序列化为普通字符串，在 `resp['data']` 中不包含嵌套 JSON/unicode 对象。后续如果 `json.dumps` 整个 resp 时，`data` 字段是原生字符串，不会产生 double-encoding。
+✅ In T2, uniformly use `str(val)` to serialize as a plain string; `resp['data']` does not contain nested JSON/unicode objects. If the entire resp is later `json.dumps`-ed, the `data` field is a native string and will not cause double-encoding.
 
-### 审计结论
+### Audit Conclusion
 
-| 严重度 | 数量 | 当前状态 |
+| Severity | Count | Current status |
 |:------:|:----:|:--------|
-| 🔴 严重 | 2 | **已处理 ✅** — A1 拼写错误、A2 UIA 不支持 capture 确认 |
-| 🟡 中等 | 4 | **已修复 ✅** — A3 `_gui_execution_lock`、A4 import 不一致、A5 代码重复（保留合理冗余）、A6 静默 fallback |
-| 🟢 轻微 | 3 | **已修复 ✅** — A7 缺失 trace、A8 类型注释、A9 JSON 编码 |
+| 🔴 Critical | 2 | **Handled ✅** — A1 typo, A2 UIA does not support capture confirmation |
+| 🟡 Medium | 4 | **Fixed ✅** — A3 `_gui_execution_lock`, A4 import inconsistency, A5 code duplication (reasonable redundancy retained), A6 silent fallback |
+| 🟢 Minor | 3 | **Fixed ✅** — A7 missing trace, A8 type annotation, A9 JSON encoding |
 
-**所有 9 项问题已在计划文档中修正完毕。** 开发者按当前计划编码即可，无需额外核对审计列表。
+**All 9 issues have been corrected in the planning document.** Developers can code directly according to the current plan without additionally checking the audit list.
 
 ---
 
-## 参考文档
+## Reference Documents
 
-- Python `uiautomation` 库：https://github.com/yinkaisheng/Python-UIAutomation-for-Windows
-- 现有自动化服务：`src/services/automation_service.py`
-- 现有测试脚本目录：`tests/scripts/`
-- Python 官方 UIA 文档：https://learn.microsoft.com/en-us/windows/win32/winauto/entry-uiauto-win32
-- 审计前版本（已废弃）：`docs/uia-integration-plan.md`
+- Python `uiautomation` library: https://github.com/yinkaisheng/Python-UIAutomation-for-Windows
+- Existing automation service: `src/services/automation_service.py`
+- Existing test script directory: `tests/scripts/`
+- Python official UIA documentation: https://learn.microsoft.com/en-us/windows/win32/winauto/entry-uiauto-win32
+- Pre-audit version (deprecated): `docs/uia-integration-plan.md`
+

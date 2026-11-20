@@ -12,15 +12,15 @@
 ## Overall Strategy
 
 ```
-现有架构：
-  TAutomationProcessorBase (基类)
+Existing architecture:
+  TAutomationProcessorBase (base class)
     ├── Vcl.TAutomationProcessor
     └── Fmx.TAutomationProcessor
 
-Phase 1 新增：
-  可选 UIA 通道（独立单元，条件 uses）
-    ├── DaofyAutomation.UIA.pas          ← UIA COM 包装 + 工具函数
-    └── DaofyAutomation.UIA.Commands.pas  ← UIA 命令实现 (uiagoto/uiaclick/uiaget/uiascan/uiawait)
+Phase 1 additions:
+  Optional UIA channel (standalone units, conditional uses)
+    ├── DaofyAutomation.UIA.pas          ← UIA COM wrapper + utility functions
+    └── DaofyAutomation.UIA.Commands.pas  ← UIA command implementations (uiagoto/uiaclick/uiaget/uiascan/uiawait)
 ```
 
 **Design principles:**
@@ -28,6 +28,7 @@ Phase 1 新增：
 - The UIA dependency (`UIAutomationCore.dll`) is delay-loaded, so a machine without it does not block startup
 - No code path of the existing non-UIA commands is modified
 - The Python side of `automation_service.py` supports automatic fallback: a failing UIA command degrades back to RTTI
+
 ---
 
 ## Effort Estimate
@@ -41,7 +42,7 @@ Phase 1 新增：
 | T5. Modify `Fmx.DaofyAutomation.pas` — same as above | 1 | T3 |
 | T6. Python side of `automation_service.py` — command mapping + fallback logic | 1.5 | T3 |
 | T7. Integration tests — test scripts + on-machine verification | 2 | T6 |
-| **Total** | **~11 person-days** | |
+| **Total** | **~11 person-days** | | |
 
 ---
 
@@ -56,31 +57,31 @@ interface
 
 uses Winapi.Windows, System.SysUtils, System.Variants;
 
-// ── UIA COM 接口定义（从 UIAutomationCore.dll 导入，非源代码依赖）──
+// ── UIA COM interface definitions (imported from UIAutomationCore.dll, not a source-code dependency) ──
 
 type
-  IUIAutomation = interface ... // 导入类型库或手写关键接口
+  IUIAutomation = interface ... // import type library or hand-write key interfaces
   IUIAutomationElement = interface ...
-  // 核心 Control Patterns:
-  IInvokeProvider = interface ...    // 按钮点击
-  IValueProvider = interface ...     // 读写文本
-  IToggleProvider = interface ...    // 复选框
-  ISelectionProvider = interface ... // 列表选择
-  IRangeValueProvider = interface ...// 滑块/进度条
+  // Core Control Patterns:
+  IInvokeProvider = interface ...    // button click
+  IValueProvider = interface ...     // read/write text
+  IToggleProvider = interface ...    // check box
+  ISelectionProvider = interface ... // list selection
+  IRangeValueProvider = interface ...// slider/progress bar
 
-// ── 延迟加载 UIAutomationCore.dll ──
+// ── Delay-load UIAutomationCore.dll ──
 
-function IsUIAvailable: Boolean;      // 检测是否可加载
-function GetUIAutomation: IUIAutomation; // 单例
+function IsUIAvailable: Boolean;      // check whether it can be loaded
+function GetUIAutomation: IUIAutomation; // singleton
 
-// ── 工具函数 ──
+// ── Utility functions ──
 
 function FindElementByAutomationId(Root: IUIAutomationElement; const AId: string): IUIAutomationElement;
 function FindElementByName(Root: IUIAutomationElement; const AName: string): IUIAutomationElement;
 function FindElementByControlType(Root: IUIAutomationElement; AType: Integer): TArray<IUIAutomationElement>;
 function GetElementRect(Root: IUIAutomationElement): TRect;
 
-// ── Control Pattern 工具 ──
+// ── Control Pattern utilities ──
 
 function TryGetInvokePattern(Elem: IUIAutomationElement; out Pattern: IInvokeProvider): Boolean;
 function TryGetValuePattern(Elem: IUIAutomationElement; out Pattern: IValueProvider): Boolean;
@@ -94,11 +95,11 @@ var
 
 function IsUIAvailable: Boolean;
 begin
-  // CoCreateInstance(CLSID_CUIAutomation, ...) 延迟加载
+  // CoCreateInstance(CLSID_CUIAutomation, ...) delay loading
   Result := Assigned(_UIAutomation);
 end;
 
-// ...其余实现
+// ...rest of implementation
 ```
 
 **Key design decisions:**
@@ -115,25 +116,25 @@ interface
 
 uses DaofyAutomation.UIA;
 
-// 6 个 UIA 命令，全部返回 JSON 字符串（与基类 WriteResp 格式兼容）
+// 6 UIA commands, all return JSON strings (compatible with the base class WriteResp format)
 
 function UiaGoto(const ReqId, Target: string): string;
-  // 定位窗口：按 Name/AutomationId 激活指定 UIA 窗口
+  // Locate window: activate the specified UIA window by Name/AutomationId
 
 function UiaClick(const ReqId, Target: string): string;
-  // 语义化点击：找到控件 → InvokePattern.Invoke 或模拟鼠标点击
+  // Semantic click: find control → InvokePattern.Invoke or simulate mouse click
 
 function UiaGet(const ReqId, Target, Prop: string): string;
-  // 读值：ValuePattern.Value / TogglePattern.ToggleState / 属性表
+  // Read value: ValuePattern.Value / TogglePattern.ToggleState / property table
 
 function UiaScan(const ReqId: string): string;
-  // 扫描当前 UIA 树，返回 JSON 格式的控件摘要（类似 dumpstate 但走 UIA）
+  // Scan current UIA tree, return JSON-format control summary (similar to dumpstate but through UIA)
 
 function UiaWait(const ReqId, Target, Condition: string; TimeoutMs: Integer): string;
-  // 等待条件：控件出现 / 属性满足 / 状态变化
+  // Wait for condition: control appears / property satisfied / state changes
 
 function UiaSet(const ReqId, Target, Value: string): string;
-  // 设置值：ValuePattern.SetValue 输入文本
+  // Set value: ValuePattern.SetValue input text
 ```
 
 **Key design decisions:**
@@ -146,7 +147,7 @@ function UiaSet(const ReqId, Target, Value: string): string;
 Add a new branch to the `ExecCmd` method:
 
 ```pascal
-// ── 在 ExecCmd 的框架相关命令段之前插入 ──
+// ── Insert before the framework-related command section of ExecCmd ──
 
 else if Cmd = 'uiagoto' then
   Result := WriteResp(ReqId, 'ok', DaofyAutomation.UIA.Commands.UiaGoto(ReqId, Target))
@@ -176,10 +177,10 @@ The `uses` clause needs a conditional reference — it is imported only where UI
 implementation
 
 uses
-  // ... 现有 uses ...
+  // ... existing uses ...
   DaofyAutomation.UIA.Commands;
-// Uses 放在 implementation 段，仅在编译时链接。若 UIAutomationCore.dll 不存在，
-// CoCreateInstance 在运行时返回错误，函数内部优雅降级为 `WriteResp(reqId, 'err', 'UIA_unavailable')`
+// Uses is placed in the implementation section and linked only at compile time. If UIAutomationCore.dll does not exist,
+// CoCreateInstance returns an error at runtime, and the function internally degrades gracefully to `WriteResp(reqId, 'err', 'UIA_unavailable')`
 ```
 
 **Key design decisions:**
@@ -197,18 +198,18 @@ Points to watch:
 ### T6. Python-side `automation_service.py` Extension
 
 ```python
-# 新增 UIA 命令集合
+# New UIA command set
 _UIA_CMDS = frozenset({
     'uiagoto', 'uiaclick', 'uiaget', 'uiascan', 'uiawait', 'uiaset',
 })
 
-# `_is_async_cmd` 增加：
+# Add to `_is_async_cmd`:
 _ASYNC_CMDS = _ASYNC_CMDS | frozenset({'uiaclick', 'uiaset'})
 _UI_ASYNC_CMDS = _UI_ASYNC_CMDS | frozenset({'uiaclick', 'uiaset'})
 
-# 命令构造逻辑增加 uia 前缀分支（在 `_execute_script_unlocked` 的 cmd 分支表中：
+# Add uia-prefix branch to command construction logic (in the cmd branch table of `_execute_script_unlocked`:
 if cmd in ('uiaget',):
-    # 解析 target.prop 语法
+    # parse target.prop syntax
 elif cmd == 'uiawait':
     req['condition'] = step.get('condition', '')
 ```
@@ -216,19 +217,19 @@ elif cmd == 'uiawait':
 ### T7. Integration Tests
 
 ```
-测试脚本目录: tests/scripts/
-新增: tests/scripts/uia-basic-test.json
+Test script directory: tests/scripts/
+New: tests/scripts/uia-basic-test.json
 
-测试内容:
-  1. uiascan — 扫描桌面 UIA 树（验证返回 JSON 格式正确）
-  2. uiagoto — 定位计算器/记事本窗口
-  3. uiaclick — 点击窗口上的标准按钮
-  4. uiget — 读取 Edit 和 Button 的属性
-  5. uiawait — 等待窗口打开
+Test content:
+  1. uiascan — scan the desktop UIA tree (verify the returned JSON format is correct)
+  2. uiagoto — locate Calculator/Notepad window
+  3. uiaclick — click a standard button on the window
+  4. uiget — read properties of Edit and Button
+  5. uiawait — wait for a window to open
 
-测试方式:
-  - 手动启动一个带标准控件的 Delphi 测试程序（或直接用 notepad.exe）
-  - 通过 mcp 测试或 pytest 调用 execute_script
+Test method:
+  - Manually start a Delphi test program with standard controls (or directly use notepad.exe)
+  - Call execute_script through an mcp test or pytest
 ```
 
 ---
@@ -264,3 +265,4 @@ elif cmd == 'uiawait':
 - Assessment report: `docs/uia-integration-plan.md` (this document)
 - Microsoft UIA documentation: https://learn.microsoft.com/en-us/windows/win32/winauto/entry-uiauto-win32
 - UIA Control Patterns: https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-controlpatternsoverview
+

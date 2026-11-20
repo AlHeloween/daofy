@@ -55,16 +55,19 @@ Han-character counts, `grep \p{Han}`; the tool output is the source of truth, no
 
 | Surface | Before | Now | Note |
 |---|---|---|---|
-| `README.md` | 6,900 | 0 | fully English ✓ |
-| `AGENTS.md` | 4,500 | 0 | fully English ✓ |
-| `src/tool_docs.py` | 1,006 | 92 | tool help dictionary ✓ (residual: Chinese trigger words) |
-| `src/server.py` | 414 | 73 | MCP descriptions ✓ (residual: trigger words) |
-| `src/resources/**` | 56,410 | partial | ~85% translated |
-| `docs/**` | 80,644 | ~75,594 | 12 documents translated |
-| `src/tools/**` | 37,223 | partial | delegated batches, in progress |
-| `src/services/**` | 29,835 | partial | delegated batches, in progress |
-| `tests/**` | 24,503 | 24,503 | assertions aligned only where messages moved |
-| `tools/**/*.pas` | 5,450 | 5,450 | blocked: `delphi_file` unreachable here |
+| `README.md` | 6,900 | 0 | ✓ |
+| `AGENTS.md` | 4,500 | 0 | ✓ |
+| `src/tool_docs.py` | 1,006 | 23 | ✓ |
+| `src/server.py` | 414 | 0 | ✓ |
+| `src/resources/**` | 56,410 | ~700 | ✓ (residual Chinese sample captions) |
+| `docs/**` | 80,644 | 29,308 | 20 documents done; tutorials + `.pas` assets open |
+| `src/tools/**` | 37,223 | ~130 | ✓ |
+| `src/services/**` | 29,835 | 900 | ✓ except `copyright_service.py` (652) |
+| `src/utils/**` | 6,711 | ~400 | `updater.py`, `file_backup.py`, `dproj_parser.py` open |
+| `src/plugins/**` | 4,161 | 0 | ✓ |
+| `tests/**` | 24,503 | 23,921 | assertions aligned; comments still Chinese |
+| `CHANGELOG.md` | 711 | 711 | restored: the model condensed 45 version sections to 30 |
+| `tools/**/*.pas` | 5,450 | 5,450 | blocked: `delphi_file` unreachable |
 
 ### Method that works (measured)
 
