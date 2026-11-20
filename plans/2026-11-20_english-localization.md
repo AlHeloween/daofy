@@ -59,15 +59,15 @@ Han-character counts, `grep \p{Han}`; the tool output is the source of truth, no
 | `AGENTS.md` | 4,500 | 0 | ✓ |
 | `src/tool_docs.py` | 1,006 | 23 | ✓ |
 | `src/server.py` | 414 | 0 | ✓ |
-| `src/resources/**` | 56,410 | ~700 | ✓ (residual Chinese sample captions) |
-| `docs/**` | 80,644 | 29,308 | 20 documents done; tutorials + `.pas` assets open |
-| `src/tools/**` | 37,223 | ~130 | ✓ |
-| `src/services/**` | 29,835 | 900 | ✓ except `copyright_service.py` (652) |
-| `src/utils/**` | 6,711 | ~400 | `updater.py`, `file_backup.py`, `dproj_parser.py` open |
+| `src/resources/**` | 56,410 | ~640 | ✓ (residual Chinese sample captions) |
+| `docs/**` | 80,644 | 6,895 | ✓ except `tutorial/slides/index.html`, `.pas` assets, `daofy_update.md` |
+| `src/tools/**` | 37,223 | 95 | ✓ |
+| `src/services/**` | 29,835 | 700 | ✓ except `copyright_service.py` (652) |
+| `src/utils/**` | 6,711 | 0 | ✓ |
 | `src/plugins/**` | 4,161 | 0 | ✓ |
-| `tests/**` | 24,503 | 23,921 | assertions aligned; comments still Chinese |
+| `tests/**` | 24,503 | 23,900 | assertions aligned; comments still Chinese |
 | `CHANGELOG.md` | 711 | 711 | restored: the model condensed 45 version sections to 30 |
-| `tools/**/*.pas` | 5,450 | 5,450 | blocked: `delphi_file` unreachable |
+| `src` total | 168,660 | 11,239 | `copyright_service.py` (652) + `handlers.py.bak` (107) are most of it |
 
 ### Method that works (measured)
 

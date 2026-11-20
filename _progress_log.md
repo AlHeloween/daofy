@@ -47,3 +47,32 @@ against `.temp/baseline.xml`).
 - `tools/**/*.pas` and `docs/tutorial/**/*.pas` — blocked: `delphi_file` is not
   reachable from this session, and editing `.pas` with native tools is forbidden
   by `AGENTS.md`.
+
+## 2026-11-20 — English localization, wave 2 (tools, services, docs)
+
+Measured with `grep \p{Han}`:
+
+| Surface | Before | After |
+|---|---|---|
+| `src/tools/**` | 37,223 | 95 |
+| `src/services/**` | 29,835 | 700 |
+| `src/utils/**` | 6,711 | 0 |
+| `src/plugins/**` | 4,161 | 0 |
+| `src/detection/**` | ~1,100 | 31 |
+| `docs/**` | 80,644 | 6,895 |
+| `src` total | 168,660 | 11,239 |
+
+Test oracle: 1,650 cases, 373 bad, **0 new failures**, 17 previously failing now pass
+(`.temp/wave9.xml` vs `.temp/baseline.xml`). `python -m compileall src tests`: clean.
+
+Two failures worth recording:
+
+- `CHANGELOG.md` — the model condensed 45 version sections to 30 instead of translating
+  them one-to-one; the file was restored from git and left untranslated.
+- `copyright_service.py` — a fragment pass dropped `generate_copyright` while still
+  compiling in isolation; caught by `import src.server`, restored from git.
+
+Commits: `3eafe2f`, `98b1bf6`, `566b632`, `e285fc8`.
+
+Open: `copyright_service.py` (652), `tests/**` comments (23,900), `CHANGELOG.md` (711),
+`docs/tutorial/slides/index.html` (388), `tools/**/*.pas` (5,450, needs `delphi_file`).
