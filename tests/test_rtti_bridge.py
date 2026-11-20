@@ -195,7 +195,7 @@ class TestDiscover:
         """非 JSON 响应应返回解析错误"""
         result = rtti_bridge.discover("C:\\App.exe")
         assert result["status"] == "error"
-        assert "无效响应" in result["message"]
+        assert "Invalid response" in result["message"]
 
     @mock.patch("src.services.rtti_bridge._ensure_process", return_value=(False, None))
     @mock.patch("src.services.rtti_bridge._send_command", return_value=json.dumps({
@@ -255,7 +255,7 @@ class TestCall:
         """非 JSON 响应时处理"""
         result = rtti_bridge.call("C:\\App.exe", "TMainForm", "Method")
         assert result["status"] == "error"
-        assert "无效响应" in result["message"]
+        assert "Invalid response" in result["message"]
 
 
 # ═══════════════════════════════════════════════════════════════

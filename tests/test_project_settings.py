@@ -212,7 +212,7 @@ def test_resolve_msbuild_path_invalid_project_path_fails_without_fallback(
 
     assert path is None
     assert explicit_error is True
-    assert "项目配置" in source
+    assert "Project configuration" in source
 
 
 def test_resolve_msbuild_path_redetects_for_project_version(tmp_path):

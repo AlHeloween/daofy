@@ -1,17 +1,17 @@
 """
-编译器插件基类
+Compiler plugin base class
 
-定义所有编译器插件必须实现的接口。
+Defines the interfaces that all compiler plugins must implement.
 
-核心能力分层:
-  - 必须实现: compile, detect, parse_project
-  - 可选覆盖: file_handling, kb_search, project_management
-    插件未覆盖的核心能力由 MCP Server 的核心服务提供默认实现。
+Core capability layers:
+  - Must implement: compile, detect, parse_project
+  - Optional overrides: file_handling, kb_search, project_management
+    Core capabilities not overridden by a plugin are provided by default by the MCP Server's core services.
 
-工具归属:
-  - 每个插件通过 owned_tools 声明自己拥有的 MCP 工具名
-  - 插件未拥有的工具由核心服务提供
-  - handler 引用在 Phase 2 由 server.py 注入到 registry
+Tool ownership:
+  - Each plugin declares the MCP tool names it owns via owned_tools
+  - Tools not owned by a plugin are provided by core services
+  - handler references are injected into the registry by server.py in Phase 2
 """
 
 from abc import ABC, abstractmethod
@@ -22,7 +22,7 @@ from typing import List, Optional, Dict, Any, Callable
 
 @dataclass
 class PluginInfo:
-    """插件元信息"""
+    """Plugin metadata"""
     name: str
     display_name: str
     version: str = "1.0.0"
@@ -32,7 +32,7 @@ class PluginInfo:
 
 @dataclass
 class ToolDefinition:
-    """MCP 工具声明（由插件注册到核心）"""
+    """MCP tool declaration (registered by the plugin to the core)"""
     name: str
     description: str
     input_schema: Dict[str, Any]
@@ -40,67 +40,68 @@ class ToolDefinition:
 
 
 class CompilerPlugin(ABC):
-    """编译器插件基类 — 每种语言/编译器实现一个。
+    """Compiler plugin base class — implement one per language/compiler.
 
-    Phase 1: 注册骨架，handler 由 server.py 管理。
-    Phase 2: 插件声明工具归属，handler 由 registry 注入。
-    Phase 3+: handler 提取到插件模块。
+    Phase 1: registration skeleton, handlers managed by server.py.
+    Phase 2: plugins declare tool ownership, handlers injected by registry.
+    Phase 3+: handlers extracted into plugin modules.
     """
 
-    # ── 必须实现 ──
+    # ── Must implement ──
 
     @property
     @abstractmethod
     def info(self) -> PluginInfo:
-        """插件元信息"""
+        """Plugin metadata"""
         ...
 
     def is_available(self) -> bool:
-        """检查当前环境是否安装了此插件对应的开发工具。
+        """Check whether the development tools corresponding to this plugin are installed in the current environment.
 
-        返回 False 时，registry.register() 将跳过该插件的工具注册，
-        避免向 MCP 客户端暴露不可用的工具。
-        子类可覆盖此方法实现自定义检测逻辑。
+        When False is returned, registry.register() will skip tool registration for this plugin
+        to avoid exposing unavailable tools to MCP clients.
+        Subclasses can override this method to implement custom detection logic.
         """
         return True
 
     @abstractmethod
     async def detect(self) -> List[Dict[str, Any]]:
-        """检测本机已安装的该编译器实例"""
+        """Detect instances of this compiler installed on the local machine"""
         ...
 
     @abstractmethod
     async def compile(self, project_path: str, options: Dict[str, Any]) -> Dict[str, Any]:
-        """执行编译"""
+        """Execute compilation"""
         ...
 
     @abstractmethod
     def parse_project(self, project_path: str) -> Optional[Dict[str, Any]]:
-        """解析项目文件，提取源文件列表、依赖、配置等"""
+        """Parse project files and extract source file lists, dependencies, configuration, etc."""
         ...
 
-    # ── 工具归属声明 ──
+    # ── Tool ownership declaration ──
 
     def get_owned_tool_names(self) -> List[str]:
-        """返回此插件拥有的 MCP 工具名列表。
+        """Return the list of MCP tool names owned by this plugin.
 
-        Phase 2: 只声明名称，handler 由 server.py 注入到 registry。
-        Phase 3: handler 迁移到插件模块后，返回完整 ToolDefinition。
+        Phase 2: only declare names; handlers are injected into the registry by server.py.
+        Phase 3: after handlers are migrated to plugin modules, return complete ToolDefinitions.
         """
         return []
 
-    # ── 可选覆盖: 编码规范 ──
+    # ── Optional override: coding rules ──
 
     def get_coding_rules(self, section: str = None) -> str:
-        """返回语言编码规范（可选覆盖）"""
+        """Return language coding rules (optional override)"""
         return ""
 
-    # ── 工具注册 ──
+    # ── Tool registration ──
 
     def get_tools(self) -> List[ToolDefinition]:
-        """返回插件注册的 MCP 工具列表。
+        """Return the list of MCP tools registered by the plugin.
 
-        Phase 2: 返回空列表，handler 由 registry 管理。
-        Phase 3: 返回完整 ToolDefinition 列表。
+        Phase 2: return an empty list; handlers are managed by the registry.
+        Phase 3: return a complete list of ToolDefinitions.
         """
         return []
+

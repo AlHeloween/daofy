@@ -241,7 +241,7 @@ class TestExecuteAutomation:
         """未知 action 返回错误"""
         result = execute_automation(action="unknown")
         assert result["status"] == "error"
-        assert "未知" in result["message"]
+        assert "Unknown" in result["message"]
 
     def test_gui_action_routes_to_execute_script(self):
         """execute_automation(action='gui') 走 execute_script"""

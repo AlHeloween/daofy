@@ -1,15 +1,15 @@
 """
-插件注册表
+Plugin registry
 
-动态发现 + 注册 + 按文件扩展名路由 + handler 分发。
+Dynamic discovery + registration + routing by file extension + handler dispatch.
 
-核心机制:
-  1. discover(plugins_dir) 扫描 src/plugins/*/plugin.py，
-     importlib 动态加载 CompilerPlugin 子类并实例化。
-  2. register_handlers(handlers, descriptions, schemas, owner) 注册 handler + schema，
-     由各插件 handler 模块自行调用。
-  3. collect_tools() 返回所有工具定义（ToolDefinition），供 list_tools() 使用。
-  4. get_handler() 按工具名路由到 handler，供 call_tool() 使用。
+Core mechanisms:
+  1. discover(plugins_dir) scans src/plugins/*/plugin.py,
+     importlib dynamically loads and instantiates CompilerPlugin subclasses.
+  2. register_handlers(handlers, descriptions, schemas, owner) registers handlers + schemas,
+     called by each plugin's handler module itself.
+  3. collect_tools() returns all tool definitions (ToolDefinition), for use by list_tools().
+  4. get_handler() routes to a handler by tool name, for use by call_tool().
 """
 
 import importlib
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class PluginRegistry:
-    """插件注册表 — 动态发现 + handler 分发 + schema 收集"""
+    """Plugin registry — dynamic discovery + handler dispatch + schema collection"""
 
     def __init__(self):
         self._plugins: Dict[str, CompilerPlugin] = {}  # name -> plugin
@@ -32,34 +32,34 @@ class PluginRegistry:
         self._tool_descriptions: Dict[str, str] = {}  # tool_name -> description
         self._tool_schemas: Dict[str, Dict[str, Any]] = {}  # tool_name -> inputSchema
         self._tool_owner: Dict[str, str] = {}  # tool_name -> plugin_name
-        self._aliases: set = set()  # 别名工具名（不暴露给 MCP 客户端）
+        self._aliases: set = set()  # alias tool names (not exposed to MCP clients)
 
-    # ── 插件动态发现 ──
+    # ── Plugin dynamic discovery ──
 
     def discover(self, plugins_dir: str | Path) -> None:
-        """扫描 plugins_dir/*/plugin.py，动态加载 CompilerPlugin 子类。
+        """Scan plugins_dir/*/plugin.py and dynamically load CompilerPlugin subclasses.
 
-        目录结构约定:
+        Directory structure convention:
           src/plugins/<name>/
             __init__.py
-            plugin.py    # 必须包含 CompilerPlugin 子类
-            handlers.py  # 可选，handler 函数
+            plugin.py    # must contain a CompilerPlugin subclass
+            handlers.py  # optional, handler functions
 
-        跳过:
-          - __pycache__、以 _ 或 . 开头的目录
-          - base.py、registry.py 等非 plugin 目录
-          - core/ 目录（核心工具单独注册）
+        Skip:
+          - __pycache__, directories starting with _ or .
+          - non-plugin directories such as base.py, registry.py
+          - core/ directory (core tools are registered separately)
         """
         plugins_path = Path(plugins_dir)
         if not plugins_path.is_dir():
-            logger.warning(f"插件目录不存在: {plugins_path}")
+            logger.warning(f"Plugin directory does not exist: {plugins_path}")
             return
 
         for pkg_dir in sorted(plugins_path.iterdir()):
             if not pkg_dir.is_dir():
                 continue
             name = pkg_dir.name
-            # 跳过特殊目录
+            # Skip special directories
             if name.startswith(("_", ".")) or name == "core":
                 continue
             plugin_file = pkg_dir / "plugin.py"
@@ -69,10 +69,10 @@ class PluginRegistry:
             try:
                 module = importlib.import_module(f"src.plugins.{name}.plugin")
             except Exception as e:
-                logger.error(f"导入插件模块失败: src.plugins.{name}.plugin — {e}", exc_info=True)
+                logger.error(f"Failed to import plugin module: src.plugins.{name}.plugin — {e}", exc_info=True)
                 continue
 
-            # 查找 CompilerPlugin 子类
+            # Find CompilerPlugin subclasses
             found = False
             for attr_name in dir(module):
                 attr = getattr(module, attr_name)
@@ -83,21 +83,21 @@ class PluginRegistry:
                         plugin_instance = attr()
                         self.register(plugin_instance)
                         found = True
-                        logger.info(f"动态加载插件: {plugin_instance.info.display_name} "
+                        logger.info(f"Dynamically loaded plugin: {plugin_instance.info.display_name} "
                                     f"(tools: {plugin_instance.get_owned_tool_names()})")
                     except Exception as e:
-                        logger.error(f"实例化插件 {attr_name} 失败: {e}", exc_info=True)
+                        logger.error(f"Failed to instantiate plugin {attr_name}: {e}", exc_info=True)
 
             if not found:
-                logger.warning(f"插件目录 {name}/ 中未找到 CompilerPlugin 子类")
+                logger.warning(f"No CompilerPlugin subclass found in plugin directory {name}/")
 
-    # ── 插件注册 ──
+    # ── Plugin registration ──
 
     def register(self, plugin: CompilerPlugin) -> None:
-        """注册插件 + 收集其 ToolDefinition（含 handler + schema）
+        """Register a plugin + collect its ToolDefinitions (including handler + schema)
 
-        如果 plugin.is_available() 返回 False，跳过该插件的工具注册，
-        仅保留插件元信息（名称、扩展名映射），避免暴露不可用的工具。
+        If plugin.is_available() returns False, skip tool registration for this plugin
+        and keep only plugin metadata (name, extension mapping) to avoid exposing unavailable tools.
         """
         info = plugin.info
         self._plugins[info.name] = plugin
@@ -105,14 +105,14 @@ class PluginRegistry:
             self._ext_map[ext.lower()] = info.name
 
         if not plugin.is_available():
-            logger.info(f"插件 {info.display_name} 未检测到开发工具，跳过工具注册")
+            logger.info(f"No development tools detected for plugin {info.display_name}; skipping tool registration")
             return
 
-        # 收集插件声明的工具归属
+        # Collect tool ownership declared by the plugin
         for tool_name in plugin.get_owned_tool_names():
             self._tool_owner[tool_name] = info.name
 
-        # 从 get_tools() 收集 handler + schema + description
+        # Collect handler + schema + description from get_tools()
         for tool_def in plugin.get_tools():
             if tool_def.handler:
                 self._tool_handlers[tool_def.name] = tool_def.handler
@@ -121,7 +121,7 @@ class PluginRegistry:
             if tool_def.input_schema:
                 self._tool_schemas[tool_def.name] = tool_def.input_schema
 
-    # ── Handler 模块注册（各插件 handler 模块自行调用）──
+    # ── Handler module registration (called by each plugin's handler module itself) ──
 
     def register_handlers(
         self,
@@ -131,9 +131,9 @@ class PluginRegistry:
         owner: str | None = None,
         aliases: set | None = None,
     ) -> None:
-        """注册 handler 模块导出的工具 — handler + description + schema 一次注册。
+        """Register tools exported by a handler module — register handler + description + schema at once.
 
-        由各插件的 handlers.py 模块在导入时调用：
+        Called by each plugin's handlers.py module at import time:
             _plugin_registry.register_handlers(
                 CORE_HANDLERS, CORE_TOOL_DESCRIPTIONS, CORE_TOOL_SCHEMAS)
         """
@@ -149,16 +149,16 @@ class PluginRegistry:
             self._aliases.update(aliases)
 
     def get_handler(self, tool_name: str) -> Optional[Callable]:
-        """按工具名获取 handler"""
+        """Get handler by tool name"""
         return self._tool_handlers.get(tool_name)
 
-    # ── 工具定义收集（供 list_tools 使用）──
+    # ── Tool definition collection (for list_tools) ──
 
     def collect_tools(self) -> List[ToolDefinition]:
-        """收集所有工具定义（插件 + 核心），供 server.py list_tools() 使用。
+        """Collect all tool definitions (plugin + core) for server.py list_tools().
 
-        返回的 ToolDefinition 包含 name, description, inputSchema, handler。
-        别名工具（如 file_tool）不包含在内。
+        Returned ToolDefinition includes name, description, inputSchema, handler.
+        Alias tools (such as file_tool) are not included.
         """
         tools: List[ToolDefinition] = []
         for name in self._tool_handlers:
@@ -166,20 +166,20 @@ class PluginRegistry:
                 continue
             tools.append(ToolDefinition(
                 name=name,
-                description=self._tool_descriptions.get(name, f"工具: {name}"),
+                description=self._tool_descriptions.get(name, f"Tool: {name}"),
                 input_schema=self._tool_schemas.get(name, {"type": "object", "properties": {}}),
                 handler=self._tool_handlers[name],
             ))
         return tools
 
-    # ── 查询方法 ──
+    # ── Query methods ──
 
     def get_plugin(self, name: str) -> Optional[CompilerPlugin]:
-        """按名称获取插件"""
+        """Get plugin by name"""
         return self._plugins.get(name)
 
     def get_plugin_for_file(self, file_path: str) -> Optional[CompilerPlugin]:
-        """按文件扩展名获取插件"""
+        """Get plugin by file extension"""
         ext = Path(file_path).suffix.lower()
         name = self._ext_map.get(ext)
         if name:
@@ -187,30 +187,31 @@ class PluginRegistry:
         return None
 
     def get_all_plugins(self) -> List[CompilerPlugin]:
-        """获取所有已注册插件"""
+        """Get all registered plugins"""
         return list(self._plugins.values())
 
     def get_all_extensions(self) -> Dict[str, str]:
-        """获取扩展名 -> 插件名映射"""
+        """Get extension -> plugin name mapping"""
         return dict(self._ext_map)
 
     def get_tool_owner(self, tool_name: str) -> Optional[str]:
-        """获取工具归属的插件名"""
+        """Get the plugin name that owns a tool"""
         return self._tool_owner.get(tool_name)
 
     def get_plugin_tools(self, plugin_name: str) -> List[str]:
-        """获取指定插件拥有的工具名列表"""
+        """Get the list of tool names owned by the specified plugin"""
         return [name for name, owner in self._tool_owner.items()
                 if owner == plugin_name]
 
     def get_core_tools(self) -> List[str]:
-        """获取核心（非插件）工具名列表"""
+        """Get the list of core (non-plugin) tool names"""
         return [name for name in self._tool_handlers
                 if name not in self._tool_owner]
 
     def dispatch(self, tool_name: str, arguments: dict) -> Any:
-        """分发工具调用到对应 handler"""
+        """Dispatch a tool call to the corresponding handler"""
         handler = self._tool_handlers.get(tool_name)
         if handler:
             return handler(arguments)
         return None
+

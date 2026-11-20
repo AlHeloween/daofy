@@ -1,11 +1,11 @@
 """
-编译服务
+Compilation Service
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Province ZuoYou Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
-Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
+Update & Mod By Crystalxp (Night Killer QQ:281309196)
 
-核心业务逻辑,协调参数生成、进程执行、结果解析等组件
+Core business logic, coordinating components such as parameter generation, process execution, and result parsing
 """
 
 import os
@@ -54,13 +54,13 @@ logger = get_logger(__name__)
 
 
 class CompilerService:
-    """编译服务"""
+    """Compilation Service"""
 
     def __init__(self, config_manager: ConfigManager):
-        """初始化编译服务
+        """Initialize the compilation service
         
         Args:
-            config_manager: 配置管理器
+            config_manager: Configuration manager
         """
         self.config_manager = config_manager
         self.args_generator = ArgsGenerator()
@@ -69,18 +69,18 @@ class CompilerService:
         self.validator = Validator()
         self.history: list = []
         
-        # MSBuild 路径（初始化时先做一次通用探测；编译时再按工程版本重新探测）
+        # MSBuild path (perform a general detection at initialization; re-detect by project version during compilation)
         self.msbuild_path = self._find_msbuild()
         self._msbuild_auto_cache: dict[str, Optional[str]] = {}
         
-        logger.info("编译服务初始化完成")
+        logger.info("Compilation service initialization complete")
 
     def _lookup_compiler_by_version(
         self,
         version: str,
         platform: TargetPlatform,
     ) -> Optional[CompilerConfig]:
-        """按 Delphi 版本查找编译器配置，兼容测试中的裁剪版 config_manager。"""
+        """Look up compiler configuration by Delphi version, compatible with the trimmed config_manager used in tests."""
         config_manager = getattr(self, "config_manager", None)
         getter = getattr(config_manager, "get_compiler_by_registry_version", None)
         if not callable(getter) or not version:
@@ -88,14 +88,14 @@ class CompilerService:
         try:
             return getter(version, platform.value)
         except TypeError:
-            # 兼容只接受一个位置参数的旧签名/桩对象
+            # Compatible with old signatures/stub objects that accept only one positional argument
             try:
                 return getter(version)
             except Exception:
-                logger.warning("按版本查找编译器失败: %s", version, exc_info=True)
+                logger.warning("Failed to look up compiler by version: %s", version, exc_info=True)
                 return None
         except Exception:
-            logger.warning("按版本查找编译器失败: %s", version, exc_info=True)
+            logger.warning("Failed to look up compiler by version: %s", version, exc_info=True)
             return None
 
     def _compiler_from_registry_version(
@@ -103,7 +103,7 @@ class CompilerService:
         version: str,
         platform: TargetPlatform,
     ) -> Optional[CompilerConfig]:
-        """按版本从注册表定位编译器，返回可用于编译的配置对象。"""
+        """Locate the compiler from the registry by version and return a configuration object usable for compilation."""
         path = self._find_compiler_from_registry(platform, version)
         if not path:
             return None
@@ -118,10 +118,10 @@ class CompilerService:
         value: str,
         platform: TargetPlatform,
     ) -> Optional[CompilerConfig]:
-        """先按编译器名称查找；找不到时把 value 当作 Delphi 版本再查。
+        """Look up by compiler name first; if not found, treat value as a Delphi version and look up again.
 
-        这样 ``compiler_version="11.0"`` / ``"XE4"`` 也能命中 XE4 的编译器，
-        而不是直接报“编译器不存在”。
+        This allows ``compiler_version="11.0"`` / ``"XE4"`` to hit the XE4 compiler,
+        instead of directly reporting "compiler does not exist".
         """
         config_manager = getattr(self, "config_manager", None)
         if config_manager is None or not value:
@@ -132,7 +132,7 @@ class CompilerService:
             try:
                 compiler = getter(value)
             except Exception:
-                logger.warning("查找编译器配置失败: %s", value, exc_info=True)
+                logger.warning("Failed to look up compiler configuration: %s", value, exc_info=True)
                 compiler = None
             if compiler:
                 return compiler
@@ -146,7 +146,7 @@ class CompilerService:
         self,
         project_settings: Optional[ProjectSettings],
     ) -> None:
-        """项目同时配置 compiler_version 与 delphi_version 且版本不一致时告警。"""
+        """Warn when a project configures both compiler_version and delphi_version and the versions are inconsistent."""
         if not project_settings:
             return
         if not project_settings.compiler_version or not project_settings.delphi_version:
@@ -160,8 +160,8 @@ class CompilerService:
         actual = normalize_registry_version(compiler.registry_version)
         if actual and actual != project_settings.delphi_version:
             logger.warning(
-                "项目配置 %s 中 compiler_version=%r 对应 Delphi %s，"
-                "与 delphi_version=%s 不一致；将以 compiler_version 为准",
+                "Project configuration %s has compiler_version=%r corresponding to Delphi %s, "
+                "which is inconsistent with delphi_version=%s; compiler_version will take precedence",
                 project_settings.source,
                 project_settings.compiler_version,
                 actual,
@@ -173,7 +173,7 @@ class CompilerService:
         project_path: str,
         compiler: Optional[CompilerConfig],
     ) -> None:
-        """直接编译时提示 .dproj 推断版本与实际编译器不一致。"""
+        """Warn during direct compilation when the .dproj inferred version does not match the actual compiler."""
         if not compiler or not compiler.registry_version:
             return
         dproj = project_path
@@ -187,7 +187,7 @@ class CompilerService:
                 return
             project_version = parser.get_project_version()
         except Exception:
-            logger.debug("读取 .dproj ProjectVersion 失败: %s", dproj, exc_info=True)
+            logger.debug("Failed to read .dproj ProjectVersion: %s", dproj, exc_info=True)
             return
         target = (
             project_version_to_registry_version(project_version)
@@ -197,9 +197,9 @@ class CompilerService:
         actual = normalize_registry_version(compiler.registry_version)
         if target and actual and target != actual:
             logger.warning(
-                "工程 %s 的 .dproj ProjectVersion=%s 对应 Delphi %s，"
-                "但直接编译将使用编译器 %s（Delphi %s）；"
-                "如需严格匹配，请在工程目录配置 .daofy/project.json 的 delphi_version",
+                "Project %s has .dproj ProjectVersion=%s corresponding to Delphi %s, "
+                "but direct compilation will use compiler %s (Delphi %s); "
+                "for strict matching, configure delphi_version in .daofy/project.json in the project directory",
                 Path(dproj).name,
                 project_version,
                 target,
@@ -214,16 +214,16 @@ class CompilerService:
         platform: TargetPlatform,
         project_settings: Optional[ProjectSettings] = None,
     ) -> tuple[Optional[CompilerConfig], Optional[str], Optional[str]]:
-        """解析工程实际使用的编译器。
+        """Resolve the compiler actually used by the project.
 
-        优先级：工具显式参数 > 项目配置 ``compiler_version`` > 项目配置
-        ``delphi_version`` > 默认编译器。项目配置指定了版本
-        但该版本不可用时返回错误，不回退到其它 Delphi 版本。
+        Priority: explicit tool parameter > project configuration ``compiler_version`` > project configuration
+        ``delphi_version`` > default compiler. If the project configuration specifies a version
+        but that version is unavailable, return an error and do not fall back to another Delphi version.
 
         Returns:
-            ``(compiler_config, compiler_path, error_message)``；正常时
-            ``error_message`` 为 None。只有路径没有注册表配置时
-            ``compiler_config`` 为 None、``compiler_path`` 有值。
+            ``(compiler_config, compiler_path, error_message)``; when normal,
+            ``error_message`` is None. When only a path exists without registry configuration,
+            ``compiler_config`` is None and ``compiler_path`` has a value.
         """
         settings = (
             project_settings
@@ -250,18 +250,18 @@ class CompilerService:
                     return None, path, None
             if not explicit_name and settings and settings.delphi_version:
                 logger.warning(
-                    "项目配置的 compiler_version=%r 不可用，改用 delphi_version=%s",
+                    "The project-configured compiler_version=%r is unavailable; using delphi_version=%s instead",
                     name,
                     settings.delphi_version,
                 )
             elif version_hint:
                 return None, None, (
-                    f"指定的 Delphi 版本 {name!r} 未安装"
-                    f"（找不到 {platform.value} 编译器）；不会回退到其它版本"
+                    f"Specified Delphi version {name!r} is not installed"
+                    f" (no {platform.value} compiler found); will not fall back to another version"
                 )
             else:
                 return None, None, (
-                    f"指定的编译器 {name!r} 不存在；不会回退到其它 Delphi 版本"
+                    f"Specified compiler {name!r} does not exist; will not fall back to another Delphi version"
                 )
 
         if settings and settings.delphi_version:
@@ -272,9 +272,9 @@ class CompilerService:
             if path:
                 return None, path, None
             return None, None, (
-                f"项目配置指定 Delphi {settings.delphi_version}"
-                f"（{settings.source}），但未找到该版本的编译器；"
-                "不会回退到其它 Delphi 版本"
+                f"Project configuration specifies Delphi {settings.delphi_version}"
+                f" ({settings.source}), but no compiler for this version was found; "
+                "will not fall back to another Delphi version"
             )
 
         config_manager = getattr(self, "config_manager", None)
@@ -285,7 +285,7 @@ class CompilerService:
             except TypeError:
                 compiler = getter(None)
             except Exception:
-                logger.warning("获取生效编译器失败", exc_info=True)
+                logger.warning("Failed to get effective compiler", exc_info=True)
                 compiler = None
             if compiler:
                 if settings is None:
@@ -298,38 +298,38 @@ class CompilerService:
         return None, path, None
 
     def _find_msbuild(self, version: Optional[str] = None) -> Optional[str]:
-        """查找 MSBuild 可执行文件（自动探测）。
+        """Find the MSBuild executable (automatic detection).
 
-        搜索优先级：
-        1. 老版本 Delphi 对应的 .NET Framework MSBuild（指定版本时）
-        2. vswhere.exe（VS 2017+ 官方工具，最准确）
+        Search priority:
+        1. .NET Framework MSBuild corresponding to older Delphi versions (when a version is specified)
+        2. vswhere.exe (official VS 2017+ tool, most accurate)
         3. %ProgramFiles(x86)%/Microsoft Visual Studio/Installer/vswhere.exe
-        4. 常见 VS 安装路径列表（回退方案）
-        5. Delphi 安装目录自带的 MSBuild（指定版本优先）
-        6. PATH 中的 msbuild.exe
+        4. List of common VS installation paths (fallback)
+        5. MSBuild bundled with the Delphi installation directory (prefer the specified version)
+        6. msbuild.exe in PATH
 
         Args:
-            version: Delphi 注册表版本号，用于优先匹配该版本自带的 MSBuild
+            version: Delphi registry version number, used to prefer the MSBuild bundled with that version
 
         Returns:
-            MSBuild 路径,如果未找到则返回 None
+            MSBuild path, or None if not found
         """
         return self._auto_find_msbuild(version)
 
     def _auto_find_msbuild(self, version: Optional[str] = None) -> Optional[str]:
-        """自动探测 MSBuild（不含显式配置）。
+        """Automatically detect MSBuild (excluding explicit configuration).
 
         Args:
-            version: Delphi 注册表版本号，用于优先匹配该版本自带的 MSBuild
+            version: Delphi registry version number, used to prefer the MSBuild bundled with that version
 
         Returns:
-            MSBuild 路径,如果未找到则返回 None
+            MSBuild path, or None if not found
         """
         import subprocess
 
-        # 方法0: 老版本 Delphi 依赖 .NET Framework 自带的 MSBuild。
-        # XE4 及更早使用 v3.5，XE5–10 Seattle 使用 v4.0.30319；
-        # 让 VS2019/2022 的 MSBuild 编译这些工程通常会失败。
+        # Method 0: Older Delphi versions rely on the MSBuild bundled with .NET Framework.
+        # XE4 and earlier use v3.5; XE5–10 Seattle use v4.0.30319;
+        # using VS2019/2022 MSBuild to compile these projects usually fails.
         preferred_version = version
         preferred_target = (
             normalize_registry_version(preferred_version) if preferred_version else None
@@ -345,21 +345,21 @@ class CompilerService:
                 )
                 if framework_msbuild.is_file():
                     logger.info(
-                        "Delphi %s 对应 .NET Framework %s，使用 MSBuild: %s",
+                        "Delphi %s corresponds to .NET Framework %s; using MSBuild: %s",
                         preferred_target,
                         framework_version,
                         framework_msbuild,
                     )
                     return str(framework_msbuild)
                 logger.warning(
-                    "Delphi %s 通常需要 .NET Framework %s 的 MSBuild，"
-                    "但未找到 %s；将继续尝试其它 MSBuild（可能不兼容）",
+                    "Delphi %s usually requires the .NET Framework %s MSBuild, "
+                    "but %s was not found; continuing to try other MSBuild installations (may be incompatible)",
                     preferred_target,
                     framework_version,
                     framework_msbuild,
                 )
 
-        # 方法1: 使用 vswhere.exe 查询最新 VS 的 MSBuild 路径
+        # Method 1: Use vswhere.exe to query the MSBuild path of the latest VS
         vswhere_candidates = []
         program_files_x86 = os.environ.get("ProgramFiles(x86)")
         if program_files_x86:
@@ -384,16 +384,17 @@ class CompilerService:
                         capture_output=True, text=True, timeout=TIMEOUT_MSBUILD_DISCOVERY,
                         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
                     )
+
                     if result.returncode == 0 and result.stdout.strip():
                         for line in result.stdout.strip().splitlines():
                             msbuild_path = line.strip()
                             if msbuild_path and Path(msbuild_path).exists():
-                                logger.info(f"通过 vswhere 找到 MSBuild: {msbuild_path}")
+                                logger.info(f"Found MSBuild via vswhere: {msbuild_path}")
                                 return msbuild_path
                 except (subprocess.TimeoutExpired, OSError) as e:
-                    logger.debug(f"vswhere 查询失败: {e}")
+                    logger.debug(f"vswhere query failed: {e}")
 
-        # 方法2: 常见 VS 安装路径列表（回退方案）
+        # Method 2: List of common VS installation paths (fallback)
         editions = ["BuildTools", "Community", "Professional", "Enterprise"]
         years = ["2019", "2022"]
         possible_paths = []
@@ -409,12 +410,12 @@ class CompilerService:
 
         for path in possible_paths:
             if Path(path).exists():
-                logger.info(f"找到 MSBuild: {path}")
+                logger.info(f"Found MSBuild: {path}")
                 return path
 
-        # 方法3: Delphi/RAD Studio 自带 MSBuild 回退
-        # 无 VS 的机器上 vswhere / VS 路径列表都为空时，检查 Delphi 安装目录
-        # 是否随附 MSBuild，避免 .dproj 因找不到 MSBuild 而无法编译。
+        # Method 3: Fallback to MSBuild bundled with Delphi/RAD Studio
+        # On machines without VS, when both vswhere and the VS path list are empty, check whether the Delphi installation directory
+        # includes MSBuild, to avoid .dproj failing to compile because MSBuild cannot be found.
         try:
             delphi_roots = self._read_delphi_roots_from_hive(
                 winreg.HKEY_CURRENT_USER, "HKCU"
@@ -423,7 +424,7 @@ class CompilerService:
                 self._read_delphi_roots_from_hive(winreg.HKEY_LOCAL_MACHINE, "HKLM")
             )
 
-            # 指定版本优先，避免 XE4 工程误用其它版本目录里的 MSBuild
+            # Prefer the specified version to avoid XE4 projects mistakenly using MSBuild from another version's directory
             preferred_version = version
             if preferred_version:
                 preferred_target = normalize_registry_version(preferred_version)
@@ -441,22 +442,22 @@ class CompilerService:
                 ]
                 for cand in candidates:
                     if cand.exists():
-                        logger.info(f"通过 Delphi 安装目录找到 MSBuild: {cand}")
+                        logger.info(f"Found MSBuild via the Delphi installation directory: {cand}")
                         return str(cand)
         except Exception as e:
-            logger.debug(f"Delphi 自带 MSBuild 搜索失败: {e}")
+            logger.debug(f"Search for Delphi-bundled MSBuild failed: {e}")
 
-        # 方法4: PATH 中的 msbuild.exe（兜底，通常不生效，仅做最后尝试）
+        # Method 4: msbuild.exe in PATH (last resort; usually ineffective, only a final attempt)
         try:
             import shutil
             on_path = shutil.which("msbuild.exe") or shutil.which("msbuild")
             if on_path:
-                logger.info(f"通过 PATH 找到 MSBuild: {on_path}")
+                logger.info(f"Found MSBuild via PATH: {on_path}")
                 return on_path
         except Exception as e:
-            logger.debug(f"PATH 搜索 msbuild 失败: {e}")
+            logger.debug(f"PATH search for msbuild failed: {e}")
 
-        logger.warning("未找到 MSBuild，将回退到直接编译")
+        logger.warning("MSBuild not found; will fall back to direct compilation")
         return None
 
     def _resolve_msbuild_path(
@@ -464,27 +465,27 @@ class CompilerService:
         version: Optional[str] = None,
         project_settings: Optional[ProjectSettings] = None,
     ) -> tuple[Optional[str], str, bool]:
-        """按优先级解析本次编译应使用的 MSBuild，并返回来源说明。
+        """Resolve the MSBuild to use for this compilation by priority, and return the source description.
 
-        优先级（显式配置命中但路径无效时直接失败，不静默换用其它版本）：
-        1. 项目配置 ``.daofy/project.json`` / ``daofy.project.json`` 的 ``msbuild_path``
-        2. ``compilers.json`` 的 ``msbuild_by_delphi_version[<版本>]``
-        3. 自动探测（按工程 Delphi 版本优先 → vswhere → VS → Delphi → PATH）
+        Priority (if an explicit configuration matches but its path is invalid, fail directly and do not silently switch to another version):
+        1. ``msbuild_path`` in project configuration ``.daofy/project.json`` / ``daofy.project.json``
+        2. ``msbuild_by_delphi_version[<version>]`` in ``compilers.json``
+        3. Automatic detection (prefer the project's Delphi version → vswhere → VS → Delphi → PATH)
 
         Args:
-            version: 本次编译解析出的 Delphi 注册表版本号
-            project_settings: 项目级配置（可选）
+            version: Delphi registry version number resolved for this compilation
+            project_settings: Project-level configuration (optional)
 
         Returns:
-            ``(msbuild_path, source, explicit_error)``；显式配置无效时 path 为
-            None、explicit_error 为 True，调用方应直接失败而不是回退到其它
-            MSBuild/直接编译。
+            ``(msbuild_path, source, explicit_error)``; when explicit configuration is invalid, path is
+            None and explicit_error is True; the caller should fail directly instead of falling back to another
+            MSBuild/direct compilation.
         """
         explicit: list[tuple[str, str]] = []
 
         if project_settings and project_settings.msbuild_path:
             explicit.append(
-                (project_settings.msbuild_path, f"项目配置 {project_settings.source}")
+                (project_settings.msbuild_path, f"Project configuration {project_settings.source}")
             )
 
         config_manager = getattr(self, "config_manager", None)
@@ -493,7 +494,7 @@ class CompilerService:
             try:
                 mapped = version_getter(version)
             except Exception:
-                logger.warning("读取 msbuild_by_delphi_version 失败", exc_info=True)
+                logger.warning("Failed to read msbuild_by_delphi_version", exc_info=True)
                 mapped = None
             if mapped:
                 explicit.append(
@@ -506,41 +507,41 @@ class CompilerService:
         for raw_path, source in explicit:
             path = Path(raw_path).expanduser()
             if path.is_file():
-                logger.info("使用配置指定的 MSBuild (%s): %s", source, path)
+                logger.info("Using MSBuild specified by configuration (%s): %s", source, path)
                 return str(path), source, False
             logger.error(
-                "配置的 MSBuild 路径不存在 (%s): %s；"
-                "请修正该配置，或删除它以恢复自动探测",
+                "Configured MSBuild path does not exist (%s): %s; "
+                "please correct this configuration, or remove it to restore automatic detection",
                 source,
                 raw_path,
             )
             return None, f"{source} 指向的路径不存在: {raw_path}", True
 
-        # 没有任何显式配置时才自动探测。必须按本次工程的 Delphi 版本
-        # 重新探测：初始化时缓存的 msbuild_path 是通用探测结果，直接复用
-        # 会让另一个版本的工程仍然用错 MSBuild。
+        # Only auto-detect when there is no explicit configuration. It must be re-detected by this project's Delphi version:
+        # the msbuild_path cached at initialization is a generic detection result; reusing it directly
+        # would still make a project of another version use the wrong MSBuild.
         fallback = getattr(self, "msbuild_path", None)
         if fallback and not Path(fallback).is_absolute():
-            # 裸文件名（如测试注入的 "MSBuild.exe"）视为调用方显式指定，交给 PATH
-            return fallback, "自动探测", False
+            # A bare filename (such as "MSBuild.exe" injected by tests) is treated as explicitly specified by the caller and left to PATH
+            return fallback, "Automatic detection", False
 
         version_key = normalize_registry_version(version) if version else None
         if version_key:
             found = self._auto_find_msbuild_cached(version_key)
             if found:
-                return found, f"自动探测（按 Delphi {version_key} 优先）", False
+                return found, f"Automatic detection (prefer Delphi {version_key})", False
 
         if fallback:
-            return fallback, "自动探测", False
+            return fallback, "Automatic detection", False
 
         # 初始化时未探测到（或对象由测试直接构造）时再尝试一次
         found = self._auto_find_msbuild_cached(version_key)
         if found:
-            return found, "自动探测", False
-        return None, "自动探测未找到 MSBuild", False
+            return found, "Automatic detection", False
+        return None, "Automatic detection did not find MSBuild", False
 
     def _auto_find_msbuild_cached(self, version_key: Optional[str]) -> Optional[str]:
-        """按版本缓存自动探测结果，避免每次编译都启动 vswhere。"""
+        """Cache automatic detection results by version to avoid launching vswhere on every compilation."""
         cache = getattr(self, "_msbuild_auto_cache", None)
         if cache is None:
             cache = {}
@@ -552,17 +553,17 @@ class CompilerService:
         if key in cache:
             return cache[key]
         found = self._auto_find_msbuild(version_key)
-        # 只缓存成功结果：用户后续安装 MSBuild 后无需重启服务
+        # Only cache successful results: users do not need to restart the service after installing MSBuild later
         if found:
             cache[key] = found
         return found
 
     @staticmethod
     def _version_sort_key(version_key: str) -> tuple:
-        """将 ``"11.0"`` 这类注册表版本键转为可比较的数值元组。
+        """Convert a registry version key such as ``"11.0"`` into a comparable numeric tuple.
 
-        直接按字符串排序会把 ``"9.0"`` 排到 ``"37.0"`` 之后，导致“最新版本”
-        选错，因此必须按数值比较。
+        Sorting directly by string would place ``"9.0"`` after ``"37.0"``, causing the "latest version"
+        to be selected incorrectly, so comparison must be numeric.
         """
         try:
             return tuple(int(part) for part in str(version_key).split("."))
@@ -570,7 +571,7 @@ class CompilerService:
             return (0,)
 
     def _read_delphi_roots_from_hive(self, hive, hive_name: str) -> list:
-        """读取单个注册表根下的 Delphi 安装（版本, RootDir）。"""
+        """Read Delphi installations (version, RootDir) under a single registry root."""
         roots: list = []
         try:
             key = winreg.OpenKey(
@@ -580,10 +581,10 @@ class CompilerService:
                 winreg.KEY_READ | winreg.KEY_WOW64_32KEY,
             )
         except FileNotFoundError:
-            logger.debug("注册表 %s\\%s 不存在,跳过", hive_name, REG_KEY_EMBARCADERO_BDS)
+            logger.debug("Registry %s\\%s does not exist; skipping", hive_name, REG_KEY_EMBARCADERO_BDS)
             return roots
         except OSError as exc:
-            logger.warning("打开注册表 %s\\%s 失败: %s", hive_name, REG_KEY_EMBARCADERO_BDS, exc)
+            logger.warning("Failed to open registry %s\\%s: %s", hive_name, REG_KEY_EMBARCADERO_BDS, exc)
             return roots
 
         try:
@@ -599,7 +600,7 @@ class CompilerService:
                     version_path_key = winreg.OpenKey(key, version_key)
                 except OSError as exc:
                     logger.debug(
-                        "打开 %s\\%s\\%s 失败: %s",
+                        "Failed to open %s\\%s\\%s: %s",
                         hive_name, REG_KEY_EMBARCADERO_BDS, version_key, exc,
                     )
                     continue
@@ -609,7 +610,7 @@ class CompilerService:
                     if root_dir and Path(root_dir).exists():
                         roots.append((version_key, root_dir))
                 except OSError:
-                    logger.debug("Delphi %s 没有可用的 RootDir", version_key)
+                    logger.debug("Delphi %s has no available RootDir", version_key)
                 finally:
                     winreg.CloseKey(version_path_key)
         finally:
@@ -618,16 +619,16 @@ class CompilerService:
 
     def _get_delphi_root_from_registry(self, version: Optional[str] = None) -> Optional[str]:
         """
-        从注册表获取 Delphi 安装根目录
+        Get the Delphi installation root directory from the registry
 
-        HKCU 优先、HKLM 兜底。指定版本未安装时返回 None，不再静默回退到
-        最新版本——否则指定 XE4 时会拿到 Tokyo/XE8 的安装目录。
+        Prefer HKCU, fall back to HKLM. If the specified version is not installed, return None and no longer silently fall back to
+        the latest version—otherwise specifying XE4 would get the installation directory of Tokyo/XE8.
 
         Args:
-            version: Delphi 版本号(如 "22.0")，如果为 None 则使用最新版本
+            version: Delphi version number (e.g. "22.0"); if None, use the latest version
 
         Returns:
-            Delphi 安装根目录，如果未找到则返回 None
+            Delphi installation root directory, or None if not found
         """
         try:
             versions = self._read_delphi_roots_from_hive(winreg.HKEY_CURRENT_USER, "HKCU")
@@ -636,7 +637,7 @@ class CompilerService:
             )
 
             if not versions:
-                logger.warning("注册表 HKCU/HKLM 均未找到 Delphi 安装")
+                logger.warning("No Delphi installation found in either HKCU or HKLM registry")
                 return None
 
             if version:
@@ -644,7 +645,7 @@ class CompilerService:
                 for registered_version, root_dir in versions:
                     if normalize_registry_version(registered_version) == target:
                         return root_dir
-                logger.warning("注册表中未找到 Delphi %s，不回退到其它版本", version)
+                logger.warning("Delphi %s not found in the registry; will not fall back to another version", version)
                 return None
 
             versions.sort(
@@ -654,22 +655,22 @@ class CompilerService:
             return versions[0][1]
 
         except Exception as e:
-            logger.warning(f"从注册表获取 Delphi 路径失败: {e}")
+            logger.warning(f"Failed to get Delphi path from registry: {e}")
             return None
 
     def _get_rsvars_path(self, version: Optional[str] = None) -> Optional[str]:
         """
-        获取 rsvars.bat 路径
+        Get the rsvars.bat path
 
         Args:
-            version: Delphi 版本号；为 None 时使用最新安装版本
+            version: Delphi version number; if None, use the latest installed version
 
         Returns:
-            rsvars.bat 完整路径，如果未找到则返回 None
+            Full rsvars.bat path, or None if not found
         """
         root_dir = self._get_delphi_root_from_registry(version)
         if not root_dir and version:
-            # 注册表缺失时，用 compilers.json 中该版本的编译器路径反推根目录
+            # When the registry is missing, infer the root directory from the compiler path for that version in compilers.json
             config_manager = getattr(self, "config_manager", None)
             getter = getattr(config_manager, "get_compiler_by_registry_version", None)
             compiler = None
@@ -677,43 +678,43 @@ class CompilerService:
                 try:
                     compiler = getter(version)
                 except Exception:
-                    logger.debug("按版本查找编译器配置失败: %s", version, exc_info=True)
+                    logger.debug("Failed to look up compiler configuration by version: %s", version, exc_info=True)
             if compiler and compiler.path:
                 root_dir = str(Path(compiler.path).parent.parent)
                 logger.info(
-                    "注册表未找到 Delphi %s，改用编译器配置推断根目录: %s",
+                    "Delphi %s not found in the registry; inferring root directory from compiler configuration instead: %s",
                     version,
                     root_dir,
                 )
 
         if not root_dir:
-            logger.error("无法从注册表获取 Delphi 安装路径")
+            logger.error("Unable to get Delphi installation path from the registry")
             return None
 
         rsvars_path = Path(root_dir) / "bin" / "rsvars.bat"
         if rsvars_path.exists():
-            logger.info(f"找到 rsvars.bat: {rsvars_path}")
+            logger.info(f"Found rsvars.bat: {rsvars_path}")
             return str(rsvars_path)
         else:
-            logger.error(f"rsvars.bat 不存在: {rsvars_path}")
+            logger.error(f"rsvars.bat does not exist: {rsvars_path}")
             return None
 
     def _get_effective_delphi_root(self, version: Optional[str] = None) -> Optional[str]:
-        """获取当前生效的 Delphi 安装根目录。
+        """Get the currently effective Delphi installation root directory.
 
         Args:
-            version: 指定 Delphi 注册表版本（如 ``"11.0"``）；为 None 时使用
-                最新安装版本。包安装/ BPL 查找传入项目配置的版本即可避免与
-                其它版本混用。
+            version: Specify the Delphi registry version (e.g. ``"11.0"``); if None, use
+                the latest installed version. For package installation/BPL lookup, pass the version from the project configuration to avoid mixing with
+                other versions.
 
         Returns:
-            Delphi 安装根目录，未找到时返回 None
+            Delphi installation root directory, or None if not found
         """
         root_dir = self._get_delphi_root_from_registry(version)
         if root_dir:
             return root_dir
 
-        # 注册表不可用（手动配置编译器/绿色版）时，从编译器路径反推根目录
+        # When the registry is unavailable (manually configured compiler/portable version), infer the root directory from the compiler path
         config_manager = getattr(self, "config_manager", None)
         compiler = None
         if version:
@@ -724,12 +725,12 @@ class CompilerService:
                 try:
                     compiler = getter(None, "win32")
                 except Exception:
-                    logger.warning("获取生效编译器失败", exc_info=True)
+                    logger.warning("Failed to get effective compiler", exc_info=True)
         if compiler and compiler.path:
             inferred = str(Path(compiler.path).parent.parent)
             logger.info(
-                "注册表未找到 Delphi %s，改用编译器配置推断根目录: %s",
-                version or "默认版本",
+                "Delphi %s not found in the registry; inferring root directory from compiler configuration instead: %s",
+                version or "default version",
                 inferred,
             )
             return inferred
@@ -737,20 +738,20 @@ class CompilerService:
 
     def _check_process_running(self, process_name: str) -> Optional[dict]:
         """
-        检查指定进程是否正在运行
+        Check whether the specified process is running
         
         Args:
-            process_name: 进程名称（不含.exe扩展名）
+            process_name: Process name (without the .exe extension)
             
         Returns:
-            如果进程正在运行，返回包含进程信息的字典；否则返回 None
+            If the process is running, return a dictionary containing process information; otherwise return None
         """
         import subprocess
         import json
         import re
         
         if not re.match(r'^[A-Za-z0-9_.-]+$', process_name):
-            logger.warning("进程名包含非法字符，已拒绝: %s", process_name)
+            logger.warning("Process name contains illegal characters; rejected: %s", process_name)
             return None
         
         try:
@@ -778,7 +779,7 @@ class CompilerService:
                 else:
                     return None
                 
-                logger.info("检测到进程正在运行: %s (PID: %s)", proc.get('ProcessName'), proc.get('Id'))
+                logger.info("Detected running process: %s (PID: %s)", proc.get('ProcessName'), proc.get('Id'))
                 return {
                     'pid': proc.get('Id'),
                     'name': proc.get('ProcessName'),
@@ -788,15 +789,15 @@ class CompilerService:
             return None
             
         except Exception as e:
-            logger.warning("检查进程时发生错误: %s", str(e))
+            logger.warning("Error occurred while checking process: %s", str(e))
             return None
 
     def _cleanup_dcu_files(self, file_path: str):
         """
-        清理源文件所在目录的 .dcu 文件
+        Clean up .dcu files in the directory containing the source file
         
         Args:
-            file_path: 源文件路径
+            file_path: Source file path
         """
         import glob
         
@@ -810,42 +811,42 @@ class CompilerService:
         dcu_files = glob.glob(dcu_pattern)
         
         if dcu_files:
-            logger.info(f"在 {file_dir} 中找到 {len(dcu_files)} 个 .dcu 文件")
+            logger.info(f"Found {len(dcu_files)} .dcu files in {file_dir}")
             
             total_deleted = 0
             for dcu_file in dcu_files:
                 try:
                     os.unlink(dcu_file)
-                    logger.debug(f"已删除: {dcu_file}")
+                    logger.debug(f"Deleted: {dcu_file}")
                     total_deleted += 1
                 except Exception as e:
-                    logger.warning(f"删除失败 {dcu_file}: {str(e)}")
+                    logger.warning(f"Failed to delete {dcu_file}: {str(e)}")
             
             if total_deleted > 0:
-                logger.info(f"共删除 {total_deleted} 个 .dcu 文件")
+                logger.info(f"Deleted {total_deleted} .dcu files in total")
 
     def _execute_build_event(self, event_name: str, event_cmd: str, project_dir: str, 
                             ignore_exit_code: bool = False, timeout: int = 60,
                             context: dict = None) -> tuple:
         """
-        执行编译事件
+        Execute build event
 
         Args:
-            event_name: 事件名称(用于日志)
-            event_cmd: 事件命令
-            project_dir: 项目目录
-            ignore_exit_code: 是否忽略退出码
-            timeout: 超时时间(秒)
-            context: 上下文变量字典,包含项目信息等
+            event_name: Event name (used for logging)
+            event_cmd: Event command
+            project_dir: Project directory
+            ignore_exit_code: Whether to ignore exit code
+            timeout: Timeout (seconds)
+            context: Context variable dictionary, including project information, etc.
 
         Returns:
-            (success, error_message, output) 元组
+            (success, error_message, output) tuple
         """
         import subprocess
         import tempfile
         import re
         
-        logger.info("执行 %s: %s", event_name, event_cmd[:200])
+        logger.info("Executing %s: %s", event_name, event_cmd[:200])
         
         _DANGEROUS_PATTERNS = re.compile(
             r'(?:^|\b)(?:rm\s+/|del\s+/[sq]|format\s+[a-z]:|net\s+user|'
@@ -854,53 +855,53 @@ class CompilerService:
             re.IGNORECASE
         )
         if _DANGEROUS_PATTERNS.search(event_cmd):
-            error_msg = "%s 命令包含危险模式，已拒绝执行: %s" % (event_name, event_cmd[:200])
+            error_msg = "%s command contains dangerous patterns and was rejected: %s" % (event_name, event_cmd[:200])
             logger.error(error_msg)
             return (False, error_msg, None)
         
-        # 替换 Delphi 支持的变量
+        # Replace variables supported by Delphi
         if context:
-            # 项目相关变量
+            # Project-related variables
             event_cmd = event_cmd.replace('$(PROJECTDIR)', context.get('project_dir', project_dir))
             event_cmd = event_cmd.replace('$(PROJECTPATH)', context.get('project_path', ''))
             event_cmd = event_cmd.replace('$(PROJECTFILENAME)', context.get('project_filename', ''))
             event_cmd = event_cmd.replace('$(PROJECTNAME)', context.get('project_name', ''))
             
-            # 输入文件相关变量
+            # Input file-related variables
             event_cmd = event_cmd.replace('$(INPUTPATH)', context.get('input_path', ''))
             event_cmd = event_cmd.replace('$(INPUTFILENAME)', context.get('input_filename', ''))
             event_cmd = event_cmd.replace('$(INPUTEXT)', context.get('input_ext', ''))
             
-            # 输出文件相关变量
+            # Output file-related variables
             event_cmd = event_cmd.replace('$(OUTPUTDIR)', context.get('output_dir', ''))
             event_cmd = event_cmd.replace('$(OUTPUTPATH)', context.get('output_path', ''))
             event_cmd = event_cmd.replace('$(OUTPUTFILENAME)', context.get('output_filename', ''))
             event_cmd = event_cmd.replace('$(OUTPUTEXT)', context.get('output_ext', ''))
             
-            # 配置相关变量
+            # Configuration-related variables
             event_cmd = event_cmd.replace('$(Config)', context.get('config', 'Debug'))
             event_cmd = event_cmd.replace('$(Platform)', context.get('platform', 'Win32'))
             event_cmd = event_cmd.replace('$(DEFINES)', context.get('defines', ''))
             
-            # 路径相关变量
+            # Path-related variables
             event_cmd = event_cmd.replace('$(DIR)', context.get('dir', project_dir))
             event_cmd = event_cmd.replace('$(INCLUDEPATH)', context.get('include_path', ''))
             event_cmd = event_cmd.replace('$(PATH)', context.get('path', ''))
             
-            # Delphi 环境变量
+            # Delphi environment variables
             event_cmd = event_cmd.replace('$(BDS)', context.get('bds', ''))
             event_cmd = event_cmd.replace('$(LOCALCOMMAND)', context.get('local_command', ''))
             
-            # 系统变量
+            # System variables
             event_cmd = event_cmd.replace('$(SystemRoot)', context.get('system_root', ''))
             event_cmd = event_cmd.replace('$(WINDIR)', context.get('windir', ''))
         
-        # 兼容旧版本的变量替换
+        # Variable replacement compatible with older versions
         event_cmd = event_cmd.replace('$(PROJECTDIR)', project_dir)
         
         try:
-            logger.warning("编译事件来自 .dproj 文件配置，请确保项目文件可信")
-            # 使用控制台编码（可能为 UTF-8 或 GBK），确保 cmd.exe 正确读取中文路径
+            logger.warning("Build event comes from .dproj file configuration; please ensure the project file is trusted")
+            # Use console encoding (may be UTF-8 or GBK) to ensure cmd.exe correctly reads Chinese paths
             batch_encoding = get_console_encoding()
             with tempfile.NamedTemporaryFile(
                 mode='w', suffix='.bat', delete=False, encoding=batch_encoding
@@ -925,95 +926,95 @@ class CompilerService:
                     pass
             
             if result.returncode != 0 and not ignore_exit_code:
-                error_msg = "%s 失败(退出码 %d): %s" % (event_name, result.returncode, result.stderr)
+                error_msg = "%s failed (exit code %d): %s" % (event_name, result.returncode, result.stderr)
                 logger.error(error_msg)
                 return (False, error_msg, result.stdout + result.stderr)
             
-            logger.info("%s 执行成功", event_name)
+            logger.info("%s executed successfully", event_name)
             if result.stdout:
-                logger.debug("%s 输出: %s", event_name, result.stdout)
+                logger.debug("%s output: %s", event_name, result.stdout)
             
             return (True, None, result.stdout + result.stderr)
             
         except subprocess.TimeoutExpired:
-            error_msg = "%s 执行超时(%d秒)" % (event_name, timeout)
+            error_msg = "%s execution timed out (%d seconds)" % (event_name, timeout)
             logger.error(error_msg)
             return (False, error_msg, None)
         except Exception as e:
-            error_msg = "%s 执行失败: %s" % (event_name, str(e))
+            error_msg = "%s execution failed: %s" % (event_name, str(e))
             logger.error(error_msg, exc_info=True)
             return (False, error_msg, None)
 
     def _extract_config_from_dproj(self, project_path: str, options: 'CompileOptions') -> 'CompileOptions':
         """
-        从 .dproj 文件中提取配置
+        Extract configuration from .dproj file
 
         Args:
-            project_path: 项目文件路径(.dproj 或 .dpr)
-            options: 原始编译选项
+            project_path: Project file path (.dproj or .dpr)
+            options: Original compile options
 
         Returns:
-            合并后的编译选项
+            Merged compile options
         """
-        # 如果传入的是 .dpr/.dpk 文件,查找对应的 .dproj 文件
+        # If a .dpr/.dpk file is passed in, find the corresponding .dproj file
         if project_path.endswith('.dpr') or project_path.endswith('.dpk'):
             ext = '.dpr' if project_path.endswith('.dpr') else '.dpk'
             dproj_path = project_path[:-len(ext)] + '.dproj'
             if not Path(dproj_path).exists():
-                logger.info(f"未找到对应的 .dproj 文件: {dproj_path}")
+                logger.info(f"Corresponding .dproj file not found: {dproj_path}")
                 return options
         elif project_path.endswith('.dproj'):
             dproj_path = project_path
         else:
             return options
 
-        # 解析 .dproj 文件
+        # Parse .dproj file
         parser = DprojParser(dproj_path)
         if not parser.parse():
-            logger.warning(f"解析 .dproj 文件失败: {dproj_path}")
+            logger.warning(f"Failed to parse .dproj file: {dproj_path}")
             return options
 
-        # 获取配置和平台
+        # Get configuration and platform
         config = options.build_configuration
         platform = "Win64" if options.target_platform == TargetPlatform.WIN64 else "Win32"
 
-        # 提取单元搜索路径
-        # 1. 先获取基础路径(不限制配置和平台)
+        # Extract unit search paths
+        # 1. First get base paths (without limiting configuration and platform)
+        # 2. Then get platform-specific paths
+        # 3. Merge all paths
         base_unit_paths = parser.get_unit_search_paths()
-        # 2. 再获取平台特定路径
         platform_unit_paths = parser.get_unit_search_paths(config, platform)
-        # 3. 合并所有路径
         dproj_unit_paths = base_unit_paths + platform_unit_paths
         
         if dproj_unit_paths:
-            # 合并用户指定的路径和 .dproj 中的路径
+            # Merge user-specified paths and paths from .dproj
             all_paths = list(options.unit_search_paths) + dproj_unit_paths
-            # 去重
+            # Deduplicate
             options.unit_search_paths = list(dict.fromkeys(all_paths))
-            logger.info(f"从 .dproj 文件中提取了 {len(dproj_unit_paths)} 个单元搜索路径")
+            logger.info(f"Extracted {len(dproj_unit_paths)} unit search paths from .dproj file")
 
-        # 提取条件编译符号
+        # Extract conditional compilation symbols
         dproj_defines = parser.get_conditional_defines(config, platform)
         if dproj_defines:
             all_defines = list(options.conditional_defines) + dproj_defines
             options.conditional_defines = list(dict.fromkeys(all_defines))
-            logger.info(f"从 .dproj 文件中提取了 {len(dproj_defines)} 个条件编译符号")
+            logger.info(f"Extracted {len(dproj_defines)} conditional compilation symbols from .dproj file")
 
-        # 提取输出路径
+        # Extract output path
         if not options.output_path:
             dproj_output = parser.get_output_path(config, platform)
             if dproj_output:
                 options.output_path = dproj_output
-                logger.info(f"从 .dproj 文件中提取了输出路径: {dproj_output}")
+                logger.info(f"Extracted output path from .dproj file: {dproj_output}")
 
-        # 智能解析第三方库路径
-        # 注意：如果用户显式传入了 unit_search_paths，resolver 会直接返回，不会进行智能分析
+        # Intelligently resolve third-party library paths
+        # Note: If the user explicitly passes unit_search_paths, the resolver returns directly and does not perform intelligent analysis
         try:
-            logger.info("开始解析第三方库路径...")
+            logger.info("Starting to resolve third-party library paths...")
             resolver = SmartLibraryPathResolver()
             
-            # 解析 registry_version（与 RTL 库搜索路径共用同一策略），
-            # 使第三方库路径按同一 Delphi 版本过滤注册表，避免跨版本混入。
+            # Resolve registry_version (shares the same strategy as the RTL library search path),
+            # so third-party library paths filter the registry by the same Delphi version and avoid mixing versions.
             from ..utils.delphi_versions import resolve_registry_version
             project_settings = load_project_settings(project_path)
             resolver_compiler = options.compiler_version
@@ -1028,7 +1029,7 @@ class CompilerService:
                 ),
             )
             
-            # 传入用户显式指定的路径，resolver 会判断是否跳过智能分析
+            # Pass in user-specified paths; the resolver will determine whether to skip intelligent analysis
             user_provided_paths = list(options.unit_search_paths) if options.unit_search_paths else None
             resolved_paths, info = resolver.resolve_library_paths(
                 project_path, 
@@ -1038,40 +1039,40 @@ class CompilerService:
             )
             
             if info.get("mode") == "user_provided":
-                logger.info(f"使用用户显式传入的 {len(resolved_paths)} 个路径")
+                logger.info(f"Using {len(resolved_paths)} user-specified paths")
             elif resolved_paths:
                 options.unit_search_paths = resolved_paths
-                logger.info(f"智能解析选择了 {len(resolved_paths)} 个第三方库路径"
-                           f"（从 {info.get('total_paths_count', 0)} 个全局路径中筛选，"
-                           f"解决了 {info.get('resolved_units', 0)} 个单元依赖）")
-                logger.debug(f"解析详情: {info}")
+                logger.info(f"Intelligent resolution selected {len(resolved_paths)} third-party library paths"
+                           f" (filtered from {info.get('total_paths_count', 0)} global paths, "
+                           f"resolved {info.get('resolved_units', 0)} unit dependencies)")
+                logger.debug(f"Resolution details: {info}")
             
-            # 记录未找到的单元
+            # Record units that were not found
             if info.get('still_missing_units'):
-                logger.warning(f"仍有 {len(info['still_missing_units'])} 个单元未找到: "
+                logger.warning(f"Still {len(info['still_missing_units'])} units not found: "
                              f"{info['still_missing_units'][:5]}")
                 
         except Exception as e:
-            logger.warning(f"智能解析第三方库路径失败: {e}，将使用默认方式")
+            logger.warning(f"Failed to intelligently resolve third-party library paths: {e}; using default method")
 
         return options
 
     async def compile_dpr_direct(self, request: ProjectCompileRequest) -> CompileResult:
         """
-        直接使用 dcc32/dcc64 编译 .dpr 文件（不依赖 .dproj）
+        Compile .dpr file directly using dcc32/dcc64 (without relying on .dproj)
 
         Args:
-            request: 工程编译请求
+            request: Project compile request
 
         Returns:
-            编译结果
+            Compile result
         """
-        logger.info(f"直接编译 .dpr 文件: {request.project_path}")
+        logger.info(f"Compiling .dpr file directly: {request.project_path}")
         start_time = time.time()
 
-        # dcc 直编只支持 .dpr/.dpk，.dproj 必须走 MSBuild
+        # Direct dcc compilation only supports .dpr/.dpk; .dproj must use MSBuild
         if request.project_path.lower().endswith('.dproj'):
-            error_msg = ".dproj 文件不能通过 dcc 直接编译，必须使用 MSBuild"
+            error_msg = ".dproj files cannot be compiled directly with dcc; MSBuild must be used"
             logger.error(error_msg)
             return CompileResult(
                 status=CompileStatus.FAILED,
@@ -1081,10 +1082,10 @@ class CompilerService:
             )
 
         try:
-            # 1. 验证项目路径
+            # 1. Validate project path
             is_valid, error_msg = self.validator.validate_project_path(request.project_path)
             if not is_valid:
-                logger.error(f"项目路径验证失败: {error_msg}")
+                logger.error(f"Project path validation failed: {error_msg}")
                 return CompileResult(
                     status=CompileStatus.FAILED,
                     error_code="INVALID_PROJECT_PATH",
@@ -1092,22 +1093,22 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000)
                 )
 
-            # 1.5 从同目录 .dproj 提取配置（条件编译符号/搜索路径/输出路径）
-            # 直接 DCC 编译不会自动读取 .dproj，需手动合并该配置的 DCC_Define，
-            # 否则默认配置（如 Debug）的条件编译符号不会生效，编出的 exe 是 "plain"
+            # 1.5 Extract configuration from .dproj in the same directory (conditional compilation symbols/search paths/output path)
+            # Direct DCC compilation does not automatically read .dproj; DCC_Define for that configuration must be merged manually,
+            # otherwise conditional compilation symbols in the default configuration (such as Debug) will not take effect and the produced exe will be "plain"
             try:
                 self._extract_config_from_dproj(request.project_path, request.options)
             except Exception as e:
-                logger.debug("从 .dproj 提取配置失败（继续直接编译）: %s", e)
+                logger.debug("Failed to extract configuration from .dproj (continuing direct compilation): %s", e)
 
-            # 2. 确定输出路径 - 默认输出到 Win32/Debug 子目录
+            # 2. Determine output path - defaults to Win32/Debug subdirectory
             project_dir = str(Path(request.project_path).parent)
             project_name = Path(request.project_path).stem
 
             if request.options.output_path:
                 output_base = request.options.output_path
             else:
-                # 优先从同目录 .dproj 读取 DCC_ExeOutput
+                # Prefer reading DCC_ExeOutput from .dproj in the same directory
                 dproj_path = Path(request.project_path).with_suffix('.dproj')
                 dproj_output = None
                 if dproj_path.exists():
@@ -1120,7 +1121,7 @@ class CompilerService:
                             cfg = request.options.build_configuration or "Debug"
                             dproj_output = parser.get_output_path(config=cfg, platform=plat_dir)
                     except Exception:
-                        logger.debug("读取 .dproj DCC_ExeOutput 失败，使用默认路径")
+                        logger.debug("Failed to read .dproj DCC_ExeOutput; using default path")
 
                 if dproj_output:
                     output_base = dproj_output
@@ -1130,12 +1131,12 @@ class CompilerService:
                     cfg = request.options.build_configuration or "Debug"
                     output_base = str(Path(project_dir) / lib_dir / cfg)
 
-            # 确保输出目录存在
+            # Ensure output directory exists
             Path(output_base).mkdir(parents=True, exist_ok=True)
 
-            # 3. 获取编译器配置（显式版本 > 项目配置 > 默认编译器）
-            # 项目级配置（.daofy/project.json）优先，保证同一台机器上不同工程
-            # 使用各自声明的 Delphi 版本，且项目指定版本缺失时直接失败不静默回退。
+            # 3. Get compiler configuration (explicit version > project configuration > default compiler)
+            # Project-level configuration (.daofy/project.json) takes precedence, ensuring different projects on the same machine
+            # use their respectively declared Delphi versions, and if the project-specified version is missing, fail directly without silent fallback.
             project_settings = load_project_settings(request.project_path)
             if project_settings and project_settings.error:
                 logger.error(project_settings.error)
@@ -1162,7 +1163,7 @@ class CompilerService:
             if compiler_config:
                 compiler_path = compiler_config.path
             if not compiler_path:
-                error_msg = "未配置默认编译器且无法自动查找"
+                error_msg = "No default compiler configured and unable to find one automatically"
                 logger.error(error_msg)
                 return CompileResult(
                     status=CompileStatus.FAILED,
@@ -1171,7 +1172,7 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000)
                 )
 
-            # 4. 根据目标平台选择编译器
+            # 4. Select compiler according to target platform
             target_platform = request.options.target_platform
             if target_platform != TargetPlatform.WIN32:
                 compiler_name = self._get_platform_compiler_name(target_platform)
@@ -1179,9 +1180,9 @@ class CompilerService:
                 target_compiler = str(bin_dir / compiler_name)
                 if Path(target_compiler).exists():
                     compiler_path = target_compiler
-                    logger.info(f"切换到 {target_platform.value} 编译器: {compiler_path}")
+                    logger.info(f"Switched to {target_platform.value} compiler: {compiler_path}")
                 else:
-                    # 跨平台编译器不存在，回退查找（优先使用当前编译器版本）
+                    # Cross-platform compiler does not exist; fall back to lookup (prefer the current compiler version)
                     fallback_version = (
                         compiler_config.registry_version
                         if compiler_config
@@ -1193,14 +1194,14 @@ class CompilerService:
                     )
                     if found:
                         compiler_path = found
-                        logger.info(f"从注册表找到 {target_platform.value} 编译器: {compiler_path}")
+                        logger.info(f"Found {target_platform.value} compiler from registry: {compiler_path}")
                     else:
-                        logger.warning(f"{target_platform.value} 编译器 ({compiler_name}) 未找到，尝试使用 dcc32")
+                        logger.warning(f"{target_platform.value} compiler ({compiler_name}) not found; trying to use dcc32")
 
-            # 5. 验证编译器路径
+            # 5. Validate compiler path
             is_valid, error_msg = self.validator.validate_compiler_path(compiler_path)
             if not is_valid:
-                logger.error(f"编译器路径验证失败: {error_msg}")
+                logger.error(f"Compiler path validation failed: {error_msg}")
                 return CompileResult(
                     status=CompileStatus.FAILED,
                     error_code="INVALID_COMPILER_PATH",
@@ -1208,35 +1209,35 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000)
                 )
 
-            # 6. 检查目标程序是否正在运行
+            # 6. Check whether the target program is running
             running_process = self._check_process_running(project_name)
             if running_process:
-                error_msg = f"目标程序 '{project_name}.exe' 正在运行 (PID: {running_process['pid']})，无法编译。请先关闭程序后再试。"
+                error_msg = f"Target program '{project_name}.exe' is running (PID: {running_process['pid']}) and cannot be compiled. Please close the program and try again."
                 logger.warning(error_msg)
                 return CompileResult(
                     status=CompileStatus.FAILED,
                     error_code="PROCESS_RUNNING",
                     error_message=error_msg,
                     duration=int((time.time() - start_time) * 1000),
-                    log=f"进程信息: PID={running_process['pid']}, 路径={running_process.get('path', '未知')}"
+                    log=f"Process information: PID={running_process['pid']}, path={running_process.get('path', 'unknown')}"
                 )
 
-            # 7. 生成命令行参数
+            # 7. Generate command-line arguments
             args = self._generate_dpr_args(request.project_path, request.options, output_base, compiler_path)
 
-            # 8. 验证参数
+            # 8. Validate arguments
             if not self.args_generator.validate_args(args):
-                logger.error("参数验证失败")
+                logger.error("Argument validation failed")
                 return CompileResult(
                     status=CompileStatus.FAILED,
                     error_code="INVALID_ARGS",
-                    error_message="编译参数包含非法字符",
+                    error_message="Compile arguments contain invalid characters",
                     duration=int((time.time() - start_time) * 1000)
                 )
 
-            logger.info(f"编译命令: {compiler_path} {' '.join(args)}")
+            logger.info(f"Compile command: {compiler_path} {' '.join(args)}")
 
-            # 9. 执行编译
+            # 9. Execute compilation
             try:
                 return_code, stdout, stderr = await self.process_manager.execute(
                     compiler_path,
@@ -1244,11 +1245,11 @@ class CompilerService:
                     request.options.timeout
                 )
 
-                # 10. 解析输出
+                # 10. Parse output
                 errors = self.output_parser.parse_errors(stdout + stderr)
                 warnings = self.output_parser.parse_warnings(stdout + stderr)
 
-                # 11. 构建结果
+                # 11. Build result
                 duration = int((time.time() - start_time) * 1000)
                 output_file = str(Path(output_base) / f"{project_name}.exe")
 
@@ -1268,7 +1269,7 @@ class CompilerService:
                         duration=duration,
                         log=stdout + stderr
                     )
-                    logger.info(f"编译成功,输出文件: {output_file},耗时 {duration}ms")
+                    logger.info(f"Compilation succeeded, output file: {output_file}, duration {duration}ms")
                 else:
                     result = CompileResult(
                         status=CompileStatus.FAILED,
@@ -1279,16 +1280,16 @@ class CompilerService:
                         duration=duration,
                         log=stdout + stderr
                     )
-                    logger.error(f"编译失败,耗时 {duration}ms")
+                    logger.error(f"Compilation failed, duration {duration}ms")
 
-                # 12. 保存编译历史
+                # 12. Save compilation history
                 self._save_history(request.project_path, result.status.value, duration, result.error_message)
 
                 return result
 
             except TimeoutError as e:
                 duration = int((time.time() - start_time) * 1000)
-                logger.error(f"编译超时: {str(e)}")
+                logger.error(f"Compilation timed out: {str(e)}")
                 result = CompileResult(
                     status=CompileStatus.TIMEOUT,
                     error_code="COMPILATION_TIMEOUT",
@@ -1300,7 +1301,7 @@ class CompilerService:
 
         except Exception as e:
             duration = int((time.time() - start_time) * 1000)
-            error_msg = f"直接编译过程发生异常: {str(e)}"
+            error_msg = f"Exception occurred during direct compilation: {str(e)}"
             logger.error(error_msg, exc_info=True)
             result = CompileResult(
                 status=CompileStatus.FAILED,
@@ -1313,14 +1314,14 @@ class CompilerService:
 
     def _generate_dpr_args(self, project_path: str, options: 'CompileOptions', output_base: str,
                            compiler_path: Optional[str] = None) -> list[str]:
-        """生成 .dpr 文件的直接编译参数
+        """Generate direct compilation arguments for .dpr file
 
         Args:
-            project_path: .dpr 文件路径
-            options: 编译选项
-            output_base: 输出目录（存放 .exe 文件）
-            compiler_path: 实际选定的 dcc32/dcc64 编译器路径（用于注册表不可用时
-                从编译器自身目录推导 RTL 库搜索路径，保证 -U 总能发出）
+            project_path: .dpr file path
+            options: Compile options
+            output_base: Output directory (stores .exe file)
+            compiler_path: Actual selected dcc32/dcc64 compiler path (used when registry is unavailable
+                to derive RTL library search paths from the compiler's own directory, ensuring -U is always emitted)
         """
         from ..utils.delphi_env import (
             expand_delphi_path_macros,
@@ -1330,16 +1331,16 @@ class CompilerService:
 
         args = []
 
-        # 项目文件
+        # Project file
         args.append(project_path)
 
-        # 输出目录（存放 .exe 文件）
+        # Output directory (stores .exe file)
         args.append(f'-E{output_base}')
 
-        # 中间文件目录（存放 .dcu 文件）
+        # Intermediate file directory (stores .dcu files)
         dcu_dir = None
         dproj_path_dcu = Path(project_path).with_suffix('.dproj')
-        project_version = None  # .dproj <ProjectVersion>，用于推断 registry_version
+        project_version = None  # .dproj <ProjectVersion>, used to infer registry_version
         if dproj_path_dcu.exists():
             try:
                 from ..utils.dproj_parser import DprojParser
@@ -1351,19 +1352,19 @@ class CompilerService:
                     dcu_dir = parser.get_dcu_output_path(config=cfg, platform=plat_dir)
                     project_version = parser.get_project_version()
             except Exception:
-                logger.debug("读取 .dproj DCC_DcuOutput 失败，使用默认路径")
+                logger.debug("Failed to read .dproj DCC_DcuOutput; using default path")
         if not dcu_dir:
             dcu_dir = output_base
         args.append(f'-N{dcu_dir}')
 
-        # 条件编译符号（注意：defines 语法是 -D，-$D+ 是调试信息开关，二者不可混用）
+        # Conditional compilation symbols (note: defines syntax is -D, -$D+ is the debug information switch; the two must not be mixed up)
         if options.conditional_defines:
             defines = ";".join(options.conditional_defines)
             args.append(f'-D{defines}')
 
-        # 命名空间搜索路径 - 默认添加 System 等 RTL/VCL 命名空间，
-        # 并合并同目录 .dproj 的 DCC_Namespace（与 compile_file 单文件路径一致），
-        # 使 uses SysUtils、uses Classes 等短单元名能解析到 System.SysUtils 等
+        # Namespace search paths - by default add System and other RTL/VCL namespaces,
+        # and merge DCC_Namespace from .dproj in the same directory (consistent with compile_file single-file path),
+        # so short unit names such as uses SysUtils and uses Classes can resolve to System.SysUtils, etc.
         default_namespaces = ["System", "Winapi", "System.Win", "Vcl", "Vcl.Imaging",
                               "Vcl.Touch", "Vcl.Samples", "Vcl.Shell", "Data", "Datasnap",
                               "Web", "Soap", "Xml",
@@ -1377,22 +1378,22 @@ class CompilerService:
                 if ns_parser.parse():
                     project_namespaces = ns_parser.get_namespace() or []
             except Exception:
-                logger.debug("读取 .dproj DCC_Namespace 失败，仅使用默认命名空间")
+                logger.debug("Failed to read .dproj DCC_Namespace; using only default namespaces")
         if project_namespaces:
             namespaces = list(dict.fromkeys(project_namespaces + default_namespaces))
         else:
             namespaces = default_namespaces
         args.append('-NS' + ";".join(namespaces))
 
-        # 单元搜索路径 - 如果未提供，则自动获取 Delphi 默认库搜索路径
+        # Unit search paths - if not provided, automatically obtain Delphi default library search paths
         unit_paths = options.unit_search_paths if options.unit_search_paths else []
         if not unit_paths:
-            # 自动获取 Delphi 库搜索路径
-            # 使用目标平台名（首字母大写，用于注册表查询）
+            # Automatically obtain Delphi library search paths
+            # Use target platform name (first letter capitalized, used for registry query)
             from ..services.args_generator import ArgsGenerator
             platform = ArgsGenerator._PLATFORM_LIB_DIR.get(options.target_platform, 'Win32')
-            # 获取编译器对应的 Delphi 版本号（registry_version），用于读取该版本的搜索路径
-            # 与第三方库路径解析共用 resolve_registry_version，保证两处版本过滤策略一致
+            # Get the Delphi version number (registry_version) corresponding to the compiler, used to read search paths for that version
+            # Shares resolve_registry_version with third-party library path resolution, ensuring consistent version filtering strategy in both places
             from ..utils.delphi_versions import resolve_registry_version
             settings = load_project_settings(project_path)
             resolver_compiler = options.compiler_version
@@ -1404,7 +1405,7 @@ class CompilerService:
                 self.config_manager,
                 override_version=settings.delphi_version if settings else None,
             )
-            # 手动配置的编译器可能没有 registry_version：从安装路径/编译器输出推断
+            # Manually configured compilers may not have registry_version: infer from installation path/compiler output
             if not registry_version and compiler_path:
                 for parent in Path(compiler_path).parents:
                     inferred = project_version_to_registry_version(parent.name)
@@ -1416,24 +1417,24 @@ class CompilerService:
                         compiler_path
                     )
             delphi_lib_paths = get_delphi_library_paths(version=registry_version, platform=platform)
-            # 展开路径中的宏变量
+            # Expand macro variables in paths
             for p in delphi_lib_paths:
                 expanded = expand_delphi_path_macros(p, version=registry_version, platform=platform)
                 if expanded and expanded not in unit_paths:
                     unit_paths.append(expanded)
 
-            # 兜底：注册表/版本解析失败（如无 .dproj 且编译器为手动配置、不在注册表）时，
-            # delphi_lib_paths 可能为空。dcc32 不像 IDE 那样有内置默认库搜索路径，
-            # 若完全不发 -U，则 uses SysUtils/Classes 等 RTL 单元无法解析导致编译失败。
-            # 因此从编译器自身目录推导 RTL 路径：<root>/lib/<platform>/release。
+            # Fallback: when registry/version resolution fails (e.g. no .dproj and the compiler is manually configured/not in the registry),
+            # delphi_lib_paths may be empty. dcc32, unlike the IDE, has no built-in default library search paths;
+            # if -U is not passed at all, RTL units such as SysUtils/Classes cannot be resolved causing compilation failure.
+            # Therefore derive the RTL path from the compiler's own directory: <root>/lib/<platform>/release.
             if not unit_paths:
                 rtl_candidates: list[str] = []
-                # 1. 从 dcc32/dcc64 所在目录推导（bin/ 的上一级是 Delphi 根目录）
+                # 1. Derive from the directory containing dcc32/dcc64 (the parent of bin/ is the Delphi root directory)
                 if compiler_path:
                     compiler_root = Path(compiler_path).resolve().parent.parent
                     rtl_candidates.append(str(compiler_root / "lib" / platform / "release"))
                     rtl_candidates.append(str(compiler_root / "lib" / "win32" / "release"))
-                # 2. 尝试从注册表根目录推导
+                # 2. Try deriving from the registry root directory
                 try:
                     root_dir = get_delphi_root_dir(registry_version) if registry_version else None
                     if not root_dir:
@@ -1441,43 +1442,43 @@ class CompilerService:
                     if root_dir:
                         rtl_candidates.append(str(Path(root_dir) / "lib" / platform / "release"))
                 except Exception:
-                    logger.debug("从注册表根目录推导 RTL 路径失败")
+                    logger.debug("Failed to derive RTL path from registry root directory")
                 for cand in rtl_candidates:
                     cand_path = Path(cand)
                     if cand_path.is_dir() and str(cand_path).lower() not in {
                             p.lower() for p in unit_paths}:
                         unit_paths.append(str(cand_path))
-                        logger.info("从编译器/注册表目录推导 RTL 单元搜索路径: %s", cand_path)
+                        logger.info("Derived RTL unit search path from compiler/registry directory: %s", cand_path)
         
         if unit_paths:
             paths = ";".join(unit_paths)
             args.append(f'-U{paths}')
 
-        # 资源搜索路径
+        # Resource search paths
         if options.resource_search_paths:
             paths = ";".join(options.resource_search_paths)
             args.append(f'-R{paths}')
 
-        # 优化选项
+        # Optimization options
         if options.optimize:
             args.append('-$O+')
         else:
             args.append('-$O-')
 
-        # 调试信息
+        # Debug information
         if options.debug:
             args.append('-$D+')
         else:
             args.append('-$D-')
 
-        # 警告级别
+        # Warning level
         args.append(f'-$W{options.warning_level}')
 
-        # 禁用警告
+        # Disable warnings
         for warning in options.disabled_warnings:
             args.append(f'-$W-{warning}')
 
-        # 输出类型
+        # Output type
         output_type_map = {
             OutputType.CONSOLE: "-CC",
             OutputType.GUI: "-CG",
@@ -1485,19 +1486,19 @@ class CompilerService:
         }
         args.append(output_type_map[options.output_type])
 
-        # 运行时库
+        # Runtime library
         if options.runtime_library == RuntimeLibrary.DYNAMIC:
             args.append('-$Y+')
         else:
             args.append('-$Y-')
 
-        logger.debug(f"生成的 .dpr 编译参数: {' '.join(args)}")
+        logger.debug(f"Generated .dpr compile arguments: {' '.join(args)}")
         return args
 
     @staticmethod
     @staticmethod
     def _get_platform_compiler_name(platform: TargetPlatform) -> str:
-        """根据目标平台返回编译器可执行文件名"""
+        """Return the compiler executable name for the target platform"""
         _PLATFORM_COMPILER_MAP = {
             TargetPlatform.WIN32: 'dcc32.exe',
             TargetPlatform.WIN64: 'dcc64.exe',
@@ -1517,11 +1518,11 @@ class CompilerService:
         platform: TargetPlatform,
         version: Optional[str] = None,
     ) -> Optional[str]:
-        """从注册表查找指定平台的编译器路径
+        """Find the compiler path for the specified platform from the registry
 
         Args:
-            platform: 目标平台
-            version: Delphi 注册表版本号；为 None 时使用最新安装版本
+            platform: Target platform
+            version: Delphi registry version number; when None, use the latest installed version
         """
         root_dir = self._get_delphi_root_from_registry(version)
         if not root_dir:
@@ -1535,7 +1536,7 @@ class CompilerService:
         return None
 
     def _find_dcc32_from_registry(self) -> Optional[str]:
-        """从注册表查找 dcc32.exe 路径（向后兼容）"""
+        """Find the dcc32.exe path from the registry (backward compatible)"""
         return self._find_compiler_from_registry(TargetPlatform.WIN32)
 
     @staticmethod
@@ -1586,7 +1587,7 @@ class CompilerService:
                     compiler = compiler_getter(compiler_version)
                 except Exception:
                     logger.warning(
-                        "查找编译器配置失败: %s", compiler_version, exc_info=True
+                        "Failed to find compiler configuration: %s", compiler_version, exc_info=True
                     )
             if compiler and compiler.registry_version:
                 return compiler.registry_version
@@ -1595,7 +1596,7 @@ class CompilerService:
                     registry_version = project_version_to_registry_version(parent.name)
                     if registry_version:
                         logger.info(
-                            "从编译器路径推断 registry_version: %s -> %s",
+                            "Inferred registry_version from compiler path: %s -> %s",
                             compiler.path,
                             registry_version,
                         )
@@ -1603,38 +1604,38 @@ class CompilerService:
                 registry_version = detect_registry_version_from_compiler(compiler.path)
                 if registry_version:
                     logger.info(
-                        "从编译器输出推断 registry_version: %s -> %s",
+                        "Inferred registry_version from compiler output: %s -> %s",
                         compiler.path,
                         registry_version,
                     )
                     return registry_version
 
-            # 兼容把版本号/产品名直接写进 compiler_version（如 "11.0"、"XE4"）
+            # Support writing the version number/product name directly into compiler_version (e.g. "11.0", "XE4")
             version_hint = normalize_version_key(compiler_version)
             if version_hint:
                 logger.info(
-                    "compiler_version=%r 按 Delphi 版本解释为 registry_version=%s",
+                    "compiler_version=%r interpreted as Delphi version registry_version=%s",
                     compiler_version,
                     version_hint,
                 )
                 return version_hint
 
-            # 项目配置里的 compiler_version 写错时，delphi_version 仍可作为
-            # 明确的版本声明；工具调用显式传入的错误值则直接失败，避免掩盖问题。
+            # When compiler_version in project config is wrong, delphi_version can still serve as
+            # an explicit version declaration; an explicitly passed invalid value from a tool call fails directly to avoid masking the issue.
             if (
                 not explicit_compiler
                 and project_settings
                 and project_settings.delphi_version
             ):
                 logger.warning(
-                    "项目配置的 compiler_version=%r 无法解析，改用 delphi_version=%s",
+                    "Unable to parse project-configured compiler_version=%r, using delphi_version=%s",
                     compiler_version,
                     project_settings.delphi_version,
                 )
                 return project_settings.delphi_version
 
             logger.error(
-                "无法确定显式编译器 %s 的 registry_version，拒绝回退到其他 Delphi 版本",
+                "Cannot determine registry_version for explicit compiler %s; refusing to fall back to another Delphi version",
                 compiler_version,
             )
             return None
@@ -1642,10 +1643,10 @@ class CompilerService:
         if project_settings and project_settings.delphi_version:
             project_version = parser.get_project_version() if project_parsed else None
             logger.info(
-                "使用项目配置 %s 的 delphi_version=%s（忽略 .dproj ProjectVersion=%s）",
+                "Using project config %s delphi_version=%s (ignoring .dproj ProjectVersion=%s)",
                 project_settings.source,
                 project_settings.delphi_version,
-                project_version or "未知",
+                project_version or "unknown",
             )
             return project_settings.delphi_version
 
@@ -1657,8 +1658,8 @@ class CompilerService:
                     return registry_version
 
         logger.warning(
-            "无法确定工程对应的 Delphi registry_version；"
-            "将沿用 rsvars 默认选择并跳过 EnvOptions 兼容处理"
+            "Cannot determine the Delphi registry_version for the project; "
+            "will use the rsvars default selection and skip EnvOptions compatibility handling"
         )
         return None
 
@@ -1694,28 +1695,28 @@ class CompilerService:
         except FileNotFoundError:
             return
         except OSError as exc:
-            logger.warning("删除临时文件失败 %s: %s", file_path, exc)
+            logger.warning("Failed to delete temporary file %s: %s", file_path, exc)
 
     async def compile_project_with_msbuild(self, request: ProjectCompileRequest) -> CompileResult:
         """
-        使用 MSBuild 编译 Delphi 工程
-        
+        Compile a Delphi project using MSBuild
+
         Args:
-            request: 工程编译请求
-            
+            request: Project compile request
+
         Returns:
-            编译结果
+            Compile result
         """
-        logger.info(f"使用 MSBuild 编译工程: {request.project_path}")
+        logger.info(f"Compiling project using MSBuild: {request.project_path}")
         start_time = time.time()
         batch_file: Optional[str] = None
         env_options_overlay: Optional[str] = None
         
         try:
-            # 1. 验证项目路径
+            # 1. Validate project path
             is_valid, error_msg = self.validator.validate_project_path(request.project_path)
             if not is_valid:
-                logger.error(f"项目路径验证失败: {error_msg}")
+                logger.error(f"Project path validation failed: {error_msg}")
                 return CompileResult(
                     status=CompileStatus.FAILED,
                     error_code="INVALID_PROJECT_PATH",
@@ -1723,12 +1724,12 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000)
                 )
             
-            # 3. 确定项目文件(.dproj)
+            # 3. Determine the project file (.dproj)
             if request.project_path.endswith(('.dpr', '.dpk')):
                 ext = '.dpr' if request.project_path.endswith('.dpr') else '.dpk'
                 dproj_path = request.project_path[:-len(ext)] + '.dproj'
                 if not Path(dproj_path).exists():
-                    error_msg = f"未找到对应的 .dproj 文件: {dproj_path}"
+                    error_msg = f"Corresponding .dproj file not found: {dproj_path}"
                     logger.error(error_msg)
                     return CompileResult(
                         status=CompileStatus.FAILED,
@@ -1739,7 +1740,7 @@ class CompilerService:
             elif request.project_path.endswith('.dproj'):
                 dproj_path = request.project_path
             else:
-                error_msg = "项目文件必须是 .dpr、.dpk 或 .dproj 文件"
+                error_msg = "Project file must be a .dpr, .dpk, or .dproj file"
                 logger.error(error_msg)
                 return CompileResult(
                     status=CompileStatus.FAILED,
@@ -1748,8 +1749,8 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000)
                 )
             
-            # 3. 加载项目级配置（.daofy/project.json / daofy.project.json）
-            # 每个工程可独立指定 Delphi 版本与 MSBuild，避免多版本机器上互相串用。
+            # 3. Load project-level configuration (.daofy/project.json / daofy.project.json)
+            # Each project can independently specify the Delphi version and MSBuild to avoid cross-use on multi-version machines.
             project_settings = load_project_settings(dproj_path)
             if project_settings and project_settings.error:
                 logger.error(project_settings.error)
@@ -1760,7 +1761,7 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000),
                 )
 
-            # 4. 提取并执行编译事件
+            # 4. Extract and execute build events
             _PLATFORM_MSBUILD_MAP = {
                 TargetPlatform.WIN32: "Win32",
                 TargetPlatform.WIN64: "Win64",
@@ -1776,8 +1777,9 @@ class CompilerService:
             platform = _PLATFORM_MSBUILD_MAP.get(request.options.target_platform, "Win32")
             config = request.options.build_configuration or "Debug"
             
-            # ── 防御：extra_args 中 /p:Platform 或 /p:Config 与 options 不一致时，以 extra_args 为准 ──
-            # （正常路径由 project.py 包装层同步，此处为直接调用 compiler_service 的兜底）
+            # ── Defense: when /p:Platform or /p:Config in extra_args differs from options, extra_args wins ──
+            # (the normal path is synchronized by the project.py wrapper; this is a fallback for direct compiler_service calls)
+
             _extra_args = request.options.extra_args or []
             _found_platform = _found_config = False
             for _ea in reversed(_extra_args):
@@ -1789,8 +1791,8 @@ class CompilerService:
                     _extra_plat = _property_value
                     if _extra_plat.lower() != platform.lower():
                         logger.warning(
-                            "extra_args /p:Platform=%s 与 options.target_platform=%s冲突，"
-                            "以 extra_args 值为准（MSBuild last-wins）",
+                            "extra_args /p:Platform=%s conflicts with options.target_platform=%s, "
+                            "using extra_args value (MSBuild last-wins)",
                             _extra_plat, platform,
                         )
                         platform = _extra_plat
@@ -1803,8 +1805,8 @@ class CompilerService:
                     _extra_cfg = _property_value
                     if _extra_cfg != config:
                         logger.warning(
-                            "extra_args /p:Config=%s 与 build_configuration=%s冲突，"
-                            "以 extra_args 值为准",
+                            "extra_args /p:Config=%s conflicts with build_configuration=%s, "
+                            "using extra_args value",
                             _extra_cfg, config,
                         )
                         config = _extra_cfg
@@ -1830,8 +1832,8 @@ class CompilerService:
                     project_settings.error
                     if project_settings and project_settings.error
                     else (
-                        "无法确定指定编译器/项目配置的 Delphi 注册表版本，"
-                        "为避免混用其他 Delphi 版本，已停止编译"
+                        "Cannot determine the Delphi registry version for the specified compiler/project config; "
+                        "compilation stopped to avoid mixing another Delphi version"
                     )
                 )
                 return CompileResult(
@@ -1847,18 +1849,18 @@ class CompilerService:
             )
             if registry_version:
                 logger.info(
-                    "MSBuild 使用 Delphi %s，平台 %s，配置 %s",
+                    "MSBuild using Delphi %s, platform %s, configuration %s",
                     registry_version,
                     platform,
                     config,
                 )
 
-            # 3.5 按工程解析 MSBuild（项目配置 > 版本映射 > 自动探测）
+            # 3.5 Resolve MSBuild per project (project config > version mapping > auto-detection)
             msbuild_path, msbuild_source, msbuild_explicit_error = (
                 self._resolve_msbuild_path(registry_version, project_settings)
             )
             if not msbuild_path:
-                error_msg = f"未找到可用的 MSBuild（{msbuild_source}）"
+                error_msg = f"No usable MSBuild found ({msbuild_source})"
                 logger.error(error_msg)
                 return CompileResult(
                     status=CompileStatus.FAILED,
@@ -1871,15 +1873,15 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000),
                 )
 
-            # 3.6 先确认目标 Delphi 版本的 rsvars.bat 可用，再执行编译事件。
-            # 否则版本未安装时 PreBuildEvent 仍会用错误的 BDS 环境运行。
+            # 3.6 First confirm the target Delphi version's rsvars.bat is available before executing build events.
+            # Otherwise, when the version is not installed, PreBuildEvent will still run with the wrong BDS environment.
             if registry_version:
-                logger.info("定位 Delphi %s 的 rsvars.bat", registry_version)
+                logger.info("Locating rsvars.bat for Delphi %s", registry_version)
             rsvars_path = self._get_rsvars_path(registry_version)
             if not rsvars_path:
                 error_msg = (
-                    f"无法找到 Delphi {registry_version or '默认版本'} 的 rsvars.bat，"
-                    "请检查该版本是否已安装"
+                    f"Unable to find rsvars.bat for Delphi {registry_version or 'default version'}, "
+                    "please check whether that version is installed"
                 )
                 logger.error(error_msg)
                 return CompileResult(
@@ -1896,63 +1898,63 @@ class CompilerService:
             project_filename = Path(dproj_path).name
             project_name = Path(dproj_path).stem
             
-            # 4.5 检查目标程序是否正在运行
+            # 4.5 Check whether the target program is running
             running_process = self._check_process_running(project_name)
             if running_process:
-                error_msg = f"目标程序 '{project_name}.exe' 正在运行 (PID: {running_process['pid']})，无法编译。请先关闭程序后再试。"
+                error_msg = f"Target program '{project_name}.exe' is running (PID: {running_process['pid']}), cannot compile. Please close the program and try again."
                 logger.warning(error_msg)
                 return CompileResult(
                     status=CompileStatus.FAILED,
                     error_code="PROCESS_RUNNING",
                     error_message=error_msg,
                     duration=int((time.time() - start_time) * 1000),
-                    log=f"进程信息: PID={running_process['pid']}, 路径={running_process.get('path', '未知')}"
+                    log=f"Process info: PID={running_process['pid']}, path={running_process.get('path', 'unknown')}"
                 )
             
-            # 构建上下文变量（os 已在模块顶部导入）
+            # Build context variables (os is imported at the top of the module)
             context = {
-                # 项目相关
+                # Project-related
                 'project_dir': project_dir,
                 'project_path': project_path,
                 'project_filename': project_filename,
                 'project_name': project_name,
                 
-                # 输入文件相关(对于项目编译,输入文件就是项目文件)
+                # Input file-related (for project compilation, the input file is the project file)
                 'input_path': project_path,
                 'input_filename': project_filename,
                 'input_ext': Path(dproj_path).suffix,
                 
-                # 输出文件相关
+                # Output file-related
                 'output_dir': request.options.output_path or project_dir,
                 'output_path': request.options.output_path or project_dir,
                 'output_filename': f"{project_name}.exe",
                 'output_ext': '.exe',
                 
-                # 配置相关
+                # Configuration-related
                 'config': config,
                 'platform': platform,
                 'defines': ';'.join(request.options.conditional_defines) if request.options.conditional_defines else '',
                 
-                # 路径相关
+                # Path-related
                 'dir': project_dir,
                 'include_path': ';'.join(request.options.unit_search_paths) if request.options.unit_search_paths else '',
                 'path': os.environ.get('PATH', ''),
                 
-                # Delphi 环境变量
+                # Delphi environment variables
                 'bds': selected_bds or os.environ.get('BDS') or '',
                 'local_command': '',
                 
-                # 系统变量
+                # System variables
                 'system_root': os.environ.get('SystemRoot', r'C:\Windows'),
                 'windir': os.environ.get('WINDIR', r'C:\Windows'),
             }
             
-            # 解析 .dproj 文件获取编译事件
+            # Parse the .dproj file to get build events
             build_events = {}
             if project_parsed:
                 build_events = parser.get_build_events(config, platform)
                 
-                # 执行 PreBuildEvent
+                # Execute PreBuildEvent
                 if build_events.get('pre_build'):
                     success, error_msg, output = self._execute_build_event(
                         "PreBuildEvent",
@@ -1972,66 +1974,66 @@ class CompilerService:
                             log=output or ""
                         )
             
-            # 5. 构建 MSBuild 参数
+            # 5. Build MSBuild arguments
             args = []
             
-            # 项目文件
+            # Project file
             args.append(dproj_path)
             
-            # ── 从 extra_args 提取属性名，跳过工具生成的同名属性 ──
-            # extra_args 中的 MSBuild 属性为唯一来源，避免命令行重复且语义明确。
+            # ── Extract property names from extra_args and skip same-named properties generated by the tool ──
+            # MSBuild properties in extra_args are the sole source, avoiding duplicate command-line properties and keeping semantics clear.
             _extra_prop_names = set()
             for _ea in (request.options.extra_args or []):
                 _property = self._parse_msbuild_property(_ea)
                 if _property:
                     _extra_prop_names.add(_property[0])
             
-            # 目标平台
+            # Target platform
             if 'platform' not in _extra_prop_names:
                 args.append(f"/p:Platform={platform}")
             
-            # 配置(Debug/Release)
+            # Configuration (Debug/Release)
             if 'config' not in _extra_prop_names:
                 args.append(f"/p:Config={config}")
             
-            # 输出路径
+            # Output path
             if request.options.output_path and 'dcc_exeoutput' not in _extra_prop_names:
                 args.append(f"/p:DCC_ExeOutput={request.options.output_path}")
             
-            # 条件编译符号
+            # Conditional compilation symbols
             if request.options.conditional_defines and 'dcc_define' not in _extra_prop_names:
                 defines = ";".join(request.options.conditional_defines)
-                # MSBuild 命令行上分号是属性分隔符，必须转义为 %3B
-                # 经批处理文件传递时 % 需写为 %% 才能被 cmd.exe 正确展开
+                # On the MSBuild command line, semicolon is a property separator and must be escaped as %3B
+                # When passed through a batch file, % must be written as %% for cmd.exe to expand correctly
                 defines = defines.replace(";", "%%3B")
                 args.append(f"/p:DCC_Define={defines}")
             
-            # 单元搜索路径
+            # Unit search paths
             if request.options.unit_search_paths and 'dcc_unitsearchpath' not in _extra_prop_names:
                 paths = ";".join(request.options.unit_search_paths)
                 args.append(f"/p:DCC_UnitSearchPath={paths}")
             
-            # 生成 Detailed 级别 .map 文件（供 StackTrace callgraph 解析）
+            # Generate a Detailed-level .map file (for StackTrace callgraph parsing)
             if 'dcc_mapfile' not in _extra_prop_names:
                 args.append("/p:DCC_MapFile=3")
             
-            # Delphi >= XE5 (registry version >= 12.0) 时自动启用响应文件编译
-            # 解决 MSBuild 命令行过长 (>32K) 导致编译失败的问题
+            # Automatically enable response-file compilation for Delphi >= XE5 (registry version >= 12.0)
+            # Solves compilation failures caused by an overly long MSBuild command line (>32K)
             if 'dcc_usemsbuildexternally' not in _extra_prop_names:
                 try:
                     delphi_ver = registry_version or _get_delphi_version_env()
                     if delphi_ver and float(delphi_ver) >= 12.0:
                         args.append("/p:DCC_UseMSBuildExternally=true")
-                        logger.info("检测到 Delphi %s (>=XE5)，已启用 DCC_UseMSBuildExternally", delphi_ver)
+                        logger.info("Detected Delphi %s (>=XE5), enabled DCC_UseMSBuildExternally", delphi_ver)
                 except Exception as e:
-                    logger.warning("检测 Delphi 版本失败，不启用 DCC_UseMSBuildExternally: %s", e)
+                    logger.warning("Failed to detect Delphi version, not enabling DCC_UseMSBuildExternally: %s", e)
 
-            # 其他参数
-            args.append("/v:minimal")  # 最小输出级别
+            # Other arguments
+            args.append("/v:minimal")  # Minimal output level
 
-            # 用户参数追加（extra_args 中已覆盖的属性在此提供唯一来源）
+            # Append user arguments (properties already overridden in extra_args are the sole source here)
             if not self.args_generator.validate_batch_extra_args(request.options.extra_args):
-                error_msg = "额外编译参数包含不允许的批处理元字符"
+                error_msg = "Extra compile arguments contain disallowed batch metacharacters"
                 logger.error(error_msg)
                 return CompileResult(
                     status=CompileStatus.FAILED,
@@ -2039,7 +2041,7 @@ class CompilerService:
                     error_message=error_msg,
                     duration=int((time.time() - start_time) * 1000)
                 )
-            # 5. rsvars.bat 已在执行编译事件前定位并校验（见 3.6）
+            # 5. rsvars.bat has already been located and validated before executing build events (see 3.6)
             explicit_env_properties = {
                 "bds",
                 "bdsappdatabasedir",
@@ -2060,8 +2062,8 @@ class CompilerService:
                     )
                     args.append(f"/p:EnvOptions={env_options_overlay}")
                     logger.warning(
-                        "Delphi %s %s 的 EnvOptions 状态为 %s；"
-                        "本次编译使用临时 overlay（注册表 %d 项，EnvOptions %d 项）",
+                        "EnvOptions state for Delphi %s %s is %s; "
+                        "this compilation uses a temporary overlay (registry %d entries, EnvOptions %d entries)",
                         registry_version,
                         platform,
                         env_status.state,
@@ -2070,36 +2072,36 @@ class CompilerService:
                     )
                 elif env_status.state == "unknown":
                     logger.warning(
-                        "无法可靠检查 Delphi %s %s 的 EnvOptions，跳过自动覆盖",
+                        "Cannot reliably check EnvOptions for Delphi %s %s, skipping automatic override",
                         registry_version,
                         platform,
                     )
                 elif env_status.state == "registry_missing":
                     logger.debug(
-                        "Delphi %s %s 未配置注册表 Library Search Path，沿用 EnvOptions",
+                        "Delphi %s %s has no registry Library Search Path configured, using EnvOptions",
                         registry_version,
                         platform,
                     )
             elif _extra_prop_names & explicit_env_properties:
-                logger.info("检测到显式 EnvOptions/DelphiLibraryPath 参数，跳过自动兼容处理")
+                logger.info("Explicit EnvOptions/DelphiLibraryPath arguments detected, skipping automatic compatibility handling")
 
             args.extend(request.options.extra_args)
 
-            # 记录完整编译参数到日志
-            # 使用解析出的 MSBuild 绝对路径，而非裸 msbuild（依赖 PATH），
-            # 避免 rsvars.bat 未将 VS MSBuild 加入 PATH 时找不到 msbuild.exe。
+            # Log the complete compile arguments
+            # Use the resolved absolute MSBuild path instead of bare msbuild (which depends on PATH),
+            # to avoid failing to find msbuild.exe when rsvars.bat has not added VS MSBuild to PATH.
             msbuild_cmd = f'"{msbuild_path}" {" ".join(args)}'
-            logger.info(f"MSBuild 参数: {msbuild_cmd}")
+            logger.info(f"MSBuild arguments: {msbuild_cmd}")
             
-            # 6. 创建临时批处理文件来设置环境并执行 MSBuild
-            # 将参数中的路径用引号包裹（处理空格）
+            # 6. Create a temporary batch file to set the environment and execute MSBuild
+            # Quote paths in the arguments (to handle spaces)
             quoted_args = []
             for arg in args:
                 if ' ' in arg:
                     quoted_args.append('"%s"' % arg)
                 else:
                     quoted_args.append(arg)
-            # 使用 OEM 代码页编码写 batch 文件，cmd.exe 只认 OEM 编码（不支持 UTF-8）
+            # Write batch file using OEM code page encoding; cmd.exe only recognizes OEM encoding (UTF-8 is not supported)
             batch_encoding = get_console_encoding(oem=True)
             with tempfile.NamedTemporaryFile(mode='w', suffix='.bat', delete=False,
                                              encoding=batch_encoding) as f:
@@ -2108,11 +2110,11 @@ class CompilerService:
                 f.write('"%s" %s\n' % (msbuild_path, ' '.join(quoted_args)))
                 batch_file = f.name
             
-            logger.info("创建批处理文件: %s", batch_file)
-            logger.debug("=== 完整编译命令 ===\n"
+            logger.info("Creating batch file: %s", batch_file)
+            logger.debug("=== Full compile command ===\n"
                          "rsp: %s\n%s" % (rsvars_path, msbuild_cmd))
             
-            # 6. 执行批处理文件
+            # 6. Execute batch file
             try:
                 return_code, stdout, stderr = await self.process_manager.execute(
                     'cmd.exe',
@@ -2120,31 +2122,31 @@ class CompilerService:
                     request.options.timeout
                 )
                 
-                # 记录 MSBuild 输出中的编译器版本/行数信息
+                # Record compiler version/line count info in MSBuild output
                 for line in (stdout or '').split('\n'):
                     line = line.strip()
                     if line and ('Embarcadero Delphi' in line or 'dcc' in line.lower() or 'lines' in line.lower()):
-                        logger.debug(f"编译器输出: {line}")
+                        logger.debug(f"Compiler output: {line}")
                 
-                # 6. 解析输出
+                # 6. Parse output
                 errors = self.output_parser.parse_errors(stdout + stderr)
                 warnings = self.output_parser.parse_warnings(stdout + stderr)
                 
-                # 7. 构建结果
+                # 7. Build result
                 duration = int((time.time() - start_time) * 1000)
                 
                 if return_code == 0:
-                    # 编译成功
-                    # 执行 PostBuildEvent
+                    # Compilation succeeded
+                    # Execute PostBuildEvent
                     if build_events.get('post_build'):
-                        # 检查执行条件
+                        # Check execution conditions
                         execute_when = build_events.get('post_build_execute_when', 'Always')
                         should_execute = False
                         
                         if execute_when == 'Always':
                             should_execute = True
                         elif execute_when == 'TargetOutOfDate':
-                            # 目标过期时执行(编译成功意味着目标已更新)
+                            # Execute when target is out of date (successful build means target has been updated)
                             should_execute = True
                         
                         if should_execute:
@@ -2158,7 +2160,7 @@ class CompilerService:
                             )
                             
                             if not success:
-                                logger.warning(f"PostBuildEvent 失败,但编译已成功: {error_msg}")
+                                logger.warning(f"PostBuildEvent failed, but compilation succeeded: {error_msg}")
                     
                     output_file = self._extract_output_file(stdout, request.options.output_path)
                     output_files = self._collect_output_files(
@@ -2167,7 +2169,7 @@ class CompilerService:
                         config,
                         output_file if (output_file and Path(output_file).parent.exists()) else None,
                     )
-                    # 若 _extract_output_file 没找到（MSBuild 输出无 Output: 行），从 output_files 回填
+                    # If _extract_output_file didn't find it (no Output: line in MSBuild output), backfill from output_files
                     if not output_file and output_files:
                         output_file = output_files[0]
                     result = CompileResult(
@@ -2179,9 +2181,9 @@ class CompilerService:
                         duration=duration,
                         log=stdout + stderr
                     )
-                    logger.info(f"MSBuild 编译成功,耗时 {duration}ms")
+                    logger.info(f"MSBuild compilation succeeded, took {duration}ms")
                 else:
-                    # 编译失败
+                    # Compilation failed
                     result = CompileResult(
                         status=CompileStatus.FAILED,
                         error_code="COMPILATION_FAILED",
@@ -2191,16 +2193,16 @@ class CompilerService:
                         duration=duration,
                         log=stdout + stderr
                     )
-                    logger.error(f"MSBuild 编译失败,耗时 {duration}ms")
+                    logger.error(f"MSBuild compilation failed, took {duration}ms")
                 
-                # 8. 保存编译历史
+                # 8. Save compilation history
                 self._save_history(request.project_path, result.status.value, duration, result.error_message)
                 
                 return result
                 
             except TimeoutError as e:
                 duration = int((time.time() - start_time) * 1000)
-                logger.error(f"MSBuild 编译超时: {str(e)}")
+                logger.error(f"MSBuild compilation timed out: {str(e)}")
                 result = CompileResult(
                     status=CompileStatus.TIMEOUT,
                     error_code="COMPILATION_TIMEOUT",
@@ -2212,7 +2214,7 @@ class CompilerService:
                 
         except Exception as e:
             duration = int((time.time() - start_time) * 1000)
-            error_msg = f"MSBuild 编译过程发生异常: {str(e)}"
+            error_msg = f"Exception occurred during MSBuild compilation: {str(e)}"
             logger.error(error_msg, exc_info=True)
             result = CompileResult(
                 status=CompileStatus.FAILED,
@@ -2228,23 +2230,23 @@ class CompilerService:
 
     async def compile_with_lazbuild(self, request: ProjectCompileRequest) -> CompileResult:
         """
-        使用 lazbuild 编译 Lazarus/Free Pascal 工程
+        Compile a Lazarus/Free Pascal project using lazbuild
 
         Args:
-            request: 工程编译请求（project_path 为 .lpi 或 .lpr）
+            request: Project compile request (project_path is .lpi or .lpr)
 
         Returns:
-            编译结果
+            Compilation result
         """
-        logger.info(f"使用 lazbuild 编译工程: {request.project_path}")
+        logger.info(f"Compiling project using lazbuild: {request.project_path}")
         start_time = time.time()
 
         try:
-            # 1. 查找 lazbuild 路径
+            # 1. Find lazbuild path
             lazbuild_path = self._find_lazbuild()
             if not lazbuild_path:
-                error_msg = ("未找到 lazbuild.exe，请安装 Lazarus IDE。"
-                             "下载地址: https://www.lazarus-ide.org/")
+                error_msg = ("lazbuild.exe not found. Please install Lazarus IDE."
+                             "Download URL: https://www.lazarus-ide.org/")
                 logger.error(error_msg)
                 return CompileResult(
                     status=CompileStatus.FAILED,
@@ -2253,13 +2255,13 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000)
                 )
 
-            # 2. 确定 .lpi 文件路径
+            # 2. Determine .lpi file path
             project_path = Path(request.project_path)
             ext = project_path.suffix.lower()
             if ext == '.lpr':
                 lpi_path = project_path.with_suffix('.lpi')
                 if not lpi_path.exists():
-                    error_msg = f"未找到对应的 .lpi 文件: {lpi_path}"
+                    error_msg = f"Corresponding .lpi file not found: {lpi_path}"
                     logger.error(error_msg)
                     return CompileResult(
                         status=CompileStatus.FAILED,
@@ -2270,7 +2272,7 @@ class CompilerService:
             elif ext == '.lpi':
                 lpi_path = project_path
             else:
-                error_msg = "Lazarus 工程文件必须是 .lpi 或 .lpr 文件"
+                error_msg = "Lazarus project file must be a .lpi or .lpr file"
                 logger.error(error_msg)
                 return CompileResult(
                     status=CompileStatus.FAILED,
@@ -2279,31 +2281,31 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000)
                 )
 
-            # 3. 检查目标程序是否正在运行
+            # 3. Check whether target program is running
             project_name = project_path.stem
             running_process = self._check_process_running(project_name)
             if running_process:
-                error_msg = (f"目标程序 '{project_name}.exe' 正在运行 "
-                             f"(PID: {running_process['pid']})，无法编译。"
-                             "请先关闭程序后再试。")
+                error_msg = (f"Target program '{project_name}.exe' is running "
+                             f"(PID: {running_process['pid']}), cannot compile."
+                             "Please close the program and try again.")
                 logger.warning(error_msg)
                 return CompileResult(
                     status=CompileStatus.FAILED,
                     error_code="PROCESS_RUNNING",
                     error_message=error_msg,
                     duration=int((time.time() - start_time) * 1000),
-                    log=f"进程信息: PID={running_process['pid']}, "
-                        f"路径={running_process.get('path', '未知')}"
+                    log=f"Process info: PID={running_process['pid']}, "
+                        f"Path={running_process.get('path', 'Unknown')}"
                 )
 
-            # 4. 构建 lazbuild 命令行
+            # 4. Build lazbuild command line
             args = [str(lpi_path)]
 
-            # 编译模式: --build-mode=Default/Release/Debug
+            # Build mode: --build-mode=Default/Release/Debug
             if request.options.build_configuration:
                 args.append(f"--build-mode={request.options.build_configuration}")
 
-            # 平台: --ws=win32/win64
+            # Platform: --ws=win32/win64
             platform_map = {
                 TargetPlatform.WIN32: "win32",
                 TargetPlatform.WIN64: "win64",
@@ -2312,25 +2314,25 @@ class CompilerService:
             if ws:
                 args.append(f"--ws={ws}")
 
-            logger.info(f"lazbuild 命令: {lazbuild_path} {' '.join(args)}")
+            logger.info(f"lazbuild command: {lazbuild_path} {' '.join(args)}")
 
-            # 5. 执行编译
+            # 5. Execute compilation
             return_code, stdout, stderr = await self.process_manager.execute(
                 lazbuild_path,
                 args,
                 request.options.timeout
             )
 
-            # 6. 解析输出
+            # 6. Parse output
             output_text = stdout + stderr
             errors = self.output_parser.parse_errors(output_text)
             warnings = self.output_parser.parse_warnings(output_text)
 
-            # 7. 构建结果
+            # 7. Build result
             duration = int((time.time() - start_time) * 1000)
 
             if return_code == 0:
-                # 查找输出文件
+                # Find output file
                 exe_path = self._find_lazbuild_output(lpi_path)
                 result = CompileResult(
                     status=CompileStatus.SUCCESS,
@@ -2340,7 +2342,7 @@ class CompilerService:
                     log=output_text,
                 )
             else:
-                error_message = f"lazbuild 编译失败 (退出码: {return_code})"
+                error_message = f"lazbuild compilation failed (exit code: {return_code})"
                 if errors:
                     error_message += f"\n{errors[0]}"
 
@@ -2360,7 +2362,7 @@ class CompilerService:
 
         except Exception as e:
             duration = int((time.time() - start_time) * 1000)
-            error_msg = f"lazbuild 编译异常: {str(e)}"
+            error_msg = f"lazbuild compilation exception: {str(e)}"
             logger.error(error_msg, exc_info=True)
             result = CompileResult(
                 status=CompileStatus.FAILED,
@@ -2374,16 +2376,16 @@ class CompilerService:
 
     def _find_lazbuild(self) -> Optional[str]:
         """
-        查找 lazbuild.exe 路径
+        Find lazbuild.exe path
 
-        搜索顺序:
-        1. 配置文件中的 Lazarus 编译器路径
-        2. 共享检测模块（PATH → 常见目录 → 开始菜单 → 注册表）
+        Search order:
+        1. Lazarus compiler path in configuration file
+        2. Shared detection module (PATH → common directories → Start Menu → registry)
 
         Returns:
-            lazbuild.exe 路径,未找到则返回 None
+            lazbuild.exe path, or None if not found
         """
-        # 1. 从配置文件查找 Lazarus 编译器
+        # 1. Find Lazarus compiler from configuration file
         config = self.config_manager.config
         for compiler in config.compilers:
             if (getattr(compiler, 'compiler_type', None) == 'lazarus'
@@ -2391,7 +2393,7 @@ class CompilerService:
                 if Path(compiler.path).exists():
                     return compiler.path
 
-        # 2. 共享检测模块
+        # 2. Shared detection module
         from src.plugins.lazarus.detect import find_lazbuild
         paths = find_lazbuild()
         if paths:
@@ -2401,19 +2403,19 @@ class CompilerService:
 
     def _find_lazbuild_output(self, lpi_path: Path) -> Optional[Path]:
         """
-        查找 lazbuild 编译输出文件
+        Find lazbuild compilation output file
 
         Args:
-            lpi_path: .lpi 文件路径
+            lpi_path: .lpi file path
 
         Returns:
-            输出 exe 路径
+            Output exe path
         """
         project_dir = lpi_path.parent
         project_name = lpi_path.stem
         exe_name = f"{project_name}.exe"
 
-        # 优先查找 lazarus 默认输出目录
+        # Prefer Lazarus default output directories
         output_dirs = [
             project_dir / "lib" / project_name,
             project_dir / "output",
@@ -2429,84 +2431,85 @@ class CompilerService:
 
     async def compile_project(self, request: ProjectCompileRequest) -> CompileResult:
         """
-        编译 Delphi/Lazarus 工程
+        Compile Delphi/Lazarus project
         
-        优先使用 MSBuild 编译 Delphi 工程,如果 MSBuild 不可用或没有 .dproj 文件则回退到直接调用编译器
-        对于 Lazarus 工程(.lpi/.lpr),使用 lazbuild 编译
+        Prefer MSBuild to compile Delphi projects; if MSBuild is unavailable or there is no .dproj file, fall back to directly invoking the compiler
+        For Lazarus projects (.lpi/.lpr), use lazbuild to compile
 
         Args:
-            request: 工程编译请求
+            request: Project compile request
 
         Returns:
-            编译结果
+            Compilation result
         """
-        logger.info(f"开始编译工程: {request.project_path}")
+        logger.info(f"Starting project compilation: {request.project_path}")
 
-        # 检查项目类型
+        # Check project type
         ext = Path(request.project_path).suffix.lower()
         is_source_file = ext in ('.dpr', '.dpk')
         is_dproj = ext == '.dproj'
         is_lpi = ext == '.lpi'
         is_lpr = ext == '.lpr'
 
-        # Lazarus 工程 (.lpi/.lpr) 使用 lazbuild 编译
+        # Lazarus project (.lpi/.lpr) uses lazbuild for compilation
         if is_lpi or is_lpr:
             return await self.compile_with_lazbuild(request)
 
-        # Delphi 工程 (.dproj) 使用 MSBuild 编译
+        # Delphi project (.dproj) uses MSBuild for compilation
+
         if is_dproj:
-            logger.info("使用 MSBuild 编译 .dproj 文件")
-            # MSBuild 的可用性由 compile_project_with_msbuild 按工程配置解析，
-            # 这里不再用初始化时探测到的全局路径做前置判断（多版本机器上可能不同）。
+            logger.info("Compiling .dproj file using MSBuild")
+            # MSBuild availability is resolved by compile_project_with_msbuild according to project configuration,
+            # and the globally detected path at initialization is no longer used for a pre-check here (it may differ on machines with multiple versions).
             result = await self.compile_project_with_msbuild(request)
             if result.error_code in ("MSBUILD_NOT_FOUND", "MSBUILD_CONFIG_INVALID"):
                 logger.error(
-                    "MSBuild 不可用，无法编译 .dproj 文件: %s",
+                    "MSBuild is unavailable, cannot compile .dproj file: %s",
                     result.error_message,
                 )
             return result
 
-        # 检查是否存在 .dproj 文件
+        # Check whether a .dproj file exists
         dproj_exists = False
         if is_source_file:
             dproj_path = request.project_path[:-len(ext)] + '.dproj'
             dproj_exists = Path(dproj_path).exists()
             if not dproj_exists:
-                logger.info(f"未找到 .dproj 文件，将使用 dcc32 直接编译{ext} 文件")
+                logger.info(f".dproj file not found, will use dcc32 to directly compile {ext} file")
 
-        # .dpr/.dpk 有 .dproj → 优先 MSBuild；MSBuild 不可用时回退 dcc 直编。
-        # 但显式配置的 MSBuild 路径无效时必须直接失败，不能悄悄换直编掩盖配置错误。
+        # .dpr/.dpk with .dproj → prefer MSBuild; fall back to direct dcc compilation when MSBuild is unavailable.
+        # However, if an explicitly configured MSBuild path is invalid, it must fail directly; do not silently switch to direct compilation to hide configuration errors.
         if dproj_exists:
-            logger.info("使用 MSBuild 编译")
+            logger.info("Compiling using MSBuild")
             result = await self.compile_project_with_msbuild(request)
             if result.error_code != "MSBUILD_NOT_FOUND":
                 return result
             logger.warning(
-                "MSBuild 不可用，回退到 dcc 直接编译: %s",
+                "MSBuild is unavailable, falling back to direct dcc compilation: %s",
                 result.error_message,
             )
 
-        logger.info(f"使用 dcc 直接编译 {ext} 文件")
+        logger.info(f"Directly compiling {ext} file using dcc")
         return await self.compile_dpr_direct(request)
 
     async def compile_file(self, request: FileCompileRequest) -> CompileResult:
         """
-        编译单个 Delphi 单元文件(仅语法检查)
+        Compile a single Delphi unit file (syntax check only)
 
         Args:
-            request: 单文件编译请求
+            request: Single-file compile request
 
         Returns:
-            编译结果
+            Compilation result
         """
-        logger.info(f"开始编译文件: {request.file_path}")
+        logger.info(f"Starting file compilation: {request.file_path}")
         start_time = time.time()
 
         try:
-            # 1. 验证文件路径
+            # 1. Validate file path
             is_valid, error_msg = self.validator.validate_file_path(request.file_path)
             if not is_valid:
-                logger.error(f"文件路径验证失败: {error_msg}")
+                logger.error(f"File path validation failed: {error_msg}")
                 return CompileResult(
                     status=CompileStatus.FAILED,
                     error_code="INVALID_FILE_PATH",
@@ -2514,9 +2517,9 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000)
                 )
 
-            # 2. 获取编译器配置（显式版本 > 项目配置 > 最新安装的）
-            # 文件可能属于某个使用旧版 Delphi 的工程，项目级配置优先，
-            # 避免用最新安装版本做语法检查导致误报/漏报。
+            # 2. Get compiler configuration (explicit version > project configuration > newest installed)
+            # The file may belong to a project using an older Delphi version; project-level configuration takes precedence,
+            # to avoid false positives/negatives in syntax checking caused by using the newest installed version.
             settings = load_project_settings(request.file_path)
             if settings and settings.error:
                 logger.error(settings.error)
@@ -2538,7 +2541,7 @@ class CompilerService:
                     TargetPlatform.WIN32,
                 )
                 if not compiler_config and settings.delphi_version:
-                    # compiler_version 写错/不可用时，delphi_version 仍是明确声明
+                    # When compiler_version is wrong/unavailable, delphi_version is still an explicit declaration
                     compiler_config = (
                         self._lookup_compiler_by_version(
                             settings.delphi_version,
@@ -2565,12 +2568,12 @@ class CompilerService:
             if not compiler_config:
                 if settings and (settings.compiler_version or settings.delphi_version):
                     error_msg = (
-                        f"项目配置指定的 Delphi 版本不可用"
+                        f"Project configuration specifies an unavailable Delphi version"
                         f"（{settings.compiler_version or settings.delphi_version}）；"
-                        "不会回退到其它版本"
+                        "will not fall back to other versions"
                     )
                 else:
-                    error_msg = "未找到可用的编译器"
+                    error_msg = "No available compiler found"
                 logger.error(error_msg)
                 return CompileResult(
                     status=CompileStatus.FAILED,
@@ -2579,20 +2582,20 @@ class CompilerService:
                     duration=int((time.time() - start_time) * 1000)
                 )
 
-            # 3. 查找项目文件并提取配置
+            # 3. Find project file and extract configuration
             file_dir = str(Path(request.file_path).parent)
             file_name = Path(request.file_path).stem
 
-            # 尝试查找项目文件
+            # Try to find project file
             dproj_path = None
             project_unit_paths = []
             project_include_paths = []
             project_namespaces = []
 
-            # 方法1: 查找同目录下的.dproj文件
+            # Method 1: Find .dproj files in the same directory
             dproj_files = list(Path(file_dir).glob('*.dproj'))
             if dproj_files:
-                # 优先选择与文件名匹配的项目，否则选择第一个
+                # Prefer the project matching the file name; otherwise select the first one
                 for dproj in dproj_files:
                     if dproj.stem == file_name:
                         dproj_path = str(dproj)
@@ -2600,52 +2603,52 @@ class CompilerService:
                 if not dproj_path:
                     dproj_path = str(dproj_files[0])
 
-            # 方法2: 检查文件是否在项目的DCCReference中
+            # Method 2: Check whether the file is in the project's DCCReference
             if dproj_path:
                 try:
                     parser = DprojParser(dproj_path)
                     if parser.parse():
-                        # 检查文件是否属于项目
+                        # Check whether the file belongs to the project
                         if parser.is_file_in_project(Path(request.file_path).name):
-                            logger.info(f"文件 {Path(request.file_path).name} 属于项目 {Path(dproj_path).name}")
+                            logger.info(f"File {Path(request.file_path).name} belongs to project {Path(dproj_path).name}")
 
-                            # 提取单元搜索路径
+                            # Extract unit search paths
                             project_unit_paths = parser.get_unit_search_paths()
-                            logger.info(f"从项目文件中提取了 {len(project_unit_paths)} 个单元搜索路径")
+                            logger.info(f"Extracted {len(project_unit_paths)} unit search paths from project file")
 
-                            # 提取include路径（从单元搜索路径中推断）
+                            # Extract include paths (inferred from unit search paths)
                             for path in project_unit_paths:
                                 if 'include' in path.lower():
                                     project_include_paths.append(path)
 
-                            # 提取命名空间
+                            # Extract namespaces
                             project_namespaces = parser.get_namespace()
                             if project_namespaces:
-                                logger.info(f"从项目文件中提取了 {len(project_namespaces)} 个命名空间")
+                                logger.info(f"Extracted {len(project_namespaces)} namespaces from project file")
                         else:
-                            logger.info(f"文件 {Path(request.file_path).name} 不属于项目 {Path(dproj_path).name}")
+                            logger.info(f"File {Path(request.file_path).name} does not belong to project {Path(dproj_path).name}")
                             dproj_path = None
                 except Exception as e:
-                    logger.warning(f"解析项目文件失败: {e}")
+                    logger.warning(f"Failed to parse project file: {e}")
                     dproj_path = None
 
-            # 4. 删除源文件所在目录的旧版 .dcu 文件
+            # 4. Delete old .dcu files in the source file's directory
             self._cleanup_dcu_files(request.file_path)
 
-            # 5. 准备命名空间和include路径
-            # 合并项目命名空间和默认命名空间
+            # 5. Prepare namespaces and include paths
+            # Merge project namespaces and default namespaces
             default_namespaces = [
                 "System", "Winapi", "System.Win", "Vcl", "Vcl.Imaging",
                 "Vcl.Touch", "Vcl.Samples", "Vcl.Shell", "Data", "Datasnap",
                 "Web", "Soap", "Xml"
             ]
             if project_namespaces:
-                # 合并并去重
+                # Merge and deduplicate
                 namespaces = list(dict.fromkeys(project_namespaces + default_namespaces))
             else:
                 namespaces = default_namespaces
 
-            # 合并include路径
+            # Merge include paths
             default_include_paths = [
                 str(Path(file_dir) / "Thirdpart" / "Jedi" / "Jcl" / "source" / "include"),
                 str(Path(file_dir) / "Thirdpart" / "Jedi" / "Jcl" / "source" / "include" / "jedi")
@@ -2655,31 +2658,31 @@ class CompilerService:
             else:
                 include_paths = default_include_paths
 
-            # 合并单元搜索路径
+            # Merge unit search paths
+            # User-provided paths take precedence
             if project_unit_paths and request.unit_search_paths:
-                # 用户提供的路径优先
                 all_unit_paths = list(dict.fromkeys(request.unit_search_paths + project_unit_paths))
-                logger.info(f"合并单元搜索路径: 用户 {len(request.unit_search_paths)} 个 + 项目 {len(project_unit_paths)} 个")
+                logger.info(f"Merged unit search paths: {len(request.unit_search_paths)} user + {len(project_unit_paths)} project")
             elif project_unit_paths:
                 all_unit_paths = project_unit_paths
             else:
                 all_unit_paths = request.unit_search_paths or []
 
-            # 输出目录 - 使用固定的绝对路径
+            # Output directory - use a fixed absolute path
             output_dir = str(Path(file_dir) / "Win32" / "Debug")
 
-            # 确保输出目录存在
+            # Ensure output directory exists
             Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-            # 5. 从编译器配置获取 Delphi 数值版本号，用于标准库路径
+            # 5. Get Delphi numeric version from compiler configuration, used for standard library paths
             delphi_version = compiler_config.registry_version
             if not delphi_version:
-                # 注册表不可用时（如手动配置的编译器），从编译器 --version 输出解析
+                # When registry is unavailable (e.g. manually configured compiler), parse from compiler --version output
                 from ..utils.delphi_versions import detect_registry_version_from_compiler
                 detected = detect_registry_version_from_compiler(compiler_config.path)
                 if detected:
                     delphi_version = detected
-                    logger.info(f"从编译器输出检测到版本: {delphi_version}")
+                    logger.info(f"Detected version from compiler output: {delphi_version}")
                 else:
                     delphi_version = None
 
@@ -2696,18 +2699,18 @@ class CompilerService:
                 extra_args=request.extra_args,
             )
 
-            # 5. 执行编译
+            # 5. Execute compilation
             return_code, stdout, stderr = await self.process_manager.execute(
                 compiler_config.path,
                 args,
                 timeout=TIMEOUT_DELPHI_COMPILE  # 单文件编译超时时间较短
             )
 
-            # 5. 解析输出
+            # 5. Parse output
             errors = self.output_parser.parse_errors(stdout + stderr)
             warnings = self.output_parser.parse_warnings(stdout + stderr)
 
-            # 6. 构建结果
+            # 6. Build result
             duration = int((time.time() - start_time) * 1000)
 
             if return_code == 0:
@@ -2718,7 +2721,7 @@ class CompilerService:
                     duration=duration,
                     log=stdout + stderr
                 )
-                logger.info(f"文件编译成功,耗时 {duration}ms")
+                logger.info(f"File compilation succeeded, took {duration}ms")
             else:
                 result = CompileResult(
                     status=CompileStatus.FAILED,
@@ -2729,13 +2732,13 @@ class CompilerService:
                     duration=duration,
                     log=stdout + stderr
                 )
-                logger.error(f"文件编译失败,耗时 {duration}ms")
+                logger.error(f"File compilation failed, took {duration}ms")
 
             return result
 
         except Exception as e:
             duration = int((time.time() - start_time) * 1000)
-            error_msg = f"文件编译过程发生异常: {str(e)}"
+            error_msg = f"Exception occurred during file compilation: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return CompileResult(
                 status=CompileStatus.FAILED,
@@ -2746,17 +2749,17 @@ class CompilerService:
 
     def get_args(self, request: ProjectCompileRequest) -> CommandArgs:
         """
-        获取命令行参数(不执行编译)
+        Get command-line arguments (without executing compilation)
 
         Args:
-            request: 工程编译请求
+            request: Project compile request
 
         Returns:
-            命令行参数对象
+            Command-line arguments object
         """
-        logger.info(f"生成命令行参数: {request.project_path}")
+        logger.info(f"Generating command-line arguments: {request.project_path}")
 
-        # 获取编译器配置（显式版本 > 项目配置 > 默认编译器）
+        # Get compiler configuration (explicit version > project configuration > default compiler)
         settings = load_project_settings(request.project_path)
         compiler_config, compiler_path, compiler_error = self._resolve_project_compiler(
             request.project_path,
@@ -2770,30 +2773,30 @@ class CompilerService:
             compiler_path = compiler_config.path
         if not compiler_path:
             raise ValueError(
-                f"编译器配置不存在: "
-                f"{request.options.compiler_version or '默认编译器'}"
+                f"Compiler configuration does not exist: "
+                f"{request.options.compiler_version or 'default compiler'}"
             )
 
-        # 根据目标平台选择编译器
+        # Select compiler according to target platform
         if request.options.target_platform == TargetPlatform.WIN64:
-            # 大小写不敏感匹配 dcc32 可执行文件名（兼容 DCC32.EXE / Dcc32.exe 等手动配置）
+            # Case-insensitive match for dcc32 executable file name (compatible with manually configured names such as DCC32.EXE / Dcc32.exe)
             lower_path = compiler_path.lower()
             idx = lower_path.find('dcc32.exe')
             if idx != -1:
                 compiler_path = compiler_path[:idx] + 'dcc64.exe' + compiler_path[idx + len('dcc32.exe'):]
 
-        # 生成参数
+        # Generate arguments
         args = self.args_generator.generate(request.project_path, request.options)
 
-        # 生成完整命令
+        # Generate full command
         full_command = self.args_generator.format_command(compiler_path, args)
 
-        # 收集警告
+        # Collect warnings
         warnings = []
         if request.options.output_path:
             is_valid, error_msg = self.validator.validate_output_path(request.options.output_path)
             if not is_valid:
-                warnings.append(f"输出路径警告: {error_msg}")
+                warnings.append(f"Output path warning: {error_msg}")
 
         return CommandArgs(
             compiler_executable=compiler_path,
@@ -2810,22 +2813,23 @@ class CompilerService:
         build_configuration: str = "Debug",
         output_path_override: Optional[str] = None,
     ) -> list[str]:
-        """扫描编译产物目录，收集所有生成的文件路径（exe/dll/bpl/bpi/dcp 等）
+
+        """Scan build output directories and collect all generated file paths (exe/dll/bpl/bpi/dcp, etc.)
 
         Args:
-            project_path: .dproj/.dpr/.dpk 文件路径
-            target_platform: 目标平台（win32/win64 等）
-            build_configuration: 编译配置（Debug/Release）
-            output_path_override: 显式指定的输出路径（若提供则优先使用）
+            project_path: .dproj/.dpr/.dpk file path
+            target_platform: Target platform (win32/win64, etc.)
+            build_configuration: Build configuration (Debug/Release)
+            output_path_override: Explicitly specified output path (used first if provided)
 
         Returns:
-            所有存在的输出文件路径列表
+            List of all existing output file paths
         """
         proj = Path(project_path)
         project_name = proj.stem
         project_dir = proj.parent
 
-        # 确定候选输出目录
+        # Determine candidate output directories
         plat_map = {"win32": "Win32", "win64": "Win64"}
         plat_dir = plat_map.get(target_platform.lower(), "Win32")
         cfg = build_configuration or "Debug"
@@ -2839,18 +2843,18 @@ class CompilerService:
                 if parser.parse():
                     dproj_output = parser.get_output_path(config=cfg, platform=plat_dir)
             except Exception as e:
-                logger.debug("DProj 解析失败（继续用候选目录列表）: %s", e)
+                logger.debug("DProj parsing failed (continuing with candidate directory list): %s", e)
 
-        # 收集所有可能输出目录（去重、按可信度排序）
+        # Collect all possible output directories (deduplicate, sort by confidence)
         candidate_dirs: list[Path] = []
         if output_path_override:
             candidate_dirs.append(Path(output_path_override))
         if dproj_output:
             candidate_dirs.append(Path(dproj_output))
         candidate_dirs.append(project_dir / plat_dir / cfg)  # Win32/Debug
-        candidate_dirs.append(project_dir)                    # 项目根目录（MSBuild 缺省输出）
+        candidate_dirs.append(project_dir)                    # Project root directory (MSBuild default output)
 
-        # 输出产物列表（StackTrace/callgraph 需要 .map 做符号解析，.drc 不需要）
+        # Output artifact list (StackTrace/callgraph needs .map for symbol resolution; .drc is not needed)
         extensions = ['.exe', '.dll', '.bpl', '.bpi', '.dcp', '.map', '.tds', '.rsm']
         found: list[str] = []
 
@@ -2861,14 +2865,14 @@ class CompilerService:
                 candidate = output_dir / f"{project_name}{ext}"
                 if candidate.exists() and str(candidate.resolve()) not in found:
                     found.append(str(candidate.resolve()))
-            # 也通配查找以项目名开头的 .bpl/.bpi/.dcp（平台后缀变体）
+            # Also glob for .bpl/.bpi/.dcp starting with the project name (platform suffix variants)
             if not any(f.endswith(('.bpl', '.bpi', '.dcp')) for f in found):
                 for ext in ('.bpl', '.bpi', '.dcp'):
                     for p in output_dir.glob(f"{project_name}*{ext}"):
                         if p.exists() and str(p.resolve()) not in found:
                             found.append(str(p.resolve()))
 
-        # 对于 .dpk 包编译，bpl 可能输出到全局 Bpl 目录
+        # For .dpk package compilation, bpl may be output to the global Bpl directory
         if proj.suffix.lower() == '.dpk' or dproj_path.suffix.lower() == '.dpk':
             bpl_search_dirs = [Path.home() / "Documents" / "Embarcadero" / "Studio"]
             public_studio_root = get_delphi_public_studio_root()
@@ -2883,15 +2887,15 @@ class CompilerService:
                                 for p in bpl_dir.glob(f"{project_name}*{ext}"):
                                     if p.exists() and str(p.resolve()) not in found:
                                         found.append(str(p.resolve()))
-                            break  # 只检查最新版本
+                            break  # Only check the newest version
 
         return found
 
     def _extract_output_file(self, output: str, output_path: Optional[str]) -> Optional[str]:
-        """从输出中提取输出文件路径"""
+        """Extract output file path from output"""
         if output_path:
             return output_path
-        # 尝试从 dcc32 输出行解析: "Output: C:\path\to\output.exe"
+        # Try to parse from dcc32 output line: "Output: C:\path\to\output.exe"
         for line in output.splitlines():
             if 'Output:' in line and '.exe' in line:
                 idx = line.index('Output:') + 7
@@ -2901,7 +2905,7 @@ class CompilerService:
         return None
 
     def _save_history(self, project_path: str, status: str, duration: int, error_message: Optional[str]):
-        """保存编译历史"""
+        """Save compilation history"""
         entry = CompileHistoryEntry(
             timestamp=datetime.now(),
             project_path=project_path,

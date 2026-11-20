@@ -1,6 +1,6 @@
-"""核心工具 handlers — 从 server.py run_server() 闭包中提取。
+"""Core tool handlers — extracted from the server.py run_server() closure.
 
-不属于任何编译器插件的工具：async_task, code_hosting, tool_help,
+Tools that do not belong to any compiler plugin: async_task, code_hosting, tool_help,
 experience, daofy_update, generate_copyright, ocr
 """
 import asyncio
@@ -23,7 +23,7 @@ logger = init_default_logger()
 
 
 def _coerce_bool(val, default: bool = False) -> bool:
-    """将任意输入安全转换为 bool。"""
+    """Safely convert any input to bool."""
     if isinstance(val, bool):
         return val
     if isinstance(val, str):
@@ -41,17 +41,17 @@ async def _handle_async_task(arguments: dict) -> Any:
     handler = handlers.get(action)
     if handler:
         return await handler(arguments)
-    return {"error": f"未知action: {action}"}
+    return {"error": f"Unknown action: {action}"}
 
 
 async def _handle_code_hosting(arguments: dict) -> Any:
     try:
         if "action" not in arguments:
             return {"status": "failed", "message": "missing required parameter: action"}
-        # 使用 asyncio.to_thread 避免同步 HTTP 阻塞事件循环
+        # Use asyncio.to_thread to avoid blocking the event loop with synchronous HTTP
         return await asyncio.to_thread(code_hosting, **arguments)
     except Exception as e:
-        logger.error(f"code_hosting 执行失败: {e}", exc_info=True)
+        logger.error(f"code_hosting execution failed: {e}", exc_info=True)
         return {"status": "failed", "message": f"code_hosting failed: {e}"}
 
 
@@ -63,7 +63,7 @@ async def _handle_tool_help(arguments: dict) -> Any:
 
 
 async def _handle_experience(arguments: dict) -> dict:
-    """处理 experience 工具调用，带 asyncio 超时保护（30s）。"""
+    """Handle experience tool calls with asyncio timeout protection (30s)."""
     try:
         result = await asyncio.wait_for(
             asyncio.to_thread(_experience, **arguments),
@@ -73,20 +73,20 @@ async def _handle_experience(arguments: dict) -> dict:
     except asyncio.TimeoutError:
         return {
             "status": "failed",
-            "message": "experience 操作超时（30s），可能是 embedding 模型加载/下载耗时过长。"
-                " 建议：先调用 delphi_kb(action=build_embedding) 预加载模型，"
-                " 再使用 experience 的语义搜索功能。",
+            "message": "experience operation timed out (30s); embedding model loading/download may be taking too long."
+                " Suggestion: first call delphi_kb(action=build_embedding) to preload the model,"
+                " then use experience semantic search.",
         }
     except Exception as e:
         return {"status": "failed", "message": f"experience failed: {e}"}
 
 
 async def _handle_daofy_update(arguments: dict) -> dict:
-    """处理 daofy_update 工具调用（类似 code_hosting 模式：后台异步+定时重试）。"""
+    """Handle daofy_update tool calls (similar to code_hosting pattern: background async + scheduled retries)."""
     action = arguments.get("action", "check")
     task_manager = get_task_manager()
 
-    # ── version: 同步返回，无需网络 ──
+    # ── version: return synchronously, no network needed ──
     if action == "version":
         install_type = "git" if updater.is_git_installation() else "pip"
         return {
@@ -95,21 +95,21 @@ async def _handle_daofy_update(arguments: dict) -> dict:
             "python": sys.version,
         }
 
-    # ── check: 先快速尝试（同步），失败后提交后台重试任务 ──
+    # ── check: first try quickly (synchronously); if it fails, submit a background retry task ──
     if action == "check":
-        # 1. 优先检查缓存
+        # 1. Check cache first
         cached = updater.get_cached_update_result()
         if cached is not None:
             install_type = "git" if updater.is_git_installation() else "pip"
             cached["install_type"] = install_type
             status_msg = (
-                f"发现新版本 v{cached['latest']}！（当前 v{cached['current']}）"
+                f"New version v{cached['latest']} found! (current v{cached['current']})"
                 if cached.get("update_available")
-                else f"当前已是最新版本: v{cached['current']}"
+                else f"Already up to date: v{cached['current']}"
             )
             return {**cached, "message": status_msg, "cache_hit": True}
 
-        # 2. 快速同步尝试
+        # 2. Quick synchronous attempt
         quick = await asyncio.get_running_loop().run_in_executor(
             None, updater.check_for_update
         )
@@ -119,22 +119,22 @@ async def _handle_daofy_update(arguments: dict) -> dict:
             if quick["update_available"]:
                 if install_type == "git":
                     quick["message"] = (
-                        f"发现新版本 v{quick['latest']}！"
-                        f" 当前版本 v{quick['current']}。"
-                        f" 建议: daofy_update(action='update') 执行 git pull 更新。"
+                        f"New version v{quick['latest']} found!"
+                        f" Current version v{quick['current']}."
+                        f" Suggestion: run daofy_update(action='update') to perform a git pull update."
                     )
                 else:
                     quick["message"] = (
-                        f"发现新版本 v{quick['latest']}！"
-                        f" 当前版本 v{quick['current']}。"
-                        f" 请运行: pip install --upgrade daofy-for-delphi"
+                        f"New version v{quick['latest']} found!"
+                        f" Current version v{quick['current']}."
+                        f" Please run: pip install --upgrade daofy-for-delphi"
                     )
             else:
-                quick["message"] = f"当前已是最新版本: v{quick['current']}"
+                quick["message"] = f"Already up to date: v{quick['current']}"
             return quick
 
-        # 3. 快速尝试失败，提交后台自动重试任务（类似 code_hosting git_push_retry）
-        logger.info("版本检查快速尝试失败，提交后台自动重试任务...")
+        # 3. Quick attempt failed; submit a background automatic retry task (similar to code_hosting git_push_retry)
+        logger.info("Version check quick attempt failed; submitting background automatic retry task...")
         on_complete = arguments.get('_on_complete')
         task_id = task_manager.submit_task(
             name="version_check_retry",
@@ -146,14 +146,14 @@ async def _handle_daofy_update(arguments: dict) -> dict:
             "task_id": task_id,
             "status": "async",
             "message": (
-                "快速检查失败（网络不可达），已提交后台自动重试任务。\n"
-                f"  任务ID: {task_id}\n"
-                f"  重试间隔: {updater.RETRY_INTERVAL}s | 最多 {updater.MAX_RETRIES} 次\n"
-                "  使用 async_task(action=status, task_id=...) 查看进度。"
+                "Quick check failed (network unreachable); a background automatic retry task has been submitted.\n"
+                f"  Task ID: {task_id}\n"
+                f"  Retry interval: {updater.RETRY_INTERVAL}s | Max {updater.MAX_RETRIES} times\n"
+                "  Use async_task(action=status, task_id=...) to check progress."
             ),
         }
 
-    # ── check_retry: 强制提交后台自动重试任务（返回 task_id） ──
+    # ── check_retry: force-submit a background automatic retry task (returns task_id) ──
     if action == "check_retry":
         on_complete = arguments.get('_on_complete')
         task_id = task_manager.submit_task(
@@ -166,21 +166,21 @@ async def _handle_daofy_update(arguments: dict) -> dict:
             "task_id": task_id,
             "status": "async",
             "message": (
-                "后台版本检查任务已提交。\n"
-                f"  任务ID: {task_id}\n"
-                f"  重试间隔: {updater.RETRY_INTERVAL}s | 最多 {updater.MAX_RETRIES} 次\n"
-                "  使用 async_task(action=status, task_id=...) 查看进度。"
+                "Background version check task submitted.\n"
+                f"  Task ID: {task_id}\n"
+                f"  Retry interval: {updater.RETRY_INTERVAL}s | Max {updater.MAX_RETRIES} times\n"
+                "  Use async_task(action=status, task_id=...) to check progress."
             ),
         }
 
-    # ── update / update_retry: 后台 git pull 更新 ──
+    # ── update / update_retry: background git pull update ──
     if action in ("update", "update_retry"):
         if not updater.is_git_installation():
             return {
                 "success": False,
                 "message": (
-                    "当前为 pip 安装模式，不支持 git pull 更新。\n"
-                    "请手动运行: pip install --upgrade daofy-for-delphi"
+                    "Currently in pip installation mode; git pull updates are not supported.\n"
+                    "Please run manually: pip install --upgrade daofy-for-delphi"
                 ),
             }
 
@@ -189,7 +189,7 @@ async def _handle_daofy_update(arguments: dict) -> dict:
         max_retries = int(arguments.get("max_retries", 10))
 
         if action == "update_retry":
-            # 自定义 retry 参数
+            # Custom retry parameters
             orig_interval = updater.UPDATE_RETRY_INTERVAL
             orig_max = updater.UPDATE_MAX_RETRIES
             updater.UPDATE_RETRY_INTERVAL = retry_interval
@@ -209,14 +209,14 @@ async def _handle_daofy_update(arguments: dict) -> dict:
                 "task_id": task_id,
                 "status": "async",
                 "message": (
-                    "后台自动重试 git pull 更新任务已提交。\n"
-                    f"  任务ID: {task_id}\n"
-                    f"  重试间隔: {retry_interval}s | 最多 {max_retries} 次 | 预计最长 ~{eta_min}min\n"
-                    "  使用 async_task(action=status, task_id=...) 查看进度。"
+                    "Background automatic retry git pull update task submitted.\n"
+                    f"  Task ID: {task_id}\n"
+                    f"  Retry interval: {retry_interval}s | Max {max_retries} times | Estimated max ~{eta_min}min\n"
+                    "  Use async_task(action=status, task_id=...) to check progress."
                 ),
             }
 
-        # update（单次）
+        # update (single attempt)
         task_id = task_manager.submit_task(
             name="git_update",
             func=updater.git_pull_update_sync,
@@ -226,17 +226,17 @@ async def _handle_daofy_update(arguments: dict) -> dict:
             "task_id": task_id,
             "status": "async",
             "message": (
-                "后台 git pull 更新任务已提交。\n"
-                f"  任务ID: {task_id}\n"
-                "  使用 async_task(action=status, task_id=...) 查看进度。"
+                "Background git pull update task submitted.\n"
+                f"  Task ID: {task_id}\n"
+                "  Use async_task(action=status, task_id=...) to check progress."
             ),
         }
 
-    return {"error": f"未知 action: {action}"}
+    return {"error": f"Unknown action: {action}"}
 
 
 async def _handle_generate_copyright(arguments: dict) -> dict:
-    """处理 generate_copyright 工具调用。"""
+    """Handle generate_copyright tool calls."""
     try:
         result = await asyncio.wait_for(
             asyncio.to_thread(_generate_copyright, **arguments),
@@ -244,28 +244,28 @@ async def _handle_generate_copyright(arguments: dict) -> dict:
         )
         return result
     except asyncio.TimeoutError:
-        return {"status": "failed", "message": "generate_copyright 执行超时（300s）"}
+        return {"status": "failed", "message": "generate_copyright execution timed out (300s)"}
     except Exception as e:
         return {"status": "failed", "message": f"generate_copyright failed: {e}"}
 
 
 async def _handle_ocr(arguments: dict) -> dict:
-    """处理 ocr 工具调用（延迟导入，无 OCR 依赖时返回友好错误）。"""
+    """Handle ocr tool calls (lazy import; return a friendly error when OCR dependencies are unavailable)."""
     try:
         from src.tools.ocr import handle_ocr as _ocr_handler
     except ImportError as e:
         return {
             "status": "failed",
             "error": (
-                f"缺少 OCR 依赖: {e}。"
-                "请安装可选依赖: pip install daofy-for-delphi[ocr]"
+                f"Missing OCR dependencies: {e}."
+                "Please install the optional dependency: pip install daofy-for-delphi[ocr]"
             ),
         }
     return await asyncio.to_thread(_ocr_handler, arguments)
 
 
 async def _handle_structured_content(arguments: dict) -> dict:
-    """结构化文档统一读写/搜索/修改（DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf）。"""
+    """Unified read/write/search/modify for structured documents (DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf)."""
     try:
         return await _sc_handler(arguments)
     except Exception as e:
@@ -283,17 +283,17 @@ CORE_HANDLERS = {
     "structured_content": _handle_structured_content,
 }
 
-# ── 工具描述 + inputSchema — list_tools() 从 registry 收取，不再硬编码在 server.py ──
+# ── Tool descriptions + inputSchema — list_tools() collects from the registry, no longer hardcoded in server.py ──
 
 CORE_TOOL_DESCRIPTIONS: dict[str, str] = {
-    "async_task": "异步任务管理",
-    "code_hosting": "Git 操作和代码托管平台 API。参数随 action 变化；调用前先执行 tool_help(tool_name='code_hosting', action='<action>')。",
-    "tool_help": "按工具名和可选 action 获取按需帮助文档、参数说明与示例",
-    "experience": "经验记忆管理。参数随 action 变化；调用前先执行 tool_help(tool_name='experience', action='<action>')。",
-    "daofy_update": "版本更新检查和 git pull。参数随 action 变化；调用前先执行 tool_help(tool_name='daofy_update', action='<action>')。",
-    "generate_copyright": "生成软著文档。参数随 action 变化；调用前先执行 tool_help(tool_name='generate_copyright', action='<action>')。",
-    "ocr": "图像分析。参数随 action 变化；调用前先执行 tool_help(tool_name='ocr', action='<action>')。",
-    "structured_content": "结构化文档统一读写/搜索/修改 — DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf。按 JSONPath 路径读写，生成 JSON Schema。参数随 action 变化；调用前先执行 tool_help(tool_name='structured_content', action='<action>')。",
+    "async_task": "Async task management",
+    "code_hosting": "Git operations and code hosting platform APIs. Parameters vary by action; before calling, run tool_help(tool_name='code_hosting', action='<action>').",
+    "tool_help": "Get on-demand help documentation, parameter descriptions, and examples by tool name and optional action",
+    "experience": "Experience memory management. Parameters vary by action; before calling, run tool_help(tool_name='experience', action='<action>').",
+    "daofy_update": "Version update checking and git pull. Parameters vary by action; before calling, run tool_help(tool_name='daofy_update', action='<action>').",
+    "generate_copyright": "Generate software copyright documents. Parameters vary by action; before calling, run tool_help(tool_name='generate_copyright', action='<action>').",
+    "ocr": "Image analysis. Parameters vary by action; before calling, run tool_help(tool_name='ocr', action='<action>').",
+    "structured_content": "Unified read/write/search/modify for structured documents — DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf. Read/write by JSONPath and generate JSON Schema. Parameters vary by action; before calling, run tool_help(tool_name='structured_content', action='<action>').",
 }
 
 CORE_TOOL_SCHEMAS: dict[str, dict] = {
@@ -301,10 +301,10 @@ CORE_TOOL_SCHEMAS: dict[str, dict] = {
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": ["start", "status", "result", "list", "cancel"], "default": "list"},
-            "task_id": {"type": "string", "description": "任务 ID"},
+            "task_id": {"type": "string", "description": "Task ID"},
             "long_poll_seconds": {
                 "type": "integer",
-                "description": "长轮询等待秒数（可选，默认0即立即返回。MCP请求通道有超时限制，建议≤30秒）",
+                "description": "Long-polling wait seconds (optional; default 0 returns immediately. The MCP request channel has a timeout limit; ≤30 seconds is recommended)",
                 "default": 0,
             },
         }
@@ -335,7 +335,7 @@ CORE_TOOL_SCHEMAS: dict[str, dict] = {
             },
             "action": {
                 "type": "string",
-                "description": "可选；只返回指定工具 action 的参数说明和示例",
+                "description": "Optional; return only the parameter descriptions and examples for the specified tool action",
             },
         },
         "required": ["tool_name"],
@@ -389,40 +389,40 @@ CORE_TOOL_SCHEMAS: dict[str, dict] = {
             "action": {
                 "type": "string",
                 "enum": ["read", "get_schema", "set", "search"],
-                "description": "操作类型：read(读取为JSON/Schema) / get_schema(生成JSON Schema) / set(按路径修改) / search(按JSONPath搜索)",
+                "description": "Operation type: read(read as JSON/Schema) / get_schema(generate JSON Schema) / set(modify by path) / search(search by JSONPath)",
                 "default": "read",
             },
             "file_path": {
                 "type": "string",
-                "description": "文件绝对路径（read/set/search必需）",
+                "description": "File absolute path (required for read/set/search)",
             },
             "path": {
                 "type": "string",
-                "description": "JSONPath路径，如 $.Form.Left 或 $..Button1, 默认 $（根）",
+                "description": "JSONPath path, e.g. $.Form.Left or $..Button1, default $",
                 "default": "$",
             },
             "value": {
                 "type": "string",
-                "description": "set action时设置的新值",
+                "description": "New value to set for set action",
             },
             "format": {
                 "type": "string",
                 "enum": ["dfm", "lfm", "fmx", "xml", "json", "msgpack", "protobuf"],
-                "description": "强制格式（默认从扩展名检测）",
+                "description": "Force format (default detected from extension)",
             },
             "output": {
                 "type": "string",
                 "enum": ["json", "schema", "both"],
-                "description": "read action的输出格式：json(默认)/schema/both",
+                "description": "Output format for read action: json(default)/schema/both",
                 "default": "json",
             },
             "proto_file": {
                 "type": "string",
-                "description": "ProtoBuf模式时传入 .proto 文件绝对路径",
+                "description": "When in ProtoBuf mode, pass the .proto file absolute path",
             },
             "message_name": {
                 "type": "string",
-                "description": "ProtoBuf模式时传入消息名",
+                "description": "When in ProtoBuf mode, pass the message name",
             },
         },
         "required": ["action"],

@@ -1,21 +1,21 @@
 r"""
-自动化测试服务 — GUI 命名管道 + 控制台 subprocess 交互。
+Automated testing service — GUI named pipe + console subprocess interaction.
 
-通信方式：新启动进程使用由目标进程 PID 派生的独立命名管道；
-未绑定进程会话时保留旧版默认 \\.\pipe\daofy_auto 兼容路径（Delphi server -> Python client）
-使用 ctypes 直接调用 Windows API，零外部依赖。
+Communication: newly launched processes use an independent named pipe derived from the target process PID;
+when no process session is bound, the legacy default \\.\pipe\daofy_auto compatible path is retained (Delphi server -> Python client)
+Uses ctypes to call Windows API directly, with zero external dependencies.
 
-协议：JSON 请求/响应 (REST-style)
-  请求: {"reqId":"step_0","cmd":"goto","target":"TForm1"}
-  响应: {"reqId":"step_0","status":"ok","data":"OK"}
-    (async 命令: click/rclick/dblclick/hover/move/drag/msgclick/dlgclick/rcall/key/rset/type 返回 ACK，
-    同步命令: goto/capture/waitfor/wait/dumpstate/listwnd/dlgscan/msgscan/msgclose/dlgfile/snapdir/exit/rget/rinspect/
-    callgraph/callgraph_diff/callgraph_path/callgraph_impact 阻塞等待返回。
-    异步结果通过后续 peekresult 命令或 waitfor/rget/capture 验证获取，无文件落盘。)
+Protocol: JSON request/response (REST-style)
+  Request: {"reqId":"step_0","cmd":"goto","target":"TForm1"}
+  Response: {"reqId":"step_0","status":"ok","data":"OK"}
+    (async commands: click/rclick/dblclick/hover/move/drag/msgclick/dlgclick/rcall/key/rset/type return ACK,
+    synchronous commands: goto/capture/waitfor/wait/dumpstate/listwnd/dlgscan/msgscan/msgclose/dlgfile/snapdir/exit/rget/rinspect/
+    callgraph/callgraph_diff/callgraph_path/callgraph_impact block until the response arrives.
+    Async results are obtained via a subsequent peekresult command or waitfor/rget/capture verification; nothing is written to disk.)
 
-进程池复用：
-  通过 keep_alive 参数让 Delphi 进程常驻，后续调用直接复用。
-  进程超过 PROCESS_KEEPALIVE_TIMEOUT 未被使用会自动清理。
+Process pool reuse:
+  The keep_alive parameter keeps the Delphi process resident, and subsequent calls reuse it directly.
+  Processes unused for longer than PROCESS_KEEPALIVE_TIMEOUT are cleaned up automatically.
 """
 
 import ast
@@ -46,43 +46,43 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 DEFAULT_SNAPSHOTS_DIR = PROJECT_ROOT / 'docs' / 'copyright' / 'snapshots'
 PIPE_NAME = r'\\.\pipe\daofy_auto'
 
-# ── PE 子系统检测 ──
+# ── PE subsystem detection ──
 
 IMAGE_SUBSYSTEM_WINDOWS_GUI = 2
 IMAGE_SUBSYSTEM_WINDOWS_CUI = 3
 
 
 def detect_exe_subsystem(exe_path: str) -> int | None:
-    """读取 PE 头的 Subsystem 字段，判断 exe 类型。
+    """Read the Subsystem field of the PE header to determine the exe type.
 
     Returns:
-        IMAGE_SUBSYSTEM_WINDOWS_GUI (2) — GUI 程序
-        IMAGE_SUBSYSTEM_WINDOWS_CUI (3) — 控制台程序
-        None — 无法读取或非 PE 文件
+        IMAGE_SUBSYSTEM_WINDOWS_GUI (2) — GUI program
+        IMAGE_SUBSYSTEM_WINDOWS_CUI (3) — console program
+        None — unreadable or not a PE file
     """
     try:
         with open(exe_path, 'rb') as f:
-            # DOS 头: e_magic @0, e_lfanew @0x3C
+            # DOS header: e_magic @0, e_lfanew @0x3C
             magic = f.read(2)
             if magic != b'MZ':
                 return None
             f.seek(0x3C)
             e_lfanew = int.from_bytes(f.read(4), 'little')
 
-            # PE 头: 'PE\0\0' + COFF头(20字节) + OptionalHeader
+            # PE header: 'PE\0\0' + COFF header (20 bytes) + OptionalHeader
             f.seek(e_lfanew)
             pe_sig = f.read(4)
             if pe_sig != b'PE\0\0':
                 return None
 
-            # 跳过 COFF 头 (20 bytes)
+            # Skip COFF header (20 bytes)
             f.seek(e_lfanew + 4 + 20)
             # OptionalHeader.Magic: PE32=0x10b, PE32+=0x20b
             opt_magic = f.read(2)
             if opt_magic not in (b'\x0b\x01', b'\x0b\x02'):
                 return None
 
-            # Subsystem 在 OptionalHeader 偏移 68 (0x44) 处，WORD
+            # Subsystem is at OptionalHeader offset 68 (0x44), WORD
             f.seek(e_lfanew + 4 + 20 + 68)
             subsystem = int.from_bytes(f.read(2), 'little')
             if subsystem in (IMAGE_SUBSYSTEM_WINDOWS_GUI, IMAGE_SUBSYSTEM_WINDOWS_CUI):
@@ -91,7 +91,7 @@ def detect_exe_subsystem(exe_path: str) -> int | None:
     except Exception:
         return None
 
-# ── 异步命令集合（Delphi 端 IsAsyncCmd 的镜像）──
+# ── Async command set (mirror of Delphi-side IsAsyncCmd) ──
 _ASYNC_CMDS = frozenset({
     'click', 'dblclick', 'rclick', 'msgclick', 'dlgclick',
     'hover', 'move', 'drag', 'rcall', 'key', 'rset', 'type',
@@ -103,24 +103,24 @@ _UI_ASYNC_CMDS = frozenset({
 _ASYNC_PEEK_TIMEOUT = 6.0
 _UI_ASYNC_PEEK_TIMEOUT = 0.25
 
-# ── UIA 命令集合 ──
+# ── UIA command set ──
 _UIA_PREFIX_CMDS = frozenset({
-    # 基础操作
+    # Basic operations
     'uiagoto', 'uiaclick', 'uiaget', 'uiascan', 'uiawait', 'uiaset',
-    # 鼠标操作
+    # Mouse operations
     'uia.rclick', 'uia.dblclick', 'uia.hover', 'uia.drag', 'uia.wheel',
-    # 输入操作
+    # Input operations
     'uia.type', 'uia.key', 'uia.toggle',
-    # 列表/树操作
+    # List/tree operations
     'uia.select', 'uia.expand', 'uia.collapse', 'uia.invoke',
-    # 导航/探查
+    # Navigation/introspection
     'uia.find', 'uia.list',
-    # 窗口操作
+    # Window operations
     'uia.close', 'uia.minimize', 'uia.maximize', 'uia.restore',
     'uia.move', 'uia.resize', 'uia.state',
-    # 属性/状态
+    # Properties/state
     'uia.exists', 'uia.rect', 'uia.screenshot',
-    # 滚动
+    # Scrolling
     'uia.scroll', 'uia.scrollinto',
 })
 _UIA_CAPABLE_CMDS = frozenset({
@@ -142,37 +142,37 @@ try:
 except ImportError:
     pass
 
-# ── 进程池 ──
+# ── Process pool ──
 _process_pool: dict[str, dict] = {}
 _pool_lock = Lock()
-_gui_execution_lock = RLock()  # RLock 允许同线程重入，防止 UIA 路由死锁
+_gui_execution_lock = RLock()  # RLock allows same-thread reentry, preventing UIA routing deadlocks
 _pipe_session = threading.local()
 _pipe_wait_state = threading.local()
-PROCESS_KEEPALIVE_TIMEOUT = 300  # 5 分钟无使用则自动清理
+PROCESS_KEEPALIVE_TIMEOUT = 300  # auto-cleanup after 5 minutes without use
 _ENV_METADATA_KEYS = ('environment', 'env')
-_pool_cleanup_interval = 60  # 定时清理间隔（秒）
+_pool_cleanup_interval = 60  # periodic cleanup interval (seconds)
 _pool_cleanup_thread: threading.Thread | None = None
 
-# ── 异常过滤器 ──
-# exception_filter 支持的异常类型
+# ── Exception filter ──
+# Exception types supported by exception_filter
 EXCEPTION_TYPES = frozenset({
-    'dialog',      # 对话框（错误/警告/信息）
-    'notification', # 通知弹窗
-    'focus_lost',  # 焦点被切走
-    'session_expired', # 会话过期/登录失效
+    'dialog',      # dialog box (error/warning/information)
+    'notification', # notification popup
+    'focus_lost',  # focus was stolen
+    'session_expired', # session expired / login invalid
 })
 
-# exception_filter 支持的处理动作
+# Handling actions supported by exception_filter
 EXCEPTION_ACTIONS = frozenset({
-    'close',       # 关闭弹窗
-    'refocus',     # 切换回原窗口
-    'restart_app', # 重启应用
-    'log',         # 仅记录
-    'ignore',      # 忽略
-    'abort',       # 中止测试
+    'close',       # close the popup
+    'refocus',     # switch back to the original window
+    'restart_app', # restart the application
+    'log',         # log only
+    'ignore',      # ignore
+    'abort',       # abort the test
 })
 
-# 默认异常过滤器配置
+# Default exception filter configuration
 DEFAULT_EXCEPTION_FILTER = {
     'enabled': False,
     'poll_interval_ms': 500,
@@ -189,22 +189,22 @@ DEFAULT_EXCEPTION_FILTER = {
 
 
 def _pool_cleanup_worker():
-    """后台守护线程：定时清理过期进程"""
+    """Background daemon thread: periodically cleans up expired processes"""
     while True:
         time.sleep(_pool_cleanup_interval)
         try:
             _cleanup_stale_processes()
             _cleanup_stale_console_processes()
         except Exception as e:
-            logger.debug("进程池定时清理异常: %s", e)
+            logger.debug("Process pool periodic cleanup exception: %s", e)
 
 
 def _ensure_pool_cleanup_thread():
-    """启动后台清理线程（只启动一次）"""
+    """Start the background cleanup thread (only started once)"""
     global _pool_cleanup_thread
     with _pool_lock:
         if _pool_cleanup_thread is not None and _pool_cleanup_thread.is_alive():
-            return  # 已启动
+            return  # already started
         t = threading.Thread(target=_pool_cleanup_worker, daemon=True)
         t.start()
         _pool_cleanup_thread = t
@@ -340,33 +340,33 @@ def _redact_script_metadata(script_metadata: dict) -> dict:
     return redacted
 
 
-# ── 异常过滤器 ──
+# ── Exception filter ──
 
 class ExceptionFilter:
-    """异常过滤器 - 检测和处理自动化测试中的异常情况。
+    """Exception filter - detects and handles abnormal conditions during automated testing.
     
-    支持的异常类型：
-    - dialog: 对话框（错误/警告/信息）
-    - notification: 通知弹窗
-    - focus_lost: 焦点被切走
-    - session_expired: 会话过期/登录失效
+    Supported exception types:
+    - dialog: dialog box (error/warning/information)
+    - notification: notification popup
+    - focus_lost: focus was stolen
+    - session_expired: session expired / login invalid
     
-    支持的处理动作：
-    - close: 关闭弹窗
-    - refocus: 切换回原窗口
-    - restart_app: 重启应用
-    - log: 仅记录
-    - ignore: 忽略
-    - abort: 中止测试
+    Supported handling actions:
+    - close: close the popup
+    - refocus: switch back to the original window
+    - restart_app: restart the application
+    - log: log only
+    - ignore: ignore
+    - abort: abort the test
     """
     
     def __init__(self, config: dict, app_path: str, pipe_cmd_func):
-        """初始化异常过滤器。
+        """Initialize the exception filter.
         
         Args:
-            config: exception_filter 配置字典
-            app_path: 应用程序路径
-            pipe_cmd_func: 发送管道命令的函数
+            config: exception_filter configuration dictionary
+            app_path: application path
+            pipe_cmd_func: function that sends pipe commands
         """
         self.enabled = config.get('enabled', False)
         self.poll_interval_ms = config.get('poll_interval_ms', 500)
@@ -377,13 +377,13 @@ class ExceptionFilter:
         self.app_path = app_path
         self.pipe_cmd_func = pipe_cmd_func
         
-        # 统计信息
+        # Statistics
         self.exception_count = 0
         self.exceptions_handled = []
         self.last_exception_time = 0
         
     def _matches_pattern(self, text: str, pattern: dict) -> bool:
-        """检查文本是否匹配模式。"""
+        """Check whether the text matches the pattern."""
         if not text or not pattern:
             return False
             
@@ -402,13 +402,13 @@ class ExceptionFilter:
         return True
     
     def _detect_exception(self) -> tuple[str, dict] | None:
-        """检测异常情况。
+        """Detect abnormal conditions.
         
         Returns:
-            (exception_type, exception_info) 或 None
+            (exception_type, exception_info) or None
         """
         try:
-            # 使用 dumpstate 获取当前窗口状态
+            # Use dumpstate to get the current window state
             req = {"reqId": "ex_filter", "cmd": "dumpstate", "target": ""}
             resp_json = self.pipe_cmd_func(json.dumps(req, ensure_ascii=False))
             
@@ -427,15 +427,15 @@ class ExceptionFilter:
             if not isinstance(state, dict):
                 return None
             
-            # 检查是否有对话框/弹窗
+            # Check whether there are dialogs/popups
             forms = state.get('forms', [])
             for form in forms:
                 form_title = form.get('caption', '') or form.get('title', '')
                 form_class = form.get('class_name', '')
                 
-                # 检查是否是对话框
+                # Check whether it is a dialog
                 if form.get('is_dialog') or form.get('form_style') == 'fsModal':
-                    # 检查忽略模式
+                    # Check ignore patterns
                     ignore = False
                     for pattern in self.ignore_patterns:
                         if self._matches_pattern(form_title, pattern):
@@ -444,7 +444,7 @@ class ExceptionFilter:
                     if ignore:
                         continue
                     
-                    # 检查异常模式
+                    # Check exception patterns
                     for pattern in self.patterns:
                         if self._matches_pattern(form_title, pattern):
                             return ('dialog', {
@@ -453,13 +453,13 @@ class ExceptionFilter:
                                 'pattern': pattern,
                             })
                     
-                    # 默认检测为对话框异常
+                    # Default: detected as a dialog exception
                     return ('dialog', {
                         'title': form_title,
                         'class': form_class,
                     })
             
-            # 检查焦点状态
+            # Check focus state
             focus_info = state.get('focus', {})
             active_window = focus_info.get('active_window', '')
             if active_window and active_window != self.app_path:
@@ -468,25 +468,25 @@ class ExceptionFilter:
                 })
             
         except Exception as e:
-            # 异常检测本身不应影响测试
+            # Exception detection itself must not affect the test
             pass
         
         return None
     
     def _handle_exception(self, exception_type: str, exception_info: dict) -> str:
-        """处理异常情况。
+        """Handle an exception condition.
         
         Args:
-            exception_type: 异常类型
-            exception_info: 异常信息
+            exception_type: exception type
+            exception_info: exception information
             
         Returns:
-            处理动作
+            handling action
         """
-        # 获取处理动作
+        # Get the handling action
         action = self.on_exception.get(exception_type, 'log')
         
-        # 记录异常
+        # Record the exception
         self.exception_count += 1
         self.exceptions_handled.append({
             'type': exception_type,
@@ -495,10 +495,10 @@ class ExceptionFilter:
             'time': time.time(),
         })
         
-        # 执行处理动作
+        # Execute the handling action
         try:
             if action == 'close':
-                # 发送关闭命令
+                # Send close command
                 req = {
                     "reqId": f"ex_close_{self.exception_count}",
                     "cmd": "key",
@@ -509,7 +509,7 @@ class ExceptionFilter:
                 time.sleep(0.1)
                 
             elif action == 'refocus':
-                # 切换回原窗口
+                # Switch back to the original window
                 req = {
                     "reqId": f"ex_refocus_{self.exception_count}",
                     "cmd": "goto",
@@ -519,21 +519,21 @@ class ExceptionFilter:
                 time.sleep(0.1)
                 
             elif action == 'restart_app':
-                # 重启应用：通知调用方处理
+                # Restart the app: notify the caller to handle it
                 return 'restart_app'
                 
             elif action == 'abort':
-                # 中止测试
+                # Abort the test
                 return 'abort'
                 
         except Exception as e:
-            # 处理动作失败不应影响测试
+            # A failed handling action must not affect the test
             pass
         
         return action
     
     def check_and_handle(self) -> tuple[bool, str]:
-        """检查并处理异常。
+        """Check and handle exceptions.
         
         Returns:
             (should_abort, action_taken)
@@ -541,28 +541,28 @@ class ExceptionFilter:
         if not self.enabled:
             return False, ''
         
-        # 检查异常次数限制
+        # Check the exception count limit
         if self.exception_count >= self.max_exceptions:
             return True, 'max_exceptions_reached'
         
-        # 检测异常
+        # Detect exceptions
         exception = self._detect_exception()
         if not exception:
             return False, ''
         
         exception_type, exception_info = exception
         
-        # 处理异常
+        # Handle the exception
         action = self._handle_exception(exception_type, exception_info)
         
-        # 检查是否需要中止
+        # Check whether abort is needed
         if action == 'abort':
             return True, 'abort'
         
         return False, action
     
     def get_stats(self) -> dict:
-        """获取异常统计信息。"""
+        """Get exception statistics."""
         return {
             'enabled': self.enabled,
             'exception_count': self.exception_count,
@@ -572,14 +572,14 @@ class ExceptionFilter:
 
 
 def _parse_exception_filter(filter_config: dict | None) -> dict:
-    """解析和验证 exception_filter 配置。"""
+    """Parse and validate the exception_filter configuration."""
     if not filter_config:
         return dict(DEFAULT_EXCEPTION_FILTER)
     
     config = dict(DEFAULT_EXCEPTION_FILTER)
     config.update(filter_config)
     
-    # 验证 on_exception 配置
+    # Validate the on_exception configuration
     on_exception = config.get('on_exception', {})
     validated_on_exception = {}
     for exc_type, action in on_exception.items():
@@ -587,14 +587,14 @@ def _parse_exception_filter(filter_config: dict | None) -> dict:
             validated_on_exception[exc_type] = action
     config['on_exception'] = validated_on_exception
     
-    # 验证 patterns
+    # Validate patterns
     validated_patterns = []
     for pattern in config.get('patterns', []):
         if isinstance(pattern, dict):
             validated_patterns.append(pattern)
     config['patterns'] = validated_patterns
     
-    # 验证 ignore_patterns
+    # Validate ignore_patterns
     validated_ignore_patterns = []
     for pattern in config.get('ignore_patterns', []):
         if isinstance(pattern, dict):
@@ -604,13 +604,13 @@ def _parse_exception_filter(filter_config: dict | None) -> dict:
     return config
 
 
-# ── 共享管道原语 ──
+# ── Shared pipe primitives ──
 
 
 def _open_pipe(pipe_name: str, timeout_ms: int = PIPE_TIMEOUT_MS) -> int | None:
-    """打开 Delphi 命名管道，返回句柄，失败返回 None。
+    """Open the Delphi named pipe and return the handle; return None on failure.
 
-    调用方负责 _CloseHandle()。
+    The caller is responsible for _CloseHandle().
     """
     if not _WaitNP(pipe_name, timeout_ms):
         return None
@@ -628,7 +628,7 @@ def _open_pipe(pipe_name: str, timeout_ms: int = PIPE_TIMEOUT_MS) -> int | None:
 
 
 def _write_pipe(handle, data: bytes) -> bool:
-    """向管道写入数据（追加 \\0 终止符），成功返回 True。"""
+    """Write data to the pipe (appends a \\0 terminator); return True on success."""
     payload = data + b'\0' if not data.endswith(b'\0') else data
     written = wintypes.DWORD(0)
     return bool(_WriteFile(handle, payload, len(payload),
@@ -636,11 +636,11 @@ def _write_pipe(handle, data: bytes) -> bool:
 
 
 def _read_pipe_message(handle, buf_size: int = 65536) -> bytes | None:
-    """从命名管道读取一条完整消息（自动处理 ERROR_MORE_DATA 分块）。
+    """Read one complete message from the named pipe (automatically handles ERROR_MORE_DATA chunking).
 
     Returns:
-        bytes — 完整的消息内容
-        None — 读取失败（管道断开或出错）
+        bytes — complete message content
+        None — read failed (pipe disconnected or error)
     """
     chunks: list[bytes] = []
     while True:
@@ -654,7 +654,7 @@ def _read_pipe_message(handle, buf_size: int = 65536) -> bytes | None:
         if err == 234:  # ERROR_MORE_DATA
             chunks.append(buf.raw[:read.value])
             continue
-        return None  # 读取失败
+        return None  # read failed
     return b''.join(chunks)
 
 
@@ -701,9 +701,10 @@ def _is_pipe_alive(handle: int) -> bool:
 
 
 def _extract_req_id(cmd: str) -> str:
-    """从命令 JSON 中提取 reqId（Delphi 侧响应会带同一 reqId 返回）。
+    """Extract the reqId from the command JSON (the Delphi side returns the same reqId in its response).
 
-    用于请求 ID 隔离：读取响应时按 reqId 派发，避免残留旧响应污染新命令。
+    Used for request ID isolation: responses are dispatched by reqId when read,
+    preventing leftover stale responses from polluting new commands.
     """
     if not cmd:
         return ''
@@ -717,7 +718,7 @@ def _extract_req_id(cmd: str) -> str:
 
 
 def _extract_resp_req_id(resp_raw: str) -> str:
-    """从响应原始文本中提取 reqId（容错：非 JSON / 解析失败时返回空串）。"""
+    """Extract the reqId from the raw response text (tolerant: returns an empty string for non-JSON / parse failures)."""
     if not resp_raw or resp_raw.startswith('ERR:'):
         return ''
     try:
@@ -730,15 +731,15 @@ def _extract_resp_req_id(resp_raw: str) -> str:
 
 
 def _drain_stale_responses(handle, skip_req_id: str = '') -> None:
-    """发送前清理 pipe 中的残留响应。
+    """Clean up stale responses in the pipe before sending.
 
-    残留是旧请求的响应——发起方早已超时返回（或不再等待），
-    按 reqId 隔离原则，这些残留可安全跳过。
+    Stale entries are responses to old requests — the initiator already timed out and returned (or is no longer waiting);
+    under the reqId isolation principle, these stale entries can be safely skipped.
 
     Args:
-        skip_req_id: 当前即将发送的命令的 reqId。残留中若恰好包含此 ID
-                     （极小概率，通常意味着上次同 ID 命令的迟到响应），
-                     也应跳过——因为当前命令尚未发送，不可能有合法响应。
+        skip_req_id: the reqId of the command about to be sent. If a stale entry happens to contain this ID
+                     (extremely unlikely; usually it means a late response to a previous command with the same ID),
+                     it should also be skipped — the current command has not been sent yet, so a legitimate response is impossible.
     """
     while True:
         available = wintypes.DWORD(0)
@@ -751,7 +752,7 @@ def _drain_stale_responses(handle, skip_req_id: str = '') -> None:
         raw = _read_pipe_message(handle)
         if raw is None:
             return
-        # 残留响应属于已超时的旧请求，发起方已返回，安全忽略
+        # Stale responses belong to already-timed-out old requests; the initiator has returned, so ignoring them is safe
 
 
 def _send_command_on_handle(
@@ -763,16 +764,16 @@ def _send_command_on_handle(
     if not _is_pipe_alive(handle):
         return 'ERR:pipe_peer_dead'
 
-    # ── 请求 ID 隔离：发送前清理残留旧响应 ──
+    # ── Request ID isolation: clean up stale old responses before sending ──
     expected_req_id = _extract_req_id(cmd)
     _drain_stale_responses(handle, skip_req_id=expected_req_id)
 
     if not _write_pipe(handle, cmd.encode('utf-8')):
         return f'ERR:write_failed (err={_GetLastError()})'
 
-    # ── 循环读取，直到拿到匹配 reqId 的响应或超时 ──
-    # Delphi 侧可能对单个命令发回多条 message（如进度通知 + 最终响应），
-    # 循环读取并按 reqId 派发：匹配则返回，不匹配则跳过（旧请求残留）。
+    # ── Read in a loop until a response matching reqId arrives or the deadline passes ──
+    # The Delphi side may send back multiple messages for a single command (e.g. progress notification + final response);
+    # read in a loop and dispatch by reqId: return on match, skip on mismatch (stale old-request response).
     deadline = time.monotonic() + (timeout_ms / 1000)
     while True:
         remaining_s = deadline - time.monotonic()
@@ -786,21 +787,21 @@ def _send_command_on_handle(
         if raw is None:
             return f'ERR:read_failed_or_timeout (err={_GetLastError()})'
         resp_str = raw.decode('utf-8', errors='replace').strip()
-        # 协议层错误（非 JSON）直接返回
+        # Protocol-layer error (non-JSON): return directly
         if resp_str.startswith('ERR:'):
             return resp_str
 
-        # 无期望 reqId（命令未带 reqId）→ 兼容旧协议，直接返回
+        # No expected reqId (command carries no reqId) → legacy protocol compatibility, return directly
         if not expected_req_id:
             return resp_str
 
-        # 按 reqId 派发
+        # Dispatch by reqId
         resp_req_id = _extract_resp_req_id(resp_str)
         if resp_req_id == expected_req_id:
-            return resp_str  # 匹配，返回
+            return resp_str  # match, return
 
-        # 不匹配 → 是旧请求的残留响应，发起方已超时，安全跳过继续读
-        # （能明确知道它属于哪个旧请求，不是盲丢弃）
+        # Mismatch → this is a stale response from an old request; the initiator already timed out, so skip and keep reading
+        # (we know exactly which old request it belongs to — not a blind discard)
         continue
 
 
@@ -827,7 +828,7 @@ def _is_pipe_io_error(response: str) -> bool:
 
 
 def _send_command_to_pipe(pipe_name: str, cmd: str, timeout_ms: int = PIPE_TIMEOUT_MS) -> str:
-    """发送命令到指定的 Delphi 命名管道。"""
+    """Send a command to the specified Delphi named pipe."""
     if getattr(_pipe_session, 'enabled', False):
         session_handle = getattr(_pipe_session, 'handle', None)
         if not session_handle:
@@ -852,13 +853,13 @@ def _send_command_to_pipe(pipe_name: str, cmd: str, timeout_ms: int = PIPE_TIMEO
 
 
 def _send_command(cmd: str, timeout_ms: int = PIPE_TIMEOUT_MS) -> str:
-    """发送命令到当前进程管道，未绑定会话时使用兼容管道名。"""
+    """Send a command to the current process pipe; use the compatible pipe name when no session is bound."""
     pipe_name = getattr(_pipe_session, 'pipe_name', PIPE_NAME)
     return _send_command_to_pipe(pipe_name, cmd, timeout_ms)
 
 
 def _wait_for_pipe(timeout: float = 10.0, pipe_name: str = PIPE_NAME) -> bool:
-    """等待 Delphi 程序创建管道。"""
+    """Wait for the Delphi program to create the pipe."""
     deadline = time.time() + timeout
     last_error = 0
     while time.time() < deadline:
@@ -912,10 +913,10 @@ def _pipe_start_failure_message(
     )
 
 
-# ── 进程池管理 ──
+# ── Process pool management ──
 
 def _cleanup_stale_processes():
-    """清理超时未用的进程。"""
+    """Clean up processes unused for too long."""
     now = time.time()
     with _pool_lock:
         stale = [k for k, v in _process_pool.items()
@@ -929,11 +930,11 @@ def _cleanup_stale_processes():
 
 
 # ═════════════════════════════════════════════════════════════
-# Assert 系统 — Python 端后置断言
+# Assert system — Python-side post-assertions
 # ═════════════════════════════════════════════════════════════
 
 def _extract_actual(cmd: str, resp: dict) -> str:
-    """从步骤响应中提取可断言的实际值。"""
+    """Extract the actual value to assert from a step response."""
     if cmd == 'rget':
         return str(resp.get('data', ''))
     if cmd == 'rinspect':
@@ -965,15 +966,15 @@ def _extract_actual(cmd: str, resp: dict) -> str:
 
 
 def _walk_uia_tree(control, depth: int = 0, max_depth: int = 8) -> dict:
-    """递归遍历 UIA 控件树并转成可序列化 dict。
+    """Recursively traverse the UIA control tree and convert it to a serializable dict.
 
     Args:
-        control: uiautomation.Control 实例。
-        depth: 当前递归深度。
-        max_depth: 最大深度，防止无限递归。
+        control: uiautomation.Control instance.
+        depth: Current recursion depth.
+        max_depth: Maximum depth, to prevent infinite recursion.
 
     Returns:
-        控件信息 dict: { name, class_name, automation_id,
+        Control info dict: { name, class_name, automation_id,
                          control_type, rect, children: [...] }
     """
     if control is None or depth > max_depth:
@@ -1007,7 +1008,7 @@ def _walk_uia_tree(control, depth: int = 0, max_depth: int = 8) -> dict:
 
 
 def _safe_int(value: object, default: int = 0) -> int:
-    """安全转换为 int，失败时返回默认值"""
+    """Safely convert to int, returning the default value on failure."""
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -1015,7 +1016,7 @@ def _safe_int(value: object, default: int = 0) -> int:
 
 
 def _find_uia_ctrl(target: str, resp: dict) -> object | None:
-    """查找 UIA 控件，不存在时设置 resp 错误并返回 None"""
+    """Find a UIA control; if absent, set a resp error and return None"""
     if not target:
         resp['status'] = 'err'
         resp['data'] = 'TARGET_MISSING: target parameter required'
@@ -1049,15 +1050,15 @@ _SNAPSHOTS_DIR = str(DEFAULT_SNAPSHOTS_DIR)
 
 
 def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
-    """在 Python 端直接执行 UIA 自动化步骤。
+    """Execute UIA automation steps directly on the Python side.
 
     Args:
-        step: 原始脚本步骤 dict。
-        req: 已构造的请求 dict（含 cmd / target 等字段）。
-        req_id: 请求标识符。
+        step: Original script step dict.
+        req: Constructed request dict (containing fields such as cmd / target).
+        req_id: Request identifier.
 
     Returns:
-        (resp_json, step_ok, ok) 三元组，兼容现有管道返回格式。
+        (resp_json, step_ok, ok) tuple, compatible with the existing pipe return format.
     """
     cmd = req.get('cmd', '')
     target = req.get('target', '')
@@ -1065,14 +1066,14 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
 
     if not _UIA_AVAILABLE:
         resp['status'] = 'err'
-        resp['data'] = 'uiautomation 未安装，请 pip install daofy-for-delphi[uia]'
+        resp['data'] = 'uiautomation is not installed, please pip install daofy-for-delphi[uia]'
         return resp, False, False
 
-    # UIA 需要 COM 初始化为 STA
+    # UIA requires COM to be initialized as STA
     ctypes.windll.ole32.CoInitializeEx(None, 2)  # 2 = COINIT_APARTMENTTHREADED
     try:
         if cmd in ('uiagoto', 'goto'):
-            # 按 Name 查找控件并聚焦
+            # Find control by Name and focus it
             ctrl = _UIA_MODULE.Control(Name=target, searchDepth=8)
             if ctrl.Exists():
                 ctrl.SetFocus()
@@ -1134,7 +1135,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
             resp['data'] = json.dumps(tree, ensure_ascii=False, default=str)
             resp['state'] = tree
         elif cmd in ('uiawait', 'wait'):
-            timeout_s = _safe_int(step.get('timeout', 5), 5)  # 默认5秒
+            timeout_s = _safe_int(step.get('timeout', 5), 5)  # default 5 seconds
             condition = step.get('condition', 'exist')
             deadline = time.time() + timeout_s
             found = False
@@ -1154,7 +1155,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
                 resp['status'] = 'err'
                 resp['data'] = f'TIMEOUT({timeout_s}s): {target} ({condition})'
 
-        # ── 鼠标操作 ──
+        # ── Mouse operations ──
         elif cmd in ('uia.rclick', 'rclick'):
             ctrl = _UIA_MODULE.Control(Name=target, searchDepth=8)
             if ctrl.Exists():
@@ -1204,13 +1205,13 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
                 _UIA_MODULE.Wheel(delta)
             resp['data'] = f'wheeled delta={delta}'
 
-        # ── 滚动操作 ──
+        # ── Scroll operations ──
         elif cmd in ('uia.scroll', 'scroll'):
             ctrl = _find_uia_ctrl(target, resp)
             if ctrl is not None:
                 direction = step.get('direction', 'down').lower()
                 amount = _safe_int(step.get('amount', 3), 3)
-                # 验证 direction 是否有效
+                # Validate whether direction is valid
                 valid_directions = {'up', 'down', 'left', 'right', 'pageup', 'pagedown', 'pageleft', 'pageright'}
                 if direction not in valid_directions:
                     resp['status'] = 'err'
@@ -1248,7 +1249,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
                 resp['status'] = 'err'
                 resp['data'] = f'NF: {target}'
 
-        # ── 输入操作 ──
+        # ── Input operations ──
         elif cmd in ('uia.type', 'type'):
             ctrl = _UIA_MODULE.Control(Name=target, searchDepth=8)
             text = str(step.get('text', ''))
@@ -1294,7 +1295,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
                 resp['status'] = 'err'
                 resp['data'] = f'NF: {target}'
 
-        # ── 列表/树操作 ──
+        # ── List/tree operations ──
         elif cmd in ('uia.select', 'select'):
             ctrl = _UIA_MODULE.Control(Name=target, searchDepth=8)
             item_name = step.get('item', '')
@@ -1376,7 +1377,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
                 resp['status'] = 'err'
                 resp['data'] = f'NF: {target}'
 
-        # ── 导航/探查 ──
+        # ── Navigation/probing ──
         elif cmd in ('uia.find', 'find'):
             root = _UIA_MODULE.GetRootControl()
             if target:
@@ -1387,7 +1388,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
             depth = int(step.get('depth', 8))
             found_ctrl = None
             if condition:
-                # 支持复合条件 "ClassName && ControlType"
+                # Supports compound conditions "ClassName && ControlType"
                 parts = [p.strip() for p in condition.split('&&')]
                 kwargs = {}
                 for part in parts:
@@ -1422,7 +1423,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
             if ctrl.Exists():
                 children = ctrl.GetChildren()
                 items = []
-                for child in children[:50]:  # 限制返回数量
+                for child in children[:50]:  # Limit returned count
                     if control_type and child.ControlTypeName != control_type:
                         continue
                     items.append({
@@ -1436,7 +1437,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
                 resp['status'] = 'err'
                 resp['data'] = f'NF: {target}'
 
-        # ── 窗口操作 ──
+        # ── Window operations ──
         elif cmd in ('uia.close', 'close'):
             ctrl = _UIA_MODULE.Control(Name=target, searchDepth=8)
             if ctrl.Exists():
@@ -1498,15 +1499,15 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
             if ctrl is not None:
                 x = _safe_int(step.get('x', 0))
                 y = _safe_int(step.get('y', 0))
-                # 使用 Win32 API 移动窗口
+                # Move the window using the Win32 API
                 hwnd = ctrl.NativeWindowHandle
                 if hwnd:
-                    # 先恢复正常状态
+                    # Restore normal state first
                     window_pattern = _get_uia_pattern(
                         ctrl, 'GetWindowPattern', 'WindowPattern')
                     if window_pattern is not None:
                         window_pattern.SetWindowVisualState(0)
-                    # 移动窗口
+                    # Move the window
                     _user32.SetWindowPos(hwnd, 0, x, y, 0, 0, 0x0001 | 0x0004)  # SWP_NOSIZE | SWP_NOZORDER
                     resp['data'] = f'moved: {target} to ({x}, {y})'
                 else:
@@ -1519,12 +1520,12 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
                 height = _safe_int(step.get('height', 600))
                 hwnd = ctrl.NativeWindowHandle
                 if hwnd:
-                    # 先恢复正常状态
+                    # Restore normal state first
                     window_pattern = _get_uia_pattern(
                         ctrl, 'GetWindowPattern', 'WindowPattern')
                     if window_pattern is not None:
                         window_pattern.SetWindowVisualState(0)
-                    # 调整窗口大小
+                    # Resize window
                     _user32.SetWindowPos(hwnd, 0, 0, 0, width, height, 0x0002 | 0x0004)  # SWP_NOMOVE | SWP_NOZORDER
                     resp['data'] = f'resized: {target} to {width}x{height}'
                 else:
@@ -1546,7 +1547,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
                 resp['status'] = 'err'
                 resp['data'] = f'NF: {target}'
 
-        # ── 属性/状态 ──
+        # ── Properties/State ──
         elif cmd in ('uia.exists', 'exists'):
             ctrl = _UIA_MODULE.Control(Name=target, searchDepth=8)
             resp['data'] = 'true' if ctrl.Exists() else 'false'
@@ -1568,7 +1569,7 @@ def _execute_uia_step(step: dict, req: dict, req_id: str) -> tuple:
                 if hasattr(ctrl, 'CaptureToImage'):
                     img = ctrl.CaptureToImage()
                     if img is not None:
-                        # 使用与非 uia capture 相同的目录
+                        # Use the same directory as non-UIA capture
                         path = step.get('path', '')
                         if path:
                             save_path = path
@@ -2723,7 +2724,7 @@ def _parse_gui_script(script) -> tuple[list[dict], dict]:
         _validate_gui_steps(steps)
         return steps, metadata
 
-    raise TypeError('script 须为文件路径、JSON 字符串、步骤列表或包含 steps 的对象')
+    raise TypeError('script must be a file path, JSON string, step list, or object containing steps')
 
 
 def _validate_gui_steps(steps: list) -> None:
@@ -2746,20 +2747,20 @@ def _get_assert_expression(step: dict) -> tuple[str, str]:
 
 
 def _check_assert(step: dict, resp: dict) -> dict:
-    """评估 Python 断言表达式。
+    """Evaluate a Python assertion expression.
 
-    step['assert_expr'] 为 Python 表达式字符串，可用变量:
-      actual  — 从步骤响应中提取的实际值
-      re      — re 模块
-      len/str/int/float/bool — 内置函数
+    step['assert_expr'] is a Python expression string; available variables:
+      actual  — the actual value extracted from the step response
+      re      — the re module
+      len/str/int/float/bool — built-in functions
 
-    自然语言说明写入 expected/note，只把可执行 Python 表达式写入 assert_expr。
+    Put natural-language descriptions in expected/note; put only executable Python expressions in assert_expr.
 
-    示例:
+    Examples:
       {"assert_expr": "actual == True"}
       {"assert_expr": "0 < float(actual) < 100"}
-      {"assert_expr": "'保存' in actual"}
-      {"assert_expr": "'保存' in actual and '成功' in actual"}
+      {"assert_expr": "'Save' in actual"}
+      {"assert_expr": "'Save' in actual and 'Success' in actual"}
       {"assert_expr": "len(actual) > 0"}
       {"assert_expr": "re.search(r'\\\\d+', actual)"}
 
@@ -2838,7 +2839,7 @@ def _failure_signal(result: dict) -> str:
         return 'property_not_found'
     if data.startswith('UIA_ERROR:'):
         return 'uia_error'
-    if data.startswith('uiautomation 未安装'):
+    if data.startswith('uiautomation not installed'):
         return 'uia_not_available'
     if ast_result.get('message'):
         return 'assertion_failed'
@@ -2925,7 +2926,7 @@ def _make_failure(index: int, result: dict) -> dict:
 
 
 def _make_report(results: list, total_steps: int, duration_seconds: float) -> dict:
-    """从执行结果生成结构化测试报告。"""
+    """Generate a structured test report from execution results."""
     passed = 0
     failed = 0
     skipped = 0
@@ -2983,43 +2984,42 @@ def _make_report(results: list, total_steps: int, duration_seconds: float) -> di
 
 
 # ═════════════════════════════════════════════════════════════
-# Form Summary — 从 dumpstate JSON 生成紧凑的窗体摘要
+# Form Summary — Generate a compact form summary from dumpstate JSON
 # ═════════════════════════════════════════════════════════════
 
 def _curated_control(ctrl: dict) -> dict:
-    """从 dumpstate 的 control dict 中提取关键字段，展平到顶层。
+    """Extract key fields from a dumpstate control dict and flatten them to the top level.
 
     Args:
-        ctrl: dumpstate 返回的单个控件 dict（含 name/class/props/children）
+        ctrl: A single control dict returned by dumpstate (including name/class/props/children)
 
     Returns:
-        精简后的 dict：关键字段直接展平，props 不嵌套，children → Controls。
+        A curated dict: key fields are flattened directly, props are not nested, children → Controls.
     """
     out = {}
     out['Name'] = ctrl.get('name', '?')
     out['Class'] = ctrl.get('class', '?')
-
     p = ctrl.get('props', {})
 
-    # 文本值：优先 Text，其次 Caption
+    # Text value: prefer Text, then Caption
     if 'Text' in p:
         out['Text'] = p['Text']
     elif 'Caption' in p:
         out['Caption'] = p['Caption']
 
-    # 状态
+    # State
     for k in ('Enabled', 'Visible'):
         v = p.get(k)
         if v is not None:
             out[k] = v
 
-    # 布局
+    # Layout
     for k in ('TabOrder', 'Left', 'Top', 'Width', 'Height'):
         v = p.get(k)
         if v is not None:
             out[k] = v
 
-    # 递归子控件
+    # Recurse into child controls
     raw_children = ctrl.get('children', [])
     if raw_children:
         out['Controls'] = [_curated_control(c) for c in raw_children]
@@ -3028,14 +3028,14 @@ def _curated_control(ctrl: dict) -> dict:
 
 
 def _format_form_summary(state: dict) -> dict:
-    """将 dumpstate JSON 提炼为纯净的窗体摘要 JSON。
+    """Distill the dumpstate JSON into a clean form summary JSON.
 
-    输出格式与 dumpstate 的关键区别：
-    - 只保留关键业务+布局字段（Name/Class/Text/Caption/Enabled/Visible/
-      TabOrder/Left/Top/Width/Height），摒弃数百个 RTTI 属性
-    - 字段展平到对象顶层，无 props 嵌套
-    - 子控件用 Controls（大写 C，匹配用户习惯）
-    - 窗体级属性（WindowState/BorderStyle 等）展平到根
+    Key differences from the output format of dumpstate:
+    - Only keep key business + layout fields (Name/Class/Text/Caption/Enabled/Visible/
+      TabOrder/Left/Top/Width/Height), discarding hundreds of RTTI properties
+    - Fields flattened to the top level of the object, no props nesting
+    - Child controls use Controls (capital C, matching user convention)
+    - Form-level properties (WindowState/BorderStyle etc.) flattened to root
 
     Returns:
         dict: {
@@ -3051,16 +3051,16 @@ def _format_form_summary(state: dict) -> dict:
     if cap:
         out['Caption'] = cap
 
-    # 窗体级属性（展平）
+    # Form-level properties (flattened)
     p = state.get('props', {})
     for k in ('WindowState', 'BorderStyle', 'Position', 'Width', 'Height'):
         v = p.get(k)
         if v is not None:
             out[k] = v
 
-    # 控件列表
+    # Control list
     raw_controls = state.get('controls', [])
-    # 跳过非可视化组件（菜单/Timer/ImageList 等）
+    # Skip non-visual components (menus/Timer/ImageList etc.)
     non_ctrl = {'TMainMenu', 'TPopupMenu', 'TTimer',
                 'TImageList', 'TActionList', 'TrayIcon'}
     vis_ctrl = [c for c in raw_controls if c.get('class') not in non_ctrl]
@@ -3069,7 +3069,7 @@ def _format_form_summary(state: dict) -> dict:
     if vis_ctrl:
         out['Controls'] = [_curated_control(c) for c in vis_ctrl]
 
-    # 非可视化组件单独列出
+    # List non-visual components separately
     if comp_ctrl:
         out['Components'] = [
             {'Name': c.get('name', '?'), 'Class': c.get('class', '?')}
@@ -3150,11 +3150,11 @@ def _ensure_process(
             'env_fingerprint': env_fingerprint,
             'pipe_name': pipe_name,
         }
-    _ensure_pool_cleanup_thread()  # 首次使用时启动清理线程
+    _ensure_pool_cleanup_thread()  # Start cleanup thread on first use
     return True, ''
 
 def _kill_process(app_path: str):
-    """强制终止指定进程。"""
+    """Force-terminate the specified process."""
     with _pool_lock:
         entry = _process_pool.pop(app_path, None)
     if entry:
@@ -3164,7 +3164,7 @@ def _kill_process(app_path: str):
             pass
 
 
-# ── 控制台进程池（独立于 GUI 命名管道池）──
+# ── Console process pool (independent of the GUI named-pipe pool) ──
 
 _console_pool: dict[str, dict] = {}
 _console_pool_lock = Lock()
@@ -3275,15 +3275,15 @@ def _console_kill_process(app_path: str):
 # Public entry points
 
 def execute_automation(action: str, **kwargs) -> dict:
-    """统一的自动化入口，按 action 分发。
+    """Unified automation entry point, dispatched by action.
 
     Args:
-        action: "gui" - 命名管道 GUI 自动化
-                "console" - subprocess 控制台交互
-        **kwargs: 各 action 的参数
+        action: "gui" - named-pipe GUI automation
+                "console" - subprocess console interaction
+        **kwargs: parameters for each action
 
     Returns:
-        dict 执行结果（各 action 返回格式一致）。
+        dict execution result (consistent format across actions).
     """
     requested_action = action
     if action == 'gui':
@@ -3293,7 +3293,7 @@ def execute_automation(action: str, **kwargs) -> dict:
     elif action == 'test':
         result = run_tests(**kwargs)
     else:
-        return {'status': 'error', 'message': f'未知 action: {action}', 'requested_action': requested_action}
+        return {'status': 'error', 'message': f'Unknown action: {action}', 'requested_action': requested_action}
 
     if isinstance(result, dict):
         result.setdefault('requested_action', requested_action)
@@ -3310,15 +3310,15 @@ def console_execute(
     args: list[str] | None = None,
     env: dict[str, object] | None = None,
 ) -> dict:
-    """执行控制台程序交互。
+    """Execute a console program interaction.
 
     Args:
-        app_path: exe 路径
-        input_text: 发送到 stdin 的文本
-        expect: 等待的输出正则模式
-        timeout: 超时秒数
-        keep_alive: True=执行完后保持进程运行供后续复用
-        args: 额外命令行参数
+        app_path: exe path
+        input_text: text to send to stdin
+        expect: output regex pattern to wait for
+        timeout: timeout in seconds
+        keep_alive: True=keep the process running after execution for later reuse
+        args: extra command-line arguments
 
     Returns:
         dict: {status, stdout, stderr, exit_code, matched, timed_out}
@@ -3336,7 +3336,7 @@ def console_execute(
     with _console_pool_lock:
         entry = _console_pool.get(key)
     if not entry:
-        return {'status': 'error', 'message': '进程已意外终止'}
+        return {'status': 'error', 'message': 'Process terminated unexpectedly'}
 
     proc: subprocess.Popen = entry['proc']
     matched = False
@@ -3345,12 +3345,12 @@ def console_execute(
     stderr_buf = io.BytesIO()
 
     try:
-        # 发送输入
+        # Send input
         if input_text:
             data = input_text.encode('utf-8') if isinstance(input_text, str) else input_text
             proc.stdin.write(data)
             proc.stdin.flush()
-            # expect 模式：关 stdin 发 EOF，进程读完输入后自然结束
+            # expect mode: close stdin to send EOF, the process ends naturally after reading input
             if expect:
                 try:
                     proc.stdin.close()
@@ -3358,7 +3358,7 @@ def console_execute(
                     pass
 
         if expect:
-            # ── expect 模式：线程 + Queue 实现 Windows 兼容非阻塞读取 ──
+            # ── expect mode: threads + Queue for Windows-compatible non-blocking reads ──
             stdout_queue: queue.Queue = queue.Queue()
             stderr_queue: queue.Queue = queue.Queue()
             _stop_reader = threading.Event()
@@ -3410,7 +3410,7 @@ def console_execute(
                 except queue.Empty:
                     break
 
-            # 如果进程仍在运行，杀死或等待
+            # If the process is still running, kill or wait
             if proc.poll() is None:
                 if not keep_alive:
                     proc.kill()
@@ -3418,7 +3418,7 @@ def console_execute(
                 else:
                     proc.wait(timeout=timeout)
         else:
-            # ── 无 expect：直接用 communicate ──
+            # ── no expect: use communicate directly ──
             try:
                 out, err = proc.communicate(timeout=timeout)
                 stdout_buf.write(out)
@@ -3435,7 +3435,7 @@ def console_execute(
     except Exception as e:
         if not keep_alive:
             _console_kill_pool_entry(key)
-        return {'status': 'error', 'message': f'控制台交互失败: {e}'}
+        return {'status': 'error', 'message': f'Console interaction failed: {e}'}
 
     exit_code = proc.poll()
 
@@ -3478,14 +3478,14 @@ def execute_script(app_path: str, script,
 
 
 def _evaluate_assert_expr(expr: str, actual: str) -> tuple[bool, str]:
-    """评估 assert_expr Python 表达式。
+    """Evaluate an assert_expr Python expression.
 
     Args:
-        expr: Python 表达式（如 "actual == '42'", "'Error' in actual"）
-        actual: 方法返回值的字符串表示
+        expr: Python expression (e.g. "actual == '42'", "'Error' in actual")
+        actual: string representation of the method's return value
 
     Returns:
-        (passed, message) 元组
+        (passed, message) tuple
     """
     try:
         result = eval(expr, {'actual': actual})
@@ -3727,7 +3727,7 @@ def _run_tests_impl(
                 if progress_callback:
                     progress_callback(
                         10 + int((index / len(normalized_tests)) * 80),
-                        f'执行测试 {index + 1}/{len(normalized_tests)}: '
+                        f'Executing test {index + 1}/{len(normalized_tests)}: '
                         f"{original_test.get('method', '?')}",
                     )
 
@@ -3823,7 +3823,7 @@ def _run_tests_impl(
                         needs_process = True
 
             if progress_callback:
-                progress_callback(95, '整理测试结果...')
+                progress_callback(95, 'Finalizing test results...')
         finally:
             _end_pipe_session()
             if not keep_alive:
@@ -3850,23 +3850,23 @@ def run_tests(
     """Execute RTTI tests with deterministic aggregation and per-test timeout.
 
     Args:
-        app_path: Delphi exe 路径
-        tests: 测试用例列表，每项支持：
-            - target: 控件名（GUI 模式，与 className 二选一）
-            - className: 类全名如 Unit.TMyClass（直接实例化模式，与 target 二选一）
-            - method: 要调用的方法名
-            - params: 方法参数 JSON 数组
-            - constructor_params: className 模式的构造参数（可选）
-            - expected: 期望返回值（可选，用于 Delphi 侧精确字符串断言）
-            - expected_exception: 期望测试阶段抛出的异常类名（可选，与 expected 二选一）
-            - expected_message: 期望异常消息包含的文本（可选，需配合 expected_exception）
-            - assert_expr: Python 断言表达式（可选，在 Python 侧评估，如 "actual == '42'"）
-            - visibility: 可见度过滤（可选，如 'private' 或 'all'）
-        visibility: 全局 RTTI 可见度过滤（默认 public,published）
-        keep_alive: 执行后保持进程运行
-        wait_for_pipe: 等待管道超时秒数
-        test_timeout: 每个测试的默认超时秒数，可由测试项 timeout 覆盖
-        env: 环境变量覆盖
+        app_path: Delphi exe path
+        tests: List of test cases; each item supports:
+            - target: Control name (GUI mode, mutually exclusive with className)
+            - className: Fully qualified class name such as Unit.TMyClass (direct instantiation mode, mutually exclusive with target)
+            - method: Name of the method to call
+            - params: JSON array of method parameters
+            - constructor_params: Constructor parameters for className mode (optional)
+            - expected: Expected return value (optional; used for exact string assertions on the Delphi side)
+            - expected_exception: Name of the exception class expected to be thrown during the test phase (optional, mutually exclusive with expected)
+            - expected_message: Text expected to be contained in the exception message (optional; requires expected_exception)
+            - assert_expr: Python assertion expression (optional; evaluated on the Python side, e.g. "actual == '42'")
+            - visibility: Visibility filter (optional, e.g. 'private' or 'all')
+        visibility: Global RTTI visibility filter (default public,published)
+        keep_alive: Keep the process running after execution
+        wait_for_pipe: Number of seconds to wait for the pipe
+        test_timeout: Default timeout in seconds for each test; can be overridden by the test item's timeout
+        env: Environment variable overrides
 
     Returns:
         dict: {status, results, total, passed, failed, errors}
@@ -3891,18 +3891,18 @@ def submit_run_tests(
     test_timeout: float = 30.0,
     env: dict[str, object] | None = None,
 ) -> str:
-    """提交后台测试执行，返回 task_id（避免 MCP 超时）。
+    """Submit test execution in the background and return task_id (avoids MCP timeouts).
 
     Args:
-        参数同 run_tests()（支持 visibility 全局 + per-test、assert_expr）。
-        注意：tests 中每个条目可包含：
-            - visibility: 可见度过滤（可选，覆盖全局 visibility）
-            - assert_expr: Python 断言表达式（可选）
-            - expected_exception: 期望测试阶段抛出的异常类名（可选）
-            - expected_message: 期望异常消息包含的文本（可选）
+        Parameters are the same as run_tests() (supports global visibility + per-test visibility, and assert_expr).
+        Note: Each item in tests may contain:
+            - visibility: Visibility filter (optional; overrides global visibility)
+            - assert_expr: Python assertion expression (optional)
+            - expected_exception: Name of the exception class expected to be thrown during the test phase (optional)
+            - expected_message: Text expected to be contained in the exception message (optional)
 
     Returns:
-        task_id: 异步任务 ID，通过 async_task(action='status', task_id=...) 查询进度。
+        task_id: Async task ID; query progress via async_task(action='status', task_id=...).
     """
     task_manager = get_task_manager()
 
@@ -4025,39 +4025,39 @@ def _execute_script_unlocked(app_path: str, script,
                              keep_alive: bool = False,
                              stop_on_failure: bool = True,
                              env: dict[str, object] | None = None) -> dict:
-    """执行自动化脚本。
+    """Execute an automation script.
 
-    支持进程池复用：同一个 app_path 在 keep_alive=True 后保持运行，
-    后续调用直接复用已有进程。
+    Supports process pool reuse: the same app_path stays running after keep_alive=True,
+    and subsequent calls directly reuse the existing process.
 
     Args:
-        app_path: Delphi exe 路径
-        script: JSON 脚本（文件路径 / JSON 字符串 / list）
-        snapshots_dir: 截图输出目录（默认 docs/copyright/snapshots）
-        wait_for_pipe: 等待管道超时秒数
-        keep_alive: True=执行完后保持进程运行供后续复用
-        stop_on_failure: True=首个失败后停止执行后续依赖步骤，并在报告中标为 skipped
+        app_path: Delphi exe path
+        script: JSON script (file path / JSON string / list)
+        snapshots_dir: Screenshot output directory (default docs/copyright/snapshots)
+        wait_for_pipe: Number of seconds to wait for the pipe
+        keep_alive: True=keep the process running after execution for later reuse
+        stop_on_failure: True=stop executing subsequent dependent steps after the first failure, and mark them as skipped in the report
 
     Returns:
-        dict 执行结果，包含 process_reused 指示是否复用了已有进程。
+        dict Execution result, including process_reused to indicate whether an existing process was reused.
     """
     if not snapshots_dir:
         snapshots_dir = str(DEFAULT_SNAPSHOTS_DIR)
     Path(snapshots_dir).mkdir(parents=True, exist_ok=True)
     run_started = time.monotonic()
 
-    # 解析脚本
+    # Parse script
     try:
         steps, script_metadata = _parse_gui_script(script)
     except (OSError, TypeError, ValueError, json.JSONDecodeError) as e:
-        return {'status': 'error', 'message': f'脚本解析失败: {e}'}
+        return {'status': 'error', 'message': f'Script parsing failed: {e}'}
 
-    # 解析异常过滤器配置
+    # Parse exception filter configuration
     exception_filter_config = _parse_exception_filter(
         script_metadata.get('exception_filter')
     )
 
-    # 获取或创建进程
+    # Get or create process
     try:
         env_overrides = _merge_env_overrides(
             script_metadata.get('environment'),
@@ -4073,7 +4073,7 @@ def _execute_script_unlocked(app_path: str, script,
     _begin_pipe_session()
     _pipe_session.pipe_name = _process_pipe_name(app_path)
 
-    # 新建进程时需要设置截图目录
+    # Set screenshot directory when creating a new process
     if is_new:
         _send_command(json.dumps(
             {"reqId": "init", "cmd": "snapdir", "target": snapshots_dir},
@@ -4084,7 +4084,7 @@ def _execute_script_unlocked(app_path: str, script,
     success = True
     req_index = 0
 
-    # 创建异常过滤器实例
+    # Create exception filter instance
     exception_filter = None
     if exception_filter_config.get('enabled'):
         exception_filter = ExceptionFilter(
@@ -4094,21 +4094,21 @@ def _execute_script_unlocked(app_path: str, script,
         )
 
     for step in steps:
-        # 异常过滤器检查
+        # Exception filter check
         if exception_filter and exception_filter.enabled:
             should_abort, action_taken = exception_filter.check_and_handle()
             if should_abort:
-                # restart_app：终止进程并重新启动，不中断测试
+                # restart_app: terminate the process and restart it without interrupting the test
                 if action_taken == 'restart_app':
                     try:
-                        # 终止当前进程
+                        # Terminate the current process
                         entry = _process_pool.pop(app_path, None)
                         if entry:
                             proc = entry.get('proc')
                             if proc and proc.poll() is None:
                                 proc.terminate()
                                 proc.wait(timeout=3)
-                        # 重新启动
+                        # Restart
                         is_new, err = _ensure_process(app_path, wait_for_pipe, env_overrides)
                         if err:
                             results.append({
@@ -4172,12 +4172,12 @@ def _execute_script_unlocked(app_path: str, script,
         callgraph_diff_baseline = None
         callgraph_diff_compare_by = 'name'
 
-        # 构造 JSON 请求
+        # Build JSON request
         req = {'reqId': req_id, 'cmd': cmd}
         if target:
             req['target'] = target
 
-        # ── UIA 命令路由：Python 端直接执行，不走 Delphi 管道 ──
+        # ── UIA command routing: execute directly on the Python side, bypassing the Delphi pipe ──
         _via = step.get('via', '')
         if cmd in _UIA_PREFIX_CMDS or (_via == 'uia' and cmd in _UIA_CAPABLE_CMDS):
             # Already inside _gui_execution_lock (acquired in execute_gui_script),
@@ -4405,10 +4405,10 @@ def _execute_script_unlocked(app_path: str, script,
             continue
 
         # ═══════════════ analyze ═══════════════
-        # capture + OCR 分析，返回结构化 UI 元素列表
+        # capture + OCR analysis, returns structured UI element list
         if cmd == 'analyze':
             import os as _os
-            # 强制截图
+            # Force screenshot
             cap_name = target or f'analyze_{req_id}'
             cap_raw = _send_command(json.dumps(
                 {"reqId": f"cap_{req_id}", "cmd": "capture", "target": cap_name},
@@ -4488,8 +4488,8 @@ def _execute_script_unlocked(app_path: str, script,
             if props_val:
                 req['props'] = props_val
         elif cmd == 'formsum':
-            # formsum = dumpstate → Python 端格式化摘要
-            cmd = 'dumpstate'  # 实际发往 Delphi 的是 dumpstate
+            # formsum = dumpstate → Python-side formatted summary
+            cmd = 'dumpstate'  # The actual command sent to Delphi is dumpstate
             req['cmd'] = 'dumpstate'
             req['target'] = step.get('name', target)
             props_val = step.get('props', '')
@@ -4685,13 +4685,13 @@ def _execute_script_unlocked(app_path: str, script,
         else:
             resp_raw = _send_command(cmd_str, timeout_ms=pipe_timeout_ms)
 
-        # 解析 JSON 响应
+        # Parse JSON response
         resp_json = _decode_response(resp_raw)
         resp_status = resp_json.get('status', 'err')
 
         ok = resp_status in ('ok', 'ack')
 
-        # ── 异步命令 ack 后短轮询 peekresult ──
+        # ── Short-poll peekresult after async command ack ──
         if cmd in _ASYNC_CMDS and resp_status == 'ack':
             await_result = bool(step.get('await_result', False))
             _peek_timeout = float(step.get(
@@ -4723,7 +4723,7 @@ def _execute_script_unlocked(app_path: str, script,
         capture_resp_json = None
         capture_ok = True
 
-        # dumpstate/dlgscan 返回 JSON 字符串；msgscan 检测到弹窗时把弹窗 JSON 写入 _formstate.json。
+        # dumpstate/dlgscan return a JSON string; when msgscan detects a dialog, it writes the dialog JSON to _formstate.json.
         if cmd in ('callgraph', 'callgraph_diff', 'callgraph_path') and resp_json.get('data'):
             try:
                 parsed = json.loads(resp_json['data'])
@@ -4764,7 +4764,7 @@ def _execute_script_unlocked(app_path: str, script,
                 )
             except (OSError, json.JSONDecodeError):
                 pass
-        # uiascan 返回 JSON 控件树 → 自动反序列化到 state 字段
+        # uiascan returns a JSON control tree → automatically deserialize into the state field
         elif cmd in ('uiascan', 'scan') and ok and resp_json.get('data'):
             try:
                 raw = resp_json['data']
@@ -4776,7 +4776,7 @@ def _execute_script_unlocked(app_path: str, script,
             except (json.JSONDecodeError, TypeError):
                 pass
 
-        # formsum：将 dumpstate JSON 格式化为紧凑摘要
+        # formsum: format dumpstate JSON into a compact summary
         if _is_formsum and ok and resp_json.get('state'):
             try:
                 resp_json['summary'] = _format_form_summary(resp_json['state'])
@@ -4800,7 +4800,7 @@ def _execute_script_unlocked(app_path: str, script,
             results[-1]['capture'] = capture_name
             results[-1]['capture_response'] = capture_resp_json
 
-        # ⭐ Assert 检查 — Python 端后置验证
+        # ⭐ Assert check — Python-side post-validation
         assert_result = _check_assert(step, resp_json)
         results[-1]['assert_result'] = assert_result
         if not assert_result.get('passed', True):
@@ -4812,7 +4812,7 @@ def _execute_script_unlocked(app_path: str, script,
             success = False
         time.sleep(POLL_INTERVAL_AUTOMATION)
 
-    # keep_alive=False：确保进程退出（脚本没 exit 则自动发送）
+    # keep_alive=False: ensure the process exits (auto-send if the script has no exit)
     if not keep_alive:
         has_exit = any(
             r.get('step', {}).get('cmd') == 'exit' and r.get('status') != 'skipped'
@@ -4822,14 +4822,14 @@ def _execute_script_unlocked(app_path: str, script,
             _send_command(json.dumps(
                 {"reqId": "auto_exit", "cmd": "exit"}, ensure_ascii=False))
             time.sleep(0.5)
-        # 给进程一点时间退出，从池中移除
+        # Give the process some time to exit, then remove it from the pool
         time.sleep(0.5)
         with _pool_lock:
             _process_pool.pop(app_path, None)
 
     _end_pipe_session()
 
-    # 构建返回结果
+    # Build return result
     result = {
         'status': 'ok' if success else 'partial',
         'app_path': app_path,
@@ -4844,7 +4844,7 @@ def _execute_script_unlocked(app_path: str, script,
         'report': _make_report(results, len(steps), time.monotonic() - run_started),
     }
     
-    # 添加异常过滤器统计
+    # Add exception filter statistics
     if exception_filter and exception_filter.enabled:
         result['exception_filter'] = exception_filter.get_stats()
     

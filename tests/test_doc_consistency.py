@@ -259,7 +259,7 @@ class TestDocConsistency:
         # Verify automation_service.py documents the script shape parsing
         from pathlib import Path
         auto_svc = (Path(__file__).parent.parent / "src" / "services" / "automation_service.py").read_text(encoding="utf-8")
-        assert "步骤列表或包含 steps 的对象" in auto_svc, "automation_service.py missing script shape documentation"
+        assert "step list, or object containing steps" in auto_svc, "automation_service.py missing script shape documentation"
 
     def test_delphi_file_docs_forbid_default_editors(self):
         """Delphi edit docs must explicitly block direct agent write tools."""

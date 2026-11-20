@@ -66,8 +66,8 @@ def test_strict_mode_blocks_external_edit_in_scope(tmp_path: Path, monkeypatch: 
 
     message = external_edit_block_message(tmp_path)
     assert message is not None
-    assert "Delphi 编辑保护已阻止本次操作" in message
-    assert "检测到的文件" in message
+    assert "Delphi edit guard blocked this operation." in message
+    assert "Detected files:" in message
     assert str(unit_path) in message
 
 

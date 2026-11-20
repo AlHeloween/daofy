@@ -1,9 +1,9 @@
 """
-Delphi 编译器插件
+Delphi compiler plugin
 
-Phase 1: 委托到现有 compiler_service / dproj_parser 等模块，零重写。
-Phase 2: 工具归属声明 (get_owned_tool_names)。
-Phase 3: handler 提取到 handlers.py，get_tools() 返回完整 ToolDefinition。
+Phase 1: delegate to existing compiler_service / dproj_parser and other modules, with zero rewrites.
+Phase 2: tool ownership declaration (get_owned_tool_names).
+Phase 3: handlers extracted to handlers.py, get_tools() returns complete ToolDefinitions.
 """
 
 from pathlib import Path
@@ -13,11 +13,11 @@ from ..base import CompilerPlugin, PluginInfo, ToolDefinition
 
 
 class DelphiPlugin(CompilerPlugin):
-    """Delphi 编译器插件
+    """Delphi compiler plugin
 
-    工具注册: 声明 Delphi 专属工具名 → 路由到 server.py 已有处理器。
-    编译: 委托 compiler_service (MSBuild / DCC)。
-    解析: 委托 dproj_parser。
+    Tool registration: declare Delphi-specific tool names → route to existing handlers in server.py.
+    Compilation: delegate to compiler_service (MSBuild / DCC).
+    Parsing: delegate to dproj_parser.
     """
 
     @property
@@ -26,14 +26,14 @@ class DelphiPlugin(CompilerPlugin):
             name="delphi",
             display_name="Delphi",
             version="1.0.0",
-            description="Embarcadero Delphi 编译器支持 (MSBuild/DCC)",
+            description="Embarcadero Delphi compiler support (MSBuild/DCC)",
             supported_extensions=[".dproj", ".dpr", ".dpk"],
         )
 
     # ── detect ──
 
     async def detect(self) -> List[Dict[str, Any]]:
-        """检测已安装的 Delphi 编译器"""
+        """Detect installed Delphi compilers"""
         from ...services.config_manager import ConfigManager
         cm = ConfigManager()
         return cm._detect_delphi_from_registry()
@@ -41,7 +41,7 @@ class DelphiPlugin(CompilerPlugin):
     # ── compile ──
 
     async def compile(self, project_path: str, options: Dict[str, Any]) -> Dict[str, Any]:
-        """编译 Delphi 项目 (委托 compiler_service)"""
+        """Compile a Delphi project (delegated to compiler_service)"""
         from ...services.compiler_service import CompilerService
         from ...services.config_manager import ConfigManager
 
@@ -69,7 +69,7 @@ class DelphiPlugin(CompilerPlugin):
     # ── parse_project ──
 
     def parse_project(self, project_path: str) -> Optional[Dict[str, Any]]:
-        """解析 Delphi 项目文件 (.dproj)"""
+        """Parse a Delphi project file (.dproj)"""
         if not project_path.endswith(('.dproj', '.dpr', '.dpk')):
             return None
 
@@ -86,21 +86,21 @@ class DelphiPlugin(CompilerPlugin):
             "info": info,
         }
 
-    # ── 编码规范 ──
-    # Phase 1: get_coding_rules 仍在 server.py 闭包中实现，
-    # 此处保留接口定义供 Phase 2 迁移。
+    # ── Coding rules ──
+    # Phase 1: get_coding_rules is still implemented in a server.py closure;
+    # the interface definition is kept here for Phase 2 migration.
 
     def get_coding_rules(self, section: str = None) -> str:
-        """获取 Delphi 编码规范
+        """Get Delphi coding rules
 
-        Phase 2 TODO: 迁移 get_coding_rules 实现到此处。
+        Phase 2 TODO: migrate the get_coding_rules implementation here.
         """
-        return ""  # Phase 2: 实现完整逻辑
+        return ""  # Phase 2: implement complete logic
 
-    # ── 工具归属声明 (Phase 2) + handler 提取 (Phase 3) ──
+    # ── Tool ownership declaration (Phase 2) + handler extraction (Phase 3) ──
 
     def get_owned_tool_names(self) -> List[str]:
-        """Delphi 插件拥有的 MCP 工具名列表"""
+        """List of MCP tool names owned by the Delphi plugin"""
         return [
             "delphi_project",
             "delphi_file",
@@ -114,30 +114,31 @@ class DelphiPlugin(CompilerPlugin):
         ]
 
     def get_tools(self) -> List[ToolDefinition]:
-        """返回 Delphi 插件注册的 MCP 工具 (Phase 3: 完整 ToolDefinition)"""
+        """Return MCP tools registered by the Delphi plugin (Phase 3: complete ToolDefinitions)"""
         from .handlers import DELPHI_HANDLERS
         return [
             ToolDefinition(
                 name=name,
-                description=self._TOOL_DESCRIPTIONS.get(name, f"Delphi 工具: {name}"),
+                description=self._TOOL_DESCRIPTIONS.get(name, f"Delphi tool: {name}"),
                 input_schema=self._TOOL_SCHEMAS.get(name, {"type": "object", "properties": {}}),
                 handler=handler,
             )
             for name, handler in DELPHI_HANDLERS.items()
-            if name != "file_tool"  # file_tool 是 delphi_file 的兼容别名，不单独注册
+            if name != "file_tool"  # file_tool is a compatibility alias for delphi_file and is not registered separately
         ]
 
-    # 工具描述和 schema 元数据
+    # Tool descriptions and schema metadata
     _TOOL_DESCRIPTIONS = {
-        "delphi_project": "Delphi 项目全生命周期管理：编译/配置/审计/部署",
-        "delphi_file": "Delphi 文件统一入口: read/write/search/grep/replace/insert/delete/backup",
-        "delphi_kb": "知识库搜索/管理",
-        "manage_component": "DFM组件增/删/改/生成",
-        "get_coding_rules": "编码规则获取工具 — writing/compile/review/automation 前获取 Delphi 或 Lazarus/FPC 规范",
-        "package": "组件包编译安装/列出",
-        "check_environment": "环境检查/RAD Studio 编译器 detect/check/install/dcc32/dcc64",
-        "delphi_rtti": "RTTI 发现/调用",
-        "automate_delphi": "Delphi 自动化测试",
+        "delphi_project": "Delphi project full lifecycle management: compile/configure/audit/deploy",
+        "delphi_file": "Unified entry point for Delphi files: read/write/search/grep/replace/insert/delete/backup",
+        "delphi_kb": "Knowledge base search/management",
+        "manage_component": "DFM component add/delete/modify/generate",
+        "get_coding_rules": "Coding rules retrieval tool — get Delphi or Lazarus/FPC conventions before writing/compile/review/automation",
+        "package": "Component package compile/install/list",
+        "check_environment": "Environment check/RAD Studio compiler detect/check/install/dcc32/dcc64",
+        "delphi_rtti": "RTTI discovery/invocation",
+        "automate_delphi": "Delphi automated testing",
     }
 
-    _TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {}  # schema 由 server.py list_tools 提供
+    _TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {}  # schema provided by server.py list_tools
+

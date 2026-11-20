@@ -1,11 +1,11 @@
 """
-Lazarus/FPC 路径检测 — 单一入口，所有模块共用。
+Lazarus/FPC path detection — single entry point, shared by all modules.
 
-搜索顺序:
-  1. PATH 环境变量
-  2. 常见安装目录
-  3. 开始菜单快捷方式（解析 .lnk 目标）
-  4. Windows 注册表（Uninstall 信息）
+Search order:
+  1. PATH environment variable
+  2. Common installation directories
+  3. Start menu shortcuts (resolve .lnk targets)
+  4. Windows registry (Uninstall information)
 """
 
 import os
@@ -19,7 +19,7 @@ from ...utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-# ── 常见安装目录（所有检测逻辑共用）──
+# ── Common installation directories (shared by all detection logic) ──
 
 _LAZARUS_COMMON_DIRS: List[Path] = [
     Path("C:/lazarus"),
@@ -29,7 +29,7 @@ _LAZARUS_COMMON_DIRS: List[Path] = [
 ]
 
 
-# ── 开始菜单路径（Windows 特有）──
+# ── Start menu paths (Windows-specific) ──
 
 _START_MENU_DIRS: List[Path] = [
     Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Lazarus",
@@ -38,7 +38,7 @@ _START_MENU_DIRS: List[Path] = [
 
 
 def _resolve_lnk_target(lnk_path: Path) -> Optional[str]:
-    """通过 PowerShell 解析 .lnk 快捷方式的目标路径。"""
+    """Resolve the target path of a .lnk shortcut via PowerShell."""
     try:
         cmd = (
             f'$ws = New-Object -ComObject WScript.Shell; '
@@ -54,12 +54,12 @@ def _resolve_lnk_target(lnk_path: Path) -> Optional[str]:
             if target and Path(target).exists():
                 return target
     except Exception as e:
-        logger.debug(f"解析 .lnk 失败: {lnk_path}: {e}")
+        logger.debug(f"Failed to resolve .lnk: {lnk_path}: {e}")
     return None
 
 
 def _resolve_start_menu_lazbuild() -> Optional[Path]:
-    """从开始菜单的 Lazarus 快捷方式反查安装路径。"""
+    """Find the installation path from Lazarus start menu shortcuts."""
     for menu_dir in _START_MENU_DIRS:
         if not menu_dir.is_dir():
             continue
@@ -69,13 +69,13 @@ def _resolve_start_menu_lazbuild() -> Optional[Path]:
                 if target:
                     lazbuild = Path(target).parent / "lazbuild.exe"
                     if lazbuild.exists():
-                        logger.info(f"通过开始菜单找到 lazbuild: {lazbuild}")
+                        logger.info(f"Found lazbuild via Start menu: {lazbuild}")
                         return lazbuild
     return None
 
 
 def _resolve_registry_lazbuild() -> Optional[Path]:
-    """从 Windows 注册表 Uninstall 信息查找 Lazarus 安装路径。"""
+    """Find the Lazarus installation path from Windows registry Uninstall information."""
     try:
         import winreg
         key = winreg.OpenKey(
@@ -96,7 +96,7 @@ def _resolve_registry_lazbuild() -> Optional[Path]:
                             if install_loc:
                                 lazbuild = Path(install_loc) / "lazbuild.exe"
                                 if lazbuild.exists():
-                                    logger.info(f"通过注册表找到 lazbuild: {lazbuild}")
+                                    logger.info(f"Found lazbuild via registry: {lazbuild}")
                                     return lazbuild
                     except FileNotFoundError:
                         pass
@@ -109,17 +109,17 @@ def _resolve_registry_lazbuild() -> Optional[Path]:
         finally:
             winreg.CloseKey(key)
     except Exception as e:
-        logger.debug(f"注册表检测失败: {e}")
+        logger.debug(f"Registry detection failed: {e}")
     return None
 
 
-# ── 公开 API ──
+# ── Public API ──
 
 
 def find_lazbuild() -> List[Path]:
-    """返回所有找到的 lazbuild.exe 路径列表（去重）。
+    """Return a list of all found lazbuild.exe paths (deduplicated).
     
-    搜索顺序: PATH → 常见目录 → 开始菜单 → 注册表
+    Search order: PATH → common directories → Start menu → registry
     """
     seen: set[str] = set()
     candidates: List[Path] = []
@@ -135,18 +135,18 @@ def find_lazbuild() -> List[Path]:
     if path_result:
         _add(Path(path_result))
 
-    # 2. 常见安装目录
+    # 2. Common installation directories
     for d in _LAZARUS_COMMON_DIRS:
         lb = d / "lazbuild.exe"
         if lb.exists():
             _add(lb)
 
-    # 3. 开始菜单
+    # 3. Start menu
     sm = _resolve_start_menu_lazbuild()
     if sm:
         _add(sm)
 
-    # 4. 注册表
+    # 4. Registry
     reg = _resolve_registry_lazbuild()
     if reg:
         _add(reg)
@@ -155,7 +155,7 @@ def find_lazbuild() -> List[Path]:
 
 
 def find_lazarus_root() -> Optional[Path]:
-    """返回 Lazarus 安装根目录（lazbuild.exe 所在目录的父目录）。"""
+    """Return the Lazarus installation root directory (the parent of the directory containing lazbuild.exe)."""
     lazbuild_paths = find_lazbuild()
     if lazbuild_paths:
         return lazbuild_paths[0].parent
@@ -163,22 +163,22 @@ def find_lazarus_root() -> Optional[Path]:
 
 
 def is_lazarus_available() -> bool:
-    """快速检查 Lazarus 是否已安装（不解析 .lnk/注册表）。"""
+    """Quickly check whether Lazarus is installed (without resolving .lnk/registry)."""
     # PATH
     if shutil.which("lazbuild"):
         return True
-    # 常见目录（仅检查 exe 是否存在，不解析快捷方式）
+    # Common directories (only check whether the exe exists, without resolving shortcuts)
     for d in _LAZARUS_COMMON_DIRS:
         if (d / "lazbuild.exe").exists():
             return True
-    # 开始菜单（快捷方式存在即可，不解析目标）
+    # Start menu (shortcut existence is enough, without resolving the target)
     for menu_dir in _START_MENU_DIRS:
         if menu_dir.is_dir() and any(
             "lazarus" in lnk.stem.lower() and "uninstall" not in lnk.stem.lower()
             for lnk in menu_dir.glob("*.lnk")
         ):
             return True
-    # 注册表
+    # Registry
     try:
         import winreg
         key = winreg.OpenKey(
@@ -212,16 +212,16 @@ def is_lazarus_available() -> bool:
 
 
 def find_lazarus_source_dirs() -> List[dict]:
-    """返回 Lazarus/FPC 源码目录列表（供 KB 构建使用）。"""
+    """Return the list of Lazarus/FPC source directories (for KB construction)."""
     root = find_lazarus_root()
     if not root:
         return []
 
-    # 确保 root 是 lazarus 安装根目录（不是 bin 目录）
+    # Ensure root is the Lazarus installation root directory (not the bin directory)
     lazarus_root = root.parent if root.name == "bin" else root
-    # 检查是否是真正的 lazarus 根目录
+    # Check whether this is the actual Lazarus root directory
     if not (lazarus_root / "lcl").is_dir():
-        # 可能 root 本身就是 lazarus 根
+        # root itself may be the Lazarus root
         if (root / "lcl").is_dir():
             lazarus_root = root
         else:
@@ -239,7 +239,7 @@ def find_lazarus_source_dirs() -> List[dict]:
     if components.is_dir():
         sources.append({"path": str(components), "label": "Lazarus bundled components"})
 
-    # FPC 源码
+    # FPC source
     fpc_root = lazarus_root / "fpc"
     if fpc_root.is_dir():
         for ver_dir in sorted(fpc_root.iterdir(), reverse=True):
@@ -252,3 +252,4 @@ def find_lazarus_source_dirs() -> List[dict]:
                 break
 
     return sources
+

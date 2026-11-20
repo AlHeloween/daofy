@@ -1,10 +1,10 @@
 """
-Lazarus/FPC 编译器插件
+Lazarus/FPC compiler plugin
 
-Phase 1: 委托到现有 compiler_service.compile_with_lazbuild / lpi_parser，
-         不重复任何业务逻辑。
-Phase 2: 工具归属声明 (get_owned_tool_names)。
-Phase 5: handler 提取到 handlers.py，get_tools() 返回完整 ToolDefinition。
+Phase 1: Delegate to the existing compiler_service.compile_with_lazbuild / lpi_parser,
+         do not duplicate any business logic.
+Phase 2: Tool ownership declaration (get_owned_tool_names).
+Phase 5: Handler extraction to handlers.py, get_tools() returns the complete ToolDefinition.
 """
 
 from pathlib import Path
@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 
 
 class LazarusPlugin(CompilerPlugin):
-    """Lazarus/Free Pascal 编译器插件"""
+    """Lazarus/Free Pascal compiler plugin"""
 
     @property
     def info(self) -> PluginInfo:
@@ -25,21 +25,21 @@ class LazarusPlugin(CompilerPlugin):
             name="lazarus",
             display_name="Lazarus/Free Pascal",
             version="1.0.0",
-            description="Lazarus IDE / Free Pascal 编译器支持 (lazbuild)",
+            description="Lazarus IDE / Free Pascal compiler support (lazbuild)",
             supported_extensions=[".lpi", ".lpr", ".lpk"],
         )
 
-    # ── 可用性检测 ──
+    # ── Availability detection ──
 
     def is_available(self) -> bool:
-        """检查 lazbuild.exe 是否可用（PATH/常见目录/开始菜单/注册表）"""
+        """Check whether lazbuild.exe is available (PATH/common directories/Start Menu/registry)"""
         from .detect import is_lazarus_available as _check
         return _check()
 
     # ── detect ──
 
     async def detect(self) -> List[Dict[str, Any]]:
-        """检测已安装的 Lazarus/FPC 编译器"""
+        """Detect installed Lazarus/FPC compilers"""
         from .detect import find_lazbuild
         from ...services.config_manager import ConfigManager
 
@@ -62,7 +62,7 @@ class LazarusPlugin(CompilerPlugin):
     # ── compile ──
 
     async def compile(self, project_path: str, options: Dict[str, Any]) -> Dict[str, Any]:
-        """编译 Lazarus 项目 (委托 compiler_service.compile_with_lazbuild)"""
+        """Compile a Lazarus project (delegates to compiler_service.compile_with_lazbuild)"""
         from ...services.compiler_service import CompilerService
         from ...services.config_manager import ConfigManager
         from ...models.compile_request import ProjectCompileRequest, CompileOptions, TargetPlatform
@@ -94,7 +94,7 @@ class LazarusPlugin(CompilerPlugin):
     # ── parse_project ──
 
     def parse_project(self, project_path: str) -> Optional[Dict[str, Any]]:
-        """解析 Lazarus 项目文件 (.lpi)"""
+        """Parse a Lazarus project file (.lpi)"""
         if not project_path.endswith(('.lpi', '.lpr', '.lpk')):
             return None
 
@@ -119,10 +119,10 @@ class LazarusPlugin(CompilerPlugin):
             "info": info,
         }
 
-    # ── 工具归属声明 (Phase 2) + handler 提取 (Phase 5) ──
+    # ── Tool ownership declaration (Phase 2) + handler extraction (Phase 5) ──
 
     def get_owned_tool_names(self) -> List[str]:
-        """Lazarus 插件拥有的 MCP 工具名列表"""
+        """List of MCP tool names owned by the Lazarus plugin"""
         return [
             "lazarus_compile",
             "lazarus_project",
@@ -131,24 +131,24 @@ class LazarusPlugin(CompilerPlugin):
         ]
 
     def get_tools(self) -> List[ToolDefinition]:
-        """返回 Lazarus 插件注册的 MCP 工具 (Phase 5: 完整 ToolDefinition)"""
+        """Return the MCP tools registered by the Lazarus plugin (Phase 5: complete ToolDefinition)"""
         from .handlers import LAZARUS_HANDLERS
         return [
             ToolDefinition(
                 name=name,
-                description=self._TOOL_DESCRIPTIONS.get(name, f"Lazarus 工具: {name}"),
+                description=self._TOOL_DESCRIPTIONS.get(name, f"Lazarus tool: {name}"),
                 input_schema=self._TOOL_SCHEMAS.get(name, {"type": "object", "properties": {}}),
                 handler=handler,
             )
             for name, handler in LAZARUS_HANDLERS.items()
         ]
 
-    # 工具描述和 schema 元数据
+    # Tool descriptions and schema metadata
     _TOOL_DESCRIPTIONS = {
-        "lazarus_compile": "Lazarus/Free Pascal 项目编译 (lazbuild)",
-        "lazarus_project": "Lazarus 项目信息查询 — 解析 .lpi 文件",
-        "lazarus_kb": "Lazarus/FPC 源码知识库 — 索引和搜索 LCL/FPC RTL 源码",
-        "lazarus_file": "Lazarus/FPC 文件读写 — read/write(edits,自动备份)/backup",
+        "lazarus_compile": "Lazarus/Free Pascal project compilation (lazbuild)",
+        "lazarus_project": "Lazarus project information query — parse .lpi files",
+        "lazarus_kb": "Lazarus/FPC source knowledge base — index and search LCL/FPC RTL source code",
+        "lazarus_file": "Lazarus/FPC file read/write — read/write(edits, automatic backup)/backup",
     }
 
     _TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {}

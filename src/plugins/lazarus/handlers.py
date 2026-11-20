@@ -1,9 +1,9 @@
-"""Lazarus/FPC 插件工具 handlers — 独立于插件实例的纯函数。
+"""Lazarus/FPC plugin tool handlers — pure functions independent of plugin instances.
 
-遵循 Delphi 插件 handlers.py 模式:
-  1. 每个 handler 接受 (arguments: dict) → 返回 Any (dict / CallToolResult)
-  2. 导出 LAZARUS_HANDLERS / LAZARUS_TOOL_DESCRIPTIONS / LAZARUS_TOOL_SCHEMAS
-  3. handler 内部延迟导入 CompilerService / LpiParser，避免模块级依赖
+Follows the Delphi plugin handlers.py pattern:
+  1. Each handler accepts (arguments: dict) → returns Any (dict / CallToolResult)
+  2. Exports LAZARUS_HANDLERS / LAZARUS_TOOL_DESCRIPTIONS / LAZARUS_TOOL_SCHEMAS
+  3. Handlers lazily import CompilerService / LpiParser internally to avoid module-level dependencies
 """
 
 from pathlib import Path
@@ -15,18 +15,18 @@ logger = init_default_logger()
 
 
 # ============================================================
-# 工具 handler 函数
+# Tool handler functions
 # ============================================================
 
 async def _handle_lazarus_compile(arguments: dict) -> dict:
-    """编译 Lazarus/Free Pascal 项目 (.lpi / .lpr)
+    """Compile a Lazarus/Free Pascal project (.lpi / .lpr)
 
     Arguments:
-        project_path (str): .lpi 或 .lpr 文件路径 (必需)
-        target_platform (str, optional): win32 / win64，默认 win32
+        project_path (str): .lpi or .lpr file path (required)
+        target_platform (str, optional): win32 / win64, default win32
         build_configuration (str, optional): Default / Release / Debug
-        timeout (int, optional): 超时秒数，默认 600
-        run_verify (bool, optional): 编译成功后启动程序 3 秒验证是否崩溃，默认 false
+        timeout (int, optional): Timeout in seconds, default 600
+        run_verify (bool, optional): After a successful build, launch the program for 3 seconds to verify it does not crash, default false
     """
     from src.services.compiler_service import CompilerService
     from src.services.config_manager import ConfigManager
@@ -34,7 +34,7 @@ async def _handle_lazarus_compile(arguments: dict) -> dict:
 
     project_path = arguments.get("project_path", "")
     if not project_path:
-        return {"status": "failed", "error": "缺少必需参数: project_path"}
+        return {"status": "failed", "error": "Missing required parameter: project_path"}
 
     platform_map = {
         "win32": TargetPlatform.WIN32,
@@ -64,7 +64,7 @@ async def _handle_lazarus_compile(arguments: dict) -> dict:
         result = await cs.compile_with_lazbuild(request)
         result_dict = result.to_dict()
 
-        # ── 运行验证 ──
+        # ── Run verification ──
         if run_verify and result.status.value == "success":
             verify_info = await _run_lazarus_verify(
                 cs, request, project_path, target, build_config
@@ -73,38 +73,38 @@ async def _handle_lazarus_compile(arguments: dict) -> dict:
 
         return result_dict
     except Exception as e:
-        logger.error(f"lazarus_compile 失败: {e}", exc_info=True)
+        logger.error(f"lazarus_compile failed: {e}", exc_info=True)
         return {
             "status": "failed",
-            "error": f"编译失败: {e}",
+            "error": f"Compilation failed: {e}",
             "project_path": project_path,
         }
 
 
 # ============================================================
-# run_verify 辅助函数
+# run_verify helper functions
 # ============================================================
 
 def _get_verify_tools_dir() -> Path:
-    """获取 StackTrace 工具目录"""
+    """Get the StackTrace tools directory"""
     return Path(__file__).resolve().parents[3] / "tools" / "stacktrace"
 
 
 def _inject_lazarus_verify_units(lpi_path: str, lpr_path: str) -> dict:
-    """修改 .lpi + .lpr 注入 StackTraceFPC 验证单元，返回备份路径。
+    """Modify .lpi + .lpr to inject the StackTraceFPC verification unit and return backup paths.
 
-    注入内容 (.lpi):
-       1. 添加 StackTraceFPC 到 Uses 部分
-       2. 添加 tools/stacktrace 到搜索路径
-       3. 启用调试信息 (-gl -gw)
+    Injected content (.lpi):
+       1. Add StackTraceFPC to the Uses section
+       2. Add tools/stacktrace to the search path
+       3. Enable debug information (-gl -gw)
 
-    注入内容 (.lpr):
-       1. uses 子句追加 StackTraceFPC
-       2. begin 块后插入 TStackTraceManagerFPC.Initialize 调用
+    Injected content (.lpr):
+       1. Append StackTraceFPC to the uses clause
+       2. Insert a TStackTraceManagerFPC.Initialize call after the begin block
 
     Args:
-        lpi_path: .lpi 文件路径
-        lpr_path: .lpr 文件路径
+        lpi_path: .lpi file path
+        lpr_path: .lpr file path
 
     Returns:
         dict with backup paths
@@ -122,18 +122,18 @@ def _inject_lazarus_verify_units(lpi_path: str, lpr_path: str) -> dict:
         '.lpr': lpr.with_suffix('.lpr.verify_bak'),
     }
 
-    # 备份
+    # Backup
     shutil.copy2(str(lpi), str(backs['.lpi']))
     if lpr.exists():
         shutil.copy2(str(lpr), str(backs['.lpr']))
 
-    # ── 修改 .lpi ──
+    # ── Modify .lpi ──
     content = lpi.read_text(encoding="utf-8-sig")
 
-    # 添加 StackTraceFPC 到 Uses
+    # Add StackTraceFPC to Uses
     rel_stacktrace = tools_dir.name + '/Fpc.StackTrace.pas'
     if 'Fpc_StackTrace' not in content:
-        # 查找 <Units> 节点并添加
+        # Find the <Units> node and add it
         units_pattern = r'(<Units>)'
         inject_unit = (
             f'    <Unit Filename="{rel_stacktrace}">\n'
@@ -147,13 +147,13 @@ def _inject_lazarus_verify_units(lpi_path: str, lpr_path: str) -> dict:
                 content
             )
         else:
-            # 如果没有 <Units>，添加到 <CompilerOptions> 前
+            # If there is no <Units>, add before <CompilerOptions>
             content = content.replace(
                 '<CompilerOptions>',
                 '<Units>\n' + inject_unit + '\n  </Units>\n  <CompilerOptions>'
             )
 
-    # 添加搜索路径
+    # Add search path
     rel_path = tools_dir.name
     paths_pattern = r'(<OtherUnitFiles[^>]*Value=")(.*?)(")'
     if re.search(paths_pattern, content):
@@ -163,13 +163,13 @@ def _inject_lazarus_verify_units(lpi_path: str, lpr_path: str) -> dict:
             content
         )
     else:
-        # 添加 OtherUnitFiles
+        # Add OtherUnitFiles
         content = content.replace(
             '</CompilerOptions>',
             '    <OtherUnitFiles Value="' + rel_path + '"/>\n  </CompilerOptions>'
         )
 
-    # 启用调试信息 (-gl -gw)
+    # Enable debug information (-gl -gw)
     if '-gl' not in content:
         content = content.replace(
             '</CompilerOptions>',
@@ -177,13 +177,13 @@ def _inject_lazarus_verify_units(lpi_path: str, lpr_path: str) -> dict:
         )
 
     lpi.write_text(content, encoding="utf-8-sig")
-    logger.info("已注入 StackTraceFPC 单元到 .lpi: %s", lpi_path)
+    logger.info("Injected StackTraceFPC unit into .lpi: %s", lpi_path)
 
-    # ── 修改 .lpr ──
+    # ── Modify .lpr ──
     if lpr.exists():
         original = lpr.read_text(encoding='utf-8-sig')
         if 'Fpc_StackTrace' not in original:
-            # 在 uses 中追加
+            # Append to uses
             uses_pos = original.lower().find('uses')
             if uses_pos >= 0:
                 end_uses = original.find(';', uses_pos + 4)
@@ -192,7 +192,7 @@ def _inject_lazarus_verify_units(lpi_path: str, lpr_path: str) -> dict:
                     if 'Fpc_StackTrace' not in uses_section:
                         original = original[:end_uses] + ', Fpc_StackTrace' + original[end_uses:]
 
-            # 在 begin 后添加初始化
+            # Add initialization after begin
             lines = original.split('\n')
             begin_idx = -1
             for i, line in enumerate(lines):
@@ -209,13 +209,13 @@ def _inject_lazarus_verify_units(lpi_path: str, lpr_path: str) -> dict:
                     lines.insert(begin_idx + 1 + j, line)
 
                 lpr.write_text('\n'.join(lines), encoding='utf-8-sig')
-                logger.info("已注入 Fpc_StackTrace 初始化到 .lpr: %s", lpr_path)
+                logger.info("Injected Fpc_StackTrace initialization into .lpr: %s", lpr_path)
 
     return backs
 
 
 def _restore_lazarus_files(lpi_path: str, lpr_path: str, backs: dict):
-    """恢复备份的 .lpi 和 .lpr 文件"""
+    """Restore the backed-up .lpi and .lpr files"""
     import shutil
     from pathlib import Path
 
@@ -225,12 +225,12 @@ def _restore_lazarus_files(lpi_path: str, lpr_path: str, backs: dict):
     if backs.get('.lpi') and backs['.lpi'].exists():
         shutil.copy2(str(backs['.lpi']), str(lpi))
         backs['.lpi'].unlink()
-        logger.info("已恢复 .lpi: %s", lpi_path)
+        logger.info("Restored .lpi: %s", lpi_path)
 
     if backs.get('.lpr') and backs['.lpr'].exists():
         shutil.copy2(str(backs['.lpr']), str(lpr))
         backs['.lpr'].unlink()
-        logger.info("已恢复 .lpr: %s", lpr_path)
+        logger.info("Restored .lpr: %s", lpr_path)
 
 
 async def _run_lazarus_verify(
@@ -240,23 +240,23 @@ async def _run_lazarus_verify(
     target_platform: 'TargetPlatform',
     build_configuration: str
 ) -> dict:
-    """运行 Lazarus 项目的运行验证
+    """Run runtime verification for a Lazarus project
 
-    1. 注入 StackTraceFPC 单元
-    2. 重新编译
-    3. 运行 exe 3 秒
-    4. 检查 exception.log
+    1. Inject the StackTraceFPC unit
+    2. Recompile
+    3. Run the exe for 3 seconds
+    4. Check exception.log
     """
     import asyncio
     from pathlib import Path
 
-    TIMEOUT_PROCESS_TERMINATE = 3.5  # 秒
+    TIMEOUT_PROCESS_TERMINATE = 3.5  # seconds
 
     try:
         lpi_path = Path(project_path)
         lpr_path = lpi_path.with_suffix('.lpr')
         if not lpr_path.exists():
-            # 尝试从 .lpi 获取主源文件
+            # Try to get the main source file from .lpi
             from src.utils.lpi_parser import LpiParser
             parser = LpiParser(str(lpi_path))
             if parser.parse():
@@ -265,22 +265,22 @@ async def _run_lazarus_verify(
                     lpr_path = lpi_path.parent / main_src
 
         if not lpr_path.exists():
-            return {"error": "未找到 .lpr 主源文件"}
+            return {"error": "Could not find the .lpr main source file"}
 
-        # 1. 注入 StackTraceFPC
+        # 1. Inject StackTraceFPC
         backs = _inject_lazarus_verify_units(str(lpi_path), str(lpr_path))
 
         try:
-            # 2. 重新编译
+            # 2. Recompile
             verify_result = await cs.compile_with_lazbuild(request)
 
             if verify_result.status.value != "success":
                 err_detail = verify_result.log or verify_result.error_message or "(no log)"
-                logger.warning("注入 StackTraceFPC 后编译失败: %s", err_detail[:500])
+                logger.warning("Compilation failed after injecting StackTraceFPC: %s", err_detail[:500])
                 return {"error": "injected compile failed", "log": err_detail[:1000]}
 
-            # 3. 查找 exe 路径
-            # Lazarus 输出路径通常在 output 目录
+            # 3. Find the exe path
+            # Lazarus output path is usually in the output directory
             exe_name = lpr_path.stem + '.exe'
             output_dir = lpi_path.parent / 'bin'
             if not output_dir.exists():
@@ -288,16 +288,16 @@ async def _run_lazarus_verify(
             exe_path = output_dir / exe_name
 
             if not exe_path.exists():
-                return {"error": f"未找到输出文件: {exe_path}"}
+                return {"error": f"Output file not found: {exe_path}"}
 
-            # 4. 运行验证
+            # 4. Run verification
             exe_dir = exe_path.parent
             log_path = exe_dir / 'exception.log'
             if log_path.exists():
                 try:
                     log_path.unlink()
                 except Exception as e:
-                    logger.debug("清理 exception.log 失败: %s", e)
+                    logger.debug("Failed to clean exception.log: %s", e)
 
             import subprocess
             proc = subprocess.Popen([str(exe_path)], cwd=str(exe_dir))
@@ -307,45 +307,45 @@ async def _run_lazarus_verify(
                 proc.kill()
                 proc.wait()
 
-            # 5. 检查 exception.log
+            # 5. Check exception.log
             if log_path.exists():
                 try:
                     from src.utils.detect_encoding import detect_encoding
                     enc = detect_encoding(str(log_path))
                     log_content = log_path.read_text(encoding=enc, errors='replace')
-                    logger.warning("运行时异常: %s", log_content[:200])
+                    logger.warning("Runtime exception: %s", log_content[:200])
                     return {"error": "runtime exception", "log": log_content}
                 except Exception as read_err:
                     return {"error": "runtime exception", "read_error": str(read_err)}
             else:
-                logger.info("运行验证通过")
+                logger.info("Runtime verification passed")
                 return {"passed": True}
 
         finally:
-            # 恢复原始文件
+            # Restore original files
             _restore_lazarus_files(str(lpi_path), str(lpr_path), backs)
 
     except Exception as e:
-        logger.warning("运行验证异常: %s", e, exc_info=True)
+        logger.warning("Runtime verification exception: %s", e, exc_info=True)
         return {"error": str(e)}
 
 
 async def _handle_lazarus_project(arguments: dict) -> dict:
-    """获取 Lazarus 项目信息
+    """Get Lazarus project information
 
-    解析 .lpi 文件，返回项目名称、主源文件、单元列表、编译器选项。
+    Parse the .lpi file and return the project name, main source file, unit list, and compiler options.
 
     Arguments:
-        project_path (str): .lpi 或 .lpr 文件路径 (必需)
-        action (str, optional): info / units / options，默认 info
+        project_path (str): .lpi or .lpr file path (required)
+        action (str, optional): info / units / options, default info
     """
     from src.utils.lpi_parser import LpiParser
 
     project_path = arguments.get("project_path", "")
     if not project_path:
-        return {"status": "failed", "error": "缺少必需参数: project_path"}
+        return {"status": "failed", "error": "Missing required parameter: project_path"}
 
-    # .lpr → 查找同名 .lpi
+    # .lpr → find same-name .lpi
     from pathlib import Path
     p = Path(project_path)
     lpi_path = project_path
@@ -356,14 +356,14 @@ async def _handle_lazarus_project(arguments: dict) -> dict:
         else:
             return {
                 "status": "failed",
-                "error": f"未找到与 {project_path} 对应的 .lpi 文件",
+                "error": f"No .lpi file found corresponding to {project_path}",
             }
 
     parser = LpiParser(lpi_path)
     if not parser.parse():
         return {
             "status": "failed",
-            "error": f"解析 .lpi 文件失败: {lpi_path}",
+            "error": f"Failed to parse .lpi file: {lpi_path}",
         }
 
     action = arguments.get("action", "info")
@@ -382,7 +382,7 @@ async def _handle_lazarus_project(arguments: dict) -> dict:
             "compiler_options": parser.get_compiler_options(),
         }
 
-    # 默认 info
+    # Default info
     info = parser.get_project_info()
     return {
         "status": "success",
@@ -396,26 +396,26 @@ async def _handle_lazarus_project(arguments: dict) -> dict:
 
 
 async def _handle_lazarus_kb(arguments: dict) -> dict:
-    """Lazarus/FPC 源码知识库
+    """Lazarus/FPC source knowledge base
 
-    索引和搜索 Lazarus LCL / FPC RTL 源码。使用独立的 ZVec 知识库
-    存储在 data/lazarus-knowledge-base/。
+    Index and search Lazarus LCL / FPC RTL source code. Uses an independent ZVec knowledge base
+    stored in data/lazarus-knowledge-base/.
 
     Actions:
-        build:   扫描 Lazarus 安装目录索引源码
-        search:  搜索已索引的源码（返回符号定义和用法）
-        stats:   知识库统计信息
-        read:    读取源码文件内容
+        build:   Scan the Lazarus installation directory and index source code
+        search:  Search indexed source code (returns symbol definitions and usages)
+        stats:   Knowledge base statistics
+        read:    Read source file contents
     """
     from pathlib import Path
 
     action = arguments.get("action", "search")
 
-    # 独立 KB 路径
+    # Independent KB path
     server_root = Path(__file__).resolve().parents[3]
     kb_dir = str(server_root / "data" / "lazarus-knowledge-base")
 
-    # ── 自动检测 Lazarus 源码目录 ──
+    # ── Auto-detect Lazarus source directories ──
     def _detect_source_dirs() -> List[dict]:
         from .detect import find_lazarus_source_dirs
         return find_lazarus_source_dirs()
@@ -430,7 +430,7 @@ async def _handle_lazarus_kb(arguments: dict) -> dict:
         if not sources:
             return {
                 "status": "failed",
-                "error": "未检测到 Lazarus/FPC 安装目录。请确认 Lazarus 安装在 C:\\lazarus",
+                "error": "No Lazarus/FPC installation directory detected. Please confirm Lazarus is installed at C:\\lazarus",
             }
 
         Path(kb_dir).mkdir(parents=True, exist_ok=True)
@@ -453,7 +453,7 @@ async def _handle_lazarus_kb(arguments: dict) -> dict:
                     "failed": result.get("failed", 0),
                 })
             except Exception as e:
-                logger.warning(f"扫描 {src['label']} 失败: {e}")
+                logger.warning(f"Failed to scan {src['label']}: {e}")
                 results.append({
                     "source": src["label"],
                     "path": src["path"],
@@ -474,7 +474,7 @@ async def _handle_lazarus_kb(arguments: dict) -> dict:
     if action == "search":
         query = arguments.get("query", "")
         if not query:
-            return {"status": "failed", "error": "缺少必需参数: query"}
+            return {"status": "failed", "error": "Missing required parameter: query"}
 
         top_k = min(int(arguments.get("top_k", 20)), 100)
         content_type = arguments.get("content_type")  # optional filter
@@ -483,7 +483,7 @@ async def _handle_lazarus_kb(arguments: dict) -> dict:
         if not kb_path.is_dir() or not any(kb_path.iterdir()):
             return {
                 "status": "failed",
-                "error": "Lazarus 知识库为空，请先执行 lazarus_kb(action=build)",
+                "error": "Lazarus knowledge base is empty. Please run lazarus_kb(action=build) first",
             }
 
         from src.services.knowledge_base.scan_generic_documents import (
@@ -499,7 +499,7 @@ async def _handle_lazarus_kb(arguments: dict) -> dict:
                 "query": query,
                 "count": 0,
                 "results": [],
-                "message": f"未找到匹配 '{query}' 的文档",
+                "message": f"No documents matching '{query}' found",
             }
 
         output = []
@@ -528,13 +528,13 @@ async def _handle_lazarus_kb(arguments: dict) -> dict:
     if action == "read":
         file_path = arguments.get("file_path")
         if not file_path:
-            return {"status": "failed", "error": "需要 file_path 参数"}
+            return {"status": "failed", "error": "file_path parameter is required"}
 
         p = Path(file_path)
         if not p.exists():
-            return {"status": "failed", "error": f"文件不存在: {file_path}"}
+            return {"status": "failed", "error": f"File does not exist: {file_path}"}
         try:
-            # BOM 自动检测：优先 UTF-8 BOM，fallback UTF-8
+            # BOM auto-detection: prefer UTF-8 BOM, fallback UTF-8
             raw = p.read_bytes()
             if raw[:3] == b'\xef\xbb\xbf':
                 text = raw[3:].decode('utf-8')
@@ -551,7 +551,7 @@ async def _handle_lazarus_kb(arguments: dict) -> dict:
                 "encoding": "utf-8",
             }
         except UnicodeDecodeError:
-            # Fallback: 系统默认编码
+            # Fallback: system default encoding
             try:
                 text = p.read_text(encoding="ansi")
                 return {
@@ -563,9 +563,9 @@ async def _handle_lazarus_kb(arguments: dict) -> dict:
                     "encoding": "ansi",
                 }
             except Exception as e2:
-                return {"status": "failed", "error": f"无法解码文件（尝试了 UTF-8/UTF-16/ANSI）: {e2}"}
+                return {"status": "failed", "error": f"Unable to decode file (tried UTF-8/UTF-16/ANSI): {e2}"}
         except Exception as e:
-            return {"status": "failed", "error": f"读取文件失败: {e}"}
+            return {"status": "failed", "error": f"Failed to read file: {e}"}
 
     # ── stats ──
     if action == "stats":
@@ -576,7 +576,7 @@ async def _handle_lazarus_kb(arguments: dict) -> dict:
                 "action": "stats",
                 "total_documents": 0,
                 "sources_available": _detect_source_dirs(),
-                "message": "知识库尚未构建。请执行 lazarus_kb(action=build)",
+                "message": "Knowledge base has not been built yet. Please run lazarus_kb(action=build)",
             }
 
         from src.services.knowledge_base.scan_generic_documents import (
@@ -595,18 +595,18 @@ async def _handle_lazarus_kb(arguments: dict) -> dict:
             "sources_available": _detect_source_dirs(),
         }
 
-    return {"status": "failed", "error": f"未知 action: {action}"}
+    return {"status": "failed", "error": f"Unknown action: {action}"}
 
 
 async def _handle_lazarus_file(arguments: dict) -> dict:
-    """Lazarus/FPC 文件读写工具（只读/写/备份，复用共享文件内核）
+    """Lazarus/FPC file read/write tool (read/write/backup only, reuses the shared file core)
 
     Actions:
-        read:    读取文件（BOM 自动检测）
-        write:   写入文件（edits=[...] 批量修改，自动备份到 __history）
-        backup:  手动创建备份到 __history
+        read:    Read file (BOM auto-detection)
+        write:   Write file (edits=[...] batch modifications, automatically backed up to __history)
+        backup:  Manually create a backup in __history
 
-    限制 action 范围，禁止 delphi_file 特有的 DFM/pasfmt/uses/grep 等操作。
+    Limits the action scope and disallows delphi_file-specific operations such as DFM/pasfmt/uses/grep.
     """
     from src.tools.file_tool import handle_file_tool
 
@@ -615,14 +615,14 @@ async def _handle_lazarus_file(arguments: dict) -> dict:
     if action not in allowed:
         return {
             "status": "failed",
-            "error": f"lazarus_file 不支持 action='{action}'。支持: {', '.join(sorted(allowed))}",
+            "error": f"lazarus_file does not support action='{action}'. Supported: {', '.join(sorted(allowed))}",
         }
 
     return await handle_file_tool(arguments)
 
 
 # ============================================================
-# 导出：工具名 → handler 映射
+# Exports: tool name → handler mapping
 # ============================================================
 
 LAZARUS_HANDLERS: dict[str, Any] = {
@@ -633,10 +633,10 @@ LAZARUS_HANDLERS: dict[str, Any] = {
 }
 
 LAZARUS_TOOL_DESCRIPTIONS: dict[str, str] = {
-    "lazarus_compile": "Lazarus/Free Pascal 项目编译 (lazbuild)",
-    "lazarus_project": "Lazarus 项目信息查询 — 解析 .lpi 文件，获取项目名称/主源文件/单元列表/编译器选项",
-    "lazarus_kb": "Lazarus/FPC 源码知识库 — 索引和搜索 LCL/FPC RTL 源码。build(构建)/search(搜索)/stats(统计)/read(读取源码)",
-    "lazarus_file": "Lazarus/FPC 文件读写 — read(读)/write(edits批量修改，自动备份)/backup(手动备份)",
+    "lazarus_compile": "Lazarus/Free Pascal project compilation (lazbuild)",
+    "lazarus_project": "Lazarus project information query — parse .lpi file and get project name/main source file/unit list/compiler options",
+    "lazarus_kb": "Lazarus/FPC source knowledge base — index and search LCL/FPC RTL source code. build(build)/search(search)/stats(statistics)/read(read source)",
+    "lazarus_file": "Lazarus/FPC file read/write — read(read)/write(edits batch modifications, automatic backup)/backup(manual backup)",
 }
 
 LAZARUS_TOOL_SCHEMAS: dict[str, dict] = {
@@ -645,7 +645,7 @@ LAZARUS_TOOL_SCHEMAS: dict[str, dict] = {
         "properties": {
             "project_path": {
                 "type": "string",
-                "description": ".lpi 或 .lpr 文件绝对路径",
+                "description": ".lpi or .lpr file absolute path",
             },
             "target_platform": {
                 "type": "string",
@@ -663,7 +663,7 @@ LAZARUS_TOOL_SCHEMAS: dict[str, dict] = {
             "run_verify": {
                 "type": "boolean",
                 "default": False,
-                "description": "编译成功后启动程序 3 秒验证是否崩溃",
+                "description": "After a successful build, launch the program for 3 seconds to verify it does not crash",
             },
         },
         "required": ["project_path"],
@@ -673,13 +673,13 @@ LAZARUS_TOOL_SCHEMAS: dict[str, dict] = {
         "properties": {
             "project_path": {
                 "type": "string",
-                "description": ".lpi 或 .lpr 文件绝对路径",
+                "description": ".lpi or .lpr file absolute path",
             },
             "action": {
                 "type": "string",
                 "enum": ["info", "units", "options"],
                 "default": "info",
-                "description": "info=项目概要, units=单元列表, options=编译器选项",
+                "description": "info=project summary, units=unit list, options=compiler options",
             },
         },
         "required": ["project_path"],
@@ -691,24 +691,24 @@ LAZARUS_TOOL_SCHEMAS: dict[str, dict] = {
                 "type": "string",
                 "enum": ["build", "search", "stats", "read"],
                 "default": "search",
-                "description": "build=构建知识库, search=搜索, stats=统计, read=读取源码",
+                "description": "build=build knowledge base, search=search, stats=statistics, read=read source code",
             },
             "query": {
                 "type": "string",
-                "description": "搜索关键词（action=search 时必需）",
+                "description": "Search keyword (required when action=search)",
             },
             "top_k": {
                 "type": "integer",
                 "default": 20,
-                "description": "返回结果数上限（默认20，最大100）",
+                "description": "Maximum number of returned results (default 20, max 100)",
             },
             "file_path": {
                 "type": "string",
-                "description": "源码文件绝对路径（action=read 时必需）",
+                "description": "Source file absolute path (required when action=read)",
             },
             "content_type": {
                 "type": "string",
-                "description": "按文件类型过滤（如 pas/inc/pp）",
+                "description": "Filter by file type (e.g. pas/inc/pp)",
             },
         },
     },
@@ -719,30 +719,31 @@ LAZARUS_TOOL_SCHEMAS: dict[str, dict] = {
                 "type": "string",
                 "enum": ["read", "write", "backup"],
                 "default": "read",
-                "description": "read=读取, write=写入(edits), backup=备份",
+                "description": "read=read, write=write(edits), backup=backup",
             },
             "file_path": {
                 "type": "string",
-                "description": "文件绝对路径",
+                "description": "File absolute path",
             },
             "edits": {
                 "type": "array",
-                "description": "批量编辑操作（write 时必需）",
+                "description": "Batch edit operations (required when write)",
                 "items": {
                     "type": "object",
                     "properties": {
-                        "start_line": {"type": "integer", "description": "起始行号（1-indexed 闭区间）"},
-                        "end_line": {"type": "integer", "description": "结束行号（1-indexed 闭区间）"},
-                        "content": {"type": "string", "description": "新内容"},
+                        "start_line": {"type": "integer", "description": "Start line number (1-indexed inclusive)"},
+                        "end_line": {"type": "integer", "description": "End line number (1-indexed inclusive)"},
+                        "content": {"type": "string", "description": "New content"},
                     },
                     "required": ["start_line"],
                 },
             },
             "encoding": {
                 "type": "string",
-                "description": "文件编码（不传则自动检测 BOM）",
+                "description": "File encoding (auto-detect BOM if omitted)",
             },
         },
         "required": ["action"],
     },
 }
+
