@@ -1,16 +1,16 @@
 """
-manage_component — 组件管理工具（增/删/改/生成 DFM + PAS 同步）
+manage_component — Component management tool (create/delete/modify/generate DFM + PAS sync)
 
-操作模式:
-  create  生成组件 DFM（原 generate_component_dfm 功能，编译+运行序列化）
-  add     向现有 DFM 添加子组件，同步 PAS 字段+事件+uses
-  remove  从 DFM 删除组件（含子树），同步删除 PAS 字段+事件方法
-  modify  修改 DFM 中组件属性，同步变更事件绑定时更新 PAS 声明
+Operation modes:
+  create  Generate component DFM (original generate_component_dfm functionality, compile + run serialization)
+  add     Add child component to existing DFM, sync PAS fields + events + uses
+  remove  Remove component from DFM (including subtree), sync removal of PAS fields + event methods
+  modify  Modify component properties in DFM, update PAS declarations when event bindings change
 
-DFM↔PAS 同步规则:
-  - add 时: 新字段声明 + 事件方法桩 + uses 单元
-  - remove 时: 字段声明 + 事件方法(声明+实现) + 空引用的 uses
-  - modify 时: 事件属性变更 → 增/删/改事件方法声明
+DFM↔PAS sync rules:
+  - add: new field declarations + event method stubs + uses units
+  - remove: field declarations + event methods (declaration + implementation) + uses with empty references
+  - modify: event property changes → add/delete/modify event method declarations
 """
 
 import os
@@ -95,7 +95,7 @@ async def manage_component(
             component_name=component_name, properties=properties,
         )
     else:
-        return {"status": "failed", "message": f"未知 action: {action}，支持 create/add/remove/modify"}
+        return {"status": "failed", "message": f"Unknown action: {action}, supported: create/add/remove/modify"}
 
 
 async def _action_create(
@@ -114,14 +114,14 @@ async def _action_create(
     if result.get("success"):
         return {
             "status": "success",
-            "message": "组件 DFM 生成成功",
+            "message": "Component DFM generated successfully",
             "action": "create",
             "dfm_text": result["dfm_text"],
             "component_name": result.get("component_name", ""),
         }
     return {
         "status": "failed",
-        "message": result.get("error", "生成失败"),
+        "message": result.get("error", "Generation failed"),
         "action": "create",
         "stage": result.get("stage", ""),
     }
@@ -137,22 +137,22 @@ async def _action_add(
     dfm_text: Optional[str],
 ) -> Dict[str, Any]:
     if not target_dfm:
-        return {"status": "failed", "message": "add 操作需要 target_dfm 参数"}
+        return {"status": "failed", "message": "add operation requires target_dfm parameter"}
     if not new_component_class and not dfm_text:
-        return {"status": "failed", "message": "add 操作需要 new_component_class 或 dfm_text 参数"}
+        return {"status": "failed", "message": "add operation requires new_component_class or dfm_text parameter"}
 
     existing_dfm = await _read_dfm_file(target_dfm)
     if existing_dfm is None:
-        return {"status": "failed", "message": f"无法读取 DFM 文件: {target_dfm}"}
+        return {"status": "failed", "message": f"Unable to read DFM file: {target_dfm}"}
 
     root = parse_dfm_text(existing_dfm)
     if root is None:
-        return {"status": "failed", "message": "DFM 解析失败"}
+        return {"status": "failed", "message": "DFM parsing failed"}
 
     if dfm_text:
         new_comp = parse_dfm_text(dfm_text)
         if new_comp is None:
-            return {"status": "failed", "message": "dfm_text 解析失败"}
+            return {"status": "failed", "message": "dfm_text parsing failed"}
     else:
         comp_name = new_component_name or _generate_default_name(root, new_component_class)
         new_comp = DfmComponent(
@@ -169,12 +169,12 @@ async def _action_add(
     if parent_name:
         parent = root.find_child(parent_name)
         if parent is None:
-            return {"status": "failed", "message": f"未找到父组件: {parent_name}"}
+            return {"status": "failed", "message": f"Parent component not found: {parent_name}"}
     else:
         parent = root
 
     if parent.find_child(new_comp.name):
-        return {"status": "failed", "message": f"组件名已存在: {new_comp.name}"}
+        return {"status": "failed", "message": f"Component name already exists: {new_comp.name}"}
 
     parent.children.append(new_comp)
 
@@ -188,7 +188,7 @@ async def _action_add(
         if pas_error:
             return {
                 "status": "failed",
-                "message": f"PAS 同步准备失败: {pas_error}",
+                "message": f"PAS sync preparation failed: {pas_error}",
                 "action": "add",
                 "component_name": new_comp.name,
             }
@@ -197,7 +197,7 @@ async def _action_add(
     if dfm_error:
         return {
             "status": "failed",
-            "message": f"写入 DFM 失败: {dfm_error}",
+            "message": f"Failed to write DFM: {dfm_error}",
             "action": "add",
             "component_name": new_comp.name,
         }
@@ -211,9 +211,9 @@ async def _action_add(
                 existing_dfm,
                 operation="rollback_dfm_add",
             )
-            message = f"写入 PAS 失败: {pas_error}；DFM 已恢复"
+            message = f"Failed to write PAS: {pas_error}; DFM has been restored"
             if rollback_error:
-                message = f"写入 PAS 失败: {pas_error}；DFM 恢复失败: {rollback_error}"
+                message = f"Failed to write PAS: {pas_error}; DFM restore failed: {rollback_error}"
             return {
                 "status": "failed",
                 "message": message,
@@ -225,7 +225,7 @@ async def _action_add(
 
     return {
         "status": "success",
-        "message": f"组件 {new_comp.name}({new_comp.class_name}) 已添加到 {parent.name}",
+        "message": f"Component {new_comp.name}({new_comp.class_name}) added to {parent.name}",
         "action": "add",
         "component_name": new_comp.name,
         "component_class": new_comp.class_name,
@@ -242,30 +242,30 @@ async def _action_remove(
     component_name: Optional[str],
 ) -> Dict[str, Any]:
     if not target_dfm:
-        return {"status": "failed", "message": "remove 操作需要 target_dfm 参数"}
+        return {"status": "failed", "message": "remove operation requires target_dfm parameter"}
     if not component_name:
-        return {"status": "failed", "message": "remove 操作需要 component_name 参数"}
+        return {"status": "failed", "message": "remove operation requires component_name parameter"}
 
     existing_dfm = await _read_dfm_file(target_dfm)
     if existing_dfm is None:
-        return {"status": "failed", "message": f"无法读取 DFM 文件: {target_dfm}"}
+        return {"status": "failed", "message": f"Unable to read DFM file: {target_dfm}"}
 
     root = parse_dfm_text(existing_dfm)
     if root is None:
-        return {"status": "failed", "message": "DFM 解析失败"}
+        return {"status": "failed", "message": "DFM parsing failed"}
 
     target = root.find_child(component_name)
     if target is None:
         if root.name == component_name:
-            return {"status": "failed", "message": "不能删除根组件，请使用其他工具替换整个 DFM"}
-        return {"status": "failed", "message": f"未找到组件: {component_name}"}
+            return {"status": "failed", "message": "Cannot delete root component; use another tool to replace the entire DFM"}
+        return {"status": "failed", "message": f"Component not found: {component_name}"}
 
     removed_events = collect_all_events(target)
     removed_class = target.class_name
     removed_children = [c.name for c in target.all_components()[1:]]
 
     if not root.remove_child(component_name):
-        return {"status": "failed", "message": f"删除组件失败: {component_name}"}
+        return {"status": "failed", "message": f"Failed to delete component: {component_name}"}
 
     new_dfm_text = serialize_component(root)
     dfm_before = existing_dfm.count('\n')
@@ -279,7 +279,7 @@ async def _action_remove(
     if dfm_error:
         return {
             "status": "failed",
-            "message": f"写入 DFM 失败: {dfm_error}",
+            "message": f"Failed to write DFM: {dfm_error}",
             "action": "remove",
             "component_name": component_name,
             "pas_sync": pas_result,
@@ -287,7 +287,7 @@ async def _action_remove(
 
     return {
         "status": "success",
-        "message": f"组件 {component_name}({removed_class}) 已删除",
+        "message": f"Component {component_name}({removed_class}) deleted",
         "action": "remove",
         "component_name": component_name,
         "component_class": removed_class,
@@ -306,26 +306,26 @@ async def _action_modify(
     properties: Optional[Dict[str, str]],
 ) -> Dict[str, Any]:
     if not target_dfm:
-        return {"status": "failed", "message": "modify 操作需要 target_dfm 参数"}
+        return {"status": "failed", "message": "modify operation requires target_dfm parameter"}
     if not component_name:
-        return {"status": "failed", "message": "modify 操作需要 component_name 参数"}
+        return {"status": "failed", "message": "modify operation requires component_name parameter"}
     if not properties:
-        return {"status": "failed", "message": "modify 操作需要 properties 参数"}
+        return {"status": "failed", "message": "modify operation requires properties parameter"}
 
     existing_dfm = await _read_dfm_file(target_dfm)
     if existing_dfm is None:
-        return {"status": "failed", "message": f"无法读取 DFM 文件: {target_dfm}"}
+        return {"status": "failed", "message": f"Unable to read DFM file: {target_dfm}"}
 
     root = parse_dfm_text(existing_dfm)
     if root is None:
-        return {"status": "failed", "message": "DFM 解析失败"}
+        return {"status": "failed", "message": "DFM parsing failed"}
 
     target = root.find_child(component_name)
     if target is None:
         if root.name == component_name:
             target = root
         else:
-            return {"status": "failed", "message": f"未找到组件: {component_name}"}
+            return {"status": "failed", "message": f"Component not found: {component_name}"}
 
     old_events = {p.name: p.value for p in target.get_events()}
     modified_props = []
@@ -359,7 +359,7 @@ async def _action_modify(
     if dfm_error:
         return {
             "status": "failed",
-            "message": f"写入 DFM 失败: {dfm_error}",
+            "message": f"Failed to write DFM: {dfm_error}",
             "action": "modify",
             "component_name": component_name,
             "pas_sync": pas_result,
@@ -367,7 +367,7 @@ async def _action_modify(
 
     return {
         "status": "success",
-        "message": f"组件 {component_name} 属性已修改",
+        "message": f"Properties of component {component_name} modified",
         "action": "modify",
         "component_name": component_name,
         "modified_properties": modified_props,
@@ -396,7 +396,7 @@ def _prepare_pas_for_add(
         with open(target_pas, 'r', encoding=enc, newline='') as f:
             pas_text = f.read()
     except OSError as e:
-        logger.warning("读取 PAS 文件失败: %s", e)
+        logger.warning("Failed to read PAS file: %s", e)
         return None, str(e)
 
     add_fields = [PasFieldDecl(name=new_comp.name, type_name=new_comp.class_name)]
@@ -436,7 +436,7 @@ def _prepare_pas_for_add(
     ]
     if missing_units:
         units_text = ", ".join(missing_units)
-        return None, f"无法将所需单元加入 interface uses: {units_text}"
+        return None, f"Unable to add required units to interface uses: {units_text}"
 
     added_units = [
         unit
@@ -445,7 +445,7 @@ def _prepare_pas_for_add(
     ]
     result = {
         "status": "success",
-        "message": "PAS 同步完成",
+        "message": "PAS sync completed",
         "added_fields": [f.name for f in add_fields],
         "added_methods": [m.name for m in add_methods],
         "added_uses": added_units,
@@ -471,14 +471,14 @@ def _write_pas_add_plan(plan: _PasAddPlan) -> Optional[str]:
         file_tool._replace_with_temp(temp_path, plan.file_path)
         return None
     except (OSError, UnicodeError) as e:
-        logger.warning("写入 PAS 文件失败: %s", e)
+        logger.warning("Failed to write PAS file: %s", e)
         return str(e)
     finally:
         if os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
             except OSError:
-                logger.debug("清理 PAS 临时文件失败: %s", temp_path)
+                logger.debug("Failed to clean up PAS temp file: %s", temp_path)
 
 
 def _sync_pas_for_remove(
@@ -491,7 +491,7 @@ def _sync_pas_for_remove(
         with open(target_pas, 'r', encoding=enc, newline='') as f:
             pas_text = f.read()
     except OSError as e:
-        logger.warning("读取 PAS 文件失败: %s", e)
+        logger.warning("Failed to read PAS file: %s", e)
         return {"status": "failed", "message": str(e)}
 
     remove_fields = [component_name]
@@ -519,7 +519,7 @@ def _sync_pas_for_remove(
         with open(target_pas, 'w', encoding=enc, newline='') as f:
             f.write(new_pas)
     except OSError as e:
-        logger.warning("写入 PAS 文件失败: %s", e)
+        logger.warning("Failed to write PAS file: %s", e)
         return {"status": "failed", "message": str(e)}
 
     pas_after = 0
@@ -531,7 +531,7 @@ def _sync_pas_for_remove(
 
     return {
         "status": "success",
-        "message": "PAS 同步完成",
+        "message": "PAS sync completed",
         "removed_fields": remove_fields,
         "removed_methods": remove_methods,
         "offset": pas_after - pas_before,
@@ -550,7 +550,7 @@ def _sync_pas_for_modify(
         with open(target_pas, 'r', encoding=enc, newline='') as f:
             pas_text = f.read()
     except OSError as e:
-        logger.warning("读取 PAS 文件失败: %s", e)
+        logger.warning("Failed to read PAS file: %s", e)
         return {"status": "failed", "message": str(e)}
 
     add_methods = []
@@ -572,7 +572,7 @@ def _sync_pas_for_modify(
             remove_methods.append(old_handler)
 
     if not add_methods and not remove_methods:
-        return {"status": "success", "message": "无事件变更，PAS 无需同步"}
+        return {"status": "success", "message": "No event changes; PAS sync not needed"}
 
     new_pas = sync_pas_declarations(
         pas_text,
@@ -596,7 +596,7 @@ def _sync_pas_for_modify(
         with open(target_pas, 'w', encoding=enc, newline='') as f:
             f.write(new_pas)
     except OSError as e:
-        logger.warning("写入 PAS 文件失败: %s", e)
+        logger.warning("Failed to write PAS file: %s", e)
         return {"status": "failed", "message": str(e)}
 
     pas_after = 0
@@ -608,7 +608,7 @@ def _sync_pas_for_modify(
 
     return {
         "status": "success",
-        "message": "PAS 同步完成",
+        "message": "PAS sync completed",
         "added_methods": [m.name for m in add_methods],
         "removed_methods": remove_methods,
         "offset": pas_after - pas_before,
@@ -635,7 +635,7 @@ async def _read_dfm_file(file_path: str) -> Optional[str]:
         with open(text_path, 'r', encoding='utf-8') as f:
             return f.read()
     except OSError as e:
-        logger.warning("读取 DFM 文件失败: %s", e)
+        logger.warning("Failed to read DFM file: %s", e)
         return None
 
 
@@ -653,7 +653,7 @@ async def _write_dfm_file(
             file_tool._write_text_temp(text_temp, new_text, "utf-8")
             conversion = await dfm_utils.convert_dfm(text_temp, temp_path, to_text=False)
             if not conversion.get("success"):
-                return str(conversion.get("message", "DFM 转换失败"))
+                return str(conversion.get("message", "DFM conversion failed"))
         else:
             file_tool._write_text_temp(temp_path, new_text, "utf-8")
 
@@ -665,7 +665,7 @@ async def _write_dfm_file(
         file_tool._replace_with_temp(temp_path, file_path)
         return None
     except (OSError, UnicodeError) as e:
-        logger.error("写入 DFM 文件失败: %s", e)
+        logger.error("Failed to write DFM file: %s", e)
         return str(e)
     finally:
         for cleanup_path in (text_temp, temp_path):
@@ -673,4 +673,4 @@ async def _write_dfm_file(
                 try:
                     os.remove(cleanup_path)
                 except OSError:
-                    logger.debug("清理 DFM 临时文件失败: %s", cleanup_path)
+                    logger.debug("Failed to clean up DFM temp file: %s", cleanup_path)

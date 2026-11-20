@@ -64,11 +64,11 @@ class TestSplitRepo:
         assert _split_repo("org/team/project") == ("org", "team/project")
 
     def test_invalid_no_slash(self):
-        with pytest.raises(ValueError, match="仓库格式应为 owner/repo"):
+        with pytest.raises(ValueError, match="Repository format should be owner/repo"):
             _split_repo("justname")
 
     def test_invalid_empty(self):
-        with pytest.raises(ValueError, match="仓库格式应为 owner/repo"):
+        with pytest.raises(ValueError, match="Repository format should be owner/repo"):
             _split_repo("")
 
 
@@ -117,12 +117,12 @@ class TestGitRun:
     def test_absolute_dir_must_exist(self, tmp_path):
         """_git_run should not silently create arbitrary absolute paths."""
         d = str(tmp_path / "nonexistent" / "deep")
-        with pytest.raises(ValueError, match="绝对路径不存在"):
+        with pytest.raises(ValueError, match="absolute path does not exist"):
             _git_run(d, "init")
         assert not os.path.exists(d)
 
     def test_relative_dir_cannot_escape_workspace(self):
-        with pytest.raises(ValueError, match="不能逃逸"):
+        with pytest.raises(ValueError, match="cannot escape"):
             _git_run("..", "status")
 
     def test_compact_git_status_porcelain(self):
@@ -1630,7 +1630,7 @@ class TestMirrorSubstitution:
             dir=str(missing),
         )
         assert r["status"] == "failed"
-        assert "绝对路径不存在" in r["message"]
+        assert "absolute path does not exist" in r["message"]
         mock_submit.assert_not_called()
 
     @patch("src.tools.code_hosting._submit_git_task")

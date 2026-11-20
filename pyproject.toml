@@ -53,7 +53,7 @@ embedding = [
 watcher = [
     "watchdog>=6.0.0",
 ]
-# 可选: OCR 图像文字识别 (PP-OCRv6, 纯 ONNX Runtime)
+# Optional: OCR image text recognition (PP-OCRv6, pure ONNX Runtime)
 ocr = [
     "onnxruntime>=1.18.0",
     "opencv-python-headless>=4.8.0",
@@ -61,23 +61,23 @@ ocr = [
     "pyclipper>=1.3.0",
     "shapely>=2.0.0",
 ]
-# 可选: OCR Intel CPU 加速 (替换 onnxruntime → onnxruntime-openvino)
+# Optional: OCR Intel CPU acceleration (replaces onnxruntime with onnxruntime-openvino)
 ocr-openvino = [
     "onnxruntime-openvino>=1.24.0",
 ]
-# 可选: Windows UIA (UI Automation) 浏览器 DOM 操作
+# Optional: Windows UIA (UI Automation) browser DOM operations
 uia = [
     "uiautomation>=2.0.0",
 ]
 
-# 可选: UI 布局检测（YOLOv11 ONNX 推理，零 PyTorch 依赖）
+# Optional: UI layout detection (YOLOv11 ONNX inference, zero PyTorch dependency)
 detection = [
     "onnxruntime>=1.18.0",
     "opencv-python-headless>=4.8.0",
     "numpy>=1.21.0",
 ]
 
-# 可选: YOLO 模型训练（含全量 PyTorch，仅训练时需要）
+# Optional: YOLO model training (includes full PyTorch, only needed for training)
 detection-train = [
     "detection",
     "ultralytics>=8.0.0",

@@ -1,61 +1,61 @@
-﻿<!-- @when: 需要管理自动化测试经验库，或了解经验检索/保存/融合机制时 -->
+<!-- @when: managing the automated-test experience base, or learning how experience is searched, saved and merged -->
 
-# 经验驱动优化闭环
+# Experience-Driven Optimisation Loop
 
-MCP resource URI: `delphi://automation/experience-loop`。
+MCP resource URI: `delphi://automation/experience-loop`.
 
-通过 `experience` 工具的检索/保存/合并能力，AI 持续从历史测试中学习。
+Through the search, save and merge capabilities of the `experience` tool, the AI keeps learning from historical tests.
 
-## G1. 优化循环
+## G1. Optimisation Loop
 
 ```
-┌─ ① 检索经验 ──────────────────┐
-│ 每次测试前搜索历史经验（top_k=3）│
+┌─ ① Retrieve experience ──────────────────┐
+│ Search historical experience before each test (top_k=3) │
 └──────────────┬─────────────────┘
                ↓
-┌─ ② 规划测试 ──────────────────┐
-│ 参考成功模式，避免历史失败模式    │
+┌─ ② Plan the test ──────────────────┐
+│ Refer to successful patterns and avoid historical failure patterns │
 └──────────────┬─────────────────┘
                ↓
-┌─ ③ 执行测试 ──────────────────┐
-│ 遇到失败 → 恢复模板 → 记录学习  │
+┌─ ③ Execute the test ──────────────────┐
+│ On failure → recovery template → record learning │
 └──────────────┬─────────────────┘
                ↓
-┌─ ④ 保存经验 ──────────────────┐
+┌─ ④ Save experience ──────────────────┐
 │ experience(action="save", ...) │
-│ 自动去重：相似度>0.85 合并      │
+│ Automatic deduplication: merge when similarity > 0.85 │
 └──────────────┬─────────────────┘
                ↓
-┌─ ⑤ 定期融合 ──────────────────┐
-│ merge 同类经验 → prune 低价值  │
+┌─ ⑤ Periodic merging ──────────────────┐
+│ merge similar experience → prune low-value entries │
 └──────────────┬─────────────────┘
                ↓
-              回到①
+              Back to ①
 ```
 
-**关键收益：**
-- 同样的错误不会犯第二次
-- 成功工具组合在同类场景复用
-- 多方经验汇聚为团队知识
-- 过期经验自动淘汰
+**Key benefits:**
+- The same mistake is never made twice
+- Successful tool combinations are reused in comparable scenarios
+- Experience gathered from many sources converges into team knowledge
+- Stale experience is retired automatically
 
-## G2. 经验检索策略
+## G2. Experience Search Strategy
 
-| 场景 | 推荐 query |
+| Scenario | Recommended query |
 |------|-----------|
-| 新用例规划 | "{应用名} {功能模块} 自动化测试" |
-| 执行失败恢复 | "{应用名} {失败操作} 失败恢复" |
-| 特定控件操作 | "{控件类型} {操作}" |
-| 弹窗处理 | "{弹窗标题} {应用名}" |
+| Planning a new test case | "{app name} {feature module} automated test" |
+| Recovering from an execution failure | "{app name} {failing operation} failure recovery" |
+| Operating a specific control | "{control type} {operation}" |
+| Handling a dialog | "{dialog title} {app name}" |
 
-**流程：** 精确查询（top_k=3）→ 结果<2 则放宽 query → 仍<2 用默认策略
+**Flow:** exact query (top_k=3) → fewer than 2 results, widen the query → still fewer than 2, fall back to the default strategy
 
-## G3. 经验融合
+## G3. Experience Merging
 
-当同类经验积累到 5+ 条或同一失败模式出现 3+ 次时融合：
+Merge when similar experience accumulates to 5+ entries, or the same failure pattern occurs 3+ times:
 
-1. `experience(search, query="{场景大类}", top_k=20)`
-2. `experience(merge, ids=[...], keep="最完整记录")`
-3. `experience(update, id="merged", ...)` 更新为抽象做法
+1. `experience(search, query="{scenario category}", top_k=20)`
+2. `experience(merge, ids=[...], keep="most complete record")`
+3. `experience(update, id="merged", ...)` to rewrite it as the abstract practice
 
-**抽象原则：** 不保存具体操作细节，保存通用模式。tags 覆盖各细分场景。
+**Abstraction rule:** store the general pattern, not the concrete operation details. Let `tags` cover each sub-scenario.

@@ -35,7 +35,7 @@ SOURCE_RULES_ROOT = Path(__file__).parent.parent / "resources" / "client-rules"
 DESCRIPTOR_NAME = "daofy-delphi.yaml"
 MANIFEST_NAME = ".daofy_client_rules_manifest.json"
 DAOFY_MANAGED_MARKER = "daofy-managed-rule: true"
-# 旧版(首次手动写入、无托管标记)也能识别为 Daofy 自有文件，便于自愈更新
+# Legacy versions (first manual write, no managed marker) are also recognized as Daofy-owned files for self-healing updates
 DAOFY_RULE_SIGNATURE = "必须用 Daofy 的 `delphi_file`"
 
 
@@ -55,18 +55,18 @@ def _resolve_home() -> Path:
 def _load_descriptor() -> Optional[dict[str, Any]]:
     descriptor_path = SOURCE_RULES_ROOT / DESCRIPTOR_NAME
     if not descriptor_path.is_file():
-        logger.warning("客户端规则描述符不存在: %s", descriptor_path)
+        logger.warning("Client rules descriptor does not exist: %s", descriptor_path)
         return None
     try:
         with descriptor_path.open(encoding="utf-8") as fh:
             data = yaml.safe_load(fh)
     except (OSError, yaml.YAMLError) as exc:
-        logger.warning("解析客户端规则描述符失败: %s", exc)
+        logger.warning("Failed to parse client rules descriptor: %s", exc)
         return None
     if not isinstance(data, dict):
-        logger.warning("客户端规则描述符格式无效: %s", descriptor_path)
+        logger.warning("Invalid client rules descriptor format: %s", descriptor_path)
         return None
-    # 描述符以 `rule:` 为根节点，扁平化取其子树
+    # The descriptor uses `rule:` as the root node; flatten and take its subtree
     return data.get("rule", data)
 
 
@@ -120,7 +120,7 @@ def _build_rule_bytes(desc: dict[str, Any], entry: dict[str, Any]) -> Optional[b
         return None
     source_path = SOURCE_RULES_ROOT / rule_file
     if not source_path.is_file():
-        logger.warning("规则源文件不存在: %s", source_path)
+        logger.warning("Rule source file does not exist: %s", source_path)
         return None
     text = source_path.read_text(encoding="utf-8")
 
@@ -147,28 +147,28 @@ def install_client_rules(client_params: Any) -> dict[str, Any]:
                               "action": None, "message": ""}
     if not is_client_rules_install_enabled():
         result["status"] = "disabled"
-        result["message"] = "客户端规则自动安装已关闭 (DAOFY_CLIENT_RULES_INSTALL)"
+        result["message"] = "Client rules auto-install is disabled (DAOFY_CLIENT_RULES_INSTALL)"
         logger.info(result["message"])
         return result
 
     desc = _load_descriptor()
     if desc is None:
         result["status"] = "error"
-        result["message"] = "无法加载客户端规则描述符"
+        result["message"] = "Unable to load client rules descriptor"
         return result
 
     client_name = detect_client(client_params)
     result["client"] = client_name
     if not client_name:
         result["status"] = "unknown_client"
-        result["message"] = "未识别到 MCP 客户端名称，跳过规则安装"
+        result["message"] = "MCP client name not recognized; skipping rule installation"
         logger.info(result["message"])
         return result
 
     entry = _match_rule_entry(desc, client_name)
     if entry is None:
         result["status"] = "no_match"
-        result["message"] = f"客户端 '{client_name}' 无对应规则目录映射，跳过"
+        result["message"] = f"Client '{client_name}' has no corresponding rules directory mapping; skipping"
         logger.info(result["message"])
         return result
 
@@ -176,7 +176,7 @@ def install_client_rules(client_params: Any) -> dict[str, Any]:
     rules_dir = _rules_dir_for(entry, home)
     if rules_dir is None:
         result["status"] = "no_dir"
-        result["message"] = "无法确定规则目录"
+        result["message"] = "Unable to determine rules directory"
         return result
 
     managed_filename = (
@@ -191,7 +191,7 @@ def install_client_rules(client_params: Any) -> dict[str, Any]:
     rule_bytes = _build_rule_bytes(desc, entry)
     if rule_bytes is None:
         result["status"] = "error"
-        result["message"] = "无法生成规则内容"
+        result["message"] = "Unable to generate rule content"
         return result
 
     manifest_path = rules_dir / MANIFEST_NAME
@@ -204,7 +204,7 @@ def install_client_rules(client_params: Any) -> dict[str, Any]:
         if destination_hash == source_hash:
             result["status"] = "current"
             result["action"] = "none"
-            result["message"] = f"客户端规则已是最新: {destination_file}"
+            result["message"] = f"Client rules are up to date: {destination_file}"
             _record_manifest(manifest_path, managed_filename, source_hash)
             return result
 
@@ -214,7 +214,7 @@ def install_client_rules(client_params: Any) -> dict[str, Any]:
         if not can_update:
             result["status"] = "skipped"
             result["action"] = "skip_user_edited"
-            result["message"] = f"用户已修改规则文件，保留不覆盖: {destination_file}"
+            result["message"] = f"User has modified the rule file; keeping it without overwriting: {destination_file}"
             logger.info(result["message"])
             return result
 
@@ -222,7 +222,7 @@ def install_client_rules(client_params: Any) -> dict[str, Any]:
         _record_manifest(manifest_path, managed_filename, source_hash)
         result["status"] = "updated"
         result["action"] = "updated"
-        result["message"] = f"客户端规则已更新: {destination_file}"
+        result["message"] = f"Client rules updated: {destination_file}"
         logger.info(result["message"])
         return result
 
@@ -230,7 +230,7 @@ def install_client_rules(client_params: Any) -> dict[str, Any]:
     _record_manifest(manifest_path, managed_filename, source_hash)
     result["status"] = "installed"
     result["action"] = "installed"
-    result["message"] = f"客户端规则已安装: {destination_file}"
+    result["message"] = f"Client rules installed: {destination_file}"
     logger.info(result["message"])
     return result
 
@@ -252,7 +252,7 @@ def _load_manifest(manifest_path: Path) -> dict[str, Any]:
     try:
         return json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        logger.warning("客户端规则 manifest 无法读取，按首次处理: %s", manifest_path)
+        logger.warning("Unable to read client rules manifest; treating as first run: %s", manifest_path)
         return {}
 
 
@@ -277,3 +277,4 @@ def _looks_daofy_managed(path: Path) -> bool:
         return False
     head = text[:4096]
     return DAOFY_MANAGED_MARKER in head or DAOFY_RULE_SIGNATURE in head
+

@@ -1,60 +1,61 @@
-﻿<!-- @when: 写 Delphi 代码前，确认编码/命名/格式规范 -->
+<!-- @when: Before writing Delphi code, confirm coding/naming/formatting conventions -->
 <!-- @chain: before=delphi-file-rules.md, after=workflow.md -->
 
-## ③ 写 Delphi 代码
+## ③ Writing Delphi Code
 
-**卡点入口**：遇到错误、方案不确定、反复试同一方案 → 先查 ⑩ 前置自检。
+**Blocker entry point**: When encountering an error, being unsure of the solution, or repeatedly trying the same solution → first check ⑩ Pre-flight self-check.
 
-### 文件编码（修改前必做）
-- 修改前先确认文件编码，避免中文乱码
-- Delphi 文件必须用 `delphi_file` 读写/搜索/正则匹配+替换，不要用内置 `Read/Edit/Write/grep`
-- ⭐ 优先用 `delphi_file(action="read", file_path=...)`（自动检测编码/BOM/GBK）
-- 写回时保持原始编码；新建文件统一 `utf-8-sig`（UTF-8 with BOM，消除 W1057 警告）
-- 含 BOM 的文件保留 BOM
+### File Encoding (required before modification)
+- Confirm the file encoding before modification to avoid garbled Chinese
+- Delphi files must be read/written/searched/regex-matched+replaced with `delphi_file`; do not use built-in `Read/Edit/Write/grep`
+- ⭐ Prefer `delphi_file(action="read", file_path=...)` (auto-detects encoding/BOM/GBK)
+- Preserve the original encoding when writing back; use `utf-8-sig` for new files (UTF-8 with BOM, eliminates W1057 warnings)
+- Preserve BOM for files that contain BOM
 
-### 自动备份
-- `delphi_file(action="write", backup=True)` 默认自动备份到 `__history/`
-- ❌ 禁止直接用 Agent 内置 Read/Edit/Write/grep、shell/Python 修改/搜索 `.pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx/.groupproj`
-- 手动操作：
+### Automatic Backup
+- `delphi_file(action="write", backup=True)` automatically backs up to `__history/` by default
+- ❌ Do not directly use Agent built-in Read/Edit/Write/grep, shell/Python to modify/search `.pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx/.groupproj`
+- Manual operations:
   ```python
-  delphi_file(action="backup", file_path="src/Unit1.pas")                                # 手动备份
-  delphi_file(action="backup", backup_action="list", file_path="src/Unit1.pas")          # 列出版本
+  delphi_file(action="backup", file_path="src/Unit1.pas")                                # Manual backup
+  delphi_file(action="backup", backup_action="list", file_path="src/Unit1.pas")          # List versions
   delphi_file(action="backup", backup_action="restore", file_path="src/Unit1.pas", version=3)
   ```
 
-### 命名规则
-| 类别 | 约定 | 示例 |
+### Naming Rules
+| Category | Convention | Example |
 |------|------|------|
-| 类/接口/异常 | T/I/E/P 前缀 | `TMyClass`, `IMyInterface` |
-| 字段 | F 前缀 | `FName: string;` |
-| 属性/方法 | 大驼峰 | `property Name` / `procedure CalculateTotal` |
-| 事件 | On→Form 后缀 | `Form1Create` |
-| 参数 | A 前缀 | `procedure SetName(AName: string);` |
-| 枚举 | 类型前缀缩写 | `taLeft, taRight, taCenter` |
-| 常量 | 全大写 | `MAX_BUFFER_SIZE` |
+| Class/Interface/Exception | T/I/E/P prefix | `TMyClass`, `IMyInterface` |
+| Field | F prefix | `FName: string;` |
+| Property/Method | UpperCamelCase | `property Name` / `procedure CalculateTotal` |
+| Event | On→Form suffix | `Form1Create` |
+| Parameter | A prefix | `procedure SetName(AName: string);` |
+| Enum | Type prefix abbreviation | `taLeft, taRight, taCenter` |
+| Constant | ALL CAPS | `MAX_BUFFER_SIZE` |
 
-### 格式
-- 缩进 2 空格，行宽 ≤120
-- `begin` 独占一行；运算符/逗号后加空格，括号内侧不加
-- `uses` 分组 + 组尾注释 + 组内字母序
+### Formatting
+- Indent 2 spaces, line width ≤120
+- `begin` on its own line; spaces after operators/commas, none inside parentheses
+- `uses` grouped + group-end comments + alphabetical within groups
 
-### 泛型
-- 描述性参数名 `TKey, TValue`；多约束 `where` 一行一条
-- 嵌套 ≥3 层用 type alias：`type TStringArrayList = TArray<TList<string>>`
+### Generics
+- Descriptive parameter names `TKey, TValue`; one constraint per line in `where`
+- Use a type alias for nesting ≥3 levels: `type TStringArrayList = TArray<TList<string>>`
 
-### 运算符重载
-- 仅对 record 定义；语义须符合直觉
-- 定义 `Implicit`/`Explicit` 时同时提供命名转换方法
+### Operator Overloading
+- Define only for records; semantics must be intuitive
+- When defining `Implicit`/`Explicit`, also provide named conversion methods
 
-### 异步与多线程
-- UI 控件访问须主线程同步；共享资源加锁
-- 任务取消/失败时清理资源；避免异步回调直接引用对象
+### Async and Multithreading
+- UI control access must be synchronized on the main thread; lock shared resources
+- Clean up resources when tasks are canceled/fail; avoid async callbacks directly referencing objects
 
-### 代码组织
-- 单元 ≤500 行，单一职责
-- `interface`：uses → 类型 → 常量 → 变量 → 声明
-- `implementation`：uses → 辅助函数 → 接口实现
+### Code Organization
+- Unit ≤500 lines, single responsibility
+- `interface`: uses → types → constants → variables → declarations
+- `implementation`: uses → helper functions → interface implementations
 
-### 版本兼容
-- 跨版本差异用条件编译包裹并标注版本号
-- 用新版 API 时提供旧版本回退实现
+### Version Compatibility
+- Wrap cross-version differences in conditional compilation and note version numbers
+- When using new APIs, provide fallback implementations for older versions
+

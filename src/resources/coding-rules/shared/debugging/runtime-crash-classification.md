@@ -1,53 +1,55 @@
-<!-- @when: 程序运行时崩溃，需分类排查根因 -->
+<!-- @when: The program crashes at runtime and the root cause must be classified and investigated -->
 <!-- @chain: before=escalation-checkpoints.md, after=post-mortem.md -->
 
-### 8.13 运行时崩溃分类排查
+### 8.13 Runtime Crash Classification and Troubleshooting
 
-Delphi 运行时崩溃有 4 种不同根因模式：
+Delphi runtime crashes have 4 distinct root-cause patterns:
 
-#### 8.13.1 A：AV — 接口引用计数问题
-**特征**：调用接口方法时 AV，调用对象方法正常。
-**排查**：
-① 确认是否接口调用（调用栈是否经过 Interface Dispatch）
-② 检查接口来源：是否从已 Free 的对象获取？跨线程传递？
-③ 修复：确保对象生命周期 ≥ 接口使用周期；或弱引用
+#### 8.13.1 A: AV — Interface Reference Counting Issues
+**Characteristics**: AV when calling an interface method; calling object methods works normally.
+**Troubleshooting**:
+① Confirm whether it is an interface call (does the call stack go through Interface Dispatch?)
+② Check the interface source: was it obtained from an already Freed object? Passed across threads?
+③ Fix: ensure the object lifetime ≥ the interface usage lifetime; or use a weak reference
 
-#### 8.13.2 B：AV — TComponent 所有权违规
-**特征**：Form 关闭后或析构链中 AV。
-**排查**：
-① 检查 AV 地址对应的源码行
-② 确认组件是否已 Free
-③ 检查事件注册/注销是否配对（Timer/Socket 回调访问已释放对象）
-④ 修复：OnDestroy 注销回调；检查 Assigned(Self)/csDestroying
+#### 8.13.2 B: AV — TComponent Ownership Violation
+**Characteristics**: AV after a Form closes or in the destruction chain.
+**Troubleshooting**:
+① Check the source line corresponding to the AV address
+② Confirm whether the component has already been Freed
+③ Check whether event registration/unregistration is paired (Timer/Socket callbacks accessing a released object)
+④ Fix: unregister callbacks in OnDestroy; check Assigned(Self)/csDestroying
 
-#### 8.13.3 C：DFM 流式错误
-**特征**：打开 Form 报错或运行期 DFM 流化异常。
-**排查**：
+#### 8.13.3 C: DFM Streaming Errors
+**Characteristics**: Error when opening a Form or a DFM streaming exception at runtime.
+**Troubleshooting**:
 ```
-Class TMyFrame not found      → 缺 uses 或未 RegisterClass
-Property Caption does not exist → DFM 属性名拼写或类型不匹配
-Error reading X: ...          → 二进制数据损坏或版本不兼容
+Class TMyFrame not found      → missing uses or RegisterClass not called
+Property Caption does not exist → DFM property name spelling or type mismatch
+Error reading X: ...          → binary data corrupted or version incompatible
 ```
-① 检查 uses 子句、RegisterClass、DFM 类名与 PAS 一致
-② published 区声明、属性名/类型匹配
-③ DFM 损坏 → 另存为文本 DFM 或从 __history 恢复
+① Check that the uses clause, RegisterClass, and DFM class name match the PAS
+② published section declarations, property name/type matching
+③ DFM corruption → save as text DFM or restore from __history
 
-#### 8.13.4 D：包/动态库加载错误
-**特征**：启动或加载 BPL/DLL 时报错。
+#### 8.13.4 D: Package/Dynamic Library Loading Errors
+**Characteristics**: Error when starting or loading a BPL/DLL.
 ```
-"Cannot load package XXX"       → BPL 不在路径或版本不匹配
-"entry point YYY not found"    → 导出函数签名不匹配
-"Runtime error 216/217"        → 初始化异常
+"Cannot load package XXX"       → BPL not on path or version mismatch
+"entry point YYY not found"    → exported function signature mismatch
+"Runtime error 216/217"        → initialization exception
 ```
-排查：check_environment → delphi_project(info) → 检查 PATH/RuntimePackages
+Troubleshooting: check_environment → delphi_project(info) → check PATH/RuntimePackages
 
-#### 8.13.5 崩溃分类决策树
+#### 8.13.5 Crash Classification Decision Tree
 ```
-运行时崩溃
- ├─ 异常类型明确 → 跳对应 A/B/C/D
- ├─ 调用栈经过 Interface Dispatch → A
- ├─ 在 TComponent.Notification/Form 析构 → B
- ├─ 含 "Class not found"/"Property" → C
- ├─ 含 "Cannot load package"/"entry point"/"216"/"217" → D
- └─ 无法分类 → StackTrace.pas 获取完整调用栈后重分类
+Runtime crash
+ ├─ Exception type is clear → jump to corresponding A/B/C/D
+ ├─ Call stack goes through Interface Dispatch → A
+ ├─ In TComponent.Notification/Form destruction → B
+ ├─ Contains "Class not found"/"Property" → C
+ ├─ Contains "Cannot load package"/"entry point"/"216"/"217" → D
+ └─ Cannot classify → use StackTrace.pas to get full call stack, then reclassify
 ```
+
+

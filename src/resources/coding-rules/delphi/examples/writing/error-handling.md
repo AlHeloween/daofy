@@ -1,56 +1,56 @@
-# 错误处理示例
+# Error Handling Examples
 
-## 核心原则
+## Core Principles
 
-- `try...finally` 用于**资源释放**（文件/句柄/锁/内存）
-- `try...except` 用于**异常处理**（转换/记录/重抛）
-- `except` 内至少记录日志，**禁止空块吞异常**
-- 用具体异常类型捕获，避免裸 `except`
+- `try...finally` is for **resource release** (files/handles/locks/memory)
+- `try...except` is for **exception handling** (conversion/logging/rethrowing)
+- Inside `except`, at least log; **empty blocks that swallow exceptions are forbidden**
+- Catch specific exception types; avoid bare `except`
 
-## 资源释放：try...finally
+## Resource Release: try...finally
 
 ```pascal
-// ✅ 资源获取后立即 try，finally 中释放
+// ✅ Immediately enter try after acquiring the resource; release in finally
 var
   LFile: TFileStream;
 begin
   LFile := TFileStream.Create(AFileName, fmOpenRead);
   try
-    // 读取逻辑（异常也会走到 finally）
+    // Read logic (exceptions also reach finally)
     ProcessStream(LFile);
   finally
-    LFile.Free;   // 无论正常/异常路径都释放
+    LFile.Free;   // Release on both normal and exception paths
   end;
 end;
 ```
 
-## 异常处理：try...except
+## Exception Handling: try...except
 
 ```pascal
-// ✅ 捕获具体异常类型 + 记录日志
+// ✅ Catch specific exception types + log
 try
   SaveToDatabase(ACustomer);
 except
   on E: EDatabaseError do
   begin
     Logger.Error('保存客户失败: ' + E.Message);
-    raise;  // 需要上层处理时重抛
+    raise;  // Rethrow when upper layer needs to handle it
   end;
   on E: Exception do
     Logger.Error('未知错误: ' + E.Message);
 end;
 ```
 
-## 反模式
+## Anti-patterns
 
 ```pascal
-// ❌ 空 except 吞异常 —— 问题被静默掩盖，极难排查
+// ❌ Empty except swallows exceptions — problems are silently hidden and very hard to troubleshoot
 try
   DoSomething;
 except
 end;
 
-// ✅ 至少记录日志（尽量用具体异常类型，参考上方 try...except 示例）
+// ✅ At least log (use specific exception types where possible; see the try...except example above)
 try
   DoSomething;
 except
@@ -58,7 +58,7 @@ except
     Logger.Error('DoSomething 失败: ' + E.Message);
 end;
 
-// ❌ 裸 except 捕获一切，掩盖编程错误（范围过宽）
+// ❌ Bare except catches everything, masking programming errors (too broad)
 try
   DoSomething;
 except
@@ -67,14 +67,14 @@ except
 end;
 ```
 
-## 防御式检查
+## Defensive Checks
 
 ```pascal
-// ✅ 前置条件校验，快速失败
+// ✅ Validate preconditions and fail fast
 if AFileName = '' then
   raise EArgumentException.Create('AFileName 不能为空');
 
-// ✅ 枚举/子范围 case 全覆盖（默认分支 raise）
+// ✅ Full coverage of enum/subrange case (default branch raises)
 case AAlign of
   taLeft:   DoLeft;
   taRight:  DoRight;
@@ -84,10 +84,11 @@ else
 end;
 ```
 
-## 检查清单
+## Checklist
 
-- [ ] 资源获取后是否立即 `try`，`finally` 是否释放
-- [ ] `except` 是否为空块（禁止）
-- [ ] 是否捕获了具体异常类型而非裸 `except`
-- [ ] 错误信息是否包含足够的上下文（变量值/调用参数）
-- [ ] 是否需要 `raise` 重抛给上层处理
+- [ ] Is `try` entered immediately after acquiring the resource, and is it released in `finally`?
+- [ ] Is `except` an empty block (forbidden)?
+- [ ] Are specific exception types caught rather than bare `except`?
+- [ ] Do error messages include enough context (variable values/call parameters)?
+- [ ] Does it need `raise` to rethrow to the upper layer?
+

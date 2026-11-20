@@ -1,8 +1,8 @@
 """
-pasfmt 代码格式化工具
+pasfmt code formatting tool
 
-提供 Delphi 代码格式化功能，使用 pasfmt 工具进行代码格式化
-包括下载、安装和配置功能
+Provides Delphi code formatting using the pasfmt tool
+Includes download, installation, and configuration features
 """
 
 import os
@@ -60,13 +60,13 @@ except ImportError:
 
 logger = get_logger(__name__)
 
-# pasfmt 可执行文件路径
+# pasfmt executable path
 _PASFMT_PATH: Optional[str] = None
 
-# uses 子句风格: "compact"=合并为一行, "pasfmt_default"=保留 pasfmt 每行一个
+# uses clause style: "compact"=merge into one line, "pasfmt_default"=keep pasfmt one per line
 _USES_STYLE: str = "compact"
 
-# 下载源配置
+# Download source configuration
 PASFMT_DOWNLOAD_SOURCES = [
     {
         "name": "GitHub",
@@ -83,7 +83,7 @@ PASFMT_DOWNLOAD_SOURCES = [
     }
 ]
 
-# pasfmt-rad 下载源配置
+# pasfmt-rad download source configuration
 PASFMT_RAD_DOWNLOAD_SOURCES = [
     {
         "name": "GitHub",
@@ -100,7 +100,7 @@ PASFMT_RAD_DOWNLOAD_SOURCES = [
     }
 ]
 
-# 源码编译配置
+# Source build configuration
 PASFMT_SOURCE_REPOSITORIES = [
     {
         "name": "GitHub",
@@ -133,7 +133,7 @@ PASFMT_RAD_SOURCE_REPOSITORIES = [
     }
 ]
 
-# Delphi 版本映射
+# Delphi version mapping
 DELPHI_VERSIONS = {
     "11": {"name": "Alexandria", "bpl_32": "Pasfmt_11_Alexandria.bpl", "bpl_64": None},
     "12": {"name": "Athens", "bpl_32": "Pasfmt_12_Athens.bpl", "bpl_64": "Pasfmt_12_Athens_64.bpl"},
@@ -175,71 +175,71 @@ def _pasfmt_rad_candidate_dirs(delphi_version: str) -> list[str]:
 
 
 def set_pasfmt_path(path: str):
-    """设置 pasfmt 可执行文件路径"""
+    """Set pasfmt executable path"""
     global _PASFMT_PATH
     _PASFMT_PATH = path
-    logger.info(f"设置 pasfmt 路径: {path}")
+    logger.info(f"Set pasfmt path: {path}")
 
 
 def get_pasfmt_path() -> Optional[str]:
-    """获取 pasfmt 可执行文件路径"""
+    """Get pasfmt executable path"""
     global _PASFMT_PATH
     
     if _PASFMT_PATH:
         return _PASFMT_PATH
     
-    # 尝试从环境变量获取
+    # Try to get from environment variable
     env_path = os.environ.get('PASFMT_PATH')
     if env_path and os.path.exists(env_path):
         _PASFMT_PATH = env_path
         return _PASFMT_PATH
     
-    # 尝试从 PATH 环境变量搜索
+    # Try to search from PATH environment variable
     path_in_path = shutil.which('pasfmt') or shutil.which('pasfmt.exe')
     if path_in_path:
         _PASFMT_PATH = path_in_path
-        logger.info(f"找到 pasfmt 在 PATH 中: {path_in_path}")
+        logger.info(f"Found pasfmt in PATH: {path_in_path}")
         return path_in_path
     
-    # 尝试从默认安装位置获取
+    # Try to get from default installation location
     default_paths = _pasfmt_default_paths()
     
     for path in default_paths:
         if os.path.exists(path):
             _PASFMT_PATH = path
-            logger.info(f"找到 pasfmt 在默认位置: {path}")
+            logger.info(f"Found pasfmt in default location: {path}")
             return path
     
-    logger.warning("未找到 pasfmt 可执行文件")
+    logger.warning("pasfmt executable not found")
     return None
 
 
 def set_uses_style(style: str) -> None:
-    """设置 uses 子句风格: "compact"=合并为一行, "pasfmt_default"=保留 pasfmt 原样"""
+    """Set uses clause style: "compact"=merge into one line, "pasfmt_default"=keep pasfmt as-is"""
     global _USES_STYLE
     if style not in ("compact", "pasfmt_default"):
-        logger.warning(f"未知的 uses_style: {style}，使用默认 compact")
+        logger.warning(f"Unknown uses_style: {style}, using default compact")
         _USES_STYLE = "compact"
     else:
         _USES_STYLE = style
-        logger.info(f"设置 uses 风格: {style}")
+        logger.info(f"Set uses style: {style}")
 
 
 def get_uses_style() -> str:
-    """获取当前 uses 子句风格设置"""
+    """Get current uses clause style setting"""
     return _USES_STYLE
 
 
 def _compact_uses_clause(content: str) -> str:
     """
-    将 pasfmt 展开的多行 uses 子句压缩回单行。
+    Compress pasfmt-expanded multi-line uses clauses back into a single line.
 
-    pasfmt 默认:
+    pasfmt default:
       uses
         System.SysUtils,
         System.Classes;
 
-    压缩后:
+    After compression:
       uses System.SysUtils, System.Classes;
     """
     lines = content.split('\n')
@@ -249,7 +249,7 @@ def _compact_uses_clause(content: str) -> str:
         line = lines[i]
         trimmed = line.strip()
 
-        # 检测独占一行的 "uses"（pasfmt 风格）
+        # Detect "uses" on its own line (pasfmt style)
         if trimmed.lower() == 'uses' and not trimmed.endswith(';'):
             items = []
             j = i + 1
@@ -257,7 +257,7 @@ def _compact_uses_clause(content: str) -> str:
                 next_line = lines[j]
                 next_trimmed = next_line.strip()
 
-                # 空行或非缩进行 = uses 块结束
+                # Blank line or non-indented line = end of uses block
                 if not next_trimmed or not (next_line.startswith(' ') or next_line.startswith('\t')):
                     break
 
@@ -267,7 +267,7 @@ def _compact_uses_clause(content: str) -> str:
 
                 if next_trimmed.endswith(';'):
                     j += 1
-                    break  # 分号结束
+                    break  # End with semicolon
                 j += 1
 
             if items:
@@ -291,24 +291,24 @@ async def format_file(
     uses_style: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    格式化 Delphi 源代码文件
+    Format a Delphi source code file
 
     Args:
-        file_path: 要格式化的 Delphi 文件路径
-        config_path: pasfmt 配置文件路径（可选）
-        backup: 是否创建备份文件（在 __history 目录下）
-        in_place: 是否原地格式化（修改原文件）
-        dry_run: 仅检查格式，不实际修改文件
-        uses_style: uses 子句风格，None=使用全局设置, "compact"=合并为一行, "pasfmt_default"=保留 pasfmt 原样
+        file_path: Path to the Delphi file to format
+        config_path: pasfmt configuration file path (optional)
+        backup: Whether to create a backup file (under the __history directory)
+        in_place: Whether to format in place (modify the original file)
+        dry_run: Only check formatting, do not actually modify the file
+        uses_style: uses clause style, None=use global setting, "compact"=merge into one line, "pasfmt_default"=keep pasfmt as-is
 
     Returns:
-        格式化结果字典
+        Formatting result dictionary
     """
-    logger.info(f"收到格式化请求: {file_path}")
+    logger.info(f"Received formatting request: {file_path}")
     
-    # 检查文件是否存在
+    # Check whether file exists
     if not os.path.exists(file_path):
-        error_msg = f"文件不存在: {file_path}"
+        error_msg = f"File does not exist: {file_path}"
         logger.error(error_msg)
         return {
             "status": "failed",
@@ -317,12 +317,12 @@ async def format_file(
             "formatted": False
         }
     
-    # 获取 pasfmt 路径
+    # Get pasfmt path
     pasfmt_path = get_pasfmt_path()
     if not pasfmt_path:
         error_msg = (
-            "pasfmt 未安装。下载地址: https://github.com/integrated-application-development/pasfmt/releases\n"
-            "由 AI Agent 根据操作系统下载最新版本并安装"
+            "pasfmt is not installed. Download URL: https://github.com/integrated-application-development/pasfmt/releases\n"
+            "The AI Agent should download and install the latest version for the operating system"
         )
         logger.error(error_msg)
         return {
@@ -332,22 +332,22 @@ async def format_file(
             "formatted": False
         }
     
-    # 检测文件编码（使用公共函数）
+    # Detect file encoding (using common function)
     encoding = _detect_encoding(file_path)
     
-    # 创建备份（使用公共函数）
+    # Create backup (using common function)
     backup_path = None
     if backup:
         backup_path = _create_backup(file_path)
     
-    # 构建 pasfmt 命令
+    # Build pasfmt command
     cmd = [pasfmt_path]
     
-    # 添加配置文件参数
+    # Add config file argument
     if config_path and os.path.exists(config_path):
         cmd.extend(["--config-file", config_path])
     
-    # 添加模式参数
+    # Add mode argument
     if dry_run:
         cmd.extend(["--mode", "check"])
     elif in_place:
@@ -355,39 +355,39 @@ async def format_file(
     else:
         cmd.extend(["--mode", "stdout"])
     
-    # 添加输入文件
+    # Add input file
     cmd.append(file_path)
     
     try:
-        # 执行 pasfmt
-        logger.info(f"执行命令: {' '.join(cmd)}")
+        # Execute pasfmt
+        logger.info(f"Executing command: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             encoding='utf-8',
             errors='replace',
-            timeout=TIMEOUT_PASFMT,  # 30秒超时
+            timeout=TIMEOUT_PASFMT,  # 30 second timeout
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)
         )
         
-        # 处理输出
+        # Process output
         stdout = result.stdout.strip()
         stderr = result.stderr.strip()
         
         if dry_run:
-            # check 模式：returncode != 0 表示格式不正确，这是正常行为
+            # check mode: returncode != 0 means incorrect formatting, this is normal behavior
             if result.returncode != 0:
-                # 有格式问题 - 解析 stderr 获取文件名
+                # Format issues found - parse stderr to get file names
                 all_output = stderr.strip()
                 lines = all_output.split('\n')
-                # 提取文件名行 (包含 "ERROR CHECK:" 或 "has incorrect formatting" 的行)
+                # Extract file name lines (lines containing "ERROR CHECK:" or "has incorrect formatting")
                 issues = []
                 for line in lines:
                     if line and ('incorrect formatting' in line or 'CHECK:' in line):
-                        # 提取文件名
+                        # Extract file name
                         if "has incorrect formatting" in line:
-                            # 格式: "ERROR CHECK: 'filepath' has incorrect formatting"
+                            # Format: "ERROR CHECK: 'filepath' has incorrect formatting"
                             import re
                             match = re.search(r"'([^']+)'", line)
                             if match:
@@ -400,26 +400,26 @@ async def format_file(
                     "formatted": False,
                     "dry_run": True,
                     "issues": issues if issues else [all_output],
-                    "message": "代码格式检查完成，发现格式问题",
+                    "message": "Code formatting check completed, formatting issues found",
                     "backup_file": backup_path
                 }
             else:
-                # 格式正确
+                # Formatting is correct
                 return {
                     "status": "success",
                     "formatted": True,
                     "dry_run": True,
                     "issues": [],
-                    "message": "代码格式正确",
+                    "message": "Code formatting is correct",
                     "backup_file": backup_path
                 }
         
-        # 非 check 模式
+        # Non-check mode
         if result.returncode == 0:
-            # 格式化成功
+            # Formatting succeeded
             if not in_place:
-                # 从 stdout 读取格式化后的内容
-                # pasfmt stdout 模式会输出 "filepath:\nformatted_code"，需要去掉文件名前缀
+                # Read formatted content from stdout
+                # pasfmt stdout mode outputs "filepath:\nformatted_code", need to remove file name prefix
                 _lines = stdout.split('\n', 1)
                 if len(_lines) > 1 and ':' in _lines[0]:
                     formatted_content = _lines[1]
@@ -429,11 +429,11 @@ async def format_file(
                     "status": "success",
                     "formatted": True,
                     "content": formatted_content,
-                    "message": "代码格式化成功",
+                    "message": "Code formatted successfully",
                     "backup_file": backup_path
                 }
             else:
-                # in_place 成功，应用 uses 压缩后处理
+                # in_place succeeded, apply uses compaction post-processing
                 effective_uses_style = uses_style if uses_style is not None else _USES_STYLE
                 if effective_uses_style == "compact":
                     try:
@@ -443,19 +443,19 @@ async def format_file(
                         if compacted != file_content:
                             with open(file_path, 'w', encoding=encoding) as f:
                                 f.write(compacted)
-                            logger.info(f"uses 子句已压缩: {file_path}")
+                            logger.info(f"uses clause compacted: {file_path}")
                     except Exception as e:
-                        logger.warning(f"uses 压缩失败: {str(e)}")
+                        logger.warning(f"uses compaction failed: {str(e)}")
 
                 return {
                     "status": "success",
                     "formatted": True,
-                    "message": "代码格式化成功",
+                    "message": "Code formatted successfully",
                     "backup_file": backup_path
                 }
         else:
-            # 失败
-            error_msg = f"pasfmt 执行失败 (退出码: {result.returncode})"
+            # Failed
+            error_msg = f"pasfmt execution failed (exit code: {result.returncode})"
             if stderr:
                 error_msg += f": {stderr}"
             elif stdout:
@@ -471,7 +471,7 @@ async def format_file(
             }
             
     except subprocess.TimeoutExpired:
-        error_msg = "pasfmt 执行超时"
+        error_msg = "pasfmt execution timed out"
         logger.error(error_msg)
         return {
             "status": "failed",
@@ -481,7 +481,7 @@ async def format_file(
             "backup_file": backup_path
         }
     except Exception as e:
-        error_msg = f"执行 pasfmt 时发生异常: {str(e)}"
+        error_msg = f"An exception occurred while executing pasfmt: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return {
             "status": "failed",
@@ -492,30 +492,31 @@ async def format_file(
         }
 
 
+
 async def format_code(
     code: str,
     config_path: Optional[str] = None,
     uses_style: Optional[str] = None
 ) -> CallToolResult:
     """
-    格式化 Delphi 代码字符串
+    Format a Delphi code string
 
     Args:
-        code: 要格式化的 Delphi 代码
-        config_path: pasfmt 配置文件路径（可选）
-        uses_style: uses 子句风格，None=使用全局设置, "compact"=合并为一行, "pasfmt_default"=保留 pasfmt 原样
+        code: Delphi code to format
+        config_path: pasfmt configuration file path (optional)
+        uses_style: uses clause style, None=use global setting, "compact"=merge into one line, "pasfmt_default"=keep pasfmt as-is
 
     Returns:
-        格式化结果字典
+        Formatting result dictionary
     """
-    logger.info("收到代码字符串格式化请求")
+    logger.info("Received code string formatting request")
     
-    # 获取 pasfmt 路径
+    # Get pasfmt path
     pasfmt_path = get_pasfmt_path()
     if not pasfmt_path:
         error_msg = (
-            "pasfmt 未安装。下载地址: https://github.com/integrated-application-development/pasfmt/releases\n"
-            "由 AI Agent 根据操作系统下载最新版本并安装"
+            "pasfmt is not installed. Download URL: https://github.com/integrated-application-development/pasfmt/releases\n"
+            "The AI Agent should download and install the latest version for the operating system"
         )
         logger.error(error_msg)
         return CallToolResult(
@@ -523,51 +524,51 @@ async def format_code(
             isError=True
         )
     
-    # 创建临时文件（先保存路径再写内容，避免 write 异常导致 temp_input 未定义）
+    # Create temporary file (save path before writing content to avoid temp_input being undefined if write raises)
     with tempfile.NamedTemporaryFile(mode='w', suffix='.pas', delete=False, encoding='utf-8') as tmp:
         temp_input = tmp.name
         tmp.write(code)
     
     try:
-        # 构建 pasfmt 命令
+        # Build pasfmt command
         cmd = [pasfmt_path]
         
-        # 添加配置文件参数
+        # Add config file argument
         if config_path and os.path.exists(config_path):
             cmd.extend(["--config-file", config_path])
         
-        # 使用 stdout 模式
+        # Use stdout mode
         cmd.extend(["--mode", "stdout"])
         
-        # 添加输入文件
+        # Add input file
         cmd.append(temp_input)
         
-        # 执行 pasfmt
-        logger.info(f"执行命令: {' '.join(cmd)}")
+        # Execute pasfmt
+        logger.info(f"Executing command: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             encoding='utf-8',
             errors='replace',
-            timeout=TIMEOUT_PASFMT,  # 30秒超时
+            timeout=TIMEOUT_PASFMT,  # 30 second timeout
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)
         )
         
-        # 清理输入临时文件
+        # Clean up input temp file
         os.unlink(temp_input)
         
         stdout = result.stdout.strip()
         
         if result.returncode == 0:
-            # 去掉文件名前缀 (pasfmt stdout 模式会输出 "filepath:\nformatted_code")
+            # Remove file name prefix (pasfmt stdout mode outputs "filepath:\nformatted_code")
             lines = stdout.split('\n', 1)
             if len(lines) > 1 and ':' in lines[0]:
                 formatted_content = lines[1]
             else:
                 formatted_content = stdout
 
-            # 应用 uses 压缩后处理
+            # Apply uses compaction post-processing
             effective_uses_style = uses_style if uses_style is not None else _USES_STYLE
             if effective_uses_style == "compact":
                 formatted_content = _compact_uses_clause(formatted_content)
@@ -577,8 +578,8 @@ async def format_code(
                 isError=False
             )
         else:
-            # 失败
-            error_msg = f"pasfmt 执行失败 (退出码: {result.returncode})"
+            # Failed
+            error_msg = f"pasfmt execution failed (exit code: {result.returncode})"
             stderr = result.stderr.strip()
             if stderr:
                 error_msg += f": {stderr}"
@@ -590,22 +591,22 @@ async def format_code(
             )
             
     except subprocess.TimeoutExpired:
-        # 清理临时文件
+        # Clean up temp file
         if os.path.exists(temp_input):
             os.unlink(temp_input)
         
-        error_msg = "pasfmt 执行超时"
+        error_msg = "pasfmt execution timed out"
         logger.error(error_msg)
         return CallToolResult(
             content=[{"type": "text", "text": error_msg}],
             isError=True
         )
     except Exception as e:
-        # 清理临时文件
+        # Clean up temp file
         if os.path.exists(temp_input):
             os.unlink(temp_input)
         
-        error_msg = f"执行 pasfmt 时发生异常: {str(e)}"
+        error_msg = f"An exception occurred while executing pasfmt: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return CallToolResult(
             content=[{"type": "text", "text": error_msg}],
@@ -613,22 +614,22 @@ async def format_code(
         )
 
 
-def _download_file(url: str, destination: str, source_name: str = "源") -> Tuple[bool, str]:
+def _download_file(url: str, destination: str, source_name: str = "source") -> Tuple[bool, str]:
     """
-    下载文件，支持重试和镜像
+    Download a file, supporting retries and mirrors
     
     Args:
-        url: 下载URL
-        destination: 目标文件路径
-        source_name: 源名称（用于日志）
+        url: Download URL
+        destination: Destination file path
+        source_name: Source name (used for logging)
     
     Returns:
-        (成功标志, 错误信息)
+        (success flag, error message)
     """
     try:
-        logger.info(f"从 {source_name} 下载: {url}")
+        logger.info(f"Downloading from {source_name}: {url}")
         
-        # 设置超时和重试
+        # Set timeout and retry
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
@@ -641,10 +642,10 @@ def _download_file(url: str, destination: str, source_name: str = "源") -> Tupl
         )
         response.raise_for_status()
         
-        # 获取文件大小
+        # Get file size
         total_size = int(response.headers.get('content-length', 0))
         
-        # 下载文件
+        # Download file
         with open(destination, 'wb') as f:
             if total_size == 0:
                 f.write(response.content)
@@ -654,49 +655,49 @@ def _download_file(url: str, destination: str, source_name: str = "源") -> Tupl
                     if chunk:
                         f.write(chunk)
                         downloaded += len(chunk)
-                        # 可以添加进度显示，但为了简洁这里省略
+                        # Progress display can be added, but omitted here for brevity
         
-        logger.info(f"下载完成: {destination} ({os.path.getsize(destination)} 字节)")
+        logger.info(f"Download complete: {destination} ({os.path.getsize(destination)} bytes)")
         return True, ""
         
     except requests.exceptions.Timeout:
-        error_msg = f"下载超时: {url}"
+        error_msg = f"Download timed out: {url}"
         logger.error(error_msg)
         return False, error_msg
     except requests.exceptions.RequestException as e:
-        error_msg = f"下载失败: {str(e)}"
+        error_msg = f"Download failed: {str(e)}"
         logger.error(error_msg)
         return False, error_msg
     except Exception as e:
-        error_msg = f"下载过程中发生错误: {str(e)}"
+        error_msg = f"An error occurred during download: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return False, error_msg
 
 
 async def download_and_install_pasfmt(install_dir: str = None) -> Dict[str, Any]:
     """
-    下载并安装 pasfmt 工具
+    Download and install the pasfmt tool
     
     Args:
-        install_dir: 安装目录，默认为项目根目录下的 tools/pasfmt/cli
+        install_dir: Installation directory, defaults to tools/pasfmt/cli under the project root
     
     Returns:
-        安装结果字典
+        Installation result dictionary
     """
-    logger.info("开始下载并安装 pasfmt 工具")
+    logger.info("Starting download and installation of pasfmt tool")
     
-    # 确定安装目录
+    # Determine installation directory
     if not install_dir:
-        # 使用项目根目录下的 tools/pasfmt/cli 目录
+        # Use the tools/pasfmt/cli directory under the project root
         project_root = Path(__file__).parent.parent.parent
         install_dir = str(project_root / "tools" / "pasfmt" / "cli")
     
-    # 创建安装目录
+    # Create installation directory
     try:
         os.makedirs(install_dir, exist_ok=True)
-        logger.info(f"创建安装目录: {install_dir}")
+        logger.info(f"Creating installation directory: {install_dir}")
     except Exception as e:
-        error_msg = f"创建安装目录失败: {str(e)}"
+        error_msg = f"Failed to create installation directory: {str(e)}"
         logger.error(error_msg)
         return {
             "status": "failed",
@@ -705,10 +706,10 @@ async def download_and_install_pasfmt(install_dir: str = None) -> Dict[str, Any]
             "install_dir": install_dir
         }
     
-    # 临时文件路径
+    # Temporary file path
     temp_zip = os.path.join(tempfile.gettempdir(), "pasfmt_%d.zip" % os.getpid())
     
-    # 尝试从多个源下载
+    # Try downloading from multiple sources
     download_success = False
     last_error = ""
     
@@ -716,7 +717,7 @@ async def download_and_install_pasfmt(install_dir: str = None) -> Dict[str, Any]
         url = source["url"]
         source_name = source["name"]
         
-        logger.info(f"尝试从 {source_name} 下载: {url}")
+        logger.info(f"Trying to download from {source_name}: {url}")
         success, error = _download_file(url, temp_zip, source_name)
         
         if success:
@@ -724,53 +725,53 @@ async def download_and_install_pasfmt(install_dir: str = None) -> Dict[str, Any]
             break
         else:
             last_error = error
-            logger.warning(f"从 {source_name} 下载失败: {error}")
+            logger.warning(f"Download from {source_name} failed: {error}")
             
-            # 尝试镜像
+            # Try mirror
             if "mirror" in source:
                 mirror_url = source["mirror"]
-                logger.info(f"尝试从 {source_name} 镜像下载: {mirror_url}")
-                success, error = _download_file(mirror_url, temp_zip, f"{source_name}镜像")
+                logger.info(f"Trying to download from {source_name} mirror: {mirror_url}")
+                success, error = _download_file(mirror_url, temp_zip, f"{source_name} mirror")
                 if success:
                     download_success = True
                     break
                 else:
                     last_error = error
-                    logger.warning(f"从 {source_name} 镜像下载失败: {error}")
+                    logger.warning(f"Download from {source_name} mirror failed: {error}")
     
     if not download_success:
-        logger.warning(f"所有下载源都失败，尝试从源码编译安装。最后错误: {last_error}")
+        logger.warning(f"All download sources failed, trying to compile and install from source. Last error: {last_error}")
         
-        # 尝试从源码编译
+        # Try compiling from source
         compile_result = await compile_from_source("pasfmt", install_dir, "release")
         
         if compile_result.get("status") == "success":
-            logger.info("从源码编译安装成功")
+            logger.info("Source compilation and installation succeeded")
             return compile_result
         else:
-            # 编译也失败，返回错误
+            # Compilation also failed, return error
             return {
                 "status": "failed",
                 "error_code": "DOWNLOAD_AND_COMPILE_FAILED",
-                "error_message": f"下载和编译都失败。下载错误: {last_error}，编译错误: {compile_result.get('error_message', '未知错误')}",
+                "error_message": f"Both download and compilation failed. Download error: {last_error}, compilation error: {compile_result.get('error_message', 'unknown error')}",
                 "install_dir": install_dir,
                 "download_error": last_error,
                 "compile_error": compile_result.get("error_message")
             }
     
-    # 解压文件
+    # Extract file
     try:
-        logger.info(f"解压文件: {temp_zip}")
+        logger.info(f"Extracting file: {temp_zip}")
         with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
-            # 查找 pasfmt.exe
+            # Find pasfmt.exe
             exe_files = [f for f in zip_ref.namelist() if f.endswith('.exe') and 'pasfmt' in f.lower()]
             
             if not exe_files:
-                # 尝试查找任何可执行文件
+                # Try to find any executable file
                 exe_files = [f for f in zip_ref.namelist() if f.endswith('.exe')]
             
             if not exe_files:
-                error_msg = "ZIP文件中未找到可执行文件"
+                error_msg = "No executable file found in ZIP file"
                 logger.error(error_msg)
                 return {
                     "status": "failed",
@@ -779,11 +780,11 @@ async def download_and_install_pasfmt(install_dir: str = None) -> Dict[str, Any]
                     "install_dir": install_dir
                 }
             
-            # 解压所有文件
+            # Extract all files
             zip_ref.extractall(install_dir)
-            logger.info(f"解压完成到: {install_dir}")
+            logger.info(f"Extraction complete to: {install_dir}")
             
-            # 查找解压后的 pasfmt.exe
+            # Find extracted pasfmt.exe
             exe_path = None
             for root, dirs, files in os.walk(install_dir):
                 for file in files:
@@ -794,12 +795,12 @@ async def download_and_install_pasfmt(install_dir: str = None) -> Dict[str, Any]
                     break
             
             if not exe_path:
-                # 查找任何 exe 文件
+                # Find any exe file
                 for root, dirs, files in os.walk(install_dir):
                     for file in files:
                         if file.endswith('.exe'):
                             exe_path = os.path.join(root, file)
-                            # 重命名为 pasfmt.exe
+                            # Rename to pasfmt.exe
                             new_path = os.path.join(install_dir, 'pasfmt.exe')
                             os.rename(exe_path, new_path)
                             exe_path = new_path
@@ -808,7 +809,7 @@ async def download_and_install_pasfmt(install_dir: str = None) -> Dict[str, Any]
                         break
             
             if not exe_path:
-                error_msg = "解压后未找到可执行文件"
+                error_msg = "No executable file found after extraction"
                 logger.error(error_msg)
                 return {
                     "status": "failed",
@@ -817,27 +818,27 @@ async def download_and_install_pasfmt(install_dir: str = None) -> Dict[str, Any]
                     "install_dir": install_dir
                 }
             
-            # 设置路径
+            # Set path
             global _PASFMT_PATH
             _PASFMT_PATH = exe_path
             
-            # 清理临时文件
+            # Clean up temp file
             try:
                 os.unlink(temp_zip)
-                logger.info(f"清理临时文件: {temp_zip}")
+                logger.info(f"Cleaning up temp file: {temp_zip}")
             except OSError:
                 pass
             
             return {
                 "status": "success",
-                "message": f"pasfmt 安装成功到: {install_dir}",
+                "message": f"pasfmt installed successfully to: {install_dir}",
                 "install_dir": install_dir,
                 "exe_path": exe_path,
                 "pasfmt_path": exe_path
             }
             
     except zipfile.BadZipFile:
-        error_msg = "下载的文件不是有效的ZIP文件"
+        error_msg = "The downloaded file is not a valid ZIP file"
         logger.error(error_msg)
         return {
             "status": "failed",
@@ -846,7 +847,7 @@ async def download_and_install_pasfmt(install_dir: str = None) -> Dict[str, Any]
             "install_dir": install_dir
         }
     except Exception as e:
-        error_msg = f"解压文件失败: {str(e)}"
+        error_msg = f"Failed to extract file: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return {
             "status": "failed",
@@ -854,29 +855,27 @@ async def download_and_install_pasfmt(install_dir: str = None) -> Dict[str, Any]
             "error_message": error_msg,
             "install_dir": install_dir
         }
-
-
 async def download_and_install_pasfmt_rad(
     delphi_version: str = "11",
     install_64bit: bool = False,
     install_dir: str = None
 ) -> Dict[str, Any]:
     """
-    下载并安装 pasfmt-rad IDE 插件
+    Download and install the pasfmt-rad IDE plugin
     
     Args:
-        delphi_version: Delphi 版本 (11, 12, 13)
-        install_64bit: 是否安装64位版本
-        install_dir: 安装目录，默认为项目根目录下的 tools/pasfmt/rad
+        delphi_version: Delphi version (11, 12, 13)
+        install_64bit: Whether to install the 64-bit version
+        install_dir: Installation directory, defaults to tools/pasfmt/rad under the project root
     
     Returns:
-        安装结果字典
+        Installation result dictionary
     """
-    logger.info(f"开始下载并安装 pasfmt-rad IDE 插件 (Delphi {delphi_version})")
+    logger.info(f"Starting download and installation of pasfmt-rad IDE plugin (Delphi {delphi_version})")
     
-    # 检查 Delphi 版本
+    # Check Delphi version
     if delphi_version not in DELPHI_VERSIONS:
-        error_msg = f"不支持的 Delphi 版本: {delphi_version}。支持: {', '.join(DELPHI_VERSIONS.keys())}"
+        error_msg = f"Unsupported Delphi version: {delphi_version}. Supported: {', '.join(DELPHI_VERSIONS.keys())}"
         logger.error(error_msg)
         return {
             "status": "failed",
@@ -886,14 +885,14 @@ async def download_and_install_pasfmt_rad(
     
     version_info = DELPHI_VERSIONS[delphi_version]
     
-    # 确定要下载的文件名
+    # Determine the filename to download
     if install_64bit and version_info["bpl_64"]:
         bpl_filename = version_info["bpl_64"]
     else:
         bpl_filename = version_info["bpl_32"]
     
     if not bpl_filename:
-        error_msg = f"Delphi {delphi_version} 不支持 {'64位' if install_64bit else '32位'}版本"
+        error_msg = f"Delphi {delphi_version} does not support the {'64-bit' if install_64bit else '32-bit'} version"
         logger.error(error_msg)
         return {
             "status": "failed",
@@ -901,18 +900,18 @@ async def download_and_install_pasfmt_rad(
             "error_message": error_msg
         }
     
-    # 确定安装目录
+    # Determine installation directory
     if not install_dir:
-        # 使用项目根目录下的 tools/pasfmt/rad 目录
+        # Use the tools/pasfmt/rad directory under the project root
         project_root = Path(__file__).parent.parent.parent
         install_dir = str(project_root / "tools" / "pasfmt" / "rad")
     
-    # 创建目录（如果不存在）
+    # Create directory (if it does not exist)
     try:
         os.makedirs(install_dir, exist_ok=True)
-        logger.info(f"安装目录: {install_dir}")
+        logger.info(f"Installation directory: {install_dir}")
     except Exception as e:
-        error_msg = f"创建安装目录失败: {str(e)}"
+        error_msg = f"Failed to create installation directory: {str(e)}"
         logger.error(error_msg)
         return {
             "status": "failed",
@@ -921,13 +920,13 @@ async def download_and_install_pasfmt_rad(
             "install_dir": install_dir
         }
     
-    # 目标文件路径
+    # Target file path
     target_path = os.path.join(install_dir, bpl_filename)
     
-    # 临时文件路径
+    # Temporary file path
     temp_bpl = os.path.join(tempfile.gettempdir(), bpl_filename)
     
-    # 尝试从多个源下载
+    # Try downloading from multiple sources
     download_success = False
     last_error = ""
     
@@ -935,7 +934,7 @@ async def download_and_install_pasfmt_rad(
         url = source["base_url"] + bpl_filename
         source_name = source["name"]
         
-        logger.info(f"尝试从 {source_name} 下载: {url}")
+        logger.info(f"Trying to download from {source_name}: {url}")
         success, error = _download_file(url, temp_bpl, source_name)
         
         if success:
@@ -943,100 +942,100 @@ async def download_and_install_pasfmt_rad(
             break
         else:
             last_error = error
-            logger.warning(f"从 {source_name} 下载失败: {error}")
+            logger.warning(f"Failed to download from {source_name}: {error}")
             
-            # 尝试镜像
+            # Try mirror
             if "mirror" in source:
                 mirror_url = source["mirror"] + bpl_filename
-                logger.info(f"尝试从 {source_name} 镜像下载: {mirror_url}")
-                success, error = _download_file(mirror_url, temp_bpl, f"{source_name}镜像")
+                logger.info(f"Trying to download from {source_name} mirror: {mirror_url}")
+                success, error = _download_file(mirror_url, temp_bpl, f"{source_name} mirror")
                 if success:
                     download_success = True
                     break
                 else:
                     last_error = error
-                    logger.warning(f"从 {source_name} 镜像下载失败: {error}")
+                    logger.warning(f"Failed to download from {source_name} mirror: {error}")
     
     if not download_success:
-        logger.warning(f"所有下载源都失败，尝试从源码编译安装。最后错误: {last_error}")
+        logger.warning(f"All download sources failed, trying to compile and install from source. Last error: {last_error}")
         
-        # 尝试从源码编译
+        # Try compiling from source
         compile_result = await compile_from_source("pasfmt-rad", install_dir, "release")
         
         if compile_result.get("status") == "success":
-            logger.info("从源码编译安装成功")
-            # 更新目标路径为编译结果中的可执行文件路径
+            logger.info("Compiled and installed from source successfully")
+            # Update target path to the executable path in the build result
             if "executable" in compile_result:
                 target_path = compile_result["executable"]
                 bpl_filename = os.path.basename(target_path)
             
             return {
                 "status": "success",
-                "message": f"pasfmt-rad IDE 插件从源码编译安装成功",
+                "message": f"pasfmt-rad IDE plugin compiled and installed from source successfully",
                 "delphi_version": delphi_version,
                 "delphi_name": version_info["name"],
                 "bpl_filename": bpl_filename,
                 "install_path": target_path,
-                "registry_success": False,  # 编译安装不自动注册
+                "registry_success": False,  # Compiled installation does not auto-register
                 "source": "compiled"
             }
         else:
-            # 编译也失败，返回错误
+            # Compilation also failed, returning error
             return {
                 "status": "failed",
                 "error_code": "DOWNLOAD_AND_COMPILE_FAILED",
-                "error_message": f"下载和编译都失败。下载错误: {last_error}，编译错误: {compile_result.get('error_message', '未知错误')}",
+                "error_message": f"Both download and compilation failed. Download error: {last_error}, compilation error: {compile_result.get('error_message', 'Unknown error')}",
                 "install_dir": install_dir,
                 "bpl_filename": bpl_filename,
                 "download_error": last_error,
                 "compile_error": compile_result.get("error_message")
             }
     
-    # 复制文件到目标位置
+    # Copy file to target location
     try:
         shutil.copy2(temp_bpl, target_path)
-        logger.info(f"复制文件到: {target_path}")
+        logger.info(f"Copying file to: {target_path}")
         
-        # 清理临时文件
+        # Clean up temporary file
         try:
             os.unlink(temp_bpl)
-            logger.info(f"清理临时文件: {temp_bpl}")
+            logger.info(f"Cleaning up temporary file: {temp_bpl}")
         except OSError:
             pass
         
-        # 注册到 IDE（Windows 注册表）
+        # Register with IDE (Windows registry)
         if sys.platform == "win32":
             try:
                 import winreg
                 
-                # Delphi 注册表路径
+                # Delphi registry path
                 registry_version = _bds_registry_version(delphi_version)
                 reg_path = f"{REG_KEY_EMBARCADERO_BDS}\\{registry_version}\\Known Packages"
                 
-                # 打开或创建注册表项
+                # Open or create registry key
                 try:
                     key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_WRITE)
                 except FileNotFoundError:
-                    # 创建键
+                    # Create key
                     key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
                 
-                # 设置值
+                # Set value
                 package_name = bpl_filename.replace('.bpl', '')
                 winreg.SetValueEx(key, target_path, 0, winreg.REG_SZ, package_name)
                 winreg.CloseKey(key)
                 
-                logger.info(f"已注册到注册表: {reg_path}")
+                logger.info(f"Registered in registry: {reg_path}")
                 registry_success = True
                 
             except Exception as e:
-                logger.warning(f"注册表操作失败: {str(e)}，需要手动注册")
+                logger.warning(f"Registry operation failed: {str(e)}, manual registration required")
                 registry_success = False
         else:
-            registry_success = True  # 非Windows平台不需要注册表
+            registry_success = True  # Non-Windows platforms do not need registry
         
         return {
             "status": "success",
-            "message": f"pasfmt-rad IDE 插件安装成功",
+            "message": f"pasfmt-rad IDE plugin installed successfully",
             "delphi_version": delphi_version,
             "delphi_name": version_info["name"],
             "bpl_filename": bpl_filename,
@@ -1052,7 +1051,7 @@ async def download_and_install_pasfmt_rad(
         }
         
     except Exception as e:
-        error_msg = f"复制文件失败: {str(e)}"
+        error_msg = f"Failed to copy file: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return {
             "status": "failed",
@@ -1065,22 +1064,22 @@ async def download_and_install_pasfmt_rad(
 
 async def check_pasfmt_installation() -> CallToolResult:
     """
-    检查 pasfmt 安装状态
+    Check pasfmt installation status
     
     Returns:
-        检查结果字典
+        Check result dictionary
     """
-    logger.info("检查 pasfmt 安装状态")
+    logger.info("Checking pasfmt installation status")
     
-    # 检查 pasfmt 是否已安装
+    # Check whether pasfmt is installed
     pasfmt_path = get_pasfmt_path()
     
     if pasfmt_path and os.path.exists(pasfmt_path):
         return CallToolResult(
-            content=[{"type": "text", "text": f"pasfmt 已安装: {pasfmt_path}"}]
+            content=[{"type": "text", "text": f"pasfmt is installed: {pasfmt_path}"}]
         )
     else:
-        # 检查可能的安装位置
+        # Check possible installation locations
         default_paths = _pasfmt_default_paths()
         
         found_paths = []
@@ -1089,50 +1088,50 @@ async def check_pasfmt_installation() -> CallToolResult:
                 found_paths.append(path)
         
         if found_paths:
-            # 设置找到的路径
+            # Set the found path
             set_pasfmt_path(found_paths[0])
             return CallToolResult(
-                content=[{"type": "text", "text": f"找到 pasfmt: {found_paths[0]}"}]
+                content=[{"type": "text", "text": f"Found pasfmt: {found_paths[0]}"}]
             )
         else:
-            # 建议安装到项目目录下的 tools/pasfmt/cli
+            # Suggest installing to tools/pasfmt/cli under the project directory
             suggested_dir = str(_project_root() / "tools" / "pasfmt" / "cli")
             
             return CallToolResult(
-                content=[{"type": "text", "text": f"未找到 pasfmt，建议安装到: {suggested_dir}"}],
+                content=[{"type": "text", "text": f"pasfmt not found, suggested installation location: {suggested_dir}"}],
                 isError=True
             )
 
 
 async def check_pasfmt_rad_installation(delphi_version: str = "11") -> Dict[str, Any]:
     """
-    检查 pasfmt-rad IDE 插件安装状态
+    Check pasfmt-rad IDE plugin installation status
     
     Args:
-        delphi_version: Delphi 版本 (11, 12, 13)
+        delphi_version: Delphi version (11, 12, 13)
     
     Returns:
-        检查结果字典
+        Check result dictionary
     """
-    logger.info(f"检查 pasfmt-rad IDE 插件安装状态 (Delphi {delphi_version})")
+    logger.info(f"Checking pasfmt-rad IDE plugin installation status (Delphi {delphi_version})")
     
     if delphi_version not in DELPHI_VERSIONS:
         return {
             "status": "failed",
             "error_code": "UNSUPPORTED_DELPHI_VERSION",
-            "error_message": f"不支持的 Delphi 版本: {delphi_version}"
+            "error_message": f"Unsupported Delphi version: {delphi_version}"
         }
     
     version_info = DELPHI_VERSIONS[delphi_version]
     
-    # 检查 32位和64位版本
+    # Check 32-bit and 64-bit versions
     bpl_files = []
     if version_info["bpl_32"]:
         bpl_files.append(version_info["bpl_32"])
     if version_info["bpl_64"]:
         bpl_files.append(version_info["bpl_64"])
     
-    # 检查常见安装位置
+    # Check common installation locations
     possible_dirs = _pasfmt_rad_candidate_dirs(delphi_version)
     
     installed_files = []
@@ -1146,7 +1145,7 @@ async def check_pasfmt_rad_installation(delphi_version: str = "11") -> Dict[str,
                     "directory": dir_path
                 })
     
-    # 检查注册表（仅Windows）
+    # Check registry (Windows only)
     registry_installed = False
     registry_path = None
     if sys.platform == "win32" and installed_files:
@@ -1158,7 +1157,7 @@ async def check_pasfmt_rad_installation(delphi_version: str = "11") -> Dict[str,
             try:
                 key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_READ)
                 
-                # 检查是否已注册
+                # Check whether registered
                 for bpl_file in bpl_files:
                     for dir_path in possible_dirs:
                         file_path = os.path.join(dir_path, bpl_file)
@@ -1173,10 +1172,10 @@ async def check_pasfmt_rad_installation(delphi_version: str = "11") -> Dict[str,
                 
                 winreg.CloseKey(key)
             except FileNotFoundError:
-                pass  # 注册表项不存在
+                pass  # Registry key does not exist
                 
         except ImportError:
-            pass  # 非Windows平台或没有winreg模块
+            pass  # Non-Windows platform or no winreg module
     
     if installed_files:
         return {
@@ -1187,7 +1186,7 @@ async def check_pasfmt_rad_installation(delphi_version: str = "11") -> Dict[str,
             "installed_files": installed_files,
             "registry_installed": registry_installed,
             "registry_path": registry_path,
-            "message": f"找到 {len(installed_files)} 个已安装的插件文件"
+            "message": f"Found {len(installed_files)} installed plugin file(s)"
         }
     else:
         return {
@@ -1195,7 +1194,7 @@ async def check_pasfmt_rad_installation(delphi_version: str = "11") -> Dict[str,
             "installed": False,
             "delphi_version": delphi_version,
             "delphi_name": version_info["name"],
-            "message": f"未找到 pasfmt-rad IDE 插件 (Delphi {delphi_version})",
+            "message": f"pasfmt-rad IDE plugin not found (Delphi {delphi_version})",
             "suggested_paths": possible_dirs
         }
 
@@ -1206,19 +1205,19 @@ async def compile_from_source(
     build_type: str = "release"
 ) -> Dict[str, Any]:
     """
-    从源码编译安装 pasfmt 或 pasfmt-rad
+    Compile and install pasfmt or pasfmt-rad from source
     
     Args:
-        source_type: 源码类型，'pasfmt' 或 'pasfmt-rad'
-        install_dir: 安装目录
-        build_type: 构建类型，'release' 或 'debug'
+        source_type: Source type, 'pasfmt' or 'pasfmt-rad'
+        install_dir: Installation directory
+        build_type: Build type, 'release' or 'debug'
     
     Returns:
-        编译结果字典
+        Compilation result dictionary
     """
-    logger.info(f"开始从源码编译 {source_type} (构建类型: {build_type})")
+    logger.info(f"Starting compilation from source for {source_type} (build type: {build_type})")
     
-    # 确定安装目录
+    # Determine installation directory
     if not install_dir:
         project_root = Path(__file__).parent.parent.parent
         if source_type == "pasfmt":
@@ -1226,12 +1225,12 @@ async def compile_from_source(
         else:  # pasfmt-rad
             install_dir = str(project_root / "tools" / "pasfmt" / "rad")
     
-    # 创建安装目录
+    # Create installation directory
     try:
         os.makedirs(install_dir, exist_ok=True)
-        logger.info(f"安装目录: {install_dir}")
+        logger.info(f"Installation directory: {install_dir}")
     except Exception as e:
-        error_msg = f"创建安装目录失败: {str(e)}"
+        error_msg = f"Failed to create installation directory: {str(e)}"
         logger.error(error_msg)
         return {
             "status": "failed",
@@ -1239,7 +1238,7 @@ async def compile_from_source(
             "error_message": error_msg
         }
     
-    # 选择源码仓库
+    # Select source repository
     if source_type == "pasfmt":
         repositories = PASFMT_SOURCE_REPOSITORIES
         repo_name = "pasfmt"
@@ -1247,13 +1246,13 @@ async def compile_from_source(
         repositories = PASFMT_RAD_SOURCE_REPOSITORIES
         repo_name = "pasfmt-rad"
     
-    # 创建临时目录用于克隆源码
+    # Create temporary directory for cloning source code
     temp_dir = None
     try:
         temp_dir = tempfile.mkdtemp(prefix=f"{repo_name}_build_")
-        logger.info(f"临时构建目录: {temp_dir}")
+        logger.info(f"Temporary build directory: {temp_dir}")
         
-        # 尝试从不同源克隆代码
+        # Try cloning code from different sources
         clone_success = False
         last_error = None
         
@@ -1262,10 +1261,10 @@ async def compile_from_source(
             repo_mirror = repo.get("mirror", repo_url)
             repo_name_display = repo["name"]
             
-            logger.info(f"尝试从 {repo_name_display} 克隆: {repo_url}")
+            logger.info(f"Trying to clone from {repo_name_display}: {repo_url}")
             
             try:
-                # 首先尝试主源
+                # First try the primary source
                 result = subprocess.run(
                     ["git", "clone", "--depth", "1", repo_url, temp_dir],
                     capture_output=True,
@@ -1276,13 +1275,13 @@ async def compile_from_source(
                 
                 if result.returncode == 0:
                     clone_success = True
-                    logger.info(f"从 {repo_name_display} 克隆成功")
+                    logger.info(f"Cloned successfully from {repo_name_display}")
                     break
                 else:
-                    logger.warning(f"从 {repo_name_display} 克隆失败: {result.stderr}")
+                    logger.warning(f"Failed to clone from {repo_name_display}: {result.stderr}")
                     
-                    # 尝试镜像
-                    logger.info(f"尝试从镜像克隆: {repo_mirror}")
+                    # Try mirror
+                    logger.info(f"Trying to clone from mirror: {repo_mirror}")
                     result = subprocess.run(
                         ["git", "clone", "--depth", "1", repo_mirror, temp_dir],
                         capture_output=True,
@@ -1293,49 +1292,49 @@ async def compile_from_source(
                     
                     if result.returncode == 0:
                         clone_success = True
-                        logger.info(f"从镜像克隆成功")
+                        logger.info(f"Cloned successfully from mirror")
                         break
                     else:
                         last_error = result.stderr
-                        logger.warning(f"从镜像克隆失败: {result.stderr}")
+                        logger.warning(f"Failed to clone from mirror: {result.stderr}")
                         
             except Exception as e:
                 last_error = str(e)
-                logger.warning(f"克隆失败: {last_error}")
+                logger.warning(f"Clone failed: {last_error}")
         
         if not clone_success:
             return {
                 "status": "failed",
                 "error_code": "GIT_CLONE_FAILED",
-                "error_message": f"所有源码仓库都克隆失败。最后错误: {last_error}",
+                "error_message": f"All source repositories failed to clone. Last error: {last_error}",
                 "install_dir": install_dir
             }
         
-        # 构建项目
-        logger.info(f"开始构建 {source_type}...")
+        # Build project
+        logger.info(f"Starting build for {source_type}...")
         
-        # 检查构建脚本
+        # Check build script
         build_script = None
         if source_type == "pasfmt":
-            # pasfmt 使用 cargo 构建 (Rust 项目)
+            # pasfmt uses cargo build (Rust project)
             build_script = os.path.join(temp_dir, "Cargo.toml")
             if os.path.exists(build_script):
-                logger.info("检测到 Rust 项目，使用 cargo 构建")
+                logger.info("Detected Rust project, using cargo build")
                 
-                # 安装 Rust 工具链（如果未安装）
+                # Install Rust toolchain (if not installed)
                 try:
                     rustc_check = subprocess.run(["rustc", "--version"], capture_output=True, text=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
                     if rustc_check.returncode != 0:
-                        logger.warning("Rust 工具链未安装，尝试安装...")
-                        # 这里可以添加 Rust 安装逻辑
+                        logger.warning("Rust toolchain is not installed, attempting to install...")
+                        # Rust installation logic can be added here
                         return {
                             "status": "failed",
                             "error_code": "RUST_NOT_INSTALLED",
-                            "error_message": "Rust 工具链未安装，请先安装 Rust",
+                            "error_message": "Rust toolchain is not installed, please install Rust first",
                             "install_dir": install_dir
                         }
                     
-                    # 使用 cargo 构建
+                    # Build with cargo
                     build_cmd = ["cargo", "build", "--release"] if build_type == "release" else ["cargo", "build"]
                     result = subprocess.run(
                         build_cmd,
@@ -1350,27 +1349,27 @@ async def compile_from_source(
                         return {
                             "status": "failed",
                             "error_code": "CARGO_BUILD_FAILED",
-                            "error_message": f"cargo 构建失败: {result.stderr}",
+                            "error_message": f"cargo build failed: {result.stderr}",
                             "install_dir": install_dir
                         }
                     
-                    # 查找构建产物
+                    # Find build artifacts
                     target_dir = os.path.join(temp_dir, "target", "release" if build_type == "release" else "debug")
                     if not os.path.exists(target_dir):
                         return {
                             "status": "failed",
                             "error_code": "BUILD_OUTPUT_NOT_FOUND",
-                            "error_message": f"构建输出目录不存在: {target_dir}",
+                            "error_message": f"Build output directory does not exist: {target_dir}",
                             "install_dir": install_dir
                         }
                     
-                    # 复制可执行文件
+                    # Copy executable
                     if source_type == "pasfmt":
                         exe_name = "pasfmt.exe" if sys.platform == "win32" else "pasfmt"
                         source_exe = os.path.join(target_dir, exe_name)
                         
                         if not os.path.exists(source_exe):
-                            # 尝试在子目录中查找
+                            # Try searching in subdirectories
                             for root, dirs, files in os.walk(target_dir):
                                 if exe_name in files:
                                     source_exe = os.path.join(root, exe_name)
@@ -1379,15 +1378,15 @@ async def compile_from_source(
                         if os.path.exists(source_exe):
                             dest_exe = os.path.join(install_dir, exe_name)
                             shutil.copy2(source_exe, dest_exe)
-                            logger.info(f"复制可执行文件到: {dest_exe}")
+                            logger.info(f"Copying executable to: {dest_exe}")
                             
-                            # 设置可执行权限（非Windows）
+                            # Set executable permissions (non-Windows)
                             if sys.platform != "win32":
                                 os.chmod(dest_exe, 0o755)
                             
                             return {
                                 "status": "success",
-                                "message": f"{source_type} 编译安装成功",
+                                "message": f"{source_type} compiled and installed successfully",
                                 "install_dir": install_dir,
                                 "executable": dest_exe,
                                 "build_type": build_type,
@@ -1397,38 +1396,38 @@ async def compile_from_source(
                             return {
                                 "status": "failed",
                                 "error_code": "EXECUTABLE_NOT_FOUND",
-                                "error_message": f"未找到可执行文件: {exe_name}",
+                                "error_message": f"Executable not found: {exe_name}",
                                 "install_dir": install_dir
                             }
                 except Exception as e:
                     return {
                         "status": "failed",
                         "error_code": "BUILD_PROCESS_FAILED",
-                        "error_message": f"构建过程失败: {str(e)}",
+                        "error_message": f"Build process failed: {str(e)}",
                         "install_dir": install_dir
                     }
             else:
                 return {
                     "status": "failed",
                     "error_code": "NO_BUILD_SYSTEM",
-                    "error_message": "未找到构建系统 (Cargo.toml)",
+                    "error_message": "Build system not found (Cargo.toml)",
                     "install_dir": install_dir
                 }
         else:  # pasfmt-rad
-            # pasfmt-rad 是 Delphi 项目，需要 Delphi 编译器
-            logger.warning("pasfmt-rad 是 Delphi 项目，需要 Delphi 编译器进行构建")
-            logger.info("建议从预编译的二进制文件安装，或手动使用 Delphi IDE 编译")
+            # pasfmt-rad is a Delphi project and requires the Delphi compiler
+            logger.warning("pasfmt-rad is a Delphi project and requires the Delphi compiler for building")
+            logger.info("It is recommended to install from precompiled binaries or compile manually using the Delphi IDE")
             
             return {
                 "status": "failed",
                 "error_code": "DELPHI_COMPILER_REQUIRED",
-                "error_message": "pasfmt-rad 需要 Delphi 编译器进行构建。请从预编译的二进制文件安装，或手动使用 Delphi IDE 编译。",
+                "error_message": "pasfmt-rad requires the Delphi compiler for building. Please install from precompiled binaries or compile manually using the Delphi IDE.",
                 "install_dir": install_dir,
                 "source_dir": temp_dir
             }
     
     except Exception as e:
-        error_msg = f"编译过程失败: {str(e)}"
+        error_msg = f"Compilation process failed: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return {
             "status": "failed",
@@ -1438,10 +1437,10 @@ async def compile_from_source(
         }
     
     finally:
-        # 清理临时目录
+        # Clean up temporary directory
         if temp_dir and os.path.exists(temp_dir):
             try:
                 shutil.rmtree(temp_dir)
-                logger.info(f"清理临时目录: {temp_dir}")
+                logger.info(f"Cleaning up temporary directory: {temp_dir}")
             except Exception as e:
-                logger.warning(f"清理临时目录失败: {str(e)}")
+                logger.warning(f"Failed to clean up temporary directory: {str(e)}")

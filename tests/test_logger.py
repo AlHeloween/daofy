@@ -155,8 +155,8 @@ def test_setup_logger_ignores_unwritable_file(monkeypatch, tmp_path, capfd):
         )
 
         captured = capfd.readouterr()
-        assert "日志目录无法写入" in captured.err
-        assert "后续文件日志将被忽略" in captured.err
+        assert "Log directory is not writable" in captured.err
+        assert "file logging will be ignored" in captured.err
         assert any(isinstance(h, logging.NullHandler) for h in configured.handlers)
 
         configured.error("this must be ignored")

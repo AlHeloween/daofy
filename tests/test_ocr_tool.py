@@ -30,14 +30,14 @@ class TestHandleOcrValidation:
         # 用 __file__ 指向本文件作为存在的输入
         result = handle_ocr({"action": "unknown", "image_path": __file__})
         assert result["status"] == "failed"
-        assert "未知" in result.get("error", "")
+        assert "Unknown" in result.get("error", "")
 
     def test_nonexistent_file_returns_error(self):
         """不存在的文件路径 → 返回 error。"""
         from src.tools.ocr import handle_ocr
         result = handle_ocr({"action": "recognize", "image_path": "C:\\nonexistent.png"})
         assert result["status"] == "failed"
-        assert "不存在" in result.get("error", "")
+        assert "does not exist" in result.get("error", "")
 
 
 # ============================================================

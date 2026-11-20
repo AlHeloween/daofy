@@ -1,8 +1,8 @@
 """
-编码规则工具
+Coding rules tool
 
-提供 Delphi 源码编码规则查询功能，支持按章节分段获取，
-减少 token 消耗并提升 AI Agent 的规则遵守率。
+Provides Delphi source code coding rules lookup, supporting section-by-section retrieval,
+reducing token consumption and improving the AI Agent's rule compliance rate.
 """
 
 import re
@@ -16,7 +16,7 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# ── 章节名称映射：短键 → Markdown 标题（## 或 ###） ──
+# ── Section name mapping: short key → Markdown heading (## or ###) ──
 
 SECTION_KEYS: Dict[str, str] = {
     "planning": "P0 前置计划与审查",
@@ -39,15 +39,15 @@ SECTION_KEYS: Dict[str, str] = {
     "ui-testing": "⑧ 自动化 UI 交互测试",
     "ui_layout": "UI 布局规范与审计",
     "console-testing": "⑨ 控制台程序交互验证",
-    # shared 跨语言章节
+    # shared cross-language sections
     "debugging": "异常诊断与调试（8.1–8.14 合集）",
     "multi_change": "多修改优先级排序",
-    # ③ 写 Delphi 代码 内的子章节
+    # Sub-sections within "③ Write Delphi code"
     "delphi_file_write_rule": "delphi_file 写入规则",
     "delphi_file_dirty_flag": "脏标记保护（v2026.06.12+）",
     "delphi_file_output_format": "紧凑输出格式（v2026.06.12+）",
     "delphi_file_usage_tips": "推荐做法",
-    # 审核子章节（### 级别）
+    # Review sub-sections (### level)
     "consistency": "一致性",
     "completeness": "完整性",
     "resource_leak": "资源泄露",
@@ -68,7 +68,7 @@ LAZARUS_SECTION_KEYS: Dict[str, str] = {
     "compile": "④ 编译",
     "review_guide": "⑤ 审核",
     "cleanup": "⑥ 清理",
-    # 共享 key 跟 SECTION_KEYS 相同
+    # Shared keys same as SECTION_KEYS
     "kb_build": "知识库重建",
     "agent_rules": "Agent 操作硬规则",
     "human_collab": "人机协同 — 异常诊断与人工介入",
@@ -77,10 +77,10 @@ LAZARUS_SECTION_KEYS: Dict[str, str] = {
     "automation": "⚙ 自动化测试架构 — 感知·规划·执行·反馈循环",
     "ui-testing": "⑧ 自动化 UI 交互测试",
     "console-testing": "⑨ 控制台程序交互验证",
-    # shared 跨语言章节
+    # shared cross-language sections
     "debugging": "异常诊断与调试（8.1–8.14 合集）",
     "multi_change": "多修改优先级排序",
-    # 审核子章节（### 级别，与 Delphi 共享）
+    # Review sub-sections (### level, shared with Delphi)
     "consistency": "一致性",
     "completeness": "完整性",
     "resource_leak": "资源泄露",
@@ -131,13 +131,13 @@ def _normalize_section_name(section_name: str) -> str:
     return SECTION_ALIASES.get(section_name, section_name)
 
 
-# 元章节：组合多个相关标题一起返回
+# Meta sections: return multiple related headings combined
 META_SECTIONS: Dict[str, List[str]] = {
     "review": ["review_guide", "review_detail"],
     "coding": ["writing", "format", "compile"],
 }
 
-# 反向映射：标题 → 短键（用于错误提示）— 运行时由 _get_title_to_key(language) 构建
+# Reverse mapping: heading → short key (for error hints) — built at runtime by _get_title_to_key(language)
 
 
 def _get_title_to_key(language: str) -> Dict[str, str]:
@@ -203,7 +203,7 @@ def _read_first_existing_text(paths: List[Path], label: str) -> Tuple[str, Optio
                 try:
                     dir_parts.append(f.read_text(encoding="utf-8"))
                 except Exception as e:
-                    logger.error(f"读取 {label} 子文件失败: {f}: {str(e)}")
+                    logger.error(f"Failed to read {label} sub-file: {f}: {str(e)}")
                     continue
             if dir_parts:
                 merged = "\n\n".join(dir_parts)
@@ -218,7 +218,7 @@ def _read_first_existing_text(paths: List[Path], label: str) -> Tuple[str, Optio
             if merged_path is None:
                 merged_path = path
         except Exception as e:
-            logger.error(f"读取{label}失败: {path}: {str(e)}")
+            logger.error(f"Failed to read {label}: {path}: {str(e)}")
             continue
 
     if parts:
@@ -227,11 +227,11 @@ def _read_first_existing_text(paths: List[Path], label: str) -> Tuple[str, Optio
 
 
 def _find_heading_ranges(lines: List[str]) -> Dict[str, Tuple[int, int]]:
-    """解析 markdown 行列表，返回 {标题文本: (起始行号, 结束行号)} 的映射。
+    """Parse markdown line list, return mapping of {heading text: (start line, end line)}.
 
-    结束行号指向下一同级/更高级标题的前一行，若无后续标题则指向末尾。
+    The end line points to the line before the next same-level/higher-level heading; if there is no following heading, it points to the end.
     """
-    # 收集所有标题行
+    # Collect all heading lines
     heading_pattern = re.compile(r'^(#{2,4})\s+(.+)$')
     headings: List[Tuple[int, str, int]] = []  # (level, title, line_index)
 
@@ -242,11 +242,11 @@ def _find_heading_ranges(lines: List[str]) -> Dict[str, Tuple[int, int]]:
             title = m.group(2).strip()
             headings.append((level, title, i))
 
-    # 为每个标题计算内容范围
+    # Compute content range for each heading
     ranges: Dict[str, Tuple[int, int]] = {}
     for idx, (level, title, start) in enumerate(headings):
         end = len(lines)
-        # 找下一个同级或更高级标题（数字越小级别越高）
+        # Find the next same-level or higher-level heading (smaller number = higher level)
         for j in range(idx + 1, len(headings)):
             if headings[j][0] <= level:
                 end = headings[j][2]
@@ -257,25 +257,25 @@ def _find_heading_ranges(lines: List[str]) -> Dict[str, Tuple[int, int]]:
 
 
 def _strip_trailing_separator(text: str) -> str:
-    """去掉尾部多余的 --- 分隔线。"""
+    """Remove redundant trailing --- separator lines."""
     return re.sub(r'\n---+\s*$', '', text)
 
 
 def _extract_debugging_sections(content: str) -> Optional[str]:
-    """提取所有 ### 级标题内容（debugging 合集）。
+    """Extract all ### level heading content (debugging collection).
 
-    shared/debugging/ 下的文件全部使用 ### 级标题（如 ### 8.1 人工介入触发条件），
-    在合并后的 rules 中散落在各处。此函数收集所有 8.x 编号的 ### 标题及其内容，
-    按原文顺序拼接为一个合集返回。
+    Files under shared/debugging/ all use ### level headings (e.g. ### 8.1 Human intervention trigger conditions),
+    scattered throughout the merged rules. This function collects all 8.x numbered ### headings and their content,
+    concatenated in original order and returned as a single collection.
 
-    只匹配标题以 "8." 开头的 ### 标题（调试章节编号），过滤掉其他 ### 标题
-    （如 writing/review/planning 等文件中的 ### 子章节）。
+    Only matches ### headings starting with "8." (debugging section numbers), filtering out other ### headings
+    (such as ### sub-sections in writing/review/planning files).
 
     Args:
-        content: 合并后的 markdown 内容
+        content: Merged markdown content
 
     Returns:
-        拼接后的调试章节全文，无匹配标题时返回 None
+        Full text of concatenated debugging sections; returns None if no matching headings
     """
     lines = content.split('\n')
     heading_pattern = re.compile(r'^###\s+(8\.(\d+))\s+(.+)$')
@@ -299,17 +299,17 @@ def _extract_debugging_sections(content: str) -> Optional[str]:
     if not sections:
         return None
 
-    # 按章节编号排序（8.1 < 8.2 < ... < 8.14）
+    # Sort by section number (8.1 < 8.2 < ... < 8.14)
     sections.sort(key=lambda s: s[1])
 
     parts: List[str] = []
     for start, num_key, title, raw_num in sections:
-        # 找下一个 ### 或更高级别（## / #）标题作为结束边界
-        # 注意：debugging 文件之间没有 ## 分隔，必须用 ^#{1,3} 匹配 ### 级别
+        # Find the next ### or higher-level (## / #) heading as end boundary
+        # Note: debugging files have no ## separator between them, must use ^#{1,3} to match ### level
         end = len(lines)
         for j in range(start + 1, len(lines)):
             line = lines[j]
-            # 遇到 #/##/### 标题都停止（#### 不停止，保留子章节内容）
+            # Stop at #/##/### headings (#### does not stop, preserves sub-section content)
             if re.match(r'^#{1,3}\s+', line):
                 end = j
                 break
@@ -319,17 +319,17 @@ def _extract_debugging_sections(content: str) -> Optional[str]:
 
 
 def _extract_section(content: str, section_name: str, language: str = "delphi") -> Optional[str]:
-    """从 markdown 内容中提取指定章节。
+    """Extract the specified section from markdown content.
 
-    返回章节内容（含标题行），不含尾部分隔线。
-    若章节不存在返回 None。
+    Returns section content (including heading line), excluding trailing separator lines.
+    Returns None if the section does not exist.
 
     Args:
-        content: markdown 内容
-        section_name: 章节短键名
-        language: 语言（影响章节标题映射）
+        content: markdown content
+        section_name: section short key name
+        language: language (affects section heading mapping)
     """
-    # 特殊处理：debugging 合集 — 收集所有 ### 级标题（shared/debugging/ 的内容）
+    # Special handling: debugging collection — collect all ### level headings (content of shared/debugging/)
     canonical_section = _normalize_section_name(section_name)
     if canonical_section == "debugging":
         result = _extract_debugging_sections(content)
@@ -339,12 +339,12 @@ def _extract_section(content: str, section_name: str, language: str = "delphi") 
     lines = content.split('\n')
     ranges = _find_heading_ranges(lines)
 
-    # 直接标题匹配
+    # Direct heading match
     if section_name in ranges:
         start, end = ranges[section_name]
         return _strip_trailing_separator('\n'.join(lines[:3] + [''] + lines[start:end]))
 
-    # 通过语言对应的章节映射查找
+    # Look up via language-specific section mapping
     keys = _get_section_keys(language)
     target_title = keys.get(canonical_section)
     if target_title and target_title in ranges:
@@ -355,7 +355,7 @@ def _extract_section(content: str, section_name: str, language: str = "delphi") 
 
 
 def _extract_meta_section(content: str, meta_name: str, ranges: Dict[str, Tuple[int, int]], language: str = "delphi") -> Optional[str]:
-    """提取元章节（多个标题的组合）。"""
+    """Extract meta section (combination of multiple headings)."""
     keys = META_SECTIONS.get(_normalize_section_name(meta_name))
     if not keys:
         return None
@@ -373,14 +373,14 @@ def _extract_meta_section(content: str, meta_name: str, ranges: Dict[str, Tuple[
     if not parts:
         return None
 
-    # 用分隔线拼接各部分，前面加 title block
+    # Join parts with separator lines, prepend title block
     header = '\n'.join(lines[:3])
     body = '\n\n---\n\n'.join(parts)
     return _strip_trailing_separator(header + '\n\n' + body)
 
 
 def _list_available_sections(content: str, language: str = "delphi") -> str:
-    """生成可用章节列表。"""
+    """Generate list of available sections."""
     lines = content.split('\n')
     ranges = _find_heading_ranges(lines)
     title_to_key = _get_title_to_key(language)
@@ -391,61 +391,61 @@ def _list_available_sections(content: str, language: str = "delphi") -> str:
             key = title_to_key[title]
             available.append(f"  `{key}` → {title}")
 
-    lines_out = ["可用章节（传给 section 参数）:", ""]
-    lines_out.append("【顶级章节】")
+    lines_out = ["Available sections (pass to the section parameter):", ""]
+    lines_out.append("[Top-level sections]")
 
     if language == "lazarus":
-        lines_out.append("  基础流程: planning, workflow, env, kb_search, writing, compile, cleanup, review_guide")
-        lines_out.append("  审核细化: review(合集), consistency, completeness, resource_leak,")
+        lines_out.append("  Basic workflow: planning, workflow, env, kb_search, writing, compile, cleanup, review_guide")
+        lines_out.append("  Review details: review(collection), consistency, completeness, resource_leak,")
         lines_out.append("           common_errors, code_quality, safety, performance")
-        lines_out.append("  其他:     kb_build, agent_rules, human_collab, experience, maintenance, automation,")
-        lines_out.append("           debugging(8.1–8.14 合集), multi_change")
-        lines_out.append("  组合:     review(审核指南+审核表), coding(writing+compile)")
+        lines_out.append("  Others:     kb_build, agent_rules, human_collab, experience, maintenance, automation,")
+        lines_out.append("           debugging(8.1–8.14 collection), multi_change")
+        lines_out.append("  Combos:     review(review guide + review checklist), coding(writing+compile)")
     else:
-        lines_out.append("  基础流程: planning, workflow, env, kb_search, writing, format, compile, cleanup, review_guide")
-        lines_out.append("  审核细化: review(合集), consistency, completeness, resource_leak, delphi_specific,")
+        lines_out.append("  Basic workflow: planning, workflow, env, kb_search, writing, format, compile, cleanup, review_guide")
+        lines_out.append("  Review details: review(collection), consistency, completeness, resource_leak, delphi_specific,")
         lines_out.append("           common_errors, code_quality, data_conversion, safety, performance")
-        lines_out.append("  writing 子章节: delphi_file_write_rule, delphi_file_dirty_flag, delphi_file_output_format,")
+        lines_out.append("  writing sub-sections: delphi_file_write_rule, delphi_file_dirty_flag, delphi_file_output_format,")
         lines_out.append("                 delphi_file_usage_tips")
-        lines_out.append("  其他:     review_detail, kb_build, agent_rules, human_collab, experience, maintenance, automation,")
-        lines_out.append("           debugging(8.1–8.14 合集), multi_change, ui-testing(→testing/ui), ui_layout, console-testing(→testing/console)")
-        lines_out.append("  组合:     review(审核指南+审核表), coding(写代码+格式化+compile)")
-        lines_out.append("  兼容别名: kb-search/kb-rebuild/agent-rules/human-collab/delphi-file-rules")
+        lines_out.append("  Others:     review_detail, kb_build, agent_rules, human_collab, experience, maintenance, automation,")
+        lines_out.append("           debugging(8.1–8.14 collection), multi_change, ui-testing(→testing/ui), ui_layout, console-testing(→testing/console)")
+        lines_out.append("  Combos:     review(review guide + review checklist), coding(write code + format + compile)")
+        lines_out.append("  Compat aliases: kb-search/kb-rebuild/agent-rules/human-collab/delphi-file-rules")
 
     lines_out.append("")
-    lines_out.append("不传 section 则返回工作流总览 + 章节索引。")
+    lines_out.append("If section is not passed, returns workflow overview + section index.")
 
     return '\n'.join(lines_out)
 
 
 def _load_example(example_name: str, language: str = "delphi") -> Optional[str]:
     """
-    按名称加载示例文件。在 coding-rules/{language}/examples/ 下递归搜索匹配的 .md 文件。
+    Load example file by name. Recursively search matching .md files under coding-rules/{language}/examples/.
 
     Args:
-        example_name: 示例名称（不含扩展名），如 "naming"、"error-handling"、"dirty-flag"
-        language: 编程语言，默认 "delphi"
+        example_name: example name (without extension), e.g. "naming", "error-handling", "dirty-flag"
+        language: programming language, defaults to "delphi"
 
     Returns:
-        示例内容，未找到返回 None
+        example content, returns None if not found
     """
     examples_dir = Path(__file__).parent.parent / "resources" / "coding-rules" / language / "examples"
     if not examples_dir.is_dir():
         return None
 
-    # 精确匹配: examples/{name}.md 或 examples/**/{name}.md
+    # Exact match: examples/{name}.md or examples/**/{name}.md
     candidates = list(examples_dir.rglob(f"{example_name}.md"))
     if not candidates:
         return None
 
-    # 优先精确目录匹配（浅层优先）
+    # Prefer exact directory match (shallower first)
     candidates.sort(key=lambda p: len(p.parts))
     try:
         text = candidates[0].read_text(encoding="utf-8")
-        logger.info(f"加载示例: {candidates[0].relative_to(examples_dir)}")
+        logger.info(f"Loading example: {candidates[0].relative_to(examples_dir)}")
         return text
     except Exception as e:
-        logger.error(f"读取示例文件失败: {candidates[0]}: {e}")
+        logger.error(f"Failed to read example file: {candidates[0]}: {e}")
         return None
 
 
@@ -456,46 +456,46 @@ async def get_coding_rules(
     language: Optional[str] = None,
 ) -> CallToolResult:
     """
-    获取编码规范规则，支持按语言（Delphi / Lazarus）和章节分段获取。
+    Get coding rules, supporting per-language (Delphi / Lazarus) and section-by-section retrieval.
 
-    默认读取 src/resources/coding-rules/{language}/ 及 shared/ 目录下的规则文件。
-    如果用户项目目录下存在 CODING_RULES.mdc，则合并用户规则（用户规则覆盖默认规则）
+    By default reads rule files from src/resources/coding-rules/{language}/ and shared/ directories.
+    If CODING_RULES.mdc exists in the user project directory, merges user rules (user rules override default rules).
 
     Args:
-        project_path: 项目路径（可选），用于查找用户自定义的编码规则文件
-        section: 章节名称（可选），如 "workflow"、"writing"、"review" 等。
-                 不传或传 None 时返回工作流总览 + 章节索引，引导按需获取。
-                 传 "list" 返回可用章节列表。
-        examples: 示例名称（可选），如 "naming"、"formatting"、"error-handling"。
-                  指定后从 coding-rules/{language}/examples/ 加载对应示例文件。
-        language: 编程语言（可选），"delphi"（默认）或 "lazarus"。
-                  不传时默认 "delphi"（向后兼容）。
+        project_path: project path (optional), used to find user-defined coding rule files
+        section: section name (optional), e.g. "workflow", "writing", "review", etc.
+                 When not passed or None, returns workflow overview + section index, guiding on-demand retrieval.
+                 Passing "list" returns the list of available sections.
+        examples: example name (optional), e.g. "naming", "formatting", "error-handling".
+                  When specified, loads the corresponding example file from coding-rules/{language}/examples/.
+        language: programming language (optional), "delphi" (default) or "lazarus".
+                  Defaults to "delphi" when not passed (backward compatible).
     """
-    # 默认语言为 delphi（向后兼容）
+    # Default language is delphi (backward compatible)
     lang = (language or "delphi").lower().strip()
     if lang not in LANGUAGE_NAMES:
         valid = ", ".join(LANGUAGE_NAMES.keys())
         return CallToolResult(
-            content=[{"type": "text", "text": f"不支持的语言: '{language}'。有效值: {valid}"}],
+            content=[{"type": "text", "text": f"Unsupported language: '{language}'. Valid values: {valid}"}],
             isError=True,
         )
 
-    logger.info(f"获取编码规则请求 — language={lang}, project_path={project_path}, section={section}, examples={examples}")
+    logger.info(f"Coding rules request — language={lang}, project_path={project_path}, section={section}, examples={examples}")
 
     try:
-        # 读取默认编码规则（shared/ + language/）
+        # Read default coding rules (shared/ + language/)
         default_rules, default_rules_path = _read_first_existing_text(
             _default_rules_candidates(lang),
-            f"默认编码规则文件 (language={lang})",
+            f"Default coding rule file (language={lang})",
         )
         if default_rules_path and default_rules:
-            logger.info(f"成功读取编码规则文件: {default_rules_path} (language={lang})")
+            logger.info(f"Successfully read coding rule file: {default_rules_path} (language={lang})")
         elif default_rules_path:
-            logger.warning(f"默认编码规则文件为空或读取失败: {default_rules_path}")
+            logger.warning(f"Default coding rule file is empty or failed to read: {default_rules_path}")
         else:
-            logger.warning("默认编码规则目录不存在: src/resources/coding-rules/")
+            logger.warning("Default coding rule directory does not exist: src/resources/coding-rules/")
 
-        # 如果提供了项目路径，尝试读取用户自定义的编码规则
+        # If project path is provided, try to read user-defined coding rules
         user_rules = ""
         if project_path:
             project_dir = Path(project_path)
@@ -505,162 +505,162 @@ async def get_coding_rules(
                 try:
                     with open(user_rules_path, 'r', encoding='utf-8') as f:
                         user_rules = f.read()
-                    logger.info(f"成功读取用户自定义编码规则文件: {user_rules_path}")
+                    logger.info(f"Successfully read user-defined coding rule file: {user_rules_path}")
                 except Exception as e:
-                    logger.error(f"读取用户自定义编码规则文件失败: {str(e)}")
+                    logger.error(f"Failed to read user-defined coding rule file: {str(e)}")
                     user_rules = ""
             else:
-                logger.info(f"用户项目目录下未找到自定义编码规则文件: {user_rules_path}")
+                logger.info(f"No custom coding rule file found in user project directory: {user_rules_path}")
 
-        # 合并规则：默认规则做底，用户规则覆盖
+        # Merge rules: default rules as base, user rules override
         merged = ""
         if default_rules:
             merged += "# ═══════════════════════════════════\n"
-            merged += "# 默认编码规则\n"
+            merged += "# Default coding rules\n"
             merged += "# ═══════════════════════════════════\n"
             merged += default_rules
             if user_rules:
                 merged += "\n\n"
                 merged += "# ═══════════════════════════════════\n"
-                merged += "# 用户自定义规则（覆盖上方同名规则）\n"
+                merged += "# User-defined rules (override same-named rules above)\n"
                 merged += "# ═══════════════════════════════════\n"
                 merged += user_rules
         elif user_rules:
             merged = user_rules
 
         if not merged:
-            logger.warning("未找到任何编码规则文件")
+            logger.warning("No coding rule files found")
             return CallToolResult(
-                content=[{"type": "text", "text": "未找到任何编码规则文件"}],
+                content=[{"type": "text", "text": "No coding rule files found"}],
                 isError=True
             )
 
-        # examples 参数处理：按名称加载示例文件
+        # Handle examples parameter: load example file by name
         if examples:
             example_text = _load_example(examples, lang)
             if example_text:
-                logger.info(f"返回示例: {examples} (language={lang})")
+                logger.info(f"Returning example: {examples} (language={lang})")
                 return CallToolResult(content=[{"type": "text", "text": example_text}])
             else:
-                # 列出可用示例名供参考
+                # List available example names for reference
                 examples_dir = Path(__file__).parent.parent / "resources" / "coding-rules" / lang / "examples"
                 available = []
                 if examples_dir.is_dir():
                     for f in sorted(examples_dir.rglob("*.md")):
                         available.append(f.stem)
-                hint = f"可用示例: {', '.join(available)}" if available else "暂无示例文件"
+                hint = f"Available examples: {', '.join(available)}" if available else "No example files"
                 return CallToolResult(
-                    content=[{"type": "text", "text": f"未找到示例: '{examples}'。{hint}"}],
+                    content=[{"type": "text", "text": f"Example not found: '{examples}'. {hint}"}],
                     isError=True
                 )
 
-        # 特殊章节：section="automation" → 从 resources/coding-rules/testing/automation/ 读取
+        # Special section: section="automation" → read from resources/coding-rules/testing/automation/
         if section and _normalize_section_name(section) == "automation":
             automation_index = Path(__file__).parent.parent / "resources" / "coding-rules" / "testing" / "automation" / "index.md"
             if automation_index.exists():
                 try:
                     text = automation_index.read_text(encoding="utf-8")
-                    logger.info("返回自动化测试章节（来自 resources/coding-rules/testing/automation/index.md）")
+                    logger.info("Returning automation test section (from resources/coding-rules/testing/automation/index.md)")
                     return CallToolResult(content=[{"type": "text", "text": text}])
                 except Exception as e:
-                    logger.error(f"读取自动化索引失败: {str(e)}")
+                    logger.error(f"Failed to read automation index: {str(e)}")
                     # fall through to default handling
 
-        # 特殊章节：section="ui-testing" → 从 resources/coding-rules/testing/ui.md 读取
+        # Special section: section="ui-testing" → read from resources/coding-rules/testing/ui.md
         if section and _normalize_section_name(section) == "ui-testing":
             ui_path = Path(__file__).parent.parent / "resources" / "coding-rules" / "testing" / "ui.md"
             if ui_path.exists():
                 try:
                     text = ui_path.read_text(encoding="utf-8")
-                    logger.info("返回 UI 自动化测试章节（来自 resources/coding-rules/testing/ui.md）")
+                    logger.info("Returning UI automation test section (from resources/coding-rules/testing/ui.md)")
                     return CallToolResult(content=[{"type": "text", "text": text}])
                 except Exception as e:
-                    logger.error(f"读取 UI 测试文件失败: {str(e)}")
+                    logger.error(f"Failed to read UI test file: {str(e)}")
 
-        # 特殊章节：section="console-testing" → 从 resources/coding-rules/testing/console.md 读取
+        # Special section: section="console-testing" → read from resources/coding-rules/testing/console.md
         if section and _normalize_section_name(section) == "console-testing":
             console_path = Path(__file__).parent.parent / "resources" / "coding-rules" / "testing" / "console.md"
             if console_path.exists():
                 try:
                     text = console_path.read_text(encoding="utf-8")
-                    logger.info("返回控制台测试章节（来自 resources/coding-rules/testing/console.md）")
+                    logger.info("Returning console test section (from resources/coding-rules/testing/console.md)")
                     return CallToolResult(content=[{"type": "text", "text": text}])
                 except Exception as e:
-                    logger.error(f"读取控制台测试文件失败: {str(e)}")
+                    logger.error(f"Failed to read console test file: {str(e)}")
 
-        # section 参数处理
+        # Handle section parameter
         if section == "list":
             output = _list_available_sections(merged, lang)
             return CallToolResult(content=[{"type": "text", "text": output}])
 
         if section:
             canonical_section = _normalize_section_name(section)
-            # 先查元章节
+            # Check meta sections first
             lines = merged.split('\n')
             ranges = _find_heading_ranges(lines)
             meta_content = _extract_meta_section(merged, canonical_section, ranges, lang)
             if meta_content:
-                logger.info(f"返回元章节: {canonical_section} (language={lang})")
+                logger.info(f"Returning meta section: {canonical_section} (language={lang})")
                 return CallToolResult(content=[{"type": "text", "text": meta_content}])
 
-            # 再查单章节
+            # Then check single sections
             section_content = _extract_section(merged, canonical_section, lang)
             if section_content:
-                logger.info(f"返回章节: {canonical_section} (language={lang})")
-                source = "默认规则 + 用户规则（用户覆盖默认）" if default_rules and user_rules else \
-                         "用户规则" if user_rules else "默认规则"
-                output = f"编码规则 (来源: {source}, 章节: {canonical_section}):\n\n"
+                logger.info(f"Returning section: {canonical_section} (language={lang})")
+                source = "default rules + user rules (user overrides default)" if default_rules and user_rules else \
+                         "user rules" if user_rules else "default rules"
+                output = f"Coding rules (source: {source}, section: {canonical_section}):\n\n"
                 output += section_content
                 return CallToolResult(content=[{"type": "text", "text": output}])
 
-            # 未找到章节
-            logger.warning(f"未知章节: {section} (language={lang})")
+            # Section not found
+            logger.warning(f"Unknown section: {section} (language={lang})")
             return CallToolResult(
                 content=[TextContent(
                     type="text",
-                    text=f"未知章节: '{section}' (language={lang})。\n\n{_list_available_sections(merged, lang)}"
+                    text=f"Unknown section: '{section}' (language={lang}).\n\n{_list_available_sections(merged, lang)}"
                 )],
                 isError=True
             )
 
-        # section=None：返回工作流总览 + 章节索引，引导按需获取
-        logger.info(f"返回工作流 + 章节索引（默认模式, language={lang}）")
+        # section=None: return workflow overview + section index, guiding on-demand retrieval
+        logger.info(f"Returning workflow + section index (default mode, language={lang})")
 
-        # 提取工作流总览章节
+        # Extract workflow overview section
         workflow_content = _extract_section(merged, "workflow", lang)
         workflow_part = workflow_content if workflow_content else ""
 
-        # 生成章节索引
+        # Generate section index
         if lang == "lazarus":
             index_lines = [
                 "",
-                "## 章节索引 (Lazarus/FPC)",
+                "## Section index (Lazarus/FPC)",
                 "",
-                "按需获取各章节详情（节省 token，提升遵守率）：",
+                "Retrieve section details on demand (saves tokens, improves compliance):",
                 "",
-                "| 参数 | 内容 | 使用时机 |",
+                "| Parameter | Content | When to use |",
                 "|------|------|----------|",
-                "| `section=\"planning\"` | P0 前置计划与审查 | 新功能/大规模修改编码前必做 |",
-                "| `section=\"workflow\"` | Lazarus/FPC 工作流总览 | 任务开始，了解整体流程 |",
-                "| `section=\"env\"` | ① 环境检查 | 首次运行/环境异常时 |",
-                "| `section=\"kb_search\"` | ② 查 API | 编码前查 FPC 定义 |",
-                "| `section=\"writing\"` | ③ 编码规范 | 编码阶段 |",
-                "| `section=\"compile\"` | ④ 编译 | 编译验证 |",
-                "| `section=\"review\"` | ⑤ 代码审核（含完整审核表） | 清理后审查最终代码质量 |",
-                "| `section=\"cleanup\"` | ⑥ 清理 | 编译通过后先清理冗余 |",
-                "| `section=\"agent_rules\"` | Agent 操作硬规则 | 执行脚本或操作文件时 |",
-                "| `section=\"human_collab\"` | 人机协同 — 异常诊断与人工介入 | 异常诊断或需要人工介入时 |",
-                "| `section=\"debugging\"` | 异常诊断与调试（8.1–8.14 合集） | 运行时崩溃/编译报错/排查困难时 |",
-                "| `section=\"multi_change\"` | 多修改优先级排序 | 多个改动同时处理时 |",
-                "| `section=\"experience\"` | ⑪ 经验沉淀 | 问题解决后保存经验时 |",
-                "| `section=\"kb_build\"` | 知识库重建 | 需要重建 KB 时 |",
-                "| `section=\"automation\"` | ⚙ 自动化测试架构 | 执行自动化 UI 测试前 |",
-                "| `section=\"coding\"` | 组合：writing + compile | 完整编码流程 |",
+                "| `section=\"planning\"` | P0 pre-planning and review | Required before coding new features / large-scale modifications |",
+                "| `section=\"workflow\"` | Lazarus/FPC workflow overview | At task start, understand the overall flow |",
+                "| `section=\"env\"` | ① Environment check | First run / when environment is abnormal |",
+                "| `section=\"kb_search\"` | ② API lookup | Look up FPC definitions before coding |",
+                "| `section=\"writing\"` | ③ Coding standards | Coding phase |",
+                "| `section=\"compile\"` | ④ Compile | Compile verification |",
+                "| `section=\"review\"` | ⑤ Code review (with complete review checklist) | Review final code quality after cleanup |",
+                "| `section=\"cleanup\"` | ⑥ Cleanup | Clean up redundancy after compile passes |",
+                "| `section=\"agent_rules\"` | Agent operation hard rules | When executing scripts or operating on files |",
+                "| `section=\"human_collab\"` | Human-machine collaboration — abnormal diagnosis and manual intervention | During abnormal diagnosis or when manual intervention is needed |",
+                "| `section=\"debugging\"` | Abnormal diagnosis and debugging (8.1–8.14 collection) | Runtime crashes / compile errors / difficult troubleshooting |",
+                "| `section=\"multi_change\"` | Multi-change priority ordering | When handling multiple changes simultaneously |",
+                "| `section=\"experience\"` | ⑪ Experience saving | When saving experience after problem resolution |",
+                "| `section=\"kb_build\"` | Knowledge base rebuild | When KB rebuild is needed |",
+                "| `section=\"automation\"` | ⚙ Automated test architecture | Before running automated UI tests |",
+                "| `section=\"coding\"` | Combo: writing + compile | Complete coding workflow |",
                 "",
-                "也可获取细分章节：planning, debugging, multi_change, consistency, completeness, resource_leak,",
+                "Also available as finer-grained sections: planning, debugging, multi_change, consistency, completeness, resource_leak,",
                 "common_errors, code_quality, safety, performance, agent_rules, human_collab, experience",
                 "",
-                "使用示例：",
+                "Usage examples:",
                 "```python",
                 'get_coding_rules(section="writing", language="lazarus")',
                 'get_coding_rules(section="review", language="lazarus")',
@@ -670,47 +670,47 @@ async def get_coding_rules(
         else:
             index_lines = [
             "",
-            "## 章节索引",
+            "## Section index",
             "",
-            "按需获取各章节详情（节省 token，提升遵守率）：",
+            "Retrieve section details on demand (saves tokens, improves compliance):",
             "",
-            "| 参数 | 内容 | 使用时机 |",
+            "| Parameter | Content | When to use |",
             "|------|------|----------|",
-             "| `section=\"planning\"` | P0 前置计划与审查 | 新功能/大规模修改编码前必做 |",
-             "| `section=\"workflow\"` | 工作流总览 | 任务开始，了解整体流程 |",
-            "| `section=\"env\"` | ① 环境检查 | 首次运行/环境异常时 |",
-            "| `section=\"kb_search\"` | ② KB 搜索 | 编码前查 API 定义 |",
-             "| `section=\"writing\"` | ③ 写 Delphi 代码（命名/格式/泛型/异步/代码组织/版本兼容/自动备份/写入规则） | 编码阶段 |",
-            "| `section=\"format\"` | ④ 格式化 | 格式化代码 |",
-            "| `section=\"compile\"` | ⑤ 编译 | 编译验证 |",
-             "| `section=\"review\"` | ⑦ 代码审核（含完整审核表） | 清理后审查最终代码质量 |",
-             "| `section=\"cleanup\"` | ⑥ 清理 | 编译通过后先清理冗余 |",
-            "| `section=\"safety\"` | 安全规则 | 涉及安全敏感操作时 |",
-            "| `section=\"performance\"` | 性能规则 | 性能敏感路径 |",
-             "| `section=\"agent_rules\"` | Agent 操作硬规则 | 执行脚本或操作文件时 |",
-             "| `section=\"human_collab\"` | 人机协同 — 异常诊断与人工介入 | 异常诊断或需要人工介入时（任意步骤可触发） |",
-             "| `section=\"debugging\"` | 异常诊断与调试（8.1–8.14 合集） | 运行时崩溃/编译报错/排查困难时 |",
-             "| `section=\"multi_change\"` | 多修改优先级排序 | 多个改动同时处理时 |",
-             "| `section=\"experience\"` | ⑪ 经验沉淀 — 知识沉淀到经验库 | 问题解决后保存经验时 |",
-            "| `section=\"kb_build\"` | 知识库重建 | 需要重建 KB 时 |",
-             "| `section=\"automation\"` | ⚙ 自动化测试架构（含提示词模板F + 经验优化闭环G） | 执行自动化 UI 测试前，规划测试计划/恢复策略 |",
-             "| `section=\"ui-testing\"` | ⑧ 自动化 UI 交互测试 | GUI 程序编译通过后，UI 交互验证 |",
-             "| `section=\"ui_layout\"` | UI 布局规范与审计 | AI 生成或修改 Delphi 窗体后检查布局质量 |",
-             "| `section=\"console-testing\"` | ⑨ 控制台程序交互验证 | Console 程序编译后，stdin/stdout 验证 |",
-             "| `section=\"coding\"` | 组合：writing + format + compile | 完整编码流程 |",
-             "| `section=\"delphi_file_write_rule\"` | delphi_file 写入规则（1-indexed/edits 参数） | 编辑 Delphi 文件需了解行号规则时 |",
+             "| `section=\"planning\"` | P0 pre-planning and review | Required before coding new features / large-scale modifications |",
+             "| `section=\"workflow\"` | Workflow overview | At task start, understand the overall flow |",
+            "| `section=\"env\"` | ① Environment check | First run / when environment is abnormal |",
+            "| `section=\"kb_search\"` | ② KB search | Look up API definitions before coding |",
+             "| `section=\"writing\"` | ③ Write Delphi code (naming/format/generics/async/code organization/version compatibility/auto backup/write rules) | Coding phase |",
+            "| `section=\"format\"` | ④ Format | Format code |",
+            "| `section=\"compile\"` | ⑤ Compile | Compile verification |",
+             "| `section=\"review\"` | ⑦ Code review (with complete review checklist) | Review final code quality after cleanup |",
+             "| `section=\"cleanup\"` | ⑥ Cleanup | Clean up redundancy after compile passes |",
+            "| `section=\"safety\"` | Safety rules | When security-sensitive operations are involved |",
+            "| `section=\"performance\"` | Performance rules | Performance-sensitive paths |",
+             "| `section=\"agent_rules\"` | Agent operation hard rules | When executing scripts or operating on files |",
+             "| `section=\"human_collab\"` | Human-machine collaboration — abnormal diagnosis and manual intervention | During abnormal diagnosis or when manual intervention is needed (can be triggered at any step) |",
+             "| `section=\"debugging\"` | Abnormal diagnosis and debugging (8.1–8.14 collection) | Runtime crashes / compile errors / difficult troubleshooting |",
+             "| `section=\"multi_change\"` | Multi-change priority ordering | When handling multiple changes simultaneously |",
+             "| `section=\"experience\"` | ⑪ Experience saving — deposit knowledge into experience library | When saving experience after problem resolution |",
+            "| `section=\"kb_build\"` | Knowledge base rebuild | When KB rebuild is needed |",
+             "| `section=\"automation\"` | ⚙ Automated test architecture (with prompt template F + experience optimization loop G) | Before running automated UI tests, plan test plan / recovery strategy |",
+             "| `section=\"ui-testing\"` | ⑧ Automated UI interaction testing | After GUI program compiles, UI interaction verification |",
+             "| `section=\"ui_layout\"` | UI layout standards and audit | Check layout quality after AI generates or modifies a Delphi form |",
+             "| `section=\"console-testing\"` | ⑨ Console program interaction verification | After console program compiles, stdin/stdout verification |",
+             "| `section=\"coding\"` | Combo: writing + format + compile | Complete coding workflow |",
+             "| `section=\"delphi_file_write_rule\"` | delphi_file write rules (1-indexed/edits parameter) | When editing Delphi files and need to understand line number rules |",
              "",
-             "也可获取细分章节：planning, debugging, multi_change, consistency, completeness, resource_leak, delphi_specific, common_errors,",
+             "Also available as finer-grained sections: planning, debugging, multi_change, consistency, completeness, resource_leak, delphi_specific, common_errors,",
              "code_quality, data_conversion, safety, performance, delphi_file_write_rule,",
              "delphi_file_dirty_flag, delphi_file_output_format, delphi_file_usage_tips, human_collab, experience, maintenance,",
              "ui-testing, ui_layout, console-testing",
             "",
-            "使用示例：",
+            "Usage examples:",
             "```python",
-            'get_coding_rules(section="writing")    # 只看编码规则',
-            'get_coding_rules(section="review")     # 只看审核表',
-            'get_coding_rules(section="safety")     # 只看安全规则',
-            'get_coding_rules(section="list")       # 列出所有章节',
+            'get_coding_rules(section="writing")    # only coding rules',
+            'get_coding_rules(section="review")     # only review checklist',
+            'get_coding_rules(section="safety")     # only safety rules',
+            'get_coding_rules(section="list")       # list all sections',
             "```",
         ]
         index_text = "\n".join(index_lines)
@@ -719,7 +719,7 @@ async def get_coding_rules(
         return CallToolResult(content=[{"type": "text", "text": output}])
 
     except Exception as e:
-        error_msg = f"获取编码规则过程发生异常: {str(e)}"
+        error_msg = f"Exception occurred while getting coding rules: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return CallToolResult(
             content=[{"type": "text", "text": error_msg}],

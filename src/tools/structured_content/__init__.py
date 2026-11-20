@@ -1,18 +1,18 @@
 """
-structured_content — 结构化文档统一读写/搜索/修改工具。
+structured_content — the unified read/write/search/modify tool for structured documents.
 
-支持的格式:
-  - DFM / LFM / FMX (Delphi / Lazarus 表单)
+Supported formats:
+  - DFM / LFM / FMX (Delphi / Lazarus forms)
   - XML
   - JSON
   - MessagePack
-  - ProtoBuf (需预先编译 .proto)
+  - ProtoBuf (the .proto must be compiled in advance)
 
-核心操作:
-  read        读取结构化文件 → JSON / Schema
-  get_schema  生成 JSON Schema
-  set         按路径修改值
-  search      按 JSONPath 搜索节点
+Core operations:
+  read        read a structured file → JSON / Schema
+  get_schema  generate a JSON Schema
+  set         modify a value by path
+  search      search nodes by JSONPath
 """
 
 from __future__ import annotations
@@ -35,24 +35,24 @@ __all__ = ["handle_structured_content", "SUPPORTED_FORMATS"]
 
 
 async def handle_structured_content(arguments: dict) -> dict[str, Any]:
-    """``structured_content`` — 结构化文档统一读写/查询/修改。
+    """``structured_content`` — unified read/write/query/modify for structured documents.
 
     Action:
-        read         读取文件，返回 JSON / Schema
-        get_schema   生成 JSON Schema
-        set          按路径修改值
-        search       按 JSONPath 搜索
+        read         read the file and return JSON / Schema
+        get_schema   generate a JSON Schema
+        set          modify a value by path
+        search       search by JSONPath
 
     Args:
-        action: 操作类型。
-        file_path: 文件路径。
-        path: JSONPath 路径（默认 ``$`` 即根）。
-        value: set action 时的新值。
-        format: 强制格式（dfm/lfm/fmx/xml/json/msgpack/protobuf）。
-                默认从文件扩展名检测。
-        output: read action 的输出格式（"json" | "schema" | "both"）。
-        proto_file: ProtoBuf 模式时传入 .proto 文件路径。
-        message_name: ProtoBuf 模式时传入消息名。
+        action: the operation type.
+        file_path: the file path.
+        path: the JSONPath path (default ``$``, i.e. the root).
+        value: the new value for the set action.
+        format: force a format (dfm/lfm/fmx/xml/json/msgpack/protobuf).
+                 Defaults to detection from the file extension.
+        output: the output format of the read action ("json" | "schema" | "both").
+        proto_file: the .proto file path, for ProtoBuf mode.
+        message_name: the message name, for ProtoBuf mode.
     """
     action = arguments.get("action", "read")
     file_path = arguments.get("file_path", "")
@@ -64,11 +64,11 @@ async def handle_structured_content(arguments: dict) -> dict[str, Any]:
     if not file_path and action in ("read", "set", "search"):
         return {"error": "file_path is required"}
 
-    # ── 格式检测 ──
+    # ── Format detection ──
     try:
         fmt = detect_format(file_path, hint=fmt_hint) if file_path else fmt_hint
     except Exception as e:
-        return {"status": "failed", "error": f"格式检测失败: {e}"}
+        return {"status": "failed", "error": f"Format detection failed: {e}"}
 
     # ── read ────────────────────────────────────────────────────
     if action == "read":
@@ -77,7 +77,7 @@ async def handle_structured_content(arguments: dict) -> dict[str, Any]:
 
         if fmt == "protobuf":
             if not proto_file or not message_name:
-                return {"error": "ProtoBuf 读取需要 proto_file 和 message_name 参数"}
+                return {"error": "ProtoBuf reading requires the proto_file and message_name parameters"}
             from .protobuf_adapter import compile_and_parse
             with open(file_path, "rb") as f:
                 raw = f.read()
@@ -86,11 +86,11 @@ async def handle_structured_content(arguments: dict) -> dict[str, Any]:
             try:
                 node, fmt = read_file(file_path, fmt)
             except FileNotFoundError:
-                return {"status": "failed", "error": f"文件不存在: {file_path}"}
+                return {"status": "failed", "error": f"File not found: {file_path}"}
             except ValueError as e:
                 return {"status": "failed", "error": str(e)}
 
-        # 按路径截取
+        # Narrow down by path
         if path_expr and path_expr != "$":
             matched = query(node, path_expr)
             if not matched:
@@ -98,13 +98,13 @@ async def handle_structured_content(arguments: dict) -> dict[str, Any]:
                     "format": fmt,
                     "path": path_expr,
                     "match_count": 0,
-                    "error": f"路径 '{path_expr}' 无匹配",
+                    "error": f"Path '{path_expr}' matched nothing",
                 }
             result_nodes = matched
         else:
             result_nodes = [node]
 
-        # 产出
+        # Produced result
         result: dict[str, Any] = {
             "format": fmt,
             "path": path_expr,
@@ -127,7 +127,7 @@ async def handle_structured_content(arguments: dict) -> dict[str, Any]:
         try:
             node, fmt = read_file(file_path, fmt)
         except FileNotFoundError:
-            return {"status": "failed", "error": f"文件不存在: {file_path}"}
+            return {"status": "failed", "error": f"File not found: {file_path}"}
         except ValueError as e:
             return {"status": "failed", "error": str(e)}
         schema = generate_schema(node, title=os.path.basename(file_path))
@@ -146,7 +146,7 @@ async def handle_structured_content(arguments: dict) -> dict[str, Any]:
         try:
             node, fmt = read_file(file_path, fmt)
         except FileNotFoundError:
-            return {"status": "failed", "error": f"文件不存在: {file_path}"}
+            return {"status": "failed", "error": f"File not found: {file_path}"}
         except ValueError as e:
             return {"status": "failed", "error": str(e)}
         count = set_value(node, path_expr, value)
@@ -157,7 +157,7 @@ async def handle_structured_content(arguments: dict) -> dict[str, Any]:
                 "format": fmt,
                 "path": path_expr,
                 "modified_count": count,
-                "message": f"已修改 {count} 个节点",
+                "message": f"Modified {count} node(s)",
             }
         }
 
@@ -166,7 +166,7 @@ async def handle_structured_content(arguments: dict) -> dict[str, Any]:
         try:
             node, fmt = read_file(file_path, fmt)
         except FileNotFoundError:
-            return {"status": "failed", "error": f"文件不存在: {file_path}"}
+            return {"status": "failed", "error": f"File not found: {file_path}"}
         except ValueError as e:
             return {"status": "failed", "error": str(e)}
         matched = query(node, path_expr)
@@ -180,4 +180,4 @@ async def handle_structured_content(arguments: dict) -> dict[str, Any]:
             }
         }
 
-    return {"error": f"未知 action: {action}, 支持: read, get_schema, set, search"}
+    return {"error": f"Unknown action: {action}; supported: read, get_schema, set, search"}

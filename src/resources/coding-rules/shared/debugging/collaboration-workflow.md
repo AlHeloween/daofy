@@ -1,21 +1,23 @@
-<!-- @when: 已申请介入，需与人工开发者协同工作 -->
+<!-- @when: Intervention has been requested and work must be coordinated with the human developer -->
 <!-- @chain: after=escalation-handover.md -->
 
-### 8.5 协同工作流
+### 8.5 Collaboration Workflow
 
 ```
-AI Agent                            人工（开发者）
+AI Agent                            Human (developer)
    │                                      │
-   │── 独立尝试解决问题 ──────────────→       │
-   │── 提交介入申请书（按 8.4 清单）──→       │
-   │←── 人工响应（定位根因/提供信息/授权）──  │
-   │── 根据反馈继续修复 → 验证 ──────→       │
-   │←── 验收确认（通过或调整）───────────     │
+   │── Attempt to solve the problem alone ──────→  │
+   │── Submit the intervention request (per the 8.4 checklist) ──→ │
+   │←── Human response (locate root cause / provide info / authorize)── │
+   │── Continue fixing per the feedback → verify ──────→   │
+   │←── Acceptance confirmation (pass or adjust)──────────    │
 ```
 
-**关键规则**：
-1. **AI 必须主动申请介入** — 满足 8.1 条件立即触发，不浪费时间
-2. **介入申请必须完整** — 缺 8.4 任意一项可被退回补充
-3. **AI 继续跟进** — 人工提供方案后 AI 负责执行修复并验证
-4. **经验沉淀** — 解决后 `experience(action="save")` 保存，下次可自行解决
-5. **介入后更新规则** — 规则盲区 → 更新 `src/resources/coding-rules.md`
+**Key rules**:
+1. **The AI must request intervention proactively** — trigger immediately when the 8.1 conditions are met; do not waste time
+2. **The intervention request must be complete** — missing any item of 8.4 can be sent back for completion
+3. **The AI keeps following through** — after the human provides a plan, the AI is responsible for executing the fix and verifying it
+4. **Capture the experience** — once solved, save it with `experience(action="save")` so the next occurrence can be solved autonomously
+5. **Update the rules after intervention** — a rule blind spot → update `src/resources/coding-rules.md`
+
+

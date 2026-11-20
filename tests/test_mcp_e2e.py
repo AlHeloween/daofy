@@ -76,8 +76,8 @@ class TestToolRegistrationConsistency:
         """list_tools 的 delphi_file 描述必须约束 Agent 内置 Read/Edit/Write。"""
         desc = TOOL_SHORT_DESC["delphi_file"]
         assert "Read/Edit/Write" in desc
-        assert "Delphi 文件专用" in desc
-        assert "读取" in desc
+        assert "Delphi file-specific" in desc
+        assert "read" in desc
         assert ".pas" in desc
         assert ".dfm" in desc
         assert "apply_patch" in desc
@@ -235,17 +235,17 @@ class TestServerDispatch:
         assert "version=__version__" in source
         # description is now set in mcp_compat.py via _V1DaofyServerSession
         compat_source = (Path(__file__).parent.parent / "src" / "mcp_compat.py").read_text(encoding="utf-8")
-        assert "Delphi 项目编译" in compat_source
+        assert "Delphi project compilation" in compat_source
 
         instructions_start = source.find("MCP_SERVER_INSTRUCTIONS")
         instructions_end = source.find("\n", instructions_start + len("MCP_SERVER_INSTRUCTIONS"))
-        instructions_block = source[instructions_start:instructions_end + 200]
+        instructions_block = source[instructions_start:instructions_end + 400]
         assert "delphi_file" in instructions_block
         assert "get_coding_rules" in instructions_block
         assert "tool_help" in instructions_block
         assert "DaofyCoding" in instructions_block
         assert "automation_run" in instructions_block
-        assert "不依赖本 Server" in instructions_block
+        assert "does not depend on this Server" in instructions_block
 
     def test_raw_initialize_response_includes_description_and_instructions(self):
         """Raw JSON-RPC initialize must expose serverInfo.description and instructions."""
@@ -323,7 +323,7 @@ class TestServerDispatch:
         assert "DaofyCoding" in result["instructions"]
         assert "automation_run" in result["instructions"]
         assert result["serverInfo"]["description"]
-        assert "Delphi 项目编译" in result["serverInfo"]["description"]
+        assert "Delphi project compilation" in result["serverInfo"]["description"]
 
     @pytest.mark.parametrize(
         "client_name,hidden_expected",
@@ -623,7 +623,7 @@ class TestToolSchemaCompleteness:
 
         # old_content 带非空校验说明
         assert "old_content" in edits_props, "delphi_file schema missing per-edit old_content"
-        assert "非空" in edits_props["old_content"].get("description", ""), "old_content schema must document non-empty guard requirement"
+        assert "non-empty" in edits_props["old_content"].get("description", ""), "old_content schema must document non-empty guard requirement"
 
         # 已移除的参数不能出现
         schema_str = _json.dumps(schema, ensure_ascii=False)
@@ -713,7 +713,7 @@ class TestToolSchemaCompleteness:
         """schema 描述也要给客户端路由模型明确提示，读取 Delphi 文件也走 delphi_file。"""
         desc = self._get_all_descriptions()["delphi_file"]
         assert "Read/Edit/Write" in desc
-        assert "即使只是读取" in desc
+        assert "Even for merely reading" in desc
         assert ".pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx" in desc
 
     def test_delphi_descriptions_keep_discovery_keywords_without_split_tools(self):

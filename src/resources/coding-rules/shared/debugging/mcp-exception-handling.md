@@ -1,11 +1,11 @@
-<!-- @when: 开发 MCP 工具或排查工具异常时 -->
+<!-- @when: Developing an MCP tool or troubleshooting a tool anomaly -->
 <!-- @chain: after=collaboration-workflow.md -->
 
-### 8.6 MCP 工具异常处理约定
+### 8.6 MCP Tool Exception-Handling Conventions
 
-| 层级 | 处理方式 |
+| Layer | Handling |
 |------|---------|
-| `tools/*.py` handler | 捕获具体异常，返回 `{"error":"..."}` + `exc_info=True` 日志；不抛出 |
-| `server.py call_tool` | 顶层兜底捕获所有异常，格式化为 `CallToolResult(isError=True)`；禁止裸抛 |
-| `services/*.py` | 业务异常用自定义异常类，保留调用链；记录日志但不吞异常 |
-| `utils/*.py` | 通常不捕获，让上层统一处理 |
+| `tools/*.py` handler | Catch concrete exceptions, return `{"error":"..."}` + log with `exc_info=True`; do not throw |
+| `server.py call_tool` | Top-level catch-all for every exception, formatted as `CallToolResult(isError=True)`; bare throws are forbidden |
+| `services/*.py` | Business exceptions use custom exception classes, keeping the call chain; log but do not swallow |
+| `utils/*.py` | Usually no catching — let the upper layer handle it uniformly |

@@ -1,17 +1,18 @@
-<!-- @when: 执行 Python 脚本、字符串格式化、处理可选参数时 -->
+<!-- @when: Running Python scripts, formatting strings, or handling optional parameters -->
 <!-- @chain: independent -->
 
-## Agent 操作硬规则
+## Agent Operating Hard Rules
 
-### 脚本执行
-- ❌ 绝不用 `python -c "..."`（PowerShell 引号转义必炸）
-- ✅ 写 `.py` 文件 → `bash python script.py` → `Remove-Item` 清理
+### Script Execution
+- ❌ Never use `python -c "..."` (PowerShell quote escaping always breaks)
+- ✅ Write a `.py` file → `bash python script.py` → clean up with `Remove-Item`
 
-### 字符串格式化
-- ❌ f-string 内嵌字典 `f'{d["key"]}'`（引号冲突）
-- ✅ 用 `.format()` 或 `%`
+### String Formatting
+- ❌ f-string with an embedded dictionary key `f'{d["key"]}'` (quote conflict)
+- ✅ Use `.format()` or `%`
 
-### Python 陷阱
-- **不在函数内局部 `import`**：`from X import Y` 使 Y 在函数作用域成为局部变量，顶部的引用也会 UnboundLocalError。始终写在模块顶部。
-- **`if x:` vs `if x is not None:`**：0、`""`、`[]` 均为 False。可选数值参数用 `Optional[int]` 并用 `is not None` 判断。
-- **`$()` 宏展开**：注册表键名不含 `$()`，加入 `macros` 字典时必须 `macros[f'$({k})'] = v`。用 `update(dict)` 会导致 `str.replace('SKIADIR', ...)` 错误匹配 `$(SKIADIR)`。
+### Python Traps
+- **No local `import` inside a function**: `from X import Y` makes Y a local variable in the function scope, and even the reference at the top of the function raises UnboundLocalError. Always write imports at the top of the module.
+- **`if x:` vs `if x is not None:`**: 0, `""` and `[]` are all False. For optional numeric parameters use `Optional[int]` and test with `is not None`.
+- **`$()` macro expansion**: registry key names do not contain `$()`; when adding them to the `macros` dictionary you must write `macros[f'$({k})'] = v`. Using `update(dict)` makes `str.replace('SKIADIR', ...)` wrongly match `$(SKIADIR)`.
+

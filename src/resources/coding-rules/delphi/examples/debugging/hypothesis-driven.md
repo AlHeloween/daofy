@@ -1,38 +1,39 @@
-# 假设驱动调试循环示例
+# Hypothesis-Driven Debugging Loop Example
 
-不要陷入"猜测→修改→验证"随机修复循环，用假设驱动方式系统性缩小范围：
+Do not fall into the random "guess → modify → verify" repair loop; use a hypothesis-driven approach to systematically narrow the scope:
 
 ```
-① 信息采集
-   ├─ 完整错误消息 + 错误号/异常类型
-   ├─ 调用栈（符号化/非符号化均可）
-   ├─ 环境信息（Delphi版本/OS/平台/配置）
-   ├─ 复现步骤（确定能否稳定复现）
-   ├─ 最近变更（git log --oneline -10）
-   └─ 查经验库: experience(search, query="...")
+① Information collection
+   ├─ Complete error message + error number/exception type
+   ├─ Call stack (symbolized/unsymbolized both acceptable)
+   ├─ Environment information (Delphi version/OS/platform/configuration)
+   ├─ Reproduction steps (determine whether it can be reproduced stably)
+   ├─ Recent changes (git log --oneline -10)
+   └─ Check experience library: experience(search, query="...")
         ↓
-② 生成 2~3 个独立假设
-   H1: 假设原因A → 预期观察A' → 验证方法V1
-   H2: 假设原因B → 预期观察B' → 验证方法V2
-   要求: 基于证据，互斥或独立，按最易验证>最可能排序
+② Generate 2~3 independent hypotheses
+   H1: Hypothesized cause A → Expected observation A' → Verification method V1
+   H2: Hypothesized cause B → Expected observation B' → Verification method V2
+   Requirements: Based on evidence, mutually exclusive or independent, sorted by easiest to verify > most likely
         ↓
-③ 并行验证
-   ├─ 互不依赖的假设同时验证
-   ├─ 每个验证用最少操作
-   ├─ 编译错误用 compile_file 单文件验证
-   └─ 运行时用 rget/delphi_rtti 快速验证
+③ Parallel verification
+   ├─ Verify mutually independent hypotheses simultaneously
+   ├─ Use minimal operations for each verification
+   ├─ For compile errors, use compile_file single-file verification
+   └─ For runtime, use rget/delphi_rtti for quick verification
         ↓
-④ 分析结果 → 决策
-   ├─ 证实 → 进入修复
-   ├─ 全证伪 → 回①或介入
-   └─ 部分证实 → 调整假设缩小范围
+④ Analyze results → Decision
+   ├─ Confirmed → Proceed to fix
+   ├─ All falsified → Return to ① or intervene
+   └─ Partially confirmed → Adjust hypothesis to narrow scope
 ```
 
-最多 3 轮仍无法定位根因 → 触发 P0 介入。
+If root cause still cannot be located after at most 3 rounds → trigger P0 intervention.
 
-## 关键规则
+## Key Rules
 
-1. **禁止零假设修复** — 没有形成假设不得改代码
-2. **每次只验证一个假设** — 不做多改动
-3. **假设可证伪** — 无法设计验证方法说明不够具体
-4. **维护调试日志** — 按 8.10 记录，避免同质方案重复
+1. **No zero-hypothesis fixes** — Do not change code without forming a hypothesis
+2. **Verify only one hypothesis at a time** — Do not make multiple changes
+3. **Hypotheses must be falsifiable** — If you cannot design a verification method, the hypothesis is not specific enough
+4. **Maintain a debugging log** — Record according to 8.10 to avoid repeating homogeneous solutions
+

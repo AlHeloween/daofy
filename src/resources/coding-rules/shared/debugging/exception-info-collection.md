@@ -1,10 +1,10 @@
-<!-- @when: 异常发生时，需要采集现场信息定位根因 -->
+<!-- @when: An exception occurs and the scene information must be collected to locate the root cause -->
 <!-- @chain: after=six-step-method.md -->
 
-### 8.3 异常信息采集
+### 8.3 Exception Information Collection
 
 ```python
-# Python 异常采集模板
+# Python exception collection template
 import traceback, sys
 def capture_exception_context(exc, locals_dict=None):
     exc_type, exc_value, exc_tb = sys.exc_info()
@@ -21,22 +21,22 @@ def capture_exception_context(exc, locals_dict=None):
     }
 ```
 
-Delphi 异常采集推荐两种方案（二选一）：
+For Delphi exception collection, two options are recommended (pick one):
 
-**方案 A：引导用户在 IDE 重现（推荐，零依赖）**
-AI 引导用户设断点、单步跟踪、收集调用栈和变量值。
-- 必须用 Debug 配置编译
-- 用户报告：出错文件+行号、异常消息、Call Stack (Ctrl+Alt+S)、Watch 变量值
+**Option A: Guide the user to reproduce in the IDE (recommended, zero dependencies)**
+The AI guides the user to set breakpoints, single-step, and collect the call stack and variable values.
+- Must compile with the Debug configuration
+- The user reports: failing file + line number, exception message, Call Stack (Ctrl+Alt+S), Watch variable values
 
-**方案 B：接入异常跟踪工具（生产环境）**
-| 工具 | 特点 |
+**Option B: Wire in an exception-tracking tool (production environment)**
+| Tool | Features |
 |------|------|
-| **StackTrace.pas**（项目自带） | VEH 钩子 + MAPDATA 符号解析 + 局部变量快照 |
-| **madExcept**（商业） | 黄金标准：完整调用栈+源码行号 |
-| **JclDebug**（JEDI 开源） | 编译时嵌入 map 符号 |
-| **EurekaLog**（商业） | 支持远程上报 |
+| **StackTrace.pas** (ships with the project) | VEH hook + MAPDATA symbol resolution + local-variable snapshot |
+| **madExcept** (commercial) | Gold standard: full call stack + source line numbers |
+| **JclDebug** (JEDI open source) | map symbols embedded at compile time |
+| **EurekaLog** (commercial) | Supports remote reporting |
 
-推荐优先用 StackTrace.pas：
+Prefer StackTrace.pas:
 ```pascal
 uses StackTrace;
 initialization
@@ -44,4 +44,6 @@ initialization
   TStackTraceManager.Current.CaptureVariables := True;
 end.
 ```
-启用后异常自动生成日志（符号化调用栈 + 源码行号 + 局部变量值）。
+Once enabled, exceptions automatically produce a log (symbolized call stack + source line numbers + local variable values).
+
+

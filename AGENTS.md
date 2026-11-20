@@ -7,9 +7,9 @@ Daofy — Python 3.10-3.14, Windows, pytest.
 | Action | Command |
 |--------|---------|
 | Install deps | `pip install -r requirements.txt && pip install -e ".[dev]"` |
-| Install file watcher | `pip install daofy-for-delphi[watcher]` (可选，自动增量 KB) |
-| Install embedding | `pip install daofy-for-delphi[embedding]` (可选，语义搜索) |
-| Run all tests | `pytest` (or `python tests/run_all_tests.py` for basic) |
+| Install file watcher | `pip install daofy-for-delphi[watcher]` (optional, automatic incremental KB) |
+| Install embedding | `pip install daofy-for-delphi[embedding]` (optional, semantic search) |
+| Run all tests | `pytest` (or `python tests/run_all_tests.py` for the basic set) |
 | Run one test | `pytest tests/test_validator.py -v` |
 | Lint/type | `mypy src/` |
 | Environment | Always set `$env:PYTHONIOENCODING='utf-8'` on Windows |
@@ -24,347 +24,347 @@ src/
 ├── tools/                 # MCP tool implementations (delphi_file, code_hosting, delphi_project, delphi_kb, ...)
 ├── services/              # Business logic
 │   ├── compiler_service.py, config_manager.py, process_manager.py, args_generator.py
-│   ├── automation_service.py     # Delphi GUI/Console 自动化测试服务
-│   ├── copyright_service.py      # 软著文档生成服务
-│   ├── delphi_edit_guard.py      # Delphi 文件编辑保护（脏标记检测）
-│   ├── experience_service.py     # AI 经验记忆管理服务
-│   ├── ocr_service.py            # 图像分析服务
-│   ├── rtti_bridge.py            # Delphi RTTI 桥接服务
+│   ├── automation_service.py     # Delphi GUI/Console automation testing service
+│   ├── copyright_service.py      # Software copyright document generation service
+│   ├── delphi_edit_guard.py      # Delphi file edit protection (dirty-flag detection)
+│   ├── experience_service.py     # AI experience memory service
+│   ├── ocr_service.py            # Image analysis service
+│   ├── rtti_bridge.py            # Delphi RTTI bridge service
 │   └── knowledge_base/           # KB modules (schema, smart_cache, project, thirdparty, scan, embedding, async_task_manager)
 ├── models/                # Pydantic/dataclass models
 └── utils/                 # Utilities (delphi_env, dproj_parser, lpi_parser, validator, logger, parser)
 ```
 
-## 知识库自动生命周期
+## Knowledge base automatic lifecycle
 
-项目知识库（`.delphi-kb/`）有以下自动化机制：
+The project knowledge base (`.delphi-kb/`) has the following automatic mechanisms:
 
-| 机制 | 触发时机 | 说明 |
+| Mechanism | Trigger | Description |
 |------|---------|------|
-| **启动时自动构建** | MCP Server 启动 | 自动检测 CWD 下的 `.dproj`，提交后台增量 KB 构建（不阻塞 MCP 就绪） |
-| **热切换重建** | 用户手动 rebuild | 构建到临时目录 `.delphi-kb-tmp-{ts}/`，旧 KB 在构建期间保持可查，构建完成原子 swap |
-| **文件变更监听** | 用户保存 `.pas/.dfm/.dproj` 等 | 需要 `pip install daofy-for-delphi[watcher]`，3秒去抖后自动触发增量更新 |
+| **Automatic build on start-up** | MCP Server start | Detects the `.dproj` under the CWD and submits a background incremental KB build (without blocking MCP readiness) |
+| **Hot-swap rebuild** | Manual rebuild by the user | Builds into a temporary directory `.delphi-kb-tmp-{ts}/`, keeps the old KB queryable during the build, then swaps atomically |
+| **File change watching** | The user saves `.pas/.dfm/.dproj` and similar | Requires `pip install daofy-for-delphi[watcher]`; triggers an incremental update after a 3-second debounce |
 
-**文件变更监听依赖**: `watchdog` 可选包，未安装时静默降级，不影响其他功能。
-**查看服务器状态**: MCP 资源 `delphi://health` 返回版本号、运行时长、监听器状态。
+**File change watching dependency**: the optional `watchdog` package; when it is not installed the feature degrades silently and nothing else is affected.
+**Checking server state**: the MCP resource `delphi://health` returns the version, the uptime and the listener state.
 
-## 工具使用规则
+## Tool usage rules
 
-### Git 操作必须使用 code_hosting
-所有 Git 操作（status/add/commit/push/clone/push_retry）必须通过 `code_hosting` 工具，禁止直接使用 bash 运行 git 命令。`code_hosting` 会统一格式化输出、自动处理异步推送重试，比原始 bash git 更省 token。
+### Git operations must go through code_hosting
+Every Git operation (status/add/commit/push/clone/push_retry) must go through the `code_hosting` tool; running git commands directly from bash is forbidden. `code_hosting` formats the output consistently and handles asynchronous push retries automatically, which costs fewer tokens than raw bash git.
 
-### 经验库维护规则
-`experience` 工具会自动去重（embedding 相似度 >0.85 时合并到旧记录而非新增），但 AI 仍需主动维护经验质量：
+### Experience library maintenance rules
+The `experience` tool de-duplicates automatically (an embedding similarity above 0.85 merges into the existing record instead of adding a new one), but the AI still has to maintain the quality of the experience actively:
 
-0. **保存前先泛化**：调用 `experience(action="save")` 前，先 `experience(action="search", query=...)` 搜索是否已存在覆盖同类问题的抽象经验。如果找到，用 `action=merge` 或 `action=update` 将当前场景合并进去，不要另存为一条具体场景的记录。示例：不要存「编译后 output_file 冗余」，而是合并到「MCP 工具接口输出精简」——后者可以覆盖任意工具的返回值清理。
-1. **任务完成后**：如果刚解决的问题与已有经验高度相关，但解决方式不同，用 `action=merge` 手动合并两条经验
-2. **定期清理**：用 `action=prune` 列出低价值（低 hit_count、长期未更新）的经验，检查后 `action=delete` 删除
-3. **抽象合并**：发现多条经验描述的是同一类问题（如不同工具的「消息精简」），手动合并为一条抽象经验，`tags` 要覆盖各类场景
-4. **重建缺失向量**：若 embedding 模型后来才加载（首次使用时未加载），旧记录缺少向量。`search()` 在模型已加载但无结果时会自动触发 `rebuild_embeddings()` 补全，无需手动调用。也可通过 `experience(action="rebuild_embedding")` 显式触发。
+0. **Generalize before saving**: before calling `experience(action="save")`, search with `experience(action="search", query=...)` for an abstract experience that already covers the same class of problem. If one exists, merge the current case into it with `action=merge` or `action=update` instead of storing another case-specific record. Example: do not store "redundant output_file after compilation"; merge it into "trim MCP tool interface output", which covers return-value cleanup for any tool.
+1. **After finishing a task**: if the problem just solved is closely related to an existing experience but was solved differently, merge the two manually with `action=merge`
+2. **Periodic cleanup**: use `action=prune` to list low-value experiences (low hit_count, long untouched), review them, then delete with `action=delete`
+3. **Abstract merging**: when several experiences describe the same class of problem (for example "message trimming" across different tools), merge them manually into one abstract experience whose `tags` cover every scenario
+4. **Rebuild missing vectors**: if the embedding model is loaded later (it was not loaded on first use), older records have no vector. `search()` triggers `rebuild_embeddings()` automatically when the model is loaded but nothing matches, so no manual call is needed. `experience(action="rebuild_embedding")` also triggers it explicitly.
 
-## Agent 编码工作流（优先级顺序）
+## Agent coding workflow (in priority order)
 
-### 编辑 Delphi 文件前
+### Before editing a Delphi file
 
-> ⚠️ **工具调用规则**：以下每一步都使用对应的 **MCP 工具名** 调用。每个工具名即是你在 `list_tools()` 中看到的工具名称。如果工具未出现在列表，刷新 MCP 连接。
+> ⚠️ **Tool call rules**: every step below calls the corresponding **MCP tool name**. Each tool name is exactly the name you see in `list_tools()`. If a tool is missing from the list, refresh the MCP connection.
 
-| 步骤 | 调用的 MCP 工具 | 说明 |
+| Step | MCP tool called | Description |
 |------|----------------|------|
-| ① 环境检查 | `check_environment(action="check")` | 确认编译器可用 |
-| ② 编码规则 | `get_coding_rules(section="workflow")` | 获取编码规范，`language="delphi"`（默认）或 `"lazarus"` |
-| ③ API 搜索 | `delphi_kb(query=...)` | 搜索 API 定义（详见 `get_coding_rules(section="kb_search")` / `delphi://coding-rules` ② 节） |
-| ④ 读源码 | `delphi_file(action="read", file_path=...)` | 读取文件确认修改点 |
-| ⑤ 写代码 | `delphi_file(action="write", edits=[...])` | 写入代码（自动备份到 __history） |
-| ⑤b 批量写 | `delphi_file(action="write", edits=[...])` | 批量写入多处（edits 顺序不限，自动备份到 __history） |
-| ⑥ 格式化 | `delphi_file(action="format", file_path=...)` | pasfmt 格式化代码 |
-| **⑦ 编译验证** | **`delphi_project(action="compile", project_path=...)`** | **编译 `.dproj`/`.dpr`/`.dpk` 项目** |
-| **⑧ 运行验证** | **`delphi_project(action="compile", ..., run_verify=True)`** | **编译后启动 exe 运行 3 秒，检测运行时崩溃** |
-| **⑨ 运行时检查** | **`delphi_project(action="runtime", base_dir=...)`** | **扫描组件类名，检测遗漏 uses 单元** |
+| ① Environment check | `check_environment(action="check")` | Confirm the compiler is usable |
+| ② Coding rules | `get_coding_rules(section="workflow")` | Fetch the coding standard, with `language="delphi"` (default) or `"lazarus"` |
+| ③ API search | `delphi_kb(query=...)` | Search API definitions (see `get_coding_rules(section="kb_search")` / section ② of `delphi://coding-rules`) |
+| ④ Read the source | `delphi_file(action="read", file_path=...)` | Read the file to confirm the change site |
+| ⑤ Write code | `delphi_file(action="write", edits=[...])` | Write the code (automatically backed up to __history) |
+| ⑤b Batch write | `delphi_file(action="write", edits=[...])` | Write several places at once (the `edits` order does not matter; automatically backed up to __history) |
+| ⑥ Format | `delphi_file(action="format", file_path=...)` | Format the code with pasfmt |
+| **⑦ Compile check** | **`delphi_project(action="compile", project_path=...)`** | **Compile a `.dproj`/`.dpr`/`.dpk` project** |
+| **⑧ Run check** | **`delphi_project(action="compile", ..., run_verify=True)`** | **Start the exe for 3 seconds after a successful compile and detect a runtime crash** |
+| **⑨ Runtime check** | **`delphi_project(action="runtime", base_dir=...)`** | **Scan component class names and detect missing `uses` units** |
 
-各步骤补充说明：
+Notes on individual steps:
 
-- **⑧ run_verify**: 编译成功后自动启动 exe 运行 3 秒，若进程崩溃则标记验证失败（秒级，自动结束进程）。检测到 `exception.log` 时使用 `detect_encoding`（与 delphi_file 同款 BOM/编码检测）读取内容直接嵌入 MCP 响应，无需 AI 额外调用 delphi_file。
-- **⑨ runtime 检查**: 扫描 .pas/.dfm 中组件类名，匹配 `src/rules/runtime_registry.json` 规则表，检测是否遗漏必需 uses 单元（如 FireDAC.DApt）。独立于编译步骤，纯源码级分析。
+- **⑧ run_verify**: after a successful compile the exe is started for 3 seconds; if the process crashes the check is marked failed (it takes seconds and the process is terminated automatically). When an `exception.log` is detected it is read with `detect_encoding` (the same BOM/encoding detection `delphi_file` uses) and embedded directly in the MCP response, so the AI does not need an extra `delphi_file` call.
+- **⑨ runtime check**: scans component class names in .pas/.dfm, matches them against the `src/rules/runtime_registry.json` rule table and detects missing required `uses` units (such as FireDAC.DApt). It is independent of the compile step and works purely at source level.
 
-> 详细 KB 搜索策略、优先级规则、kb_type 范围、Entity Kind Codes 见 `get_coding_rules(section="kb_search")` / `delphi://coding-rules` ② 节。
+> The detailed KB search strategy, priority rules, `kb_type` scope and Entity Kind Codes are in `get_coding_rules(section="kb_search")` / section ② of `delphi://coding-rules`.
 
-### 编辑 Lazarus/FPC 文件前
+### Before editing a Lazarus/FPC file
 
-| 步骤 | 调用的 MCP 工具 | 说明 |
+| Step | MCP tool called | Description |
 |------|----------------|------|
-| ① 编码规则 | `get_coding_rules(language="lazarus", section="workflow")` | 获取 Lazarus 编码规范 |
-| ② 项目信息 | `lazarus_project(action="info", project_path=...)` | 查看 `.lpi` 项目结构 |
-| ③ 读源码 | `lazarus_file(action="read", file_path=...)` | 读取文件确认修改点 |
-| ④ 写代码 | `lazarus_file(action="write", edits=[...])` | 写入代码（自动备份到 __history） |
-| **⑤ 编译验证** | **`lazarus_compile(project_path=".lpi")`** | **lazbuild 编译项目** |
-| ⑥ 查 API | `lazarus_kb(action="search", query=...)` | 搜索 LCL/FPC 源码定义 |
+| ① Coding rules | `get_coding_rules(language="lazarus", section="workflow")` | Fetch the Lazarus coding standard |
+| ② Project information | `lazarus_project(action="info", project_path=...)` | Inspect the `.lpi` project structure |
+| ③ Read the source | `lazarus_file(action="read", file_path=...)` | Read the file to confirm the change site |
+| ④ Write code | `lazarus_file(action="write", edits=[...])` | Write the code (automatically backed up to __history) |
+| **⑤ Compile check** | **`lazarus_compile(project_path=".lpi")`** | **Compile the project with lazbuild** |
+| ⑥ API lookup | `lazarus_kb(action="search", query=...)` | Search LCL/FPC source definitions |
 
-> 注意：Lazarus 没有 Delphi 的 DFM/uses 管理/自动化测试等专有功能，相关工具（delphi_file 的 format/grep/uses、manage_component、automate_delphi）在 Lazarus 工作流中不可用。请使用 `lazarus_file` 的 read/write/backup 代替。
+> Note: Lazarus has none of Delphi's proprietary features (DFM, `uses` management, automation testing), so the related tools (`delphi_file`'s format/grep/uses, `manage_component`, `automate_delphi`) are unavailable in the Lazarus workflow. Use `lazarus_file`'s read/write/backup instead.
 
 ## Code Style (Python)
 
-- **类型**: 全部用 type hints
-- **导入顺序**: stdlib → third-party → local (每组空格分隔, 内部字母序)
-- **命名**: `snake_case` 函数/变量, `PascalCase` 类, `UPPER_SNAKE` 常量, `_前缀` 私有
-- **文档**: Google-style docstring, 公共函数必须有
-- **异常**: 用具体异常类型, 不要 `except Exception: pass`
-- **测试**: `test_*.py`, `test_` 前缀函数, pytest fixture, `unittest.mock` 打桩
+- **Types**: type hints everywhere
+- **Import order**: stdlib → third-party → local (each group separated by a blank line, alphabetical inside a group)
+- **Naming**: `snake_case` for functions/variables, `PascalCase` for classes, `UPPER_SNAKE` for constants, `_` prefix for private members
+- **Documentation**: Google-style docstring, mandatory on public functions
+- **Exceptions**: use specific exception types, never `except Exception: pass`
+- **Tests**: `test_*.py`, functions prefixed `test_`, pytest fixtures, `unittest.mock` for stubbing
 
-## Agent 操作硬规则
+## Agent operating hard rules
 
-> 脚本执行、字符串格式化、Python 陷阱等通用规则见 `get_coding_rules(section="agent_rules")` / `delphi://coding-rules`「Agent 操作硬规则」。
+> Script execution, string formatting, Python pitfalls and other general rules are in `get_coding_rules(section="agent_rules")` / "Agent operating hard rules" in `delphi://coding-rules`.
 
-### 多进程 Worker
-- **Worker 内部禁用 `print()`**：MCP 环境下 stdout 是 JSON-RPC 通信管道，worker print 破坏协议边界，构建从 8s 飙到 172s
-- Worker 标准模式：
+### Multiprocess workers
+- **No `print()` inside a worker**: under MCP, stdout is the JSON-RPC channel; a worker `print()` breaks the protocol boundary and can push a build from 8s to 172s
+- Standard worker pattern:
   ```python
   def worker(args):
       import io, sys
       sys.stdout = sys.stderr = io.StringIO()
       try:
-          ...  # 实际工作
+          ...  # actual work
           return result
       except:
-          return None  # 错误通过返回值传递
+          return None  # errors travel back through the return value
   ```
 
-### 数据库
-- **DDL 统一**：所有建表语句集中在 `schema.py`，各 Builder 调 `create_source_tables()`/`create_document_tables()`
-- **同一 DB 文件所有连接用相同 journal 模式**：本项目统一使用 WAL（`PRAGMA journal_mode=WAL`），切换模式需要独占锁，运行中若有其他连接会 locked
-- 修改表结构后 `grep` 全项目旧表名/列名的所有 INSERT/DELETE/SELECT/ALTER 引用
+### Database
+- **DDL in one place**: every table-creation statement lives in `schema.py`, and each builder calls `create_source_tables()`/`create_document_tables()`
+- **One journal mode per database file**: this project uses WAL everywhere (`PRAGMA journal_mode=WAL`); switching the mode needs an exclusive lock, and any other open connection makes it locked
+- After changing a table, `grep` the whole project for every INSERT/DELETE/SELECT/ALTER that references the old table or column name
 
-### delphi_file 工具使用规则（详见 `delphi://coding-rules`）
+### delphi_file usage rules (details in `delphi://coding-rules`)
 
-编辑 Delphi 文件时的行号规则、脏标记保护、输出格式等详细规范已迁移至 MCP Resource `delphi://coding-rules`（内置源：`src/resources/coding-rules.md`），AI 应通过以下方式获取：
+The detailed rules for line numbers, dirty-flag protection and the output format when editing Delphi files now live in the MCP Resource `delphi://coding-rules` (built-in source: `src/resources/coding-rules.md`). The AI fetches them like this:
 
 ```python
-get_coding_rules(section="writing")                     # 写代码全部规则
-get_coding_rules(section="delphi_file_write_rule")      # 行号规则
-get_coding_rules(section="delphi_file_dirty_flag")      # 脏标记保护
-get_coding_rules(section="delphi_file_output_format")   # 输出格式
-get_coding_rules(section="delphi_file_usage_tips")      # 使用建议
+get_coding_rules(section="writing")                     # all writing rules
+get_coding_rules(section="delphi_file_write_rule")      # line-number rules
+get_coding_rules(section="delphi_file_dirty_flag")      # dirty-flag protection
+get_coding_rules(section="delphi_file_output_format")   # output format
+get_coding_rules(section="delphi_file_usage_tips")      # usage tips
 ```
 
-**核心要点**（完整规则见上方章节）：
-- 行号统一为 **1-indexed 左闭右闭**，`write` 统一使用 `edits=[...]`
-- 写入后文件标记为**脏**，再次 write 前必须 `read` 或 `preview`
-- write 响应中 `[s, e] → [s', e']` 的差值即为**行号偏移量**
-- ❌ 禁止使用 Agent 内置 `Read/Edit/Write`、原生 edit/write、IDE 默认编辑器读取或修改 `.pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx`
-- ❌ 禁止用 `apply_patch`、shell 重定向、PowerShell/Python 直接写入 `.pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx`
-- ✅ Delphi 文件的读取和写入只能通过 `delphi_file` 或 Daofy 内部已登记的 Delphi 工具；`list_tools()` 中的 `delphi_file` 描述是跨 Agent 的首要路由提示
-- ⚠️ `DAOFY_EDIT_GUARD=strict` 只是后验兜底：它依赖 Daofy 文件监听器检测外部写入，不能阻止内置工具抢先改文件
+**Key points** (the full rules are in the sections above):
+- Line numbers are **1-indexed, closed interval at both ends**, and `write` always uses `edits=[...]`
+- A file is marked **dirty** after a write, so `read` or `preview` is required before the next write
+- The difference in `[s, e] → [s', e']` in a write response is the **line-number offset**
+- ❌ Never read or modify `.pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx` with the agent's built-in `Read/Edit/Write`, a native edit/write tool, or the IDE's default editor
+- ❌ Never write `.pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx` with `apply_patch`, shell redirection, or PowerShell/Python
+- ✅ Delphi files may be read and written only through `delphi_file` or another Delphi tool Daofy has registered; the `delphi_file` description in `list_tools()` is the primary cross-agent routing hint
+- ⚠️ `DAOFY_EDIT_GUARD=strict` is only a post-hoc backstop: it relies on the Daofy file watcher to spot external writes and cannot stop a built-in tool from getting to the file first
 
-### 编译验证
+### Compile verification
 
-详见 `get_coding_rules(section="compile")` / `delphi://coding-rules` §⑤ 编译：
+See `get_coding_rules(section="compile")` / §⑤ Compile in `delphi://coding-rules`:
 
-## 源码审计
+## Source code audit
 
-### 审计触发条件
-当用户要求以下内容时，Agent 必须执行源码审计流程：
+### Audit triggers
+When the user asks for any of the following, the agent must run the source audit workflow:
 
-| 触发词 | 说明 |
+| Trigger words | Description |
 |--------|------|
-| "审计代码"、"审查代码"、"代码审核"、"review code"、"audit" | 全面审计 |
-| "安全检查"、"漏洞扫描"、"安全隐患"、"security review" | 安全专项审计 |
-| "性能分析"、"性能审计"、"慢在哪"、"performance" | 性能专项审计 |
-| "资源泄漏"、"内存泄漏"、"句柄泄漏"、"resource leak" | 资源管理专项审计 |
+| "audit code", "review code", "code review", "audit" | Full audit |
+| "security check", "vulnerability scan", "security risk", "security review" | Security-focused audit |
+| "performance analysis", "performance audit", "where is it slow", "performance" | Performance-focused audit |
+| "resource leak", "memory leak", "handle leak", "resource leak" | Resource management audit |
 
-### 审计工作流
-
-```
-① 确定审计对象
-   ├─ Delphi 代码（.pas/.dproj/.dpk）→ get_coding_rules(section="review")
-   └─ Python 项目（当前 MCP Server）→ 按下方 Python 审计要求逐项检查
-② 确定审计范围（全局/指定文件/新增代码）
-③ 搜索相关 API 定义，评估用法（Delphi 用 delphi_kb，Python 用 grep/LSP）
-④ **优先调用 delphi_project(audit/ast)**（daudit 不可用时降级为引导）
-   → 使用 `mode="ast"`（⭐ 推荐，daudit --mode skeleton --compact）快速了解代码结构
-   → 需要深度规则检查时使用 `mode="audit"`（运行 50+ 条静态分析规则）
-   → AI 解读结果，排除误报，生成修复建议
-   → 补充手动检查（delphi_project(action="audit") 标记 is_ai_needed=true 的项）
-⑤ delphi_project(action="compile") / pytest 验证（如果涉及代码修改）
-⑥ 输出审计报告
-```
-
-### Delphi 审计
-
-审计 Delphi 代码时，直接引用 `get_coding_rules(section="review")` / `delphi://coding-rules` 的「审核」章节作为检查项来源：
-
-> **检查项来源**：`get_coding_rules(section="review")` 获取完整的 Delphi 审核表
->（一致性、完整性、资源泄露、Delphi 特有、常见错误模式、代码质量、数据转换、安全、性能）。
-
-### Python 项目审计（当前 MCP Server）
-
-审计本 MCP Server 项目（Python 代码）时，按以下类别逐项检查：
-
-#### 1. 安全审计（Security）
-| # | 检查项 | 说明 |
-|---|--------|------|
-| 1.1 | 命令/Shell 注入 | `subprocess`/`Popen`/`os.system` 参数拼接用户输入 → 必须用列表参数 `["cmd", arg]`，禁用 `shell=True` 传参 |
-| 1.2 | 路径遍历 | 用户传入路径未经 `resolve()`/`abspath()` 校验直接文件操作 → 限制在允许目录内 |
-| 1.3 | 注册表安全 | `winreg` 读写仅读 HKLM/HKCU 的 Embarcadero BDS 路径，不写关键系统位置 |
-| 1.4 | 敏感信息泄露 | `compilers.json` 等配置文件中密钥/密码 → 环境变量替代；日志中不输出 token/password |
-| 1.5 | 临时文件安全 | `tempfile` 模块创建临时文件用 `NamedTemporaryFile(delete=True)`，防竞争 |
-| 1.6 | Pickle 反序列化 | 禁止 `pickle.loads` 从不可信源加载数据 → 用 JSON 替代 |
-
-#### 2. MCP 协议与工具审计（MCP Protocol）
-| # | 检查项 | 说明 |
-|---|--------|------|
-| 2.1 | 工具注册一致性 | `list_tools()` 和 `call_tool()` 必须同步注册 — 所有 call_tool 中处理的工具必须在 list_tools 中声明 |
-| 2.2 | 参数校验 | 工具输入参数前置校验，缺失必需参数返回明确错误信息 |
-| 2.3 | 异常安全 | 工具内全部异常在顶层 `call_tool` 中统一捕获并返回 `CallToolResult(isError=True)`，不得泄露 traceback 给 MCP 客户端 |
-| 2.4 | 返回格式统一 | 所有工具最终返回 `CallToolResult(content=[TextContent(...)], isError=...)`，不得直接返回 dict |
-| 2.5 | 超时控制 | 编译等耗时操作设置 `timeout` 参数，避免 MCP 通信通道超时（约 60s） |
-| 2.6 | 子进程通信保护 | Worker 进程 stdout 已 pipe 为 JSON-RPC 通道时禁用 `print()`，使用 `sys.stderr` 或 logging |
-
-#### 3. 并发与进程审计（Concurrency & Process）
-| # | 检查项 | 说明 |
-|---|--------|------|
-| 3.1 | Worker print 禁令 | `multiprocessing` worker 内部禁用 `print()`，MCP 环境下 stdout 是通信管道，print 破坏协议边界 |
-| 3.2 | 子进程退出清理 | 使用 `Popen`/`Process`/`ProcessPoolExecutor` 后确保进程退出时资源清理（`terminate()`/`join()`/`cancel()`） |
-| 3.3 | 竞态条件 | 共享变量（`_pkb_cache` 等）加锁保护，用 `threading.Lock` 而非 `global` 裸访问 |
-| 3.4 | 跨平台兼容 | Windows `spawn` 模式下子进程重新导入模块 → 在 `if __name__ != '__mp_main__'` 保护下延迟导入 |
-| 3.5 | 长轮询超时 | 编译状态轮询 ≤30 秒，超时后切换短轮询，防止阻塞 MCP 请求通道 |
-
-#### 4. 资源管理审计（Resource Management）
-| # | 检查项 | 说明 |
-|---|--------|------|
-| 4.1 | 数据库连接泄漏 | SQLite 连接用 `with` 或 `try...finally` 保障关闭，`use_wal=False` 时注意独占锁 |
-| 4.2 | 文件句柄泄漏 | `open()` 在 `with` 块内使用，手动 `f.open()` 必须有对应的 `f.close()` |
-| 4.3 | 临时文件清理 | 编译过程中创建的临时 `.res`/`.dcu` 文件应在结束时清理 |
-| 4.4 | 缓存未清理 | `_pkb_cache` 在服务关闭时通过 `_cleanup_resources()` 清理，确保所有 KB 实例 `close()` |
-| 4.5 | 进程残留 | 子进程超时后需 `kill()` 而非仅 `wait()`，避免僵尸进程 |
-
-#### 5. 错误处理审计（Error Handling）
-| # | 检查项 | 说明 |
-|---|--------|------|
-| 5.1 | 空 except | `except: pass` / `except Exception: pass` — 禁止静默忽略，必须记录日志 |
-| 5.2 | 异常范围过宽 | 用具体异常类型而非裸 `except:`，区分 IOError/ValueError/KeyError 等 |
-| 5.3 | 日志完整性 | `except` 块中记录异常用 `logger.error(msg, exc_info=True)` 附带调用栈 |
-| 5.4 | finally 遗漏 | 资源获取（文件/DB/锁）后必须 `try...finally` 确保释放 |
-| 5.5 | 外部调用容错 | 调用编译器/外部工具时的异常需降级处理，不因外部异常导致 MCP Server 崩溃 |
-
-#### 6. 代码质量审计（Code Quality）
-| # | 检查项 | 说明 |
-|---|--------|------|
-| 6.1 | Type Hints | 所有函数/方法必须包含完整的类型注解，返回类型不可省略 |
-| 6.2 | 导入顺序 | stdlib → third-party → local 三组，空格分隔，组内字母序 |
-| 6.3 | 命名规范 | `snake_case` 函数/变量/方法，`PascalCase` 类，`UPPER_SNAKE` 常量，`_前缀` 私有 |
-| 6.4 | 文档字符串 | 公共函数必须有 Google-style docstring，说明 Args/Returns/Raises |
-| 6.5 | 圈复杂度 | 函数不超过 50 行，嵌套不超过 4 层，过长需拆分 |
-| 6.6 | 异步模式 | 异步函数内慎用 `time.sleep()`，使用 `asyncio.sleep()`；避免同步阻塞事件循环 |
-| 6.7 | 字符串格式化 | 禁用 f-string 嵌套字典键 `f'{d["key"]}'`（引号冲突），用 `.format()` 或前置变量 |
-| 6.8 | 函数内局部 import | 禁止在函数内部出现 `from X import Y`（会使 Y 在整个函数作用域成为局部变量），import 必须写在模块顶部 |
-
-#### 7. 配置与环境审计（Configuration）
-| # | 检查项 | 说明 |
-|---|--------|------|
-| 7.1 | 编译器路径 | `compilers.json` 中的路径在服务启动时可校验有效性，无效路径应有降级 |
-| 7.2 | 注册表回退 | 注册表读取失败时自动回退默认路径列表 |
-| 7.3 | 编码设置 | Windows 下必须设置 `PYTHONIOENCODING=utf-8` / `PYTHONUTF8=1` |
-| 7.4 | 依赖完整性 | 新增依赖需同时更新 `requirements.txt` 和 `pyproject.toml` |
-
-### 审计报告模板
+### Audit workflow
 
 ```
-## 源码审计报告
+① Determine the audit target
+   ├─ Delphi code (.pas/.dproj/.dpk) → get_coding_rules(section="review")
+   └─ Python project (this MCP Server) → check each item against the Python audit requirements below
+② Determine the audit scope (whole project / named files / new code)
+③ Search the relevant API definitions and assess their usage (delphi_kb for Delphi, grep/LSP for Python)
+④ **Prefer delphi_project(audit/ast)** (degrade to guidance when daudit is unavailable)
+   → Use `mode="ast"` (⭐ recommended, `daudit --mode skeleton --compact`) for a quick view of the code structure
+   → Use `mode="audit"` when a deep rule check is needed (runs 50+ static-analysis rules)
+   → The AI interprets the results, discards false positives and produces repair suggestions
+   → Add manual checks (items marked `is_ai_needed=true` by `delphi_project(action="audit")`)
+⑤ delphi_project(action="compile") / pytest verification (when code was modified)
+⑥ Produce the audit report
+```
 
-**项目**: <项目名称>
-**审计范围**: <全局 / 文件列表>
-**审计日期**: <日期>
+### Delphi audit
+
+When auditing Delphi code, take the check items directly from the "Review" section of `get_coding_rules(section="review")` / `delphi://coding-rules`:
+
+> **Source of the check items**: `get_coding_rules(section="review")` returns the complete Delphi review table
+> (consistency, completeness, resource leaks, Delphi-specific issues, common error patterns, code quality, data conversion, security, performance).
+
+### Python project audit (this MCP Server)
+
+When auditing this MCP Server project (Python code), check each item in the categories below:
+
+#### 1. Security audit
+| # | Check item | Description |
+|---|--------|------|
+| 1.1 | Command/shell injection | `subprocess`/`Popen`/`os.system` arguments built from user input → must pass a list `["cmd", arg]`, never `shell=True` with interpolation |
+| 1.2 | Path traversal | A user-supplied path used for file operations without `resolve()`/`abspath()` validation → confine it to permitted directories |
+| 1.3 | Registry safety | `winreg` reads and writes touch only the Embarcadero BDS paths under HKLM/HKCU, never critical system locations |
+| 1.4 | Sensitive information leakage | Keys or passwords in configuration files such as `compilers.json` → use environment variables; never log a token or a password |
+| 1.5 | Temporary file safety | Temporary files created through `tempfile` use `NamedTemporaryFile(delete=True)` to avoid a race |
+| 1.6 | Pickle deserialization | `pickle.loads` from an untrusted source is forbidden → use JSON instead |
+
+#### 2. MCP protocol and tool audit
+| # | Check item | Description |
+|---|--------|------|
+| 2.1 | Tool registration consistency | `list_tools()` and `call_tool()` must stay in sync — every tool handled in `call_tool` must be declared in `list_tools` |
+| 2.2 | Parameter validation | Tool inputs are validated up front, and a missing required parameter returns a clear error message |
+| 2.3 | Exception safety | Every exception inside a tool is caught at the top-level `call_tool` and returned as `CallToolResult(isError=True)`; a traceback is never leaked to the MCP client |
+| 2.4 | Uniform return format | Every tool finally returns `CallToolResult(content=[TextContent(...)], isError=...)` and never a bare dict |
+| 2.5 | Timeout control | Long operations such as compilation take a `timeout` parameter so the MCP channel (about 60s) cannot time out |
+| 2.6 | Subprocess channel protection | When a worker's stdout is already piped as the JSON-RPC channel, `print()` is forbidden; use `sys.stderr` or logging |
+
+#### 3. Concurrency and process audit
+| # | Check item | Description |
+|---|--------|------|
+| 3.1 | Worker print ban | No `print()` inside a `multiprocessing` worker; under MCP stdout is the channel and a print breaks the protocol boundary |
+| 3.2 | Subprocess exit cleanup | After `Popen`/`Process`/`ProcessPoolExecutor`, make sure the resource is released on exit (`terminate()`/`join()`/`cancel()`) |
+| 3.3 | Race conditions | Shared variables (`_pkb_cache` and similar) are lock-protected with `threading.Lock`, not touched through a bare `global` |
+| 3.4 | Cross-platform compatibility | Under Windows `spawn` a child re-imports the module → import lazily under an `if __name__ != '__mp_main__'` guard |
+| 3.5 | Long-poll timeout | Compile-status polling stays under 30 seconds; after that it switches to short polling so the MCP request channel is never blocked |
+
+#### 4. Resource management audit
+| # | Check item | Description |
+|---|--------|------|
+| 4.1 | Database connection leaks | SQLite connections are closed with `with` or `try...finally`; watch out for an exclusive lock when `use_wal=False` |
+| 4.2 | File handle leaks | `open()` is used inside a `with` block; a manual `f.open()` needs a matching `f.close()` |
+| 4.3 | Temporary file cleanup | Temporary `.res`/`.dcu` files created during a build are cleaned up at the end |
+| 4.4 | Cache cleanup | `_pkb_cache` is cleared by `_cleanup_resources()` on shutdown, which calls `close()` on every KB instance |
+| 4.5 | Leftover processes | A subprocess that times out is `kill()`ed, not just `wait()`ed, to avoid zombies |
+
+#### 5. Error handling audit
+| # | Check item | Description |
+|---|--------|------|
+| 5.1 | Empty except | `except: pass` / `except Exception: pass` — silent swallowing is forbidden, log it |
+| 5.2 | Over-broad exceptions | Use specific exception types rather than a bare `except:`, and distinguish IOError/ValueError/KeyError |
+| 5.3 | Log completeness | Record an exception in an `except` block with `logger.error(msg, exc_info=True)` so the stack comes with it |
+| 5.4 | Missing finally | After acquiring a resource (file/DB/lock) always use `try...finally` to guarantee release |
+| 5.5 | External call resilience | Exceptions from a compiler or an external tool are degraded gracefully; an external failure never crashes the MCP Server |
+
+#### 6. Code quality audit
+| # | Check item | Description |
+|---|--------|------|
+| 6.1 | Type hints | Every function/method carries complete type annotations, return type included |
+| 6.2 | Import order | stdlib → third-party → local, three groups separated by blank lines, alphabetical inside a group |
+| 6.3 | Naming | `snake_case` for functions/variables/methods, `PascalCase` for classes, `UPPER_SNAKE` for constants, `_` prefix for private members |
+| 6.4 | Docstrings | Public functions need a Google-style docstring describing Args/Returns/Raises |
+| 6.5 | Cyclomatic complexity | A function stays under 50 lines with at most 4 nesting levels; split it when it grows |
+| 6.6 | Async patterns | Avoid `time.sleep()` inside an async function; use `asyncio.sleep()` and never block the event loop synchronously |
+| 6.7 | String formatting | No f-string with nested dictionary keys (`f'{d["key"]}'`, quote conflict); use `.format()` or a local variable |
+| 6.8 | Function-local imports | `from X import Y` inside a function is forbidden (it makes Y a local for the whole function scope); imports go at module top |
+
+#### 7. Configuration and environment audit
+| # | Check item | Description |
+|---|--------|------|
+| 7.1 | Compiler paths | Paths in `compilers.json` are validated at service start-up, and an invalid path degrades gracefully |
+| 7.2 | Registry fallback | A failed registry read falls back to the default path list automatically |
+| 7.3 | Encoding setup | On Windows, `PYTHONIOENCODING=utf-8` / `PYTHONUTF8=1` must be set |
+| 7.4 | Dependency completeness | A new dependency updates both `requirements.txt` and `pyproject.toml` |
+
+### Audit report template
+
+```
+## Source code audit report
+
+**Project**: <project name>
+**Audit scope**: <whole project / file list>
+**Audit date**: <date>
 
 ---
 
-### 概览
+### Overview
 
-审计范围是 Delphi 代码时：
+When the audit scope is Delphi code:
 
-| 类别 | 发现数 | 严重 | 一般 | 建议 |
-|------|--------|------|------|------|
-| 安全 | N | N | N | N |
-| 资源管理 | N | N | N | N |
-| 错误处理 | N | N | N | N |
-| Delphi 特有 | N | N | N | N |
-| 一致性 | N | N | N | N |
-| **合计** | **N** | **N** | **N** | **N** |
+| Category | Findings | Critical | Major | Minor |
+|----------|--------|------|------|------|
+| Security | N | N | N | N |
+| Resource management | N | N | N | N |
+| Error handling | N | N | N | N |
+| Delphi-specific | N | N | N | N |
+| Consistency | N | N | N | N |
+| **Total** | **N** | **N** | **N** | **N** |
 
-审计范围是 Python MCP Server 时：
+When the audit scope is the Python MCP Server:
 
-| 类别 | 发现数 | 严重 | 一般 | 建议 |
-|------|--------|------|------|------|
-| 安全 | N | N | N | N |
-| MCP 协议与工具 | N | N | N | N |
-| 并发与进程 | N | N | N | N |
-| 资源管理 | N | N | N | N |
-| 错误处理 | N | N | N | N |
-| 代码质量 | N | N | N | N |
-| 配置与环境 | N | N | N | N |
-| **合计** | **N** | **N** | **N** | **N** |
+| Category | Findings | Critical | Major | Minor |
+|----------|--------|------|------|------|
+| Security | N | N | N | N |
+| MCP protocol and tools | N | N | N | N |
+| Concurrency and processes | N | N | N | N |
+| Resource management | N | N | N | N |
+| Error handling | N | N | N | N |
+| Code quality | N | N | N | N |
+| Configuration and environment | N | N | N | N |
+| **Total** | **N** | **N** | **N** | **N** |
 
-### 严重问题
+### Critical issues
 
-1. **[严重] <文件:F行>: <问题描述>**
-   - **问题**: ...
-   - **风险**: ...
-   - **建议修复**: ...
-   - **代码示例**:
+1. **[Critical] <file:line>: <issue description>**
+   - **Issue**: ...
+   - **Risk**: ...
+   - **Suggested fix**: ...
+   - **Code example**:
      ```pascal
-     // 当前代码
+     // current code
      ...
-     // 修复后
+     // after the fix
      ...
      ```
 
-### 一般问题
+### Major issues
 
 ...
 
-### 建议项
+### Suggestions
 
 ...
 
-### 审计结论
+### Audit conclusion
 
-<整体评估：代码质量评级、主要风险点、建议优先修复项>
+<overall assessment: code-quality rating, main risk points, items to fix first>
 ```
 
-### 审计工具配合
+### Audit tooling
 
 ```
-get_coding_rules(section="review")               → 获取 Delphi 审核标准
-delphi_project(action="ast", base_dir="src")           → ⭐ 代码骨架提取（daudit --mode skeleton --compact 最省 token）
-delphi_project(action="audit", base_dir=".", rules="P0") → 深度静态分析规则检查（可选的）
-delphi_file(action="read", file_path="unit.pas")   → 查看 Delphi 源码
-delphi_kb(query="TThread", search_type="reference") → 查 Delphi API 用法
-delphi_project(action="compile", project_path="proj.dproj") → Delphi 审计后验证编译
---- Python 项目审计用以下工具 ---
-grep / ast_grep_search                      → 搜索 Python 代码中的模式
-lsp_diagnostics / lsp_symbols               → 类型检查和符号分析
-pytest                                      → 审计后运行测试验证
+get_coding_rules(section="review")               → fetch the Delphi review standard
+delphi_project(action="ast", base_dir="src")           → ⭐ code skeleton extraction (daudit --mode skeleton --compact, the cheapest in tokens)
+delphi_project(action="audit", base_dir=".", rules="P0") → deep static-analysis rule check (optional)
+delphi_file(action="read", file_path="unit.pas")   → view Delphi source
+delphi_kb(query="TThread", search_type="reference") → look up Delphi API usage
+delphi_project(action="compile", project_path="proj.dproj") → compile after a Delphi audit
+--- Python project audits use these tools ---
+grep / ast_grep_search                      → search Python code for patterns
+lsp_diagnostics / lsp_symbols               → type checking and symbol analysis
+pytest                                      → run the tests after the audit
 ```
 
-## 发布打包流程
+## Release packaging
 
-### 创建 Release 包
+### Creating a release package
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
-# 必须：让 PowerShell 正确解码原生命令输出，否则中文路径乱码/丢失（见下方「中文路径陷阱」）
+# Required: let PowerShell decode native command output correctly, otherwise Chinese paths are garbled or lost (see "Chinese path pitfall" below)
 [Console]::OutputEncoding=[System.Text.Encoding]::UTF8
 $OutputEncoding=[System.Text.Encoding]::UTF8
 
-$src="C:\User\delphi-complier-mcp-server"   # 仓库根目录（注意：必须先于 $7z 定义）
+$src="C:\User\delphi-complier-mcp-server"   # repository root (note: must be defined before $7z)
 $7z="$src\tools\7z\7z.exe"
-$ver="v2026.09.16"  # 替换为当前版本
+$ver="v2026.09.16"  # replace with the current version
 $out="$src\releases\daofy-for-delphi-$ver"
 
-# 清理旧产物（7z a 对已存在的归档是「追加/更新」，不清理会残留上一版文件）
+# Clean the previous artifacts (7z a appends/updates an existing archive, so leftovers from the previous version survive)
 Remove-Item "$src\releases\daofy-for-delphi-$ver.tar","$src\releases\daofy-for-delphi-$ver.7z","$src\releases\daofy-for-delphi-$ver.zip" -Force -ErrorAction SilentlyContinue
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 
-# 从 git 索引取文件（自动排除 .gitignore 内容）
-# core.quotePath=false 是关键：否则非 ASCII（中文）路径被输出为八进制转义而复制失败
+# Take the files from the git index (which excludes everything .gitignore covers)
+# core.quotePath=false is essential: otherwise non-ASCII (Chinese) paths are printed as octal escapes and the copy fails
 $sel = @(git -c core.quotePath=false ls-files | Where-Object {
     $_ -notmatch '^\.arts/' -and
     $_ -notmatch '^\.coverage$' -and
@@ -382,67 +382,67 @@ $sel | ForEach-Object {
     catch { $failed += $_ }
 }
 Write-Host "copied=$copied failed=$($failed.Count) expected=$($sel.Count)"
-if ($failed.Count -gt 0) { $failed | ForEach-Object { Write-Host "  FAIL: $_" }; throw "打包文件复制失败" }
+if ($failed.Count -gt 0) { $failed | ForEach-Object { Write-Host "  FAIL: $_" }; throw "release file copy failed" }
 
-# 打包三种格式
+# Pack the three formats
 & $7z a -ttar "$src\releases\daofy-for-delphi-$ver.tar" "$out\*" -bb0 -bsp0
 & $7z a -t7z "$src\releases\daofy-for-delphi-$ver.7z" "$src\releases\daofy-for-delphi-$ver.tar" -mx=9 -m0=LZMA2 -bb0 -bsp0
 & $7z a -tzip "$src\releases\daofy-for-delphi-$ver.zip" "$out\*" -mx=9 -bb0 -bsp0
 Remove-Item $out -Recurse -Force
 
-# 校验：包内文件数必须等于 $sel.Count，否则说明有文件被静默跳过
+# Check: the number of files inside the package must equal $sel.Count, otherwise a file was silently skipped
 $cnt = (& $7z l -slt "$src\releases\daofy-for-delphi-$ver.zip" | Select-String '^Attributes = ' | Where-Object { $_ -notmatch 'D' }).Count
 Write-Host "zip files=$cnt expected=$($sel.Count)"
 ```
 
-**中文路径陷阱**：`git ls-files` 默认 `core.quotePath=true`，会把非 ASCII（中文）路径输出为八进制转义（如 `tests/\345\206\222...`），PowerShell 按字面处理 → `Test-Path`/`Copy-Item` 报「路径中含非法字符」并**静默跳过**该文件（脚本不报错，包内却缺文件）。v2026.09.16 打包时 435 个文件只进了 429 个，漏掉 `tests/冒烟测试/*.json`、`tests/scripts/新建客户-*.json` 等 6 个中文名文件。因此脚本必须：① 设 `[Console]::OutputEncoding`/`$OutputEncoding` 为 UTF-8；② 用 `git -c core.quotePath=false`；③ 用 `Copy-Item -LiteralPath`；④ 统计 `copied`/`failed` 且失败时 `throw`；⑤ 打包后用 `zip files=N expected=N` 复核。
+**Chinese path pitfall**: `git ls-files` defaults to `core.quotePath=true`, which prints non-ASCII (Chinese) paths as octal escapes (such as `tests/\345\206\222...`). PowerShell then treats that literally → `Test-Path`/`Copy-Item` reports "illegal characters in path" and **silently skips** the file (the script does not fail, yet the package is missing files). In the v2026.09.16 packaging run, 435 files produced only 429 entries, losing six Chinese-named files including `tests/冒烟测试/*.json` and `tests/scripts/新建客户-*.json`. The script therefore must: ① set `[Console]::OutputEncoding`/`$OutputEncoding` to UTF-8; ② use `git -c core.quotePath=false`; ③ use `Copy-Item -LiteralPath`; ④ count `copied`/`failed` and `throw` on failure; ⑤ re-check with `zip files=N expected=N` after packing.
 
-**自动包含**：`tools/pasfmt/cli/pasfmt.exe` 等工具文件由 `git ls-files` 自动纳入（已在版本控制中），无需手动处理。
+**Included automatically**: tool files such as `tools/pasfmt/cli/pasfmt.exe` are picked up by `git ls-files` (they are already under version control) and need no manual step.
 
-**排除项**：`tools/daudit/` 下的文件属于商业付费部分，不包含在 Release 包中（注意 `tools/stacktrace/` **不在**排除范围，需随包发布）。
+**Exclusions**: the files under `tools/daudit/` are a commercial, paid part and are not included in the release package (note that `tools/stacktrace/` is **not** excluded and must ship with the package).
 
-### 发布步骤
+### Release steps
 
-1. 运行打包脚本 → 生成 `.7z` / `.tar` / `.zip`
-2. 创建 GitHub Release：
+1. Run the packaging script → it produces `.7z` / `.tar` / `.zip`
+2. Create the GitHub Release:
    ```bash
    gh release create v2026.05.14 --title "v2026.05.14" --notes-file release_notes.md
    ```
-3. 附加包文件到 Release（通过 Web UI 或 `gh release upload`）
-4. 发布到 PyPI（见下方）
+3. Attach the package files to the Release (through the Web UI or `gh release upload`)
+4. Publish to PyPI (see below)
 
-### PyPI 发布
+### Publishing to PyPI
 
-PyPI Token 存储在 `config/pypi.json`（已在 `.gitignore` 中排除）。
+The PyPI token is stored in `config/pypi.json` (already excluded by `.gitignore`).
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
 
-# 1. 构建包
+# 1. Build the package
 python -m build
 
-# 2. 上传到 PyPI（需设置 UTF-8 编码避免 Windows GBK 问题）
+# 2. Upload to PyPI (UTF-8 is required to avoid the Windows GBK problem)
 $token = (Get-Content config/pypi.json | ConvertFrom-Json).token
 twine upload dist/* -u __token__ -p $token --disable-progress-bar
 ```
 
-**注意事项**：
-- 必须设置 `$env:PYTHONIOENCODING='utf-8'`，否则 twine 的 rich 进度条会在 Windows GBK 终端报 UnicodeEncodeError
-- `--disable-progress-bar` 可避免 rich 终端渲染问题
-- Token 格式：`pypi-AgEIcHlwaS5vcmcC...`（完整 token 在 `config/pypi.json`）
+**Notes**:
+- `$env:PYTHONIOENCODING='utf-8'` is mandatory; otherwise twine's rich progress bar raises UnicodeEncodeError in a Windows GBK terminal
+- `--disable-progress-bar` avoids rich terminal rendering problems
+- Token format: `pypi-AgEIcHlwaS5vcmcC...` (the full token is in `config/pypi.json`)
 
-## 重构 Checklist
+## Refactoring checklist
 
 ```
-[ ] DDL 统一为 schema 模块
-[ ] grep 旧表名/列名所有 CRUD 引用
-[ ] 删除废弃方法后验证无外部调用
-[ ] 检查局部 import 作用域问题
-[ ] 同一 DB 的 journal 模式一致
-[ ] 0 值用 is not None 判断
-[ ] 构建结束时记录 metadata(时间+用时)
-[ ] 强制重建用 DELETE FROM (不逐行)
-[ ] 全量测试 + KB 构建验证
-[ ] MCP 工具超时说明准确
-[ ] 多进程 worker 禁用 print()
+[ ] DDL unified in the schema module
+[ ] grep every CRUD reference to the old table/column name
+[ ] verify no external caller remains after removing a deprecated method
+[ ] check function-local import scope problems
+[ ] one journal mode for the same database
+[ ] test a zero value with `is not None`
+[ ] record metadata (time + duration) at the end of a build
+[ ] force a rebuild with DELETE FROM rather than row by row
+[ ] full test run + KB build verification
+[ ] MCP tool timeout documentation is accurate
+[ ] no print() in a multiprocess worker
 ```

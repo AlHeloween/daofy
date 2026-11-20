@@ -1,7 +1,7 @@
 """
-工具函数包
+Utility functions package
 
-包含编码检测、路径处理等通用工具函数
+Common utility functions such as encoding detection and path handling.
 """
 
 import ctypes
@@ -13,20 +13,22 @@ logger = logging.getLogger(__name__)
 
 
 def get_console_encoding(oem: bool = False) -> str:
-    """获取当前控制台的实际编码。
+    """Get the actual encoding of the current console.
 
-    在 Windows 上，控制台代码页（GetConsoleOutputCP）可能与系统 ANSI 编码
-    （locale.getpreferredencoding）不同。例如 Python 启用 UTF-8 模式时，
-    控制台代码页为 65001 (UTF-8)，但 ANSI 编码仍为 cp936 (GBK)。
+    On Windows, the console code page (GetConsoleOutputCP) may differ from the system
+    ANSI encoding (locale.getpreferredencoding). For example, when Python runs in
+    UTF-8 mode the console code page is 65001 (UTF-8), while the ANSI encoding is
+    still cp936 (GBK).
 
-    解码子进程输出时使用控制台代码页（oem=False），确保中文正确显示。
-    写入 batch 文件时使用 OEM 代码页（oem=True），因为 cmd.exe 只认 OEM 编码。
+    Use the console code page (oem=False) when decoding subprocess output, so that
+    Chinese text displays correctly. Use the OEM code page (oem=True) when writing
+    batch files, because cmd.exe only recognizes OEM encodings.
 
     Args:
-        oem: True 时返回 OEM 代码页（用于 batch 文件），False 时返回控制台代码页
+        oem: True returns the OEM code page (for batch files); False returns the console code page
 
     Returns:
-        编码名称字符串，如 'cp65001'、'cp936'、'utf-8' 等
+        An encoding name string, e.g. 'cp65001', 'cp936', 'utf-8', etc.
     """
     try:
         if oem:
@@ -36,5 +38,5 @@ def get_console_encoding(oem: bool = False) -> str:
         if cp > 0:
             return f'cp{cp}'
     except Exception as e:
-        logger.debug("获取编码失败（回退到 ANSI 编码）: %s", e)
+        logger.debug("Failed to get console encoding (falling back to ANSI encoding): %s", e)
     return locale.getpreferredencoding()

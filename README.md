@@ -6,62 +6,62 @@
 ![Lazarus/FPC](https://img.shields.io/badge/Lazarus-FPC-brightgreen)
 [![Powered by OrcaRouter](https://img.shields.io/badge/Powered_by-OrcaRouter-2563eb)](https://www.orcarouter.ai/ref/ref_18b07a7c594033c5f754)
 
-> 💡 **推广**：本工具由 [OrcaRouter](https://www.orcarouter.ai/ref/ref_18b07a7c594033c5f754) 赞助支持。OrcaRouter 是一个强大的 AI 路由引擎，能智能调度最合适的 AI 模型处理您的任务。点击上方链接了解详情。
+> 💡 **Promotion**: This tool is sponsored by [OrcaRouter](https://www.orcarouter.ai/ref/ref_18b07a7c594033c5f754). OrcaRouter is a powerful AI routing engine that intelligently dispatches the most suitable AI model for your task. Click the link above to learn more.
 
-一个为 AI 助手提供 **Delphi** 和 **Lazarus/Free Pascal** 工程编译能力和知识库查询功能的 MCP Server。如果您觉得有用，请不要吝啬您的 Star! ⭐
+An MCP Server that gives AI assistants the ability to compile **Delphi** and **Lazarus/Free Pascal** projects and query knowledge bases. If you find it useful, please don't forget to give it a Star! ⭐
 
-Daofy（道飞）——为创意插上翅膀。
+Daofy — spread your wings for creativity.
 
-## 项目简介
+## Project Introduction
 
-Daofy 是一个基于 Model Context Protocol (MCP) 的 MCP Server，它允许 AI 助手直接编译 **Delphi** 和 **Lazarus/Free Pascal** 项目并查询知识库。
+Daofy is an MCP Server built on the Model Context Protocol (MCP) that lets AI assistants compile **Delphi** and **Lazarus/Free Pascal** projects and query knowledge bases directly.
 
-通过这个工具,您可以在与 AI 助手的对话中直接编译工程、查询 API 文档、搜索代码示例,无需手动切换到 IDE 或命令行。
+With this tool you can compile projects, look up API documentation and search code examples right inside a conversation with your AI assistant — no manual switching to the IDE or the command line.
 
-**主要优势:**
+**Key advantages:**
 
-- **多语言支持**: 同时支持 Embarcadero Delphi 和 Lazarus/Free Pascal 工具链
-- **插件架构**: 语言插件动态注册，仅安装对应开发工具后自动启用
-- **Delphi 自动化测试**: 内置 GUI/Console 自动化测试框架，AI 驱动脚本操控 Delphi 程序
-- 无缝集成到 AI 助手工作流中
-- 自动检测和配置编译器
-- 内置源码知识库,支持语义搜索
-- 项目级知识库,自动追踪三方库和项目源码
-- 通用文档知识库支持 Delphi CHM 和 FPC 文档全文搜索
-- 支持所有主流 AI 助手平台
-- 完整的编译事件支持
-- 详细的错误诊断和日志
+- **Multi-language support**: works with both the Embarcadero Delphi and the Lazarus/Free Pascal toolchains
+- **Plugin architecture**: language plugins register dynamically and are enabled only when the corresponding development tools are installed
+- **Delphi automation testing**: a built-in GUI/Console automation framework that lets AI-driven scripts drive Delphi applications
+- Seamless integration into AI assistant workflows
+- Automatic detection and configuration of compilers
+- Built-in source knowledge base with semantic search
+- Project-level knowledge base that tracks third-party libraries and project source automatically
+- A general document knowledge base supporting full-text search over Delphi CHM and FPC documentation
+- Support for all mainstream AI assistant platforms
+- Complete build event support
+- Detailed error diagnostics and logging
 
-## 功能特性
+## Features
 
-### 编译功能
+### Compilation
 
-- **工程整体编译**: 支持编译完整的 Delphi 工程(.dproj/.dpr),生成可执行文件或动态链接库
-- **MSBuild 编译**: 优先使用 MSBuild 编译,自动处理依赖关系和编译事件
-- **单文件编译**: 支持编译单个 Delphi 单元文件(.pas),进行语法检查
-- **自动检测编译器**: 自动从注册表检测已安装的 Delphi 编译器,无需手动配置
-- **智能库路径解析**: 自动分析项目依赖，智能选择需要的第三方库路径，避免命令行过长
-- **编译事件支持**: 支持 PreBuildEvent、PostBuildEvent、PreLinkEvent,包含完整的参数替换
-- **命令行参数生成**: 支持生成 Delphi 编译器命令行参数,便于调试和预览
-- **编译器配置管理**: 支持配置和管理多个 Delphi 编译器版本
-- **环境检查**: 提供编译器环境状态检查功能
-- **丰富的编译选项**: 支持条件编译符号、搜索路径、优化选项、调试信息、警告控制等
+- **Whole-project compilation**: builds complete Delphi projects (.dproj/.dpr) and produces executables or dynamic link libraries
+- **MSBuild compilation**: MSBuild is preferred, with dependencies and build events handled automatically
+- **Single-file compilation**: compiles an individual Delphi unit (.pas) for syntax checking
+- **Automatic compiler detection**: detects installed Delphi compilers from the registry, no manual configuration required
+- **Smart library path resolution**: analyses project dependencies and intelligently selects the third-party library paths that are needed, avoiding an over-long command line
+- **Build event support**: PreBuildEvent, PostBuildEvent and PreLinkEvent, with complete parameter substitution
+- **Command line argument generation**: generates Delphi compiler command line arguments for debugging and preview
+- **Compiler configuration management**: configure and manage several Delphi compiler versions
+- **Environment checking**: reports the state of the compiler environment
+- **Rich compilation options**: conditional compilation symbols, search paths, optimisation options, debug information, warning control and more
 
-### 知识库功能
+### Knowledge base
 
-- **Delphi 源码知识库**: 内置 Delphi 官方源码知识库,支持类、函数搜索和语义搜索
-- **项目知识库**: 为每个项目构建独立知识库,自动追踪三方库和项目源码
-- **三方库知识库**: 从 .dproj 文件自动提取三方库路径并构建知识库
-- **增量更新**: 自动检测源码变动,增量更新项目知识库
-- **示例知识库**: 自动发现 Delphi 官方 Demo/Samples 和三方库 Demos/Tests，全文搜索示例代码
-- **通用文档知识库**: 支持 txt/md/html/docx/doc/pdf/epub/hlp/chm 和网页文档的扫描与搜索（基于 ZVec 向量存储 + FTS 全文索引）
-  - 必需依赖: `html2text`, `requests` (已在 requirements.txt)
-  - 可选依赖: `python-docx` (Word .docx 支持), `antiword/catdoc` (旧版 Word .doc 支持), `PyMuPDF` (PDF 支持，推荐) 或 `pdfplumber` (PDF 支持，备选), `beautifulsoup4` (EPUB 支持)
-- **智能去重**: 基于完整路径去重，正确处理同名不同目录的文件
+- **Delphi source knowledge base**: built-in knowledge base over the official Delphi source, with class and function search plus semantic search
+- **Project knowledge base**: a separate knowledge base per project, tracking third-party libraries and project source automatically
+- **Third-party library knowledge base**: extracts third-party library paths from the .dproj file and builds a knowledge base over them
+- **Incremental updates**: detects source changes and updates the project knowledge base incrementally
+- **Example knowledge base**: discovers the official Delphi Demos/Samples and third-party Demos/Tests, with full-text search over example code
+- **General document knowledge base**: scans and searches txt/md/html/docx/doc/pdf/epub/hlp/chm and web documents (backed by the ZVec vector store plus a full-text index)
+  - Required dependencies: `html2text`, `requests` (already in requirements.txt)
+  - Optional dependencies: `python-docx` (Word .docx), `antiword/catdoc` (legacy Word .doc), `PyMuPDF` (PDF, recommended) or `pdfplumber` (PDF, alternative), `beautifulsoup4` (EPUB)
+- **Smart de-duplication**: de-duplicates by full path, so files with the same name in different directories are handled correctly
 
-### 构建 Delphi 帮助文档知识库
+### Building the Delphi help documentation knowledge base
 
-用户首次使用或需要重建 Delphi API 文档时，调用 `delphi_kb` 工具构建文档知识库：
+On first use, or whenever the Delphi API documentation has to be rebuilt, call the `delphi_kb` tool with `action="build"`:
 
 ```
 delphi_kb(
@@ -71,17 +71,18 @@ delphi_kb(
 )
 ```
 
-说明：
-- **不传 directory 时自动检测**最新安装的 Delphi 帮助目录（通过注册表或默认路径）
-- 也可手动指定：`directory="C:\Program Files (x86)\Embarcadero\Studio\<版本>\Help\Doc"`
-  - 版本对照：37.0=Delphi 13, 23.0=Delphi 12, 22.0=Delphi 11, 21.0=Delphi 10.4, 20.0=Delphi 10.3
-- `extensions=[".chm"]`：只扫描 CHM 文件，工具会自动解压并导入 HTML 文档
-- `async_mode=true`：异步执行（耗时数分钟），提交后返回 task_id，通过 `async_task(action=status, task_id=...)` 轮询进度
-- 需要系统安装 7-Zip（可放在 `tools/7z/` 目录下免安装）
+Notes:
 
-### 构建示例知识库
+- **Without `directory`** the most recently installed Delphi help directory is detected automatically (through the registry or a default path)
+- You can also point at it explicitly: `directory="C:\Program Files (x86)\Embarcadero\Studio\<version>\Help\Doc"`
+  - Version mapping: 37.0 = Delphi 13, 23.0 = Delphi 12, 22.0 = Delphi 11, 21.0 = Delphi 10.4, 20.0 = Delphi 10.3
+- `extensions=[".chm"]`: scan CHM files only; the tool unpacks and imports the HTML documentation by itself
+- `async_mode=true`: run asynchronously (it takes several minutes), returning a `task_id` you can poll with `async_task(action=status, task_id=...)`
+- 7-Zip must be installed on the system (it can also live in `tools/7z/` for a portable setup)
 
-构建 Delphi 官方 Demos/Samples + 三方库 Demos/Tests 的全文搜索知识库：
+### Building the example knowledge base
+
+Build a full-text knowledge base over the official Delphi Demos/Samples and the third-party Demos/Tests:
 
 ```
 delphi_kb(
@@ -90,7 +91,7 @@ delphi_kb(
 )
 ```
 
-搜索示例代码：
+Search example code:
 
 ```
 delphi_kb(
@@ -99,149 +100,150 @@ delphi_kb(
 )
 ```
 
-示例知识库仅全文搜索，不解析结构化符号（类/函数），适合快速查找示例用法。
-使用 `kb_type="all"` 时默认不搜索示例知识库，需显式指定 `kb_type="example"`。
+The example knowledge base is full-text only: it does not parse structured symbols (classes/functions), which makes it a fast way to find example usage.
+With `kb_type="all"` the example knowledge base is not searched by default — pass `kb_type="example"` explicitly.
 
-### 编码规范功能
+### Coding rules
 
-- **编码规则查询**: 获取 Delphi 源码编码规则,供 AI 助手用于代码审核和生成
-- **默认规则支持**: 内置默认编码规则文件,包含命名规则、格式化规则、修改规则和审核规则
-- **自定义规则支持**: 支持项目级别的自定义编码规则,优先于默认规则
-- **规则优先级**: 项目自定义规则 > 默认规则
+- **Coding rule lookup**: returns the Delphi source coding rules an AI assistant uses for code review and code generation
+- **Default rules**: a built-in default rule set covering naming, formatting, modification and review rules
+- **Custom rules**: project-level custom coding rules take precedence over the defaults
+- **Rule precedence**: project custom rules > default rules
 
-### 自动化测试功能
+### Automation testing
 
-Daofy 内置 Delphi GUI/Console 自动化测试框架，支持 AI 驱动的 UI 交互测试：
+Daofy ships a Delphi GUI/Console automation test framework that supports AI-driven UI interaction testing:
 
-- **命名管道 GUI 自动化**: 在 Delphi 程序中接入 `DaofyAutomation` 单元，AI 通过 `automate_delphi` 工具发送脚本命令操控界面（点击/输入/截图/断言）
-- **控制台交互测试**: 无需改造 Delphi 程序，通过 stdin/stdout 交互测试控制台应用
-- **脚本驱动**: JSON 格式测试脚本，支持条件等待（`waitfor`）、RTTI 属性读写（`rget`/`rset`）、截图比对
-- **进程复用**: `keep_alive` 模式下进程常驻，避免重复启动开销
-- **报告与修复闭环**: 失败自动定位到失败步骤，生成修复建议
+- **Named-pipe GUI automation**: add the `DaofyAutomation` unit to a Delphi program and the AI drives the UI through the `automate_delphi` tool (click / type / capture / assert)
+- **Console interaction tests**: test console applications over stdin/stdout without modifying the Delphi program
+- **Script driven**: JSON test scripts with conditional waits (`waitfor`), RTTI property read/write (`rget`/`rset`) and screenshot comparison
+- **Process reuse**: in `keep_alive` mode the process stays resident, avoiding repeated start-up cost
+- **Report and repair loop**: a failure is located down to the failing step and a repair suggestion is produced
 
-> 📖 **启用指南**: 如何在自己的 Delphi 项目中接入自动化测试，见 [`docs/automate_test_guide.md`](docs/automate_test_guide.md) 的「启用指南」章节。
+> 📖 **Enabling guide**: how to wire automation testing into your own Delphi project is described in the "Enabling guide" section of [`docs/automate_test_guide.md`](docs/automate_test_guide.md).
 
-## MCP 工具列表
+## MCP tool list
 
-| 工具名称 | 功能描述 |
-|----------|----------|
-| **Delphi 工具** | |
-| `delphi_project` | Delphi 项目全生命周期管理：编译(compile)/配置(info/set/create)/审计(audit/ast/runtime) |
-| `delphi_kb` | 搜索代码/类/函数/文档/示例代码，查看统计或构建知识库 |
-| `delphi_file` | Delphi 文件专用操作：读/写(edits批量修改)/格式化/备份管理（编码检测+自动备份+DFM转换） |
-| `manage_component` | DFM 组件增/删/改/生成 + PAS 自动同步 |
-| `check_environment` | 诊断编译环境、检测编译器、安装 pasfmt |
-| `package` | 组件包管理：安装(action=install) / 列出已安装(action=list) |
-| `get_coding_rules` | 获取编码规范，支持按语言（Delphi/Lazarus）和章节分段获取 |
-| `automate_delphi` | Delphi GUI/Console 自动化测试 — 脚本驱动（click/type/waitfor/rget/capture），支持 GUI 命名管道和控制台两种模式，`keep_alive` 进程复用 |
-| `delphi_rtti` | Delphi RTTI 桥接 — 通过 RTTI 发现和调用 Delphi 应用的运行时能力（三步法：discover/call/guide） |
-| **Lazarus/Free Pascal 工具** | |
-| `lazarus_compile` | Lazarus/FPC 项目编译 (lazbuild)，支持 `.lpi`/`.lpr` 项目文件 |
-| `lazarus_project` | Lazarus 项目信息查询 — 解析 `.lpi` 文件，获取项目名称/源文件/编译器选项 |
-| `lazarus_kb` | Lazarus/FPC 源码知识库 — 索引和搜索 LCL/FPC RTL 源码（独立 KB） |
-| `lazarus_file` | Lazarus/FPC 文件读写 — read/write(edits批量修改，自动备份)/backup |
-| **通用工具** | |
-| `code_hosting` | 统一操作 Gitea/GitHub/GitLab/Gitee/GitCode 平台 + Git 本地操作 |
-| `async_task` | 管理后台任务（构建知识库等） |
-| `daofy_update` | 检查 Daofy 版本更新、执行 git pull 更新（check/update/version），后台异步执行 |
-| `tool_help` | 获取任意工具的完整帮助文档（按需，含参数说明/示例/触发词） |
-| `generate_copyright` | 软著文档生成：源代码/说明书/摘要自动生成（PDF 浏览器渲染+自动校验） |
-| `experience` | 经验记忆管理：保存/搜索/更新/合并/删除 AI 成功解决问题的做法；定期清理低价值条目（prune）；模型加载后重建缺失向量（rebuild_embedding） |
-| `ocr` | 图像分析：文字识别(recognize)/文本框(detect)/截图比对(diff)/颜色分析(color)/图标匹配(match) |
-| `structured_content` | 结构化文档统一读写/搜索/修改 — DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf。read(读取)/get_schema(生成JSON Schema)/set(按JSONPath修改)/search(路径搜索) |
+| Tool | Description |
+|------|-------------|
+| **Delphi tools** | |
+| `delphi_project` | Full Delphi project lifecycle: compile (compile) / configuration (info, set, create) / audit (audit, ast, runtime) |
+| `delphi_kb` | Search code, classes, functions, documentation and example code; show statistics; build a knowledge base |
+| `delphi_file` | Delphi-specific file operations: read / write (batch `edits`) / format / backup management (encoding detection + automatic backup + DFM conversion) |
+| `manage_component` | Add, remove, modify and generate DFM components, with automatic PAS synchronisation |
+| `check_environment` | Diagnose the build environment, detect compilers, install pasfmt |
+| `package` | Component package management: install (`action=install`) / list installed (`action=list`) |
+| `get_coding_rules` | Fetch coding rules, by language (Delphi/Lazarus) and by section |
+| `automate_delphi` | Delphi GUI/Console automation testing — script driven (click/type/waitfor/rget/capture), covering both the named-pipe GUI mode and the console mode, with `keep_alive` process reuse |
+| `delphi_rtti` | Delphi RTTI bridge — discover and invoke the runtime capabilities of a Delphi application through RTTI (three steps: discover / call / guide) |
+| **Lazarus/Free Pascal tools** | |
+| `lazarus_compile` | Lazarus/FPC project compilation (lazbuild), supporting `.lpi`/`.lpr` project files |
+| `lazarus_project` | Lazarus project information — parses the `.lpi` file for project name, source files and compiler options |
+| `lazarus_kb` | Lazarus/FPC source knowledge base — indexes and searches LCL/FPC RTL source (a separate KB) |
+| `lazarus_file` | Lazarus/FPC file read/write — read / write (batch `edits`, automatic backup) / backup |
+| **Shared tools** | |
+| `code_hosting` | One interface over Gitea/GitHub/GitLab/Gitee/GitCode plus local Git operations |
+| `async_task` | Manage background tasks (knowledge base builds and similar) |
+| `daofy_update` | Check for a Daofy update and run a git pull (check/update/version), executed asynchronously in the background |
+| `tool_help` | Full help for any tool on demand (parameters, examples, trigger words) |
+| `generate_copyright` | Software copyright document generation: source code, manual and abstract produced automatically (PDF rendered in a browser and validated automatically) |
+| `experience` | Experience memory: save, search, update, merge and delete the practices an AI used to solve problems; prune low-value entries periodically; rebuild missing vectors once the model is loaded (`rebuild_embedding`) |
+| `ocr` | Image analysis: text recognition (recognize) / text boxes (detect) / screenshot comparison (diff) / colour analysis (color) / icon matching (match) |
+| `structured_content` | Unified read/write, search and modification of structured documents — DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf. read / get_schema (JSON Schema generation) / set (modify by JSONPath) / search (path search) |
 
-## 系统要求
+## System requirements
 
 - Python 3.10-3.14
-- **Delphi**: Delphi 编译器(dcc32.exe 或 dcc64.exe) — 编译 Delphi 项目
-- **Lazarus/FPC**: Lazarus IDE (lazbuild.exe) — 编译 Lazarus 项目（可选）
-- Windows 操作系统
+- **Delphi**: a Delphi compiler (dcc32.exe or dcc64.exe) to compile Delphi projects
+- **Lazarus/FPC**: the Lazarus IDE (lazbuild.exe) to compile Lazarus projects (optional)
+- Windows
 - Git
-- 7-Zip (用于解压 CHM 帮助文件,可选)
+- 7-Zip (used to unpack CHM help files, optional)
 
-编译器自动检测（PATH / 注册表 / 常见安装目录），无需手动配置。仅安装对应开发工具后，相关插件自动启用。
+Compilers are detected automatically (PATH / registry / common install directories), so no manual configuration is needed. The relevant plugin is enabled as soon as the matching development tool is installed.
 
-## 知识库存储位置
+## Where knowledge bases are stored
 
-所有知识库数据存储在项目根目录的 `data/` 文件夹下：
+All knowledge base data lives under the `data/` folder in the project root:
 
-| 知识库类型 | 存储路径 | 说明 |
+| Knowledge base | Storage path | Notes |
 |-----------|---------|------|
-| Delphi 源码知识库 | `data/delphi-knowledge-base/` | Delphi 官方源码 (RTL/VCL/FMX 等) |
-| Lazarus/FPC 源码知识库 | `data/lazarus-knowledge-base/` | Lazarus LCL / FPC RTL 源码（独立索引） |
-| 第三方库知识库 | `data/thirdparty-knowledge-base/` | 第三方组件库源码 |
-| 通用文档知识库 | `data/document-knowledge-base/` | Delphi CHM 帮助文档 + 通用文档 |
-| 项目知识库 | `<项目目录>/.delphi-kb/` | 项目级知识库，存放在项目目录下 |
-| 示例知识库 | `data/example-knowledge-base/` | Delphi 官方 Demos + 三方库 Demos/Tests，全文搜索 |
-| 经验知识库 | `data/experience-knowledge-base/` | AI 经验记忆（`experiences.sqlite`） |
+| Delphi source knowledge base | `data/delphi-knowledge-base/` | Official Delphi source (RTL/VCL/FMX and so on) |
+| Lazarus/FPC source knowledge base | `data/lazarus-knowledge-base/` | Lazarus LCL / FPC RTL source (a separate index) |
+| Third-party library knowledge base | `data/thirdparty-knowledge-base/` | Third-party component library source |
+| General document knowledge base | `data/document-knowledge-base/` | Delphi CHM help plus general documents |
+| Project knowledge base | `<project dir>/.delphi-kb/` | A project-level knowledge base, kept inside the project directory |
+| Example knowledge base | `data/example-knowledge-base/` | Official Delphi Demos plus third-party Demos/Tests, full-text search |
+| Experience knowledge base | `data/experience-knowledge-base/` | AI experience memory (`experiences.sqlite`) |
 
-每个知识库目录包含：
-- `*.zvec/` - ZVec 向量数据库目录（文档/示例/项目/三方库知识库）
-- `experiences.sqlite` - 经验记忆数据库（仅经验知识库保留 SQLite）
-- `config.json` - 知识库配置文件
+Each knowledge base directory contains:
 
-说明：除经验知识库外，所有知识库已从 SQLite 迁移到 ZVec 向量引擎。文档知识库不再使用 SQLite FTS5，改用 ZVec 全文索引。
+- `*.zvec/` — the ZVec vector database directory (document, example, project and third-party knowledge bases)
+- `experiences.sqlite` — the experience memory database (only the experience knowledge base keeps SQLite)
+- `config.json` — the knowledge base configuration file
 
-## 知识库配置说明
+Note: apart from the experience knowledge base, every knowledge base has moved from SQLite to the ZVec vector engine. The document knowledge base no longer uses SQLite FTS5; it uses the ZVec full-text index.
 
-每个知识库通过 `config.json` 文件进行配置，支持自定义数据库、源码路径、构建参数等。
+## Knowledge base configuration
 
-| 知识库类型 | 配置位置 |
+Each knowledge base is configured through a `config.json` file that supports custom database settings, source paths, build parameters and more.
+
+| Knowledge base | Configuration location |
 |-----------|----------|
-| Delphi 源码 | `data/delphi-knowledge-base/config.json` |
-| 第三方库 | `data/thirdparty-knowledge-base/config.json` |
-| 通用文档 | `data/document-knowledge-base/config.json` |
-| 项目级 | `<项目目录>/.delphi-kb/config.json` |
-| 示例库 | `data/example-knowledge-base/`（纯 SQLite，无 config.json） |
-| 经验库 | `data/experience-knowledge-base/`（纯 SQLite，无 config.json） |
+| Delphi source | `data/delphi-knowledge-base/config.json` |
+| Third-party libraries | `data/thirdparty-knowledge-base/config.json` |
+| General documents | `data/document-knowledge-base/config.json` |
+| Project level | `<project dir>/.delphi-kb/config.json` |
+| Example base | `data/example-knowledge-base/` (pure SQLite, no config.json) |
+| Experience base | `data/experience-knowledge-base/` (pure SQLite, no config.json) |
 
-配置文件在首次构建时自动生成，通常无需手动修改。
+Configuration files are generated automatically on the first build, so they rarely need editing by hand.
 
-## 安装
+## Installation
 
-### 方式一：pip 安装（推荐）
+### Option 1: install from pip (recommended)
 
 ```bash
 pip install daofy-for-delphi
 ```
 
-安装完成后直接进入 → [配置 AI 助手](#配置-ai-助手) 步骤即可。
+Once it is installed, go straight to [Configure your AI assistant](#configure-your-ai-assistant).
 
-> **国内用户**可使用镜像源加速：
+> **Users in mainland China** can speed this up with a mirror:
 > ```bash
 > pip install daofy-for-delphi -i https://pypi.tuna.tsinghua.edu.cn/simple
 > ```
 
-### 方式二：源码安装
+### Option 2: install from source
 
-#### AI 助手自动安装提示词
+#### Prompt for an AI assistant to install it
 
-请按以下步骤安装 Daofy:
+Please install Daofy by following these steps:
 
-[] 检查并安装 Git/Python 3.10-3.14/7-Zip
+[] Check for and install Git/Python 3.10-3.14/7-Zip
 
-[] 安装 `https://github.com/chinawsb/daofy.git`（国内用户可用镜像: `https://gitee.com/zuoyouruanjian/daofy.git`）
+[] Install `https://github.com/chinawsb/daofy.git` (users in mainland China can use the mirror `https://gitee.com/zuoyouruanjian/daofy.git`)
 
-[] 安装完成后验证结果并帮我配置当前客户端
+[] Verify the result after installation and configure my current client for me
 
-#### 手动安装步骤
+#### Manual installation
 
-##### 1. 克隆或下载项目
+##### 1. Clone or download the project
 
 ```bash
 git clone https://github.com/chinawsb/daofy.git
-# 国内用户可用 Gitee 镜像加速:
+# Users in mainland China can use the Gitee mirror for speed:
 # git clone https://gitee.com/zuoyouruanjian/daofy.git
 cd daofy
 ```
 
-##### 2. 创建虚拟环境
+##### 2. Create a virtual environment
 
 ```bash
 python -m venv venv
 ```
 
-##### 3. 激活虚拟环境
+##### 3. Activate the virtual environment
 
 Windows:
 
@@ -255,25 +257,25 @@ Linux/macOS:
 source venv/bin/activate
 ```
 
-##### 4. 安装依赖 (使用国内镜像源加速)
+##### 4. Install the dependencies (using a mainland-China mirror for speed)
 
 ```bash
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-可选国内镜像源:
+Optional mirrors:
 
-- 清华大学: <https://pypi.tuna.tsinghua.edu.cn/simple>
-- 阿里云: <https://mirrors.aliyun.com/pypi/simple/>
-- 中科大: <https://pypi.mirrors.ustc.edu.cn/simple/>
+- Tsinghua: <https://pypi.tuna.tsinghua.edu.cn/simple>
+- Aliyun: <https://mirrors.aliyun.com/pypi/simple/>
+- USTC: <https://pypi.mirrors.ustc.edu.cn/simple/>
 
-## 配置 AI 助手
+## Configure your AI assistant
 
-### 自动检测 Delphi 编译器
+### Automatic Delphi compiler detection
 
-**首次使用时,MCP Server 会自动从 Windows 注册表检测已安装的 Delphi 编译器,无需手动配置。**
+**On first use the MCP Server detects the installed Delphi compilers from the Windows registry; no manual configuration is needed.**
 
-自动检测支持的 Delphi 版本:
+Delphi versions detected automatically:
 
 - Delphi 13 Florence (37.0)
 - Delphi 12 Athens (23.0)
@@ -297,15 +299,15 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 - Delphi 2006 (4.0)
 - Delphi 2005 (3.0)
 
-### 手动配置编译器 (可选)
+### Manual compiler configuration (optional)
 
-如果需要手动配置或添加自定义编译器,可以直接编辑 `config/compilers.json` 文件,或使用 `check_environment` 工具的 `detect` action 重新检测。
+If you need to configure a compiler by hand or add a custom one, edit `config/compilers.json`, or re-run detection with the `detect` action of the `check_environment` tool.
 
-#### 指定 MSBuild 与 Delphi 版本（按工程 / 按版本）
+#### Choosing MSBuild and the Delphi version (per project / per version)
 
-多版本 Delphi 并存时，**推荐把配置放在工程目录**：同一台机器上的不同工程可以各自使用不同的 Delphi/MSBuild，互不影响。
+When several Delphi versions coexist, **the recommended place for the configuration is the project directory**: different projects on the same machine can then each use their own Delphi/MSBuild without affecting one another.
 
-**项目级配置（推荐）**：在工程目录（或任意父目录，最多向上 8 层）放置 `.daofy/project.json` 或 `daofy.project.json`：
+**Project-level configuration (recommended)**: place `.daofy/project.json` or `daofy.project.json` in the project directory (or in any parent directory, up to eight levels up):
 
 ```json
 {
@@ -315,21 +317,21 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 }
 ```
 
-| 字段 | 说明 |
+| Field | Description |
 |------|------|
-| `delphi_version` | 该工程使用的 Delphi 版本：注册表版本号（`"11.0"`）、产品名（`"XE4"`）或 `.dproj ProjectVersion`（`"14.6"`→XE6、`"18.2"`→Berlin、`"19.2"`→Tokyo） |
-| `msbuild_path` | 该工程使用的 `MSBuild.exe`；相对路径按配置文件所在目录解析 |
-| `compiler_version` | `compilers.json` 中的编译器名称；也可直接写版本号（`"11.0"`） |
+| `delphi_version` | The Delphi version this project uses: the registry version number (`"11.0"`), the product name (`"XE4"`) or the `.dproj ProjectVersion` (`"14.6"` → XE6, `"18.2"` → Berlin, `"19.2"` → Tokyo) |
+| `msbuild_path` | The `MSBuild.exe` this project uses; a relative path is resolved against the directory holding the configuration file |
+| `compiler_version` | The compiler name in `compilers.json`; a version number (`"11.0"`) also works |
 
-- 就近命中：离工程最近的配置文件生效；未配置的字段继续按下一级规则查找
-- 项目级配置同时作用于编译、`install_package`（BPL/DCP/IDE 注册）和 `deploy`
-- 工程配置可以指定任意可执行文件路径，**只应在可信工程中使用**
+- Nearest match wins: the configuration file closest to the project applies, and fields it does not set fall through to the next rule
+- The project-level configuration applies to compilation, to `install_package` (BPL/DCP/IDE registration) and to `deploy`
+- A project configuration can point at any executable path, so **only use it with trusted projects**
 
-**按版本配置（`compilers.json`，可选）**：
+**Per-version configuration (`compilers.json`, optional)**:
 
-| 配置项 | 说明 |
+| Option | Description |
 |--------|------|
-| `msbuild_by_delphi_version` | 按 Delphi 版本分别指定 MSBuild，如 `{"11.0": "...\\v3.5\\MSBuild.exe", "23.0": "...\\MSBuild.exe"}` |
+| `msbuild_by_delphi_version` | A per-Delphi-version MSBuild mapping, e.g. `{"11.0": "...\\v3.5\\MSBuild.exe", "23.0": "...\\MSBuild.exe"}` |
 
 ```json
 {
@@ -342,35 +344,35 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 }
 ```
 
-`msbuild_by_delphi_version` 的键支持注册表版本号（`"11.0"`）、产品名（`"XE4"`）或 `.dproj ProjectVersion`（如 `"14.6"`）。映射值中的相对路径按 `compilers.json` 所在目录解析。
+The keys of `msbuild_by_delphi_version` accept a registry version number (`"11.0"`), a product name (`"XE4"`) or a `.dproj ProjectVersion` (`"14.6"` and so on). Relative paths in the mapped values are resolved against the directory holding `compilers.json`.
 
-> 全局 `msbuild_path`、`default_registry_version` 以及 `DAOFY_MSBUILD` / `DAOFY_DELPHI_VERSION` 环境变量已移除。旧配置中的这些键会被忽略；请改用项目级 `.daofy/project.json`（单个工程）或 `msbuild_by_delphi_version`（按版本）。
+> The global `msbuild_path`, `default_registry_version` and the `DAOFY_MSBUILD` / `DAOFY_DELPHI_VERSION` environment variables have been removed. Those keys are ignored if present in an old configuration; use the project-level `.daofy/project.json` (single project) or `msbuild_by_delphi_version` (per version) instead.
 
-**选择优先级**：
+**Selection precedence**:
 
-- Delphi 版本：工具参数 `compiler_version` > 项目配置 `compiler_version` > 项目配置 `delphi_version` > `.dproj ProjectVersion` 推断
-- MSBuild：项目配置 `msbuild_path` > `msbuild_by_delphi_version[版本]` > 自动探测
+- Delphi version: the tool argument `compiler_version` > the project configuration's `compiler_version` > the project configuration's `delphi_version` > inferred from `.dproj ProjectVersion`
+- MSBuild: the project configuration's `msbuild_path` > `msbuild_by_delphi_version[version]` > automatic detection
 
-行为说明：
+Behaviour notes:
 
-- 项目配置的版本同时作用于 MSBuild 的 `rsvars.bat`、编译器自动匹配、`dcc32` 直接编译、RTL/第三方库搜索路径，避免"用 XE4 的 dcc32 却找 Delphi 12 的 dcu"
-- 显式配置的 MSBuild 路径不存在、或指定版本未安装时**直接报错，不会静默回退**到其它 MSBuild / Delphi 版本
-- `.dpr/.dpk` 有对应 `.dproj` 时优先 MSBuild；只有"自动探测不到 MSBuild"才回退 dcc 直编，**显式配置错误不会**被直编掩盖
-- 自动探测会按工程版本优先选择：XE4 及更早优先 `.NET Framework\v3.5\MSBuild.exe`，XE5–10 Seattle 优先 `v4.0.30319`
-- 未配置项目版本时，若 `.dproj` 对应版本的编译器不在 `compilers.json` 中，自动匹配仍可能按原有策略回退到更高版本编译器（日志会输出警告）；需要**严格版本**时请配置项目 `delphi_version`，版本未安装会直接失败
-- 项目配置中的 `delphi_version` 无法识别（如拼写错误）时会直接报错，不会静默改用 `.dproj ProjectVersion` 推断
-- 版本号支持 `"11"`、`"11.0"`、`"XE4"`、`"Delphi XE4"` 等写法
-- 修改配置后需**重启 Daofy MCP 服务/IDE** 才会生效
+- The version from the project configuration also drives MSBuild's `rsvars.bat`, automatic compiler matching, direct `dcc32` compilation and the RTL/third-party library search paths, which prevents "compiling with XE4's dcc32 while picking up Delphi 12's dcu files"
+- When an explicitly configured MSBuild path does not exist, or the named version is not installed, the tool **fails with an error instead of silently falling back** to another MSBuild / Delphi version
+- When a `.dpr/.dpk` has a matching `.dproj`, MSBuild is preferred; only when MSBuild cannot be auto-detected does it fall back to direct dcc compilation, and **an explicit configuration error is never hidden** by that fallback
+- Automatic detection prefers, by project version: XE4 and earlier use `.NET Framework\v3.5\MSBuild.exe`, XE5–10 Seattle use `v4.0.30319`
+- When the project version is not configured and the compiler for the `.dproj` version is missing from `compilers.json`, automatic matching may still fall back to a higher compiler version under the previous policy (with a warning in the log); configure the project's `delphi_version` when a **strict version** is required, and a version that is not installed fails outright
+- An unrecognised `delphi_version` in the project configuration (a typo, for example) is an error; it never falls back silently to `.dproj ProjectVersion` inference
+- Version numbers accept `"11"`, `"11.0"`, `"XE4"`, `"Delphi XE4"` and similar forms
+- After changing the configuration, **restart the Daofy MCP service / IDE** for it to take effect
 
-可用 `check_environment(action="check")` 确认按版本映射的 MSBuild 路径及文件是否存在。
+`check_environment(action="check")` confirms the per-version MSBuild paths and whether those files exist.
 
-完整参数、优先级和典型场景（多版本、旧版 Delphi、包安装、部署、CI）见 **[docs/configuration.md](docs/configuration.md)**。
+For the full set of parameters, the precedence rules and typical scenarios (multiple versions, older Delphi, package installation, deployment, CI), see **[docs/configuration.md](docs/configuration.md)**.
 
-> **pip 安装场景**：`compilers.json` 位于 `<Python 环境>/Lib/site-packages/src/config/compilers.json`，升级会覆盖。项目级 `.daofy/project.json` 不受升级影响，推荐用它固定单个工程的工具链。
+> **pip installation**: `compilers.json` lives at `<Python environment>/Lib/site-packages/src/config/compilers.json` and is overwritten by an upgrade. The project-level `.daofy/project.json` is unaffected by upgrades, so prefer it to pin the toolchain of a single project.
 
-### 通用配置（pip 安装）
+### Shared configuration (pip installation)
 
-如果通过 `pip install daofy-for-delphi` 安装，配置最简：
+If you installed through `pip install daofy-for-delphi`, the configuration is minimal:
 
 ```json
 {
@@ -387,7 +389,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 }
 ```
 
-> **路径含空格时报错？** 如果 Python 安装在 `D:\Program Files\...` 等含空格的路径，部分 MCP 客户端无法正确处理。解决方案：将 `command` 改为 Python 解释器完整路径，`args` 改为 `-m src`：
+> **Error when the path contains spaces?** If Python is installed under a path such as `D:\Program Files\...`, some MCP clients cannot handle it. The fix is to set `command` to the full path of the Python interpreter and `args` to `-m src`:
 > ```json
 > {
 >   "mcpServers": {
@@ -399,11 +401,11 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 >   }
 > }
 > ```
-> 也可直接指定 `server.py`：`"args": ["D:\\path\\to\\daofy\\src\\server.py"]`
+> You can also point at `server.py` directly: `"args": ["D:\\path\\to\\daofy\\src\\server.py"]`
 
-### 源码安装配置
+### Configuration for a source installation
 
-以下配置适用于通过 git clone 源码安装的用户，请将路径替换为实际安装路径。
+The configuration below is for users who installed from a git clone; replace the paths with your actual installation path.
 
 #### Claude Desktop
 
@@ -427,7 +429,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 #### Trae
 
-**Windows**: `C:\Users\<用户名>\.trae-cn\mcp_config.json`
+**Windows**: `C:\Users\<username>\.trae-cn\mcp_config.json`
 
 ```json
 {
@@ -447,7 +449,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 }
 ```
 
-**注意**: 请将路径修改为您的实际安装路径。
+**Note**: replace the paths with your actual installation path.
 
 #### CodeArts Agent
 
@@ -472,22 +474,22 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 #### DSH (DeepSeek Harness)
 
-DSH 通过 profile 的 `cordis.patch.yml` 注册 MCP Server。使用安装脚本 `install_mcp.py` 一键安装/卸载（与其它 Agent 同一入口）：
+DSH registers an MCP Server through the `cordis.patch.yml` of a profile. Use the `install_mcp.py` script to install or uninstall it in one step (the same entry point as for the other agents):
 
 ```bash
-python install_mcp.py --agent DSH                        # 安装 Daofy 到默认 profile (web)
-python install_mcp.py --agent DSH --dsh-profile cli      # 指定 profile
-python install_mcp.py --agent DSH --python "D:\Python311\python.exe"   # 指定 Python 解释器
-python install_mcp.py --agent DSH --pip                  # pip 安装模式（command=daofy）
-python install_mcp.py --agent DSH --uninstall            # 卸载 Daofy
+python install_mcp.py --agent DSH                        # install Daofy into the default profile (web)
+python install_mcp.py --agent DSH --dsh-profile cli      # choose a profile
+python install_mcp.py --agent DSH --python "D:\Python311\python.exe"   # choose the Python interpreter
+python install_mcp.py --agent DSH --pip                  # pip mode (command=daofy)
+python install_mcp.py --agent DSH --uninstall            # uninstall Daofy
 ```
 
-也可以不加 `--agent`，在交互菜单中选择 DSH。安装脚本会自动检测 DSH（`~/.dsh/profiles/` 目录或 `dsh` 命令）。
+You can also omit `--agent` and pick DSH from the interactive menu. The installer detects DSH automatically (the `~/.dsh/profiles/` directory or the `dsh` command).
 
-生成的 `cordis.patch.yml` 条目（示意）：
+The generated `cordis.patch.yml` entry (illustrative):
 
 ```yaml
-# ── Daofy for Delphi MCP Server (managed by install_mcp.py; uninstall: 重新运行脚本选择 DSH)
+# ── Daofy for Delphi MCP Server (managed by install_mcp.py; to uninstall, run the script again and choose DSH)
 - insert:
     - id: mcp-daofy
       name: '@deepseek-ai/dsh-mcp-client'
@@ -505,45 +507,45 @@ python install_mcp.py --agent DSH --uninstall            # 卸载 Daofy
         toolCallTimeoutMs: 600000
 ```
 
-特性：
+Properties:
 
-- **幂等**: 配置相同则直接跳过，不重复修改文件
-- **保留其他条目**: 卸载只移除 Daofy 块，不影响第三方 MCP / `!!js` 表达式
-- **自动识别环境**: 默认使用脚本检测到的 Python 解释器；`--pip` 时直接使用 `daofy` 命令
-- **卸载安全**: 移除后自动补回 `[]` 保证 patch 文件仍是合法 YAML
+- **Idempotent**: an identical configuration is skipped, the file is not rewritten
+- **Other entries preserved**: uninstalling removes only the Daofy block and leaves third-party MCP entries and `!!js` expressions untouched
+- **Environment detected automatically**: the Python interpreter the script detected is used by default; with `--pip` the `daofy` command is used directly
+- **Safe uninstall**: after removal `[]` is restored so the patch file stays valid YAML
 
-## 使用方法
+## Usage
 
-### 知识库统计
+### Knowledge base statistics
 
-| 知识库       | 文件数     | 类数量    | 数据库大小 |
-| ---------    | -------   | ------    | -------    |
-| Delphi 源码  | 2,798     | 163,737   | 260 MB     |
-| 三方库        | 1,800     | 5,724     | 27 MB      |
-| 通用文档      | 160,328   | -         | 1,306 MB   |
+| Knowledge base | Files | Classes | Database size |
+|--------    | -------   | ------    | -------    |
+| Delphi source | 2,798 | 163,737 | 260 MB |
+| Third-party libraries | 1,800 | 5,724 | 27 MB |
+| General documents | 160,328 | - | 1,306 MB |
 
-## 故障排除
+## Troubleshooting
 
-### 1. 编译器未找到
+### 1. Compiler not found
 
-**解决方案**:
+**Solution**:
 
-- 检查 `config/compilers.json` 文件中的编译器路径是否正确
-- 使用 `check_environment` 工具 `action=detect` 重新检测编译器
+- Check that the compiler paths in `config/compilers.json` are correct
+- Re-run detection with the `check_environment` tool, `action=detect`
 
-### 2. MCP Server 无法启动
+### 2. The MCP Server will not start
 
-**解决方案**:
+**Solution**:
 
-- 检查 Python 环境是否正确配置
-- 检查依赖是否已安装: `pip install -r requirements.txt`
-- 检查 MCP 库版本: `pip show mcp`
+- Check that the Python environment is configured correctly
+- Check that the dependencies are installed: `pip install -r requirements.txt`
+- Check the MCP library version: `pip show mcp`
 
-### 2a. `Spawn D:\Program ENOENT` 路径含空格报错
+### 2a. `Spawn D:\Program ENOENT` — error when the path contains spaces
 
-pip 安装后，部分 MCP 客户端（Trae 等）在路径含空格时无法正确 spawn。
+After a pip installation, some MCP clients (Trae and others) cannot spawn correctly when the path contains spaces.
 
-**解决方案**：在 MCP 配置中用 Python 解释器完整路径替代 `daofy` 命令：
+**Solution**: in the MCP configuration, replace the `daofy` command with the full path of the Python interpreter:
 
 ```json
 {
@@ -552,179 +554,179 @@ pip 安装后，部分 MCP 客户端（Trae 等）在路径含空格时无法正
 }
 ```
 
-也可用源码安装方式：`"args": ["D:\\path\\to\\daofy\\src\\server.py"]`
+The source installation form also works: `"args": ["D:\\path\\to\\daofy\\src\\server.py"]`
 
-### 3. 知识库搜索无结果
+### 3. Knowledge base searches return nothing
 
-**解决方案**:
+**Solution**:
 
-- 确保已构建知识库: 使用 `delphi_kb` 工具的 action=build 构建
-- 检查知识库目录是否存在
+- Make sure the knowledge base has been built: use `delphi_kb` with `action=build`
+- Check that the knowledge base directory exists
 
-## 许可证
+## License
 
 MIT License
 
 Copyright (c) 2026 吉林省左右软件开发有限公司
 Copyright (c) 2026 Equilibrium Software Development Co., Ltd, Jilin
 
-详见 [LICENSE](LICENSE) 文件。
+See the [LICENSE](LICENSE) file for details.
 
-## 版本历史
+## Version history
 
-### v2026.11.03 (最新)
+### v2026.11.03 (latest)
 
-- **MCP 工具路径绝对路径校验**: 在 `server.call_tool` 接口边界统一校验白名单路径字段，拒绝相对路径，避免 MCP 服务 CWD 不一致导致文件读写/编译/部署落到错误位置；JSONPath、项目相对字段不强制
-- **配置说明文档**: 新增 [`docs/configuration.md`](docs/configuration.md)，覆盖项目级/全局参数、优先级、多版本/旧版 Delphi/包安装/部署/CI 场景、错误码与迁移
-- **项目配置错误码统一**: 项目配置 JSON/`delphi_version` 非法时统一返回 `PROJECT_CONFIG_INVALID`
+- **Absolute-path validation for MCP tool paths**: whitelisted path fields are validated at `server.call_tool` boundary and relative paths are rejected, so an inconsistent MCP service CWD can no longer send file reads/writes, compilation or deployment to the wrong place; JSONPath and project-relative fields are not forced
+- **Configuration documentation**: added [`docs/configuration.md`](docs/configuration.md), covering project-level and global parameters, precedence, multi-version / older Delphi / package installation / deployment / CI scenarios, error codes and migration
+- **Unified project-configuration error code**: an invalid project configuration JSON or `delphi_version` now returns `PROJECT_CONFIG_INVALID`
 
 ### v2026.10.31
 
-- **项目级 Delphi/MSBuild 配置**: 新增 `.daofy/project.json` / `daofy.project.json`，按工程指定 `delphi_version`、`compiler_version`、`msbuild_path`；同一台机器上不同工程可使用不同 Delphi/MSBuild，互不影响
-- **移除机器级覆盖**: 移除 `compilers.json` 的 `msbuild_path`、`default_registry_version` 以及 `DAOFY_MSBUILD` / `DAOFY_DELPHI_VERSION` 环境变量；保留 `msbuild_by_delphi_version` 按版本映射
-- **按工程版本解析工具链**: MSBuild 自动探测按工程 Delphi 版本重选（XE4 及更早优先 `.NET Framework v3.5`，XE5–10 Seattle 优先 `v4.0.30319`）；`rsvars.bat`、RTL/第三方库路径、包安装 BPL/DCP 与 IDE 注册、部署 MSBuild 均按工程版本解析
-- **严格失败**: 项目配置/版本映射的 MSBuild 路径无效、指定版本未安装时直接报错，不再静默回退；`.dpr` 不再用直编掩盖配置错误；PreBuildEvent 前先校验 `rsvars.bat`
-- **版本匹配修复**: 修复 `Delphi XE`/`XE8`、`Delphi 12`/`12 Athens` 等前缀误匹配；`delphi_version` 支持 `14.6`/`18.2`/`19.2` 等 `.dproj ProjectVersion` 写法
+- **Project-level Delphi/MSBuild configuration**: added `.daofy/project.json` / `daofy.project.json` to set `delphi_version`, `compiler_version` and `msbuild_path` per project; different projects on one machine can use different Delphi/MSBuild versions without interfering
+- **Machine-level overrides removed**: removed `msbuild_path` and `default_registry_version` from `compilers.json` and the `DAOFY_MSBUILD` / `DAOFY_DELPHI_VERSION` environment variables; `msbuild_by_delphi_version` remains for per-version mapping
+- **Toolchain resolved by project version**: automatic MSBuild detection is re-selected by the project's Delphi version (XE4 and earlier prefer `.NET Framework v3.5`, XE5–10 Seattle prefer `v4.0.30319`); `rsvars.bat`, RTL/third-party library paths, package installation (BPL/DCP and IDE registration) and deployment MSBuild are all resolved by the project version
+- **Strict failure**: an invalid MSBuild path in the project configuration or the version mapping, and a version that is not installed, now fail with an error rather than falling back silently; `.dpr` no longer hides a configuration error behind direct compilation; `rsvars.bat` is validated before PreBuildEvent
+- **Version matching fixes**: fixed false prefix matches such as `Delphi XE`/`XE8` and `Delphi 12`/`12 Athens`; `delphi_version` accepts `.dproj ProjectVersion` forms such as `14.6`/`18.2`/`19.2`
 
 ### v2026.09.16
 
-- **_SafeStderrHandler 安全 stderr 处理器**: 客户端不排空 stderr 导致管道写满时，日志 `emit` 不再阻塞（可写空间足够才直写，否则入队、满则丢弃），后台消化线程可取消（`CancelSynchronousIo` 看门狗 + 30s 冷却重试）；`setup_logger` 文件处理器先挂且与 `console_logging` 解耦——修复客户现场 stderr 管道写满卡死服务（连 MCP `initialize` 都无法响应）的故障
-- **示例知识库进度日志格式串修复**: `example_knowledge_base._scan_directory` 日志 4 个占位符仅传 3 个参数，全量测试下被 pytest 日志捕获器冒泡为 `TypeError`（24 个用例失败）
-- **StackTrace 剥离重构遗留编译错误修复**: `TLocalVarInfo.GetTypeSize` 改为 `MapDataSerializer.GetLocalVarTypeSize`，并在 `MapDataSerializer` 接口导出 `MakeLocalVarInfo`/`GetLocalVarTypeSize`
+- **_SafeStderrHandler**: when a client does not drain stderr and the pipe fills, a log `emit` no longer blocks (it writes directly only when there is room, otherwise it enqueues and drops when full), and the background drain thread is cancellable (`CancelSynchronousIo` watchdog with a 30s cooldown retry); `setup_logger` attaches the file handler first and is decoupled from `console_logging` — this fixes a field failure where a full stderr pipe froze the service (even MCP `initialize` stopped responding)
+- **Example knowledge base log format fix**: `example_knowledge_base._scan_directory` had four placeholders but passed only three arguments, which pytest's log capture surfaced as a `TypeError` during the full test run (24 cases failed)
+- **StackTrace refactoring leftovers**: `TLocalVarInfo.GetTypeSize` became `MapDataSerializer.GetLocalVarTypeSize`, and `MapDataSerializer` now exports `MakeLocalVarInfo` / `GetLocalVarTypeSize`
 
 ### v2026.09.15
 
-- **console_logging 配置开关**: 日志默认不再输出到 stderr 控制台（避免干扰 MCP stdio），仅写文件
-- **file_backup 编码检测重写**: 超大文件多点采样 + chardet 低置信度仅接受多字节 CJK 编码 + UTF-16 BOM 启发式分析
-- **DSH 安装集成**: `install_mcp.py` 一键安装/卸载 DeepSeek Harness（`--agent DSH`），读写 `cordis.patch.yml`
-- **相对路径自动解析**: `delphi_file` 相对路径按 `project_path` → `workspace_root` → CWD 解析
-- **多版本编译器精确匹配**: 项目版本四级匹配，不再错配到其它 Delphi 版本编译器
-- **编译输出目录读写放行**: `.dproj` 的 `DCC_ExeOutput`/`DCC_DcuOutput` 目录允许直接读写
-- **StackTrace VEH 日志统一**为 `exception.log`
+- **`console_logging` switch**: logs no longer go to the stderr console by default (to avoid interfering with MCP stdio) and are written to files only
+- **`file_backup` encoding detection rewritten**: multi-point sampling of very large files, chardet accepted only above low confidence for multi-byte CJK encodings, and UTF-16 BOM heuristic analysis
+- **DSH installation integrated**: `install_mcp.py` installs or uninstalls DeepSeek Harness (`--agent DSH`) by reading and writing `cordis.patch.yml`
+- **Relative-path resolution**: `delphi_file` resolves a relative path by `project_path` → `workspace_root` → CWD
+- **Exact multi-version compiler matching**: the project version is matched in four steps and no longer falls through to a compiler of another Delphi version
+- **Build output directories allowed**: the `.dproj` `DCC_ExeOutput` / `DCC_DcuOutput` directories are now directly readable and writable
+- **StackTrace VEH logging unified** under `exception.log`
 
 ### v2026.09.02
 
-- **多版本编译器错配修复**: 库路径/RTL/三方库/系统库与 dcc32 版本一致
-- **系统库按编译器版本过滤**: `delphi_kb(build, kb_type=delphi, version=...)` 只索引对应 RTL/VCL/FMX 源码
-- **MCP v1/v2 全接口一致性**: read_resource/title/description/isError/jsonschema 校验对齐
-- **Fmx.DaofyAutomation 同步 Vcl 功能**: RTTI named_paths/GetRttiClasses/路径解析/Unicode 按键
+- **Multi-version compiler mismatch fixed**: library, RTL, third-party and system paths now match the dcc32 version
+- **System libraries filtered by compiler version**: `delphi_kb(build, kb_type=delphi, version=...)` indexes only the matching RTL/VCL/FMX source
+- **MCP v1/v2 interface consistency**: read_resource/title/description/isError/jsonschema validation aligned
+- **Fmx.DaofyAutomation synchronised with Vcl**: RTTI named_paths, GetRttiClasses, path resolution and Unicode key input
 
 ### v2026.08.06
 
-- **waitfor 主线程查询超时防护**: `SendMessageTimeout` + 版本号三事件无锁协议（提交/完成/放弃各 +1，僵尸消息 LParam 过滤），主线程死锁/忙时管道线程最多阻塞 200ms 即让出，异步结果回传不被长阻塞
-- **waitfor 冒烟测试**: `Tests/冒烟测试/` 新增正常路径（`waitfor-basic.json`）与超时/模态故障路径（`waitfor-timeout-modal.json`），AutoTest.exe 实测三轮全过
+- **`waitfor` main-thread query timeout protection**: `SendMessageTimeout` plus a lock-free three-counter protocol (submit/complete/abandon incremented individually, zombie messages filtered by LParam); when the main thread is deadlocked or busy the pipe thread yields after at most 200ms, so asynchronous results are never blocked for long
+- **`waitfor` smoke tests**: `Tests/冒烟测试/` gained a normal path (`waitfor-basic.json`) and a timeout/modal failure path (`waitfor-timeout-modal.json`); three rounds on AutoTest.exe all passed
 
 ### v2026.08.05
 
-- **编码规则示例补齐**: `get_coding_rules(examples=...)` 新增 `naming`/`formatting`/`documentation`/`error-handling` 四个示例文件，修复 skill 广告示例在服务端不存在的问题
+- **Coding rule examples completed**: `get_coding_rules(examples=...)` gained four example files — `naming`, `formatting`, `documentation` and `error-handling` — fixing examples that the skill advertised but the server did not have
 
 ### v2026.07.18
 
-- **版本发布**: 全量同步 Lazarus 插件支持、多语言编码规则、插件可用性检测
+- **Release**: full sync of the Lazarus plugin support, multi-language coding rules and plugin availability detection
 
 ### v2026.07.17
 
-- **Lazarus/Free Pascal 插件支持**: 新增 4 个 Lazarus 专用工具 — `lazarus_compile` (lazbuild编译)、`lazarus_project` (项目信息查询)、`lazarus_kb` (FPC/LCL 源码知识库)、`lazarus_file` (文件读写与备份)
-- **多语言编码规则**: `coding-rules/` 拆分为 `delphi/`、`lazarus/`、`shared/` 三层；`get_coding_rules` 新增 `language` 参数（支持 `"delphi"` 和 `"lazarus"`）
-- **插件可用性检测**: 插件启动时检查开发工具是否安装，不安装则不注册对应工具，避免暴露不可用的 MCP 工具
-- **FPC 错误解析**: `OutputParser` 新增 FPC 格式支持（`File(13,3) Fatal: (2003) message`）
-- **uses 排序修复**: 改为按 namespace group 插入，不重排已有单元，避免 `Winapi.Windows` 与 `Vcl.Graphics` 相对顺序改变导致类型解析错误
+- **Lazarus/Free Pascal plugin support**: four Lazarus-specific tools — `lazarus_compile` (lazbuild compilation), `lazarus_project` (project information), `lazarus_kb` (FPC/LCL source knowledge base) and `lazarus_file` (file read/write and backup)
+- **Multi-language coding rules**: `coding-rules/` split into three layers — `delphi/`, `lazarus/` and `shared/`; `get_coding_rules` gained a `language` parameter (`"delphi"` and `"lazarus"`)
+- **Plugin availability detection**: on start-up each plugin checks whether its development tool is installed and does not register its tools when it is not, avoiding unavailable MCP tools
+- **FPC error parsing**: `OutputParser` supports the FPC format (`File(13,3) Fatal: (2003) message`)
+- **`uses` ordering fix**: units are inserted by namespace group and existing units are not reordered, so the relative order of `Winapi.Windows` and `Vcl.Graphics` no longer changes and breaks type resolution
 
 ### v2026.07.05
 
-- **文档全量同步**: 全部 docs 与实现对齐——`project()` → `delphi_project()`、ZVec 存储结构、kb_type 补全、section 索引扩展、tutorial 同步修复
-- **CHANGELOG 补全**: v2026.06.22 遗漏的 Added/Fixed/Removed 条目已补录
+- **Documentation fully synchronised**: every doc aligned with the implementation — `project()` → `delphi_project()`, the ZVec storage layout, the completed kb_type list, the extended section index, and the tutorial fixes
+- **CHANGELOG completed**: the Added/Fixed/Removed entries missed in v2026.06.22 were added
 
 ### v2026.06.22
 
-- **工具名重命名**: `project` → `delphi_project`，防止非 Delphi 用户误触
-- **`delphi_rtti` 工具**: Delphi RTTI 桥接 — 通过 Enhanced RTTI 发现和调用 Delphi 应用的 published 方法（三步法：guide/discover/call）
-- **`generate_copyright` 工具**: 软著文档自动生成（源代码/说明书/摘要，PDF 浏览器渲染+自动校验）
-- **`daofy_update` 工具**: Daofy 自身版本检查和更新管理（check/update/version）
-- **存储引擎迁移**: 文档/示例/项目/三方库知识库从 SQLite FTS5 迁移至 ZVec 全文索引
-- **HTML 解析优化**: 移除 BeautifulSoup 依赖，改用 html2text 内置过滤；构建时间 -41%
-- **扫描引擎重构**: `scan_directory` 改为生产者-消费者模式，内存峰值从天降至 KB 级
-- **`DaofyAutomation.RttiDiscovery.pas`**: 新增 RTTI 能力发现单元，`TRttiDiscoverer` 类将 Delphi 类型映射为 JSON Schema
-- **`DaofyAutomation.Base.pas` / `Vcl.DaofyAutomation.pas`**: 新增 `rtti_discover` 命令路由和 VCL 端 `GetRttiClasses` 重写
-- **`src/services/rtti_bridge.py`**: 新增 RTTI 桥接服务（连接管理/5分钟缓存/discover/call）
-- **`src/tools/delphi_rtti.py`**: 新增 MCP 工具 handler（action=guide/discover/call）
-- **`.opencode/skills/delphi-rtti-bridge/SKILL.md`**: 新增 AI Agent 技能文件（含 YAML frontmatter + 渐进式 L3 文档）
-- **`scripts/build-skills.py`**: 技能多平台分发脚本（自动分发到 .claude/ .cursor/ .windsurfrules）
-- **`tests/test_rtti_bridge.py` / `tests/test_delphi_rtti.py`**: 38 个测试用例覆盖桥接服务 + 工具 handler
-- **DaofyAutomation 三层架构拆分**: tools/auto/ 拆分为 Base/VCL/FMX 三层，Overlapped I/O 管道，扩展命令集（move/drag/key/waitfor/rcall 等）
-- **`automate_delphi` 新增 Console 模式**: 支持 subprocess stdin/stdout 交互，自动 PE 头检测 GUI vs Console
-- **`file_tool` 路径白名单校验 + 脏标记系统**: `_validate_path()` 安全校验，写后标记脏防止行号错位
-- **`CODING_RULES.mdc` 规则重构**: 全面重写 delphi_file 写入规则、紧凑输出格式、脏标记保护
-- **编译验证**: DCC 0 错误通过，Python import 无报错
+- **Tool rename**: `project` → `delphi_project`, so non-Delphi users do not trigger it by mistake
+- **`delphi_rtti` tool**: a Delphi RTTI bridge that discovers and invokes published methods of a Delphi application through Enhanced RTTI (three steps: guide/discover/call)
+- **`generate_copyright` tool**: automatic software copyright document generation (source code, manual and abstract, PDF rendered in a browser and validated automatically)
+- **`daofy_update` tool**: Daofy's own version check and update management (check/update/version)
+- **Storage engine migration**: the document, example, project and third-party knowledge bases moved from SQLite FTS5 to the ZVec full-text index
+- **HTML parsing optimisation**: the BeautifulSoup dependency was removed in favour of html2text's built-in filters; build time −41%
+- **Scan engine rework**: `scan_directory` became a producer-consumer pipeline, bringing peak memory down from the gigabyte range to kilobytes
+- **`DaofyAutomation.RttiDiscovery.pas`**: new RTTI capability discovery unit; the `TRttiDiscoverer` class maps Delphi types to JSON Schema
+- **`DaofyAutomation.Base.pas` / `Vcl.DaofyAutomation.pas`**: new `rtti_discover` command routing and a rewritten VCL-side `GetRttiClasses`
+- **`src/services/rtti_bridge.py`**: new RTTI bridge service (connection management, 5-minute cache, discover/call)
+- **`src/tools/delphi_rtti.py`**: new MCP tool handler (action=guide/discover/call)
+- **`.opencode/skills/delphi-rtti-bridge/SKILL.md`**: new AI agent skill file (YAML frontmatter plus progressive L3 documentation)
+- **`scripts/build-skills.py`**: multi-platform skill distribution script (distributes to .claude/ .cursor/ .windsurfrules automatically)
+- **`tests/test_rtti_bridge.py` / `tests/test_delphi_rtti.py`**: 38 test cases covering the bridge service and the tool handler
+- **DaofyAutomation split into three layers**: `tools/auto/` split into Base/VCL/FMX layers, overlapped I/O pipes, and an extended command set (move/drag/key/waitfor/rcall and more)
+- **`automate_delphi` Console mode**: subprocess stdin/stdout interaction, with automatic PE-header detection of GUI versus Console
+- **`file_tool` path whitelist validation and dirty-flag system**: `_validate_path()` safety validation, and a post-write dirty mark that prevents line-number drift
+- **`CODING_RULES.mdc` rules reworked**: the delphi_file write rules, the compact output format and the dirty-flag protection were rewritten
+- **Build verification**: DCC compiles with 0 errors, Python imports cleanly
 
 ### v2026.06.08.1
 
-- `delphi_file` 全操作 RWLock 防并发文件损坏：read/write/format/backup/uses 全部引入多读单写锁，并发写入返回明确错误，引导合并到一次 write(edits=[...])
-- `tools/7z/` 补齐 7z.dll，release 包开箱可用
-- `tool_docs.py` 约束强化：统一写入参数为 edits，并新增并行写入禁令（后续版本推荐 `replace`/`insert`/`delete` 结构化入口）
-- `.gitignore` 排除 dot-prefixed 目录，清理 AI 工作目录追踪
+- `delphi_file` uses an RWLock across all operations to prevent concurrent file corruption: read/write/format/backup/uses all take a multi-reader single-writer lock, a concurrent write returns a clear error and the caller is directed to combine the changes into one `write(edits=[...])`
+- `tools/7z/` now ships 7z.dll, so the release package works out of the box
+- `tool_docs.py` constraints tightened: the write parameter is unified as `edits`, and parallel writes are forbidden (later versions recommend the structured `replace`/`insert`/`delete` entry points)
+- `.gitignore` excludes dot-prefixed directories and stops tracking AI working directories
 
 ### v2026.06.03
 
-- `delphi_file` 写入统一为 `write(edits=[...])`：一次传入多个 edit，内部按 `start_line` 升序排列，内存中累积偏移量后一次性写出
-- `compilers.json` 路径自愈：检测到不在 `src/config/` 时自动回退到项目根 `config/`，避免 MCP 启动时因路径差异直接报错
-- 18 处 `except Exception: pass` 添加 `logger.debug` 异常日志，便于调试时定位失败原因
-- `search_knowledge` 重构：597→37 行，拆 16 个模块级子函数，行为完全等价
-- 全量测试 727 passed
+- `delphi_file` writes unified as `write(edits=[...])`: several edits are passed at once, sorted internally by ascending `start_line`, accumulated in memory with their offsets and written in one go
+- `compilers.json` path self-healing: when it is not under `src/config/` it falls back to the project-root `config/`, so an MCP start-up no longer fails because of a path difference
+- 18 `except Exception: pass` sites gained `logger.debug` exception logging, making failures easier to locate while debugging
+- `search_knowledge` refactored: 597 → 37 lines, split into 16 module-level helper functions, behaviour fully equivalent
+- Full test run: 727 passed
 
 ### v2026.06.01
 
-- `delphi_file` 部分写入行号修正：0-indexed 文档纠偏，写入后返回偏移量+后续行号调整公式
-- `delphi_file(action="uses")` 同步返回偏移量信息
-- `AGENTS.md` 当时新增部分写入规则章节；后续版本已统一为 1-indexed inclusive 行号
-- 全量测试 684 passed, 6 skipped
+- `delphi_file` partial-write line-number fix: the 0-indexed documentation was corrected, and a write now returns the offset plus the formula for adjusting subsequent line numbers
+- `delphi_file(action="uses")` returns offset information as well
+- `AGENTS.md` gained a partial-write rules section at the time; later versions unified on 1-indexed inclusive line numbers
+- Full test run: 684 passed, 6 skipped
 
 ### v2026.05.14
 
-- 新增 `manage_component` 工具：DFM 组件增/删/改/生成 + PAS 自动同步（替代原 `generate_component_dfm`）
-- `delphi_file` 重命名+增强：DFM 二进制自动转换、备份管理、搜索定位（原名 `file_tool`，旧名仍兼容）
-- `get_coding_rules` 增强：支持按章节分段获取，节省 token
-- 新增 `code_hosting` 工具：统一 Gitea/GitHub/GitLab 操作
-- 工作流从 6 步扩展为 7 步（①环境检查→②查KB→③写代码→④格式化→⑤编译→⑥审计→⑦清理）
+- New `manage_component` tool: add, remove, modify and generate DFM components with automatic PAS synchronisation (replacing `generate_component_dfm`)
+- `delphi_file` renamed and enhanced: automatic DFM binary conversion, backup management and search-based location (formerly `file_tool`, which is still accepted as an alias)
+- `get_coding_rules` enhanced: sections can be fetched one at a time, saving tokens
+- New `code_hosting` tool: one interface over Gitea/GitHub/GitLab
+- The workflow grew from six steps to seven (① environment check → ② KB lookup → ③ write code → ④ format → ⑤ compile → ⑥ audit → ⑦ clean up)
 
-完整版本历史详见 [CHANGELOG.md](CHANGELOG.md)
+The complete version history is in [CHANGELOG.md](CHANGELOG.md).
 
-## 贡献
+## Contributing
 
-欢迎提交 Issue 和 Pull Request!
+Issues and pull requests are welcome!
 
-## 赞助
+## Sponsorship
 
-如果您觉得 Daofy for Delphi 对您有帮助，欢迎通过以下方式赞助支持我们。
-您的支持让项目走得更远！❤️
+If Daofy for Delphi helps you, you are welcome to support the project through any of the channels below.
+Your support keeps the project going! ❤️
 
-### 支付宝
+### Alipay
 
-**账号**: guansonghuan@sina.com（姓名：管耸寰，请标明QQ号）
+**Account**: guansonghuan@sina.com (name: 管耸寰 — please mention your QQ number)
 
-<img src="https://blog.qdac.cc/wp-content/uploads/2018/04/pay_alipay.jpg" alt="支付宝收款码" width="200"/>
+<img src="https://blog.qdac.cc/wp-content/uploads/2018/04/pay_alipay.jpg" alt="Alipay QR code" width="200"/>
 
-### 微信
+### WeChat
 
-**账号**: wangshengbo（发送红包或转账）
+**Account**: wangshengbo (send a red packet or a transfer)
 
-<img src="https://blog.qdac.cc/wp-content/uploads/2018/04/pay_wechat.jpg" alt="微信收款码" width="200"/>
+<img src="https://blog.qdac.cc/wp-content/uploads/2018/04/pay_wechat.jpg" alt="WeChat QR code" width="200"/>
 
 ### QQ
 
-直接群支付，或给群主发红包
+Pay through the group, or send a red packet to the group owner
 
-<img src="https://blog.qdac.cc/wp-content/uploads/2018/04/pay_qq.png" alt="QQ收款码" width="200"/>
+<img src="https://blog.qdac.cc/wp-content/uploads/2018/04/pay_qq.png" alt="QQ QR code" width="200"/>
 
-**QQ官方群**: 250530692
+**Official QQ group**: 250530692
 
-### 银行卡
+### Bank transfer
 
-| 银行 | 户名 | 账号 | 开户行 |
+| Bank | Account holder | Account number | Branch |
 |------|------|------|--------|
-| 光大银行 | 王胜波 | 6226 6208 0391 5552 | 光大银行长春人民大街支行 |
-| 建设银行 | 管耸寰 | 4367 4209 4324 0179 731 | 建设银行长春团风储蓄所 |
+| 光大银行 (China Everbright Bank) | 王胜波 | 6226 6208 0391 5552 | 光大银行长春人民大街支行 |
+| 建设银行 (China Construction Bank) | 管耸寰 | 4367 4209 4324 0179 731 | 建设银行长春团风储蓄所 |
 
-## 联系方式
+## Contact
 
-如有问题或建议,请提交 Issue。
+For questions or suggestions, please open an Issue.

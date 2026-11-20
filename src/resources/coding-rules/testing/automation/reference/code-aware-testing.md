@@ -1,18 +1,18 @@
-﻿<!-- @when: 需要从源码分析生成测试路径，或使用代码派生断言时 -->
+<!-- @when: a test path must be derived from source analysis, or code-derived assertions are needed -->
 
-# 代码感知测试
+# Code-Aware Testing
 
-MCP resource URI: `delphi://automation/code-aware-testing`。
+MCP resource URI: `delphi://automation/code-aware-testing`.
 
-## H1. 核心理念
+## H1. Core Idea
 
-AI 的优势不是模拟点击，而是**读懂代码**。源码就是最好的测试规范。
+The AI's advantage is not simulating clicks — it is **reading the code**. The source code is the best test specification there is.
 
-代码感知测试在「感知→规划→执行→验证」循环的**上游**新增代码分析阶段。
+Code-aware testing adds a code-analysis stage **upstream** of the perceive → plan → execute → verify loop.
 
-## H2. 代码分析工作流
+## H2. Code-Analysis Workflow
 
-### 步骤 1：定位目标代码
+### Step 1: Locate the target code
 
 ```python
 delphi_kb(query="TNewCustomerForm", search_type="class", kb_type="project")
@@ -20,78 +20,79 @@ delphi_file(action="read", file_path="UnitNewCustomer.pas")
 delphi_file(action="read", search_type="class", type_name="TNewCustomerForm")
 ```
 
-### 步骤 2：分析 DFM（控件结构）
+### Step 2: Analyse the DFM (control structure)
 
-提取控件的名称、类型、事件绑定、关键属性，输出供规划阶段使用的控件映射表。
+Extract each control's name, type, event bindings and key properties, then emit a control map for the planning stage to use.
 
-### 步骤 3：分析 PAS（事件处理程序）
+### Step 3: Analyse the PAS (event handlers)
 
-| 代码模式 | 测试含义 |
+| Code pattern | Testing implication |
 |---------|---------|
-| `if edtName.Text = '' then` | 测试空值路径，弹窗验证 |
-| `try ... except ... end` | 触发异常，验证降级行为 |
-| `ShowMessage('...')` | 操作后 msgscan 验证弹窗文本 |
-| `ModalResult := mrOk/mrCancel` | waitfor 窗口关闭 |
-| `Insert/Post` | 黑盒 UI 验证；灰盒 rcall 验证数据持久化 |
-| `Enabled := False` | rget 验证 Enabled |
-| `lblError.Visible := True` | rget 验证 Visible |
+| `if edtName.Text = '' then` | Test the empty-value path and verify the dialog |
+| `try ... except ... end` | Trigger the exception and verify the degradation behaviour |
+| `ShowMessage('...')` | msgscan after the operation to verify the dialog text |
+| `ModalResult := mrOk/mrCancel` | waitfor the window to close |
+| `Insert/Post` | Black-box UI verification; grey-box rcall to verify persistence |
+| `Enabled := False` | rget to verify Enabled |
+| `lblError.Visible := True` | rget to verify Visible |
 
-### 步骤 4：输出代码分析报告
+### Step 4: Emit the code-analysis report
 
 ```
-== 代码分析报告 — TNewCustomerForm ==
+== Code Analysis Report — TNewCustomerForm ==
 
-控件结构:
-| 控件名 | 类型 | 事件 |
+Control Structure:
+| Control Name | Type | Event |
 |--------|------|------|
 | edtName | TEdit | — |
 | btnSave | TButton | btnSaveClick |
 
-事件处理程序分析:
+Event Handler Analysis:
 **btnSaveClick**
-1. 验证 edtName.Text 非空 → 空则 ShowMessage('名称不能为空') + Exit
-2. 创建 TCustomer → 控件取值 → Insert DB → ShowMessage('保存成功')
+1. Validate that edtName.Text is non-empty → if empty, ShowMessage('名称不能为空') + Exit
+2. Create TCustomer → read values from controls → Insert DB → ShowMessage('保存成功')
 3. ModalResult := mrOk
 
-推导的测试路径:
-| # | 路径 | 操作 | 代码派生断言 |
+Derived Test Paths:
+| # | Path | Action | Code-Derived Assertion |
 |---|------|------|-------------|
-| 1 | 成功路径 | 输入有效数据 → Save | 弹窗"保存成功" + 窗口关闭 |
-| 2 | 名称为空 | edtName='' → Save | 弹窗"名称不能为空" |
-| 3 | 取消操作 | 任意数据 → Cancel | 窗口关闭，DB 无新增 |
+| 1 | Success path | Enter valid data → Save | Dialog "保存成功" + window closes |
+| 2 | Empty name | edtName='' → Save | Dialog "名称不能为空" |
+| 3 | Cancel operation | Any data → Cancel | Window closes, no new DB record |
 ```
 
-## H3. 代码路径 → 测试路径映射
+## H3. Code Path → Test Path Mapping
 
-| 代码结构 | 测试路径数 |
+| Code structure | Test paths |
 |---------|-----------|
-| 顺序代码（无分支） | 1（成功路径） |
-| `if ... then` | 2（真+假） |
+| Sequential code (no branches) | 1 (the success path) |
+| `if ... then` | 2 (true + false) |
 | `if ... then ... else` | 2 |
 | `case X of ... end` | N+1 |
-| `try ... except ... end` | 2（正常+异常） |
-| `for/while` | ≥2（0次 + 1+次） |
+| `try ... except ... end` | 2 (normal + exception) |
+| `for/while` | ≥2 (0 iterations + 1 or more) |
 
-每条 if/case/try 至少对应一条自动化测试操作和断言。
+Every `if`/`case`/`try` corresponds to at least one automated test operation and assertion.
 
-## H4. 代码派生断言优先级
+## H4. Priority of Code-Derived Assertions
 
-1. 纯业务类方法：`automate_delphi(action="test")`，通过参数化输入、`expected`、
-   `expected_exception` 或 `assert_expr` 验证。
-2. UI 状态：`rget` 直接检查属性值——最精确、最稳定。
-3. `waitfor` + `msgscan` — 检查弹窗内容。
-4. `capture` + OCR — 视觉验证（兜底）。
-5. `rcall` 调用业务方法 — 仅用于单步灰盒诊断；可复用测试应进入 RTTI test suite。
+1. Pure business-logic methods: `automate_delphi(action="test")`, verified through parameterised input,
+   `expected`, `expected_exception` or `assert_expr`.
+2. UI state: `rget` checks the property value directly — the most precise and most stable.
+3. `waitfor` + `msgscan` — checks the dialog content.
+4. `capture` + OCR — visual verification (the fallback).
+5. `rcall` invokes a business method — only for single-step grey-box diagnosis; a reusable test belongs in the RTTI test suite.
 
-纯业务方法测试先读取 `delphi://automation/rtti-test-runner`。用户可见交互仍生成 GUI
-黑盒脚本，不能因为 RTTI 更方便就跳过真实 UI 路径。
+Read `delphi://automation/rtti-test-runner` first for a pure business-method test. A user-visible interaction
+still gets a GUI Black-box script: RTTI being more convenient is no reason to skip the real UI path.
 
-## H5. 与自动化流程融合
+## H5. Integration with the Automation Flow
 
-在现有循环前插入代码分析阶段：
+Insert the code-analysis stage ahead of the existing loop:
 
 ```
-阶段 0: 代码分析 → 阶段 1-N: 感知→规划→执行→验证
+Stage 0: Code analysis → Stage 1-N: Perceive → Plan → Execute → Verify
 ```
 
-代码分析的输出直接指导后续的步骤选择和断言定义。
+The output of the code analysis directly guides the choice of steps and the definition of assertions that follow.
+

@@ -577,8 +577,8 @@ class TestFormatReport:
         from src.tools.audit import _format_report
         data = {"findings": [], "totalFindings": 0}
         report = _format_report(data)
-        assert "审计报告" in report
-        assert "0" in report.split("违规总数")[1].split("\n")[0] if "违规总数" in report else True
+        assert "Code Audit Report" in report
+        assert "0" in report.split("Total violations")[1].split("\n")[0] if "Total violations" in report else True
 
     def test_severity_mapping(self):
         """Should map daudit severity to display severity."""
@@ -634,7 +634,7 @@ class TestFormatReport:
         """Category distribution table should be included."""
         from src.tools.audit import _format_report
         report = _format_report(SAMPLE_AUDIT_PAYLOAD["data"])
-        assert "按类别分布" in report
+        assert "Distribution by category" in report
         assert "Security" in report
         assert "Performance" in report
         assert "CodeStyle" in report
@@ -657,7 +657,7 @@ class TestFormatReport:
         from src.tools.audit import _format_report
         report = _format_report(SAMPLE_AUDIT_PAYLOAD["data"])
         assert report.startswith("#")
-        assert "违规总数" in report
+        assert "Total violations" in report
         assert "##" in report  # severity section headers
 
     def test_severity_order(self):

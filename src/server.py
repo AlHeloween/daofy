@@ -1,11 +1,11 @@
 ﻿"""
-Daofy 主程序
+Daofy main program
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Province ZuoYou Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
-Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
+Update & Mod By Crystalxp (Night Killer QQ:281309196)
 
-提供 MCP 协议服务,注册所有工具并启动服务器
+Provides MCP protocol services, registers all tools and starts the server
 """
 
 import asyncio
@@ -23,8 +23,8 @@ import anyio
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 os.environ['PYTHONUTF8'] = '1'
 
-# 保护: 子进程(multiprocessing spawn) 的 stdout 已经 pipe,
-# TextIOWrapper 可能失败。失败时跳过不影响子进程通信。
+# Guard: the stdout of child processes (multiprocessing spawn) is already piped,
+# so TextIOWrapper may fail. Skipping on failure does not affect child process communication.
 if __name__ != '__mp_main__':
     try:
         if hasattr(sys.stdout, "reconfigure"):
@@ -34,23 +34,23 @@ if __name__ != '__mp_main__':
     except Exception:
         import logging as _logging
         _logger = _logging.getLogger(__name__)
-        _logger.warning("stdout/stderr 编码设置失败，部分输出可能乱码", exc_info=True)
+        _logger.warning("Failed to set stdout/stderr encoding, some output may be garbled", exc_info=True)
 
-# 添加项目根目录到 Python 路径
+# Add the project root directory to the Python path
 project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 
 def _ensure_deps() -> None:
-    """启动前检查核心依赖，缺失时自动 pip install（仅主进程，失败不阻塞）。
+    """Check core dependencies before startup and auto pip install when missing (main process only, failure does not block).
 
-    使用 importlib.util.find_spec 探测，不触发实际导入，避免副作用。
+    Uses importlib.util.find_spec to probe without triggering an actual import, avoiding side effects.
     """
     import subprocess
     import importlib.util
 
-    # (模块探测名, pip install 规格)
+    # (module probe name, pip install spec)
     CORE: list[tuple[str, str]] = [
         ("zvec",      "zvec>=0.5.0"),
         ("chardet",   "chardet>=7.0"),
@@ -69,7 +69,7 @@ def _ensure_deps() -> None:
 
     try:
         _logging.getLogger("daofy").info(
-            "缺失依赖，正在自动安装: %s ...", ", ".join(missing)
+            "Missing dependencies, auto-installing: %s ...", ", ".join(missing)
         )
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "--quiet", *missing],
@@ -77,14 +77,14 @@ def _ensure_deps() -> None:
             stderr=subprocess.DEVNULL,
             timeout=120,
         )
-        _logging.getLogger("daofy").info("依赖安装完成")
+        _logging.getLogger("daofy").info("Dependency installation complete")
     except Exception as exc:
         _logging.getLogger("daofy").warning(
-            "自动安装依赖失败（%s），请手动执行:  pip install -r requirements.txt", exc
+            "Failed to auto-install dependencies (%s), please run manually:  pip install -r requirements.txt", exc
         )
 
 
-# multiprocessing spawn 子进程重执行本文件时跳过安装
+# Skip installation when a multiprocessing spawn child re-executes this file
 if __name__ != "__mp_main__":
     _ensure_deps()
 
@@ -122,35 +122,37 @@ def _get_mcp_client_name(server_obj: Any) -> str | None:
         return None
 
 def _filter_surrogates(text: str) -> str:
-    """过滤字符串中的无效 UTF-8 代理对字符（surrogate characters）。
+    """Filter out invalid UTF-8 surrogate characters from a string.
 
-    代理对字符（U+D800 到 U+DFFF）在 UTF-8 编码中是无效的，
-    会导致 Pydantic JSON 序列化失败。此函数将它们替换为 Unicode 替换字符。
+    Surrogate characters (U+D800 to U+DFFF) are invalid in UTF-8 encoding
+    and will cause Pydantic JSON serialization to fail. This function replaces
+    them with the Unicode replacement character.
 
-    注意：此函数不会影响正常的 Unicode 字符（如中文、日文、韩文、emoji 等），
-    因为这些字符的 Unicode 范围（U+0000-U+D7FF, U+E000-U+10FFFF）
-    与代理对字符的范围（U+D800-U+DFFF）完全不重叠。
+    Note: this function does not affect normal Unicode characters (such as
+    Chinese, Japanese, Korean, emoji, etc.), because the Unicode ranges of
+    those characters (U+0000-U+D7FF, U+E000-U+10FFFF) do not overlap at all
+    with the range of surrogate characters (U+D800-U+DFFF).
 
-    代理对字符出现的常见原因：
-    1. UTF-16 编码的字符串被错误地当作 UTF-8 处理
-    2. 某些老旧的 Delphi 组件使用了不标准的编码
-    3. 文件读取时编码检测错误
+    Common causes of surrogate characters appearing:
+    1. A UTF-16 encoded string was mistakenly treated as UTF-8
+    2. Some legacy Delphi components used a non-standard encoding
+    3. Encoding detection error when reading a file
 
     Args:
-        text: 输入字符串
+        text: input string
 
     Returns:
-        过滤后的字符串，所有代理对字符已被替换
+        The filtered string, with all surrogate characters replaced
     """
     import re
-    # 检查是否包含代理对字符
+    # Check whether surrogate characters are present
     surrogate_pattern = re.compile(r'[\ud800-\udfff]')
     if surrogate_pattern.search(text):
-        # 记录警告，帮助调试编码问题
+        # Log a warning to help debug encoding issues
         count = len(surrogate_pattern.findall(text))
         logger.warning(
-            "检测到 %d 个无效的 UTF-8 代理对字符，已替换为替换字符。"
-            "这可能表示源文件编码不正确。",
+            "Detected %d invalid UTF-8 surrogate characters, replaced with the replacement character. "
+            "This may indicate that the source file encoding is incorrect.",
             count
         )
         return surrogate_pattern.sub('\ufffd', text)
@@ -158,25 +160,25 @@ def _filter_surrogates(text: str) -> str:
 
 
 MCP_SERVER_INSTRUCTIONS = (
-    "DaofyCoding 不依赖本 Server，使用宿主原生 automation_run 和 structured_content；本 Server 会隐藏对应重复工具。Daofy:Delphi 文件必用 delphi_file 处理，编码前 get_coding_rules；复杂工具调用前先用 tool_help(tool_name, action) 获取当前 action 的参数"
+    "DaofyCoding does not depend on this Server and uses the host-native automation_run and structured_content; this Server hides the duplicate tools. Daofy: Delphi files must be handled with delphi_file, and get_coding_rules comes before coding; before calling a complex tool, use tool_help(tool_name, action) to fetch the parameters of the current action"
 )
 
 MCP_SERVER_DESCRIPTION = (
-    "Daofy for Delphi MCP Server，提供 Delphi 项目编译、知识库搜索、"
-    "安全文件读写、自动化测试和审计工具。"
+    "Daofy for Delphi MCP Server: Delphi project compilation, knowledge base search, "
+    "safe file read/write, automation testing and audit tools."
 )
 
 # ============================================================
-# multiprocessing 子进程保护
-# Windows spawn模式下,子进程会重新导入 __main__ 模块(即本文件),
-# 导致所有服务模块被重新导入(885个模块),启动极慢。
-# 检测到是子进程时,跳过所有服务导入,只保留必要的模块。
+# multiprocessing child process protection
+# Under Windows spawn mode, the child process re-imports the __main__ module (i.e. this file),
+# causing all service modules to be re-imported (885 modules) and startup to be extremely slow.
+# When a child process is detected, skip all service imports and keep only the necessary modules.
 # ============================================================
 _is_multiprocessing_child = __name__ == '__mp_main__'
 
 if _is_multiprocessing_child:
-    # 子进程不需要任何MCP服务,直接跳过
-    # ProcessPoolExecutor的worker只需要能pickle/unpickle函数即可
+    # Child processes do not need any MCP services, so skip directly.
+    # ProcessPoolExecutor workers only need to be able to pickle/unpickle functions.
     pass
 else:
 
@@ -205,7 +207,7 @@ else:
     from src.services.knowledge_base.thirdparty_knowledge_base import ThirdPartyKnowledgeBase
     from src.services.agent_skill_installer import install_daofy_agent_skills
     from src.tools.project import handle_project as _handle_project
-    # project 模块统一管理编译器服务，保留别名供初始化用
+    # The project module manages the compiler service centrally; keep the alias for initialization
     from src.tools.compile_project import set_compiler_service as sp1
     from src.tools.compile_file import set_compiler_service as sp2
     from src.tools.get_args import set_compiler_service as sp3
@@ -249,25 +251,25 @@ else:
 )
     from src.tools.delphi_rtti import handle_delphi_rtti as _handle_delphi_rtti
     from src.services.copyright_service import generate_copyright as _generate_copyright
-    # ocr 使用延迟导入 — 仅当工具调用时才 import（避免未装 onnxruntime 时启动崩溃）
+    # ocr uses a lazy import — it is imported only when the tool is called (to avoid a startup crash when onnxruntime is not installed)
 
-    # 后台版本检查结果缓存（由 startup 异步任务填充）
+    # Background version check result cache (filled by the startup async task)
     _update_check_result: Optional[dict] = None
     _update_check_done: bool = False
 
-    # 文件变更监听器（由 startup 异步任务启动）
+    # File change watcher (started by the startup async task)
     _project_file_watcher: Optional[object] = None
 
-    # 服务器启动时间（用于 /health 资源）
+    # Server start time (used by the /health resource)
     _server_start_time: float = 0.0
-    # 最近一次 KB 构建时间
+    # Timestamp of the most recent KB build
     _last_kb_build_time: Optional[float] = None
 
-    # 初始化日志
+    # Initialize logging
     logger = init_default_logger()
 
     # ============================================================
-    # 插件系统 (Phase 2: 工具归属 + handler 分发)
+    # Plugin system (Phase 2: tool ownership + handler dispatch)
     # ============================================================
     from src.plugins.registry import PluginRegistry
     from src.plugins.delphi import DelphiPlugin
@@ -277,33 +279,33 @@ else:
     _plugin_registry.register(DelphiPlugin())
     _plugin_registry.register(LazarusPlugin())
 
-    logger.info(f"已注册插件: {[p.info.name for p in _plugin_registry.get_all_plugins()]}")
-    logger.info(f"插件扩展名映射: {_plugin_registry.get_all_extensions()}")
-    logger.info(f"可用插件工具: {list(_plugin_registry.collect_tools())}")
+    logger.info(f"Registered plugins: {[p.info.name for p in _plugin_registry.get_all_plugins()]}")
+    logger.info(f"Plugin extension mapping: {_plugin_registry.get_all_extensions()}")
+    logger.info(f"Available plugin tools: {list(_plugin_registry.collect_tools())}")
 
-    # 插件工具归属:
-    #   delphi 插件拥有: delphi_project, delphi_file, delphi_kb, manage_component,
+    # Plugin tool ownership:
+    #   delphi plugin owns: delphi_project, delphi_file, delphi_kb, manage_component,
     #                     get_coding_rules, package, check_environment, delphi_rtti, automate_delphi
-    #   lazarus 插件拥有: lazarus_compile, lazarus_project, lazarus_kb, lazarus_file
-    #                    （仅当 lazbuild.exe 可用时注册，否则跳过）
-    #   核心拥有: async_task, code_hosting, tool_help, experience, daofy_update,
+    #   lazarus plugin owns: lazarus_compile, lazarus_project, lazarus_kb, lazarus_file
+    #                    (registered only when lazbuild.exe is available, otherwise skipped)
+    #   core owns: async_task, code_hosting, tool_help, experience, daofy_update,
     #            generate_copyright, ocr
-    # handler 已全部提取到插件模块 (Phase 3 / Phase 5)。
+    # All handlers have been extracted into the plugin modules (Phase 3 / Phase 5).
 
 
     async def _fetch_workspace_roots(session) -> None:
-        """异步获取 AI Agent 工作区根目录并缓存到 file_tool。
+        """Asynchronously fetch the AI Agent workspace roots and cache them in file_tool.
 
-        在 session 初始化完成后调用 session.list_roots() 获取工作区根，
-        将第一个有效的 file:// URI 转换为本地路径后缓存。
-        若客户端不支持 roots 或超时，静默跳过。
+        After session initialization completes, call session.list_roots() to get the
+        workspace roots, convert the first valid file:// URI to a local path and cache it.
+        If the client does not support roots or the call times out, skip silently.
         """
         try:
-            # 等待初始化完成（InitializedNotification 到达后才可发起 roots/list）
+            # Wait for initialization to complete (roots/list can only be issued after the InitializedNotification arrives)
             await anyio.sleep(1.0)
             result = await session.list_roots()
             if not result or not result.roots:
-                logger.info("客户端未提供工作区根目录（roots 为空）")
+                logger.info("Client did not provide a workspace root (roots is empty)")
                 return
 
             for root in result.roots:
@@ -316,22 +318,22 @@ else:
                         from src.tools.read_source_file import set_workspace_root as set_read_source_workspace_root
                         set_read_source_workspace_root(local_path)
                         return
-                    logger.info("工作区根 URI 不是有效目录: %s", uri)
+                    logger.info("Workspace root URI is not a valid directory: %s", uri)
                 else:
-                    logger.debug("跳过非 file:// 工作区根: %s", uri)
+                    logger.debug("Skipping non-file:// workspace root: %s", uri)
 
-            logger.info("未找到有效的 file:// 工作区根目录")
+            logger.info("No valid file:// workspace root found")
         except anyio.EndOfStream:
-            logger.debug("session 已关闭，跳过根目录获取")
+            logger.debug("session already closed, skipping root retrieval")
         except Exception:
-            logger.debug("获取工作区根目录失败（客户端可能不支持 roots）- 静默跳过", exc_info=True)
+            logger.debug("Failed to fetch workspace roots (the client may not support roots) - skipping silently", exc_info=True)
 
 
     async def _install_client_rules(session) -> None:
-        """将 Daofy 客户端规则安装到所连 MCP 客户端的规则目录。
+        """Install the Daofy client rules into the rules directory of the connected MCP client.
 
-        客户端身份只有 initialize 之后才可得，故放在后台任务里执行，
-        不阻塞握手。失败不影响 Server 运行。
+        The client identity is only available after initialize, so this runs in a
+        background task and does not block the handshake. Failure does not affect Server operation.
         """
         try:
             from src.services.client_rules_installer import install_client_rules
@@ -341,7 +343,7 @@ else:
             if outcome.get("message"):
                 logger.info("[client-rules] %s", outcome["message"])
         except Exception:
-            logger.info("安装 Daofy 客户端规则失败（不影响正常运行）", exc_info=True)
+            logger.info("Failed to install Daofy client rules (does not affect normal operation)", exc_info=True)
 
 
     async def _run_mcp_server(server, read_stream, write_stream) -> None:
@@ -358,7 +360,7 @@ else:
 
 
 def _auto_detect_delphi_help_dir() -> Optional[str]:
-    """自动检测最新安装的 Delphi 帮助文档目录"""
+    """Automatically detect the help document directory of the most recently installed Delphi"""
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY_EMBARCADERO_BDS)
         versions = []
@@ -379,38 +381,36 @@ def _auto_detect_delphi_help_dir() -> Optional[str]:
                 winreg.CloseKey(vk)
                 help_dir = Path(root_dir) / "Help" / "Doc"
                 if help_dir.exists():
-                    logger.info(f"自动检测到 Delphi 帮助目录 (版本 {ver}): {help_dir}")
+                    logger.info(f"Auto-detected Delphi help directory (version {ver}): {help_dir}")
                     return str(help_dir)
             except Exception:
-                logger.debug("读取注册表版本键失败", exc_info=True)
+                logger.debug("Failed to read registry version key", exc_info=True)
                 continue
     except Exception:
-        logger.debug("打开注册表 BDS 键失败", exc_info=True)
+        logger.debug("Failed to open registry BDS key", exc_info=True)
 
-    # 注册表失败，尝试默认路径（版本号与注册表一致：37.0=Delphi13, 23.0=Delphi12, 22.0=Delphi11...）
-    # 只有 17.0 (XE) 及以上版本使用此目录结构
+    # Registry failed; try the default paths (version numbers match the registry: 37.0=Delphi13, 23.0=Delphi12, 22.0=Delphi11...)
+    # Only 17.0 (XE) and later versions use this directory structure
     program_files_x86 = os.environ.get("ProgramFiles(x86)")
     if not program_files_x86:
         return None
     for ver in ["37.0", "23.0", "22.0", "21.0", "20.0", "19.0", "18.0", "17.0"]:
         path = Path(program_files_x86) / "Embarcadero" / "Studio" / ver / "Help" / "Doc"
         if path.exists():
-            logger.info(f"使用默认帮助目录: {path}")
+            logger.info(f"Using default help directory: {path}")
             return str(path)
     return None
-
-
 def _get_smart_hint(name: str, result: Any, arguments: dict) -> Optional[str]:
     """
-    智能提示：根据工具名和返回结果，生成下一步建议。
+    Smart hint: generate next-step suggestions based on tool name and result.
 
     Args:
-        name: 工具名
-        result: 工具返回结果（dict 或 CallToolResult）
-        arguments: 调用参数
+        name: Tool name
+        result: Tool return result (dict or CallToolResult)
+        arguments: Call arguments
 
     Returns:
-        建议文本，无建议时返回 None
+        Suggestion text, or None if no suggestion
     """
     if name == "delphi_kb":
         action = arguments.get("action", "search")
@@ -425,7 +425,7 @@ def _get_smart_hint(name: str, result: Any, arguments: dict) -> Optional[str]:
                     "use delphi_kb(action='build', kb_type='project') to rebuild")
 
     elif name == "get_coding_rules":
-        # 仅在 section=None（默认模式）时提示
+        # Only hint when section=None (default mode)
         section = arguments.get("section")
         if section is None or section == "":
             return ("hint: use section param for specific chapters:\n"
@@ -449,7 +449,7 @@ def _get_smart_hint(name: str, result: Any, arguments: dict) -> Optional[str]:
     elif name == "delphi_project":
         action = arguments.get("action", "")
         if action == "compile":
-            # 判断编译是否成功
+            # Determine whether compilation succeeded
             is_success = False
             if isinstance(result, CallToolResult):
                 is_success = not call_tool_result_is_error(result)
@@ -460,11 +460,11 @@ def _get_smart_hint(name: str, result: Any, arguments: dict) -> Optional[str]:
                 )
             if is_success:
                 return (
-                    "编译通过 ✅ — 工作流后续步骤（按顺序执行）：\n"
-                    "  1️⃣  代码审核: get_coding_rules(section=\"review\")\n"
-                    "  2️⃣  清理: 删未用变量/导入/死代码\n"
-                    "  3️⃣  automate_delphi 测试: tool_help(tool_name=\"automate_delphi\")\n"
-                    "  4️⃣  经验沉淀: experience(action=\"suggest\") → save"
+                    "Compilation passed ✅ — subsequent workflow steps (execute in order):\n"
+                    "  1️⃣  Code review: get_coding_rules(section=\"review\")\n"
+                    "  2️⃣  Cleanup: remove unused variables/imports/dead code\n"
+                    "  3️⃣  automate_delphi tests: tool_help(tool_name=\"automate_delphi\")\n"
+                    "  4️⃣  Experience capture: experience(action=\"suggest\") → save"
                 )
 
     elif name == "package":
@@ -484,23 +484,24 @@ def _get_smart_hint(name: str, result: Any, arguments: dict) -> Optional[str]:
                 return ("hint: install done, "
                         "use package(action='list') to verify IDE registration")
 
-    # P4: 版本更新提示（检查完成且有新版本时通知 AI）
+    # P4: Version update hint (notify AI when check is done and a new version exists)
     if _update_check_done and _update_check_result and _update_check_result.get("update_available"):
         return (
-            f"📦 发现新版本 Daofy: v{_update_check_result['current']} → "
-            f"v{_update_check_result['latest']}！\n"
-            f"请使用 `daofy_update(action=\"check\")` 查看详情，"
-            f"或 `daofy_update(action=\"update\")` 通过 git pull 更新。\n"
-            f"发布说明: {_update_check_result['release_url']}"
+            f"📦 New Daofy version found: v{_update_check_result['current']} → "
+            f"v{_update_check_result['latest']}!\n"
+            f"Use `daofy_update(action=\"check\")` for details, "
+            f"or `daofy_update(action=\"update\")` to update via git pull.\n"
+            f"Release notes: {_update_check_result['release_url']}"
         )
 
     return None
 
 
 # ============================================================
-# Delphi 文件读写尾注 — 提醒 AI 使用 delphi_file 工具
+# Delphi file read/write footnote — remind AI to use the delphi_file tool
 # ============================================================
-# 以下工具返回结果时将追加尾注，防止 AI 绕过 delphi_file 直接读写 .pas/.dfm 等文件
+# The following tools append a footnote to their results, preventing AI from
+# bypassing delphi_file to directly read/write .pas/.dfm files
 def _redact_env_argument(value: Any) -> Any:
     """Return a log-safe summary for env/environment argument values."""
     if not isinstance(value, dict):
@@ -539,11 +540,11 @@ _DELPHI_FILE_FOOTNOTE_TOOLS: set = {
 
 _DELPHI_FILE_FOOTNOTE_TEXT = (
     "\n\n---\n"
-    "⚠️ Delphi 文件必须用 `delphi_file` 读写/搜索/正则匹配+替换，"
-    "不要用内置 Read/Edit/Write/grep。"
+    "⚠️ Delphi files must be read/written/searched/regex-matched+replaced using `delphi_file`, "
+    "do not use built-in Read/Edit/Write/grep."
 )
 
-# action → 需要尾注的操作集合
+# action → set of operations that need the footnote
 _DELPHI_FILE_FOOTNOTE_ACTIONS: dict[str, set[str]] = {
     "delphi_kb":          {"search", "read", "stats"},
     "delphi_project":     {"info", "ast", "audit", "compile", "compile_file", "devices", "deploy"},
@@ -553,10 +554,10 @@ _DELPHI_FILE_FOOTNOTE_ACTIONS: dict[str, set[str]] = {
 
 
 def _get_delphi_file_footnote(name: str, arguments: dict) -> Optional[str]:
-    """对可能涉及 Delphi 文件操作的工具返回尾注，提醒使用 delphi_file。"""
+    """Return a footnote for tools that may involve Delphi file operations, reminding to use delphi_file."""
     if name not in _DELPHI_FILE_FOOTNOTE_TOOLS:
         return None
-    # manage_component, get_coding_rules, delphi_file 无 action 限制
+    # manage_component, get_coding_rules, delphi_file have no action restriction
     if name in ("manage_component", "get_coding_rules", "delphi_file"):
         return _DELPHI_FILE_FOOTNOTE_TEXT
     action = arguments.get("action", "")
@@ -587,8 +588,8 @@ def _build_mcp_resource_list(root: Path = project_root) -> list:
     resources.append(make_resource(
         uri="delphi://health",
         name="health",
-        title="Daofy 服务器状态",
-        description="服务器运行状态、版本号、文件监听器状态等健康检查信息",
+        title="Daofy server status",
+        description="Health check info such as server running status, version, and file watcher status",
         mime_type="application/json"
     ))
     return resources
@@ -608,7 +609,7 @@ def _compute_uptime_seconds(start_time: float) -> float:
 
 def _read_mcp_resource(uri: str, root: Path = project_root):
     """Read one MCP Resource exposed by Daofy."""
-    from pydantic import AnyUrl  # 延迟导入，避免启动时额外加载
+    from pydantic import AnyUrl  # lazy import to avoid extra loading at startup
 
     uri = str(uri)
 
@@ -670,7 +671,7 @@ def _read_mcp_resource(uri: str, root: Path = project_root):
             )]
         )
 
-    raise ValueError(f"未知资源: {uri}")
+    raise ValueError(f"Unknown resource: {uri}")
 
 
 def _read_mcp_resource_contents(uri: str, root: Path = project_root) -> list:
@@ -684,51 +685,49 @@ def _read_mcp_resource_contents(uri: str, root: Path = project_root) -> list:
         )
         for content in result.contents
     ]
-
-
 async def run_server():
-    """运行 MCP Server"""
+    """Run MCP Server"""
     global _server_start_time
     _server_start_time = time.monotonic()
-    logger.info(f"启动 Daofy v{__version__}")
+    logger.info(f"Starting Daofy v{__version__}")
     logger.info(f"{__copyright__}")
 
-    # 版本横幅输出到 stderr（MCP stdout 保持 JSON-RPC 纯净）。
-    # 日志（含运行时日志）默认仅写文件，控制台只显示版本信息；
-    # 若需完整控制台日志，可在 config/logging_config.json 设 console_logging=true。
+    # Version banner output to stderr (keep MCP stdout pure for JSON-RPC).
+    # Logs (including runtime logs) are written to file only by default; console only shows version info;
+    # for full console logging, set console_logging=true in config/logging_config.json.
     print(f"Daofy v{__version__}", file=sys.stderr, flush=True)
     print(f"{__copyright__}", file=sys.stderr, flush=True)
 
-    # 尽力同步 Daofy Agent Skill。失败不影响 MCP Server 启动。
+    # Best-effort sync of Daofy Agent Skill. Failure does not affect MCP Server startup.
     try:
         install_daofy_agent_skills()
     except Exception:
-        logger.warning("同步 Daofy Agent Skill 失败（不影响正常运行）", exc_info=True)
+        logger.warning("Failed to sync Daofy Agent Skill (does not affect normal operation)", exc_info=True)
 
-    # 初始化配置管理器
+    # Initialize config manager
     config_manager = ConfigManager()
-    logger.info("配置管理器初始化完成")
+    logger.info("Config manager initialized")
 
-    # 初始化编译服务
+    # Initialize compilation service
     compiler_service = CompilerService(config_manager)
-    logger.info("编译服务初始化完成")
+    logger.info("Compilation service initialized")
 
-    # 初始化知识库服务（ZVec 引擎）
-    # 与 RTL/第三方库路径共用同一版本过滤策略（resolve_delphi_source_dirs）；
-    # 启动默认取全部已安装版本的官方源码，构建时可通过 version 参数按版本过滤。
+    # Initialize knowledge base service (ZVec engine)
+    # Shares the same version filtering strategy as RTL/third-party library paths (resolve_delphi_source_dirs);
+    # startup defaults to official sources of all installed versions; builds can filter by version via the version parameter.
     from src.utils.delphi_env import resolve_delphi_source_dirs
     delphi_source_dirs = resolve_delphi_source_dirs()
 
     kb_dir = str(Path(__file__).parent.parent / "data" / "delphi-knowledge-base")
     kb_service = ZVecKnowledgeBaseAdapter(kb_dir, source_dirs=delphi_source_dirs)
-    logger.info(f"ZVec 知识库初始化完成 (源码目录: {delphi_source_dirs})")
+    logger.info(f"ZVec knowledge base initialized (source dirs: {delphi_source_dirs})")
 
-    # 初始化第三方库知识库服务
+    # Initialize third-party library knowledge base service
     thirdparty_kb_service = ThirdPartyKnowledgeBase()
     thirdparty_kb_tools.set_thirdparty_knowledge_base_service(thirdparty_kb_service)
-    logger.info("第三方库知识库服务初始化完成")
+    logger.info("Third-party library knowledge base service initialized")
 
-    # 设置工具的服务实例
+    # Set service instances for tools
     sp1(compiler_service)
     sp2(compiler_service)
     sp3(compiler_service)
@@ -738,43 +737,43 @@ async def run_server():
     stks(thirdparty_kb_service)
     set_knowledge_base_services(kb_service, thirdparty_kb_service)
     set_delphi_kb_service(kb_service)
-    # 项目 KB 服务由 project_path 参数动态创建,不在启动时初始化
-    # set_project_kb_service(kb_service)  # kb_service 是 Delphi RTL KB,不适合作为项目 KB
+    # Project KB service is created dynamically via project_path parameter, not initialized at startup
+    # set_project_kb_service(kb_service)  # kb_service is Delphi RTL KB, not suitable as project KB
     set_thirdparty_kb_service(thirdparty_kb_service)
 
-    # 设置 DFM 工具编译器路径
+    # Set DFM tool compiler path
     newest = config_manager.get_newest_compiler()
     if newest and newest.path:
         if os.path.isfile(newest.path):
             dfm_utils_mod.set_compiler_path(newest.path)
             create_component_dfm_mod.set_compiler_path(newest.path)
-            logger.info(f"DFM 工具编译器路径已设置: {newest.path}")
+            logger.info(f"DFM tool compiler path set: {newest.path}")
         else:
-            logger.warning("编译器文件不存在: %s，DFM 转换功能将不可用。请重新检测编译器。", newest.path)
+            logger.warning("Compiler file does not exist: %s, DFM conversion will be unavailable. Please re-detect the compiler.", newest.path)
     else:
-        logger.warning("未找到可用编译器，DFM 转换功能将不可用")
+        logger.warning("No available compiler found, DFM conversion will be unavailable")
 
-    # 设置事件签名解析器的 KB 服务引用
+    # Set KB service references for event signature parser
     from src.tools.dfm_parser import set_kb_services as _set_dfm_kb
     _set_dfm_kb(delphi_kb=kb_service, thirdparty_kb=thirdparty_kb_service)
 
-    logger.info("工具服务实例设置完成")
+    logger.info("Tool service instances set")
 
-    # 创建 MCP Server 实例
+    # Create MCP Server instance
     server = CompatibleServer(
         "daofy-for-delphi",
         version=__version__,
         instructions=MCP_SERVER_INSTRUCTIONS,
     )
-    logger.info("MCP Server 实例创建完成")
+    logger.info("MCP Server instance created")
 
     # ============================================================
-    # MCP 工具注册
-    # 所有工具必须同时在 list_tools() 和 call_tool() 中注册
+    # MCP tool registration
+    # All tools must be registered in both list_tools() and call_tool()
     # ============================================================
     @server.list_tools()
     async def list_tools():
-        """列出所有可用工具（schema 由插件 handler 模块注册，registry 统一收集）"""
+        """List all available tools (schemas are registered by plugin handler modules, collected uniformly by registry)"""
         client_name = _get_mcp_client_name(server)
         return [
             make_tool(
@@ -785,7 +784,7 @@ async def run_server():
             for td in filter_tools(_plugin_registry.collect_tools(), client_name)
         ]
 
-    # 注册核心 + Delphi + Lazarus handler 模块（handler + description + schema 一次注册）
+    # Register core + Delphi + Lazarus handler modules (handler + description + schema registered at once)
     from src.plugins.core.handlers import CORE_HANDLERS, CORE_TOOL_DESCRIPTIONS, CORE_TOOL_SCHEMAS
     from src.plugins.delphi.handlers import DELPHI_HANDLERS, DELPHI_TOOL_DESCRIPTIONS, DELPHI_TOOL_SCHEMAS
     from src.plugins.lazarus.handlers import LAZARUS_HANDLERS, LAZARUS_TOOL_DESCRIPTIONS, LAZARUS_TOOL_SCHEMAS
@@ -804,7 +803,7 @@ async def run_server():
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict):
-        """调用工具（由 _plugin_registry 分发）"""
+        """Invoke tool (dispatched by _plugin_registry)"""
         import time as _time
         from datetime import datetime as _datetime
         import asyncio as _asyncio
@@ -812,7 +811,7 @@ async def run_server():
         _call_start = _time.monotonic()
         _call_start_dt = _datetime.now()
 
-        logger.info(f"调用工具: {name}")
+        logger.info(f"Invoking tool: {name}")
         result = None
 
         try:
@@ -822,9 +821,9 @@ async def run_server():
                 raise ValueError(path_error)
             handler = _plugin_registry.get_handler(name)
             if handler:
-                # ── MCP 推送通知注入 ──
-                # 对于 code_hosting 等支持异步任务的工具，注入 _on_complete 回调
-                # 任务完成时自动推送 TaskStatusNotification 到 MCP 客户端，无需轮询
+                # ── MCP push notification injection ──
+                # For tools supporting async tasks like code_hosting, inject _on_complete callback
+                # Automatically push TaskStatusNotification to MCP client on task completion, no polling needed
                 try:
                     from mcp.types import (
                         TaskStatusNotification, TaskStatusNotificationParams,
@@ -834,8 +833,8 @@ async def run_server():
 
                     def _make_on_complete(session, loop):
                         def _on_complete(task_info):
-                            """后台任务完成回调 — 推送 TaskStatusNotification"""
-                            # 映射 local TaskStatus → MCP Literal 状态值
+                            """Background task completion callback — pushes TaskStatusNotification"""
+                            # Map local TaskStatus → MCP Literal status values
                             status_map = {
                                 'COMPLETED': 'completed',
                                 'FAILED': 'failed',
@@ -843,7 +842,7 @@ async def run_server():
                             }
                             ts = task_info.status.name  # e.g. 'COMPLETED'
                             mcp_status = status_map.get(ts, 'completed')
-                            # 确保 datetime 类型
+                            # Ensure datetime type
                             created = task_info.created_at
                             updated = task_info.completed_at or _datetime.now()
 
@@ -857,7 +856,7 @@ async def run_server():
                                     ttl=3600000,  # 1 hour retention
                                 )
                             )
-                            # 从后台线程调度到 asyncio 事件循环
+                            # Schedule from background thread to asyncio event loop
                             asyncio.run_coroutine_threadsafe(
                                 session.send_notification(notif),
                                 loop
@@ -866,19 +865,19 @@ async def run_server():
 
                     arguments['_on_complete'] = _make_on_complete(_session, _loop)
                 except (LookupError, AttributeError, ImportError) as _ctx_err:
-                    logger.debug(f"无法注入 MCP 推送回调: {_ctx_err}")
-                    # 非 MCP 环境（如测试）或无 request_context 时静默跳过
+                    logger.debug(f"Unable to inject MCP push callback: {_ctx_err}")
+                    # Silently skip in non-MCP environments (e.g. tests) or without request_context
 
                 result = await handler(arguments)
             else:
-                raise ValueError(f"未知工具: {name}")
+                raise ValueError(f"Unknown tool: {name}")
 
-            # 计算调用用时
+            # Calculate call duration
             _call_end = _time.monotonic()
             _call_end_dt = _datetime.now()
             _duration = _call_end - _call_start
 
-            # P2: 智能提示
+            # P2: Smart hint
             hint = _get_smart_hint(name, result, arguments)
             if hint:
                 if isinstance(result, CallToolResult):
@@ -889,19 +888,19 @@ async def run_server():
                     if isinstance(msg, str):
                         result['message'] = msg + "\n\n" + hint
 
-            # P2b: Delphi 文件读写尾注
+            # P2b: Delphi file read/write footnote
             footnote = _get_delphi_file_footnote(name, arguments)
             if footnote:
                 if isinstance(result, CallToolResult):
                     if result.content and hasattr(result.content[0], 'text'):
-                        # 避免重复添加（后续 serialize 时还会嵌入一次）
+                        # Avoid duplicate addition (will be embedded again during later serialize)
                         result.content[0].text = result.content[0].text + footnote
                 elif isinstance(result, dict):
                     msg = result.get('message', '')
                     if isinstance(msg, str):
                         result['message'] = msg + footnote
 
-            # P3: API 调用日志（排除注入的 _on_complete 回调，防止 json.dumps 序列化函数报错）
+            # P3: API call log (exclude injected _on_complete callback to prevent json.dumps serialization errors on functions)
             _log_args = _redact_sensitive_arguments(
                 {k: v for k, v in arguments.items() if k != '_on_complete'}
             )
@@ -909,7 +908,7 @@ async def run_server():
 
             import json as _json
             _show_timing = config_manager.get_show_timing()
-            # 统一提取 data：dict→直接使用，CallToolResult→提取 TextContent 文本
+            # Uniformly extract data: dict→use directly, CallToolResult→extract TextContent text
             if isinstance(result, dict):
                 data = result
                 is_error = (result.get('status') == 'failed'
@@ -956,7 +955,7 @@ async def run_server():
                     text = str(response)
             else:
                 text = str(response)
-            # 过滤无效的 UTF-8 代理对字符，防止 Pydantic JSON 序列化失败
+            # Filter invalid UTF-8 surrogate pair characters to prevent Pydantic JSON serialization failure
             text = _filter_surrogates(text)
             if hasattr(CallToolResult, "is_error"):
                 result = CallToolResult(
@@ -981,156 +980,156 @@ async def run_server():
                 }
             }
             log_api_call(logger, name, _redact_sensitive_arguments(arguments), {"error": str(e)})
-            logger.error(f"工具调用失败: {str(e)}", exc_info=True)
+            logger.error(f"Tool call failed: {str(e)}", exc_info=True)
             import json as _json
             return CallToolResult(
                 content=[TextContent(type="text", text=_json.dumps(error_result, ensure_ascii=False, indent=2))],
                 isError=True
             )
 
-    # 注册 MCP 资源
+    # Register MCP resources
 
     @server.list_resources()
     async def list_resources():
-        """列出可用资源"""
+        """List available resources"""
         return _build_mcp_resource_list(project_root)
 
     @server.read_resource()
     async def read_resource(uri: str):
-        """读取资源内容"""
+        """Read resource content"""
         return _read_mcp_resource_contents(uri, project_root)
 
     # ============================================================
-    # MCP 提示词注册
-    # 自动化测试工作流专用提示词模板
+    # MCP prompt registration
+    # Prompt templates for automation test workflow
     # ============================================================
 
     @server.list_prompts()
     async def list_prompts():
-        """列出所有可用提示词模板"""
+        """List all available prompt templates"""
         return [
             Prompt(
                 name="automate-expert-primer",
-                description="🎭 注入测试专家角色：设定身份、思维框架、三层递进思考模型",
+                description="🎭 Inject test expert role: set identity, thinking framework, three-tier progressive thinking model",
                 arguments=[
                     PromptArgument(
                         name="app_name",
-                        description="被测 Delphi 应用名称",
+                        description="Name of the Delphi application under test",
                         required=False,
                     ),
                     PromptArgument(
                         name="project_path",
-                        description="项目路径（用于后续代码分析）",
+                        description="Project path (for subsequent code analysis)",
                         required=False,
                     ),
                 ],
             ),
             Prompt(
                 name="automate-code-analysis",
-                description="🔍 代码感知分析：读取目标单元的 DFM/PAS，生成控件映射表、事件分析、测试路径",
+                description="🔍 Code-aware analysis: read target unit's DFM/PAS, generate control mapping table, event analysis, test paths",
                 arguments=[
                     PromptArgument(
                         name="form_name",
-                        description="目标 Form/Frame 类名（如 TNewCustomerForm）",
+                        description="Target Form/Frame class name (e.g., TNewCustomerForm)",
                         required=True,
                     ),
                     PromptArgument(
                         name="project_path",
-                        description="项目路径（传给 delphi_kb 搜索代码）",
+                        description="Project path (passed to delphi_kb to search code)",
                         required=True,
                     ),
                     PromptArgument(
                         name="app_path",
-                        description="Delphi 应用 exe 路径（可选，用于后续自动化）",
+                        description="Delphi application exe path (optional, for subsequent automation)",
                         required=False,
                     ),
                 ],
             ),
             Prompt(
                 name="automate-test-plan",
-                description="启动自动化测试规划：角色设定 + 代码分析 + 结构化步骤序列",
+                description="Start automation test planning: role setup + code analysis + structured step sequence",
                 arguments=[
                     PromptArgument(
                         name="goal",
-                        description="测试目标描述（如「新建客户 - 成功路径」）",
+                        description="Test goal description (e.g., 'New Customer - Success Path')",
                         required=True,
                     ),
                     PromptArgument(
                         name="app_path",
-                        description="Delphi 应用 exe 路径",
+                        description="Delphi application exe path",
                         required=False,
                     ),
                     PromptArgument(
                         name="project_path",
-                        description="项目路径（用于代码分析）",
+                        description="Project path (for code analysis)",
                         required=False,
                     ),
                 ],
             ),
             Prompt(
                 name="automate-step-execute",
-                description="单步自动化执行协议：前置感知→执行→等待→验证",
+                description="Single-step automation execution protocol: pre-perception → execute → wait → verify",
                 arguments=[
                     PromptArgument(
                         name="phase",
-                        description="步骤阶段: perceive / execute / verify",
+                        description="Step phase: perceive / execute / verify",
                         required=True,
                     ),
                     PromptArgument(
                         name="tool",
-                        description="工具/命令名 (如 goto+click, capture, waitfor, rcall)",
+                        description="Tool/command name (e.g., goto+click, capture, waitfor, rcall)",
                         required=True,
                     ),
                     PromptArgument(
                         name="target",
-                        description="操作目标 (控件名/坐标/文件路径)",
+                        description="Operation target (control name/coordinates/file path)",
                         required=True,
                     ),
                     PromptArgument(
                         name="expected",
-                        description="预期结果描述",
+                        description="Expected result description",
                         required=False,
                     ),
                 ],
             ),
             Prompt(
                 name="automate-failure-recover",
-                description="自动化测试失败恢复：诊断→决策→恢复→学习",
+                description="Automation test failure recovery: diagnose → decide → recover → learn",
                 arguments=[
                     PromptArgument(
                         name="signal",
-                        description="失败信号: timeout / click_error / unexpected_dialog / rtti_exception / ocr_mismatch",
+                        description="Failure signal: timeout / click_error / unexpected_dialog / rtti_exception / ocr_mismatch",
                         required=True,
                     ),
                     PromptArgument(
                         name="expected",
-                        description="预期结果",
+                        description="Expected result",
                         required=False,
                     ),
                     PromptArgument(
                         name="actual",
-                        description="实际结果",
+                        description="Actual result",
                         required=False,
                     ),
                 ],
             ),
             Prompt(
                 name="automate-save-experience",
-                description="测试完成后保存经验到知识库：结构化记录成功/失败模式",
+                description="Save experience to knowledge base after test completion: structured recording of success/failure patterns",
                 arguments=[],
             ),
             Prompt(
                 name="automate-session-end",
-                description="结束测试会话：保存经验、导出脚本、角色切回开发模式",
+                description="End test session: save experience, export script, switch role back to development mode",
                 arguments=[
                     PromptArgument(
                         name="save_experience",
-                        description="是否保存测试经验（true/false，默认 true）",
+                        description="Whether to save test experience (true/false, default true)",
                         required=False,
                     ),
                     PromptArgument(
                         name="export_script",
-                        description="是否导出测试脚本到 tests/scripts/（true/false，默认 true）",
+                        description="Whether to export test script to tests/scripts/ (true/false, default true)",
                         required=False,
                     ),
                 ],
@@ -1139,13 +1138,13 @@ async def run_server():
 
     @server.get_prompt()
     async def get_prompt(name: str, arguments: dict[str, str] | None) -> GetPromptResult:
-        """获取指定提示词模板内容"""
+        """Get content of specified prompt template"""
         args = arguments or {}
 
         if name == "automate-expert-primer":
-            app_name = args.get("app_name", "待测 Delphi 应用")
+            app_name = args.get("app_name", "Delphi application under test")
             project_path = args.get("project_path", "")
-            proj_line = f"\n项目路径: `{project_path}`" if project_path else ""
+            proj_line = f"\nProject path: `{project_path}`" if project_path else ""
             return GetPromptResult(
                 messages=[
                     PromptMessage(
@@ -1153,34 +1152,34 @@ async def run_server():
                         content=TextContent(
                             type="text",
                             text=(
-                                f"## 角色设定：Delphi UI 自动化测试专家\n\n"
-                                f"你是一位 **Delphi UI 自动化测试专家**。"
-                                f"被测应用: **{app_name}**{proj_line}\n\n"
-                                f"### 你的核心方法论\n\n"
-                                f"**感知 → 规划 → 执行 → 反馈（循环）**\n\n"
-                                f"### 三层递进思考模型\n\n"
-                                f"**第一层：理解被测对象（代码感知）**\n"
-                                f"在操作任何控件之前，先读源码理解它：\n"
-                                f"- 读 `.dfm` → 了解控件布局、类型、名称、事件绑定\n"
-                                f"- 读 `.pas` → 了解事件处理程序、验证逻辑、数据流\n"
-                                f"- 用 `delphi_kb` 查 API → 理解框架行为\n"
-                                f"- 输出：控件映射表 + 事件处理程序分析 + 代码分支路径表\n\n"
-                                f"**第二层：生成测试策略（规划）**\n"
-                                f"根据源码理解，确定：\n"
-                                f"- 覆盖哪些路径 — 每个事件处理程序 + 每个代码分支\n"
-                                f"- 用什么工具 — RTTI(`rcall`) > 控件级(`goto+click`) > 坐标级(`move+click`)\n"
-                                f"- 预期结果 — 从代码逻辑推导的断言（如 `ModalResult := mrOk` → 窗口应关闭）\n"
-                                f"- 边界条件 — 从验证代码中提取（`if edtName.Text=''` → 测试空值）\n\n"
-                                f"**第三层：执行-验证循环（执行）**\n"
-                                f"严格按感知→执行→验证每步循环：\n"
-                                f"- 先感知（`capture`/`dumpstate`/`msgscan`），不假设 UI 状态\n"
-                                f"- 一步一验证，失败即停\n"
-                                f"- 弹窗优先处理 — 操作后立即 `msgscan`\n"
-                                f"- 失败时诊断→决策→恢复→学习\n\n"
+                                f"## Role Setup: Delphi UI Automation Test Expert\n\n"
+                                f"You are a **Delphi UI Automation Test Expert**."
+                                f"Application under test: **{app_name}**{proj_line}\n\n"
+                                f"### Your Core Methodology\n\n"
+                                f"**Perceive → Plan → Execute → Feedback (loop)**\n\n"
+                                f"### Three-Tier Progressive Thinking Model\n\n"
+                                f"**Tier 1: Understand the system under test (code perception)**\n"
+                                f"Before operating any control, first read the source code to understand it:\n"
+                                f"- Read `.dfm` → understand control layout, type, name, event bindings\n"
+                                f"- Read `.pas` → understand event handlers, validation logic, data flow\n"
+                                f"- Use `delphi_kb` to query API → understand framework behavior\n"
+                                f"- Output: control mapping table + event handler analysis + code branch path table\n\n"
+                                f"**Tier 2: Generate test strategy (planning)**\n"
+                                f"Based on source code understanding, determine:\n"
+                                f"- Which paths to cover — every event handler + every code branch\n"
+                                f"- Which tools to use — RTTI(`rcall`) > control-level(`goto+click`) > coordinate-level(`move+click`)\n"
+                                f"- Expected results — assertions derived from code logic (e.g., `ModalResult := mrOk` → window should close)\n"
+                                f"- Boundary conditions — extracted from validation code (`if edtName.Text=''` → test empty value)\n\n"
+                                f"**Tier 3: Execute-Verify Loop (execution)**\n"
+                                f"Strictly follow perceive→execute→verify loop for each step:\n"
+                                f"- Perceive first (`capture`/`dumpstate`/`msgscan`), never assume UI state\n"
+                                f"- One verify per step, stop on failure\n"
+                                f"- Handle dialogs first — `msgscan` immediately after operation\n"
+                                f"- On failure: diagnose→decide→recover→learn\n\n"
                                 f"---\n"
-                                f"开始前，请先读取 MCP Resource `delphi://automation/workflow`，"
-                                f"再执行 `get_coding_rules(section=\"automation\")` "
-                                f"加载完整的方法论和提示词模板。"
+                                f"Before starting, please first read MCP Resource `delphi://automation/workflow`,"
+                                f"then execute `get_coding_rules(section=\"automation\")` "
+                                f"to load complete methodology and prompt templates."
                             ),
                         ),
                     ),
@@ -1191,7 +1190,7 @@ async def run_server():
             form_name = args.get("form_name", "")
             project_path = args.get("project_path", "")
             app_path = args.get("app_path", "")
-            app_hint = f"\n应用路径: `{app_path}`" if app_path else ""
+            app_hint = f"\nApplication path: `{app_path}`" if app_path else ""
             return GetPromptResult(
                 messages=[
                     PromptMessage(
@@ -1199,11 +1198,11 @@ async def run_server():
                         content=TextContent(
                             type="text",
                             text=(
-                                f"## 代码感知分析\n\n"
-                                f"目标类: **{form_name}**\n"
-                                f"项目路径: `{project_path}`{app_hint}\n\n"
-                                f"请按以下流程分析源码并输出测试路径：\n\n"
-                                f"### 步骤 1：定位目标代码\n"
+                                f"## Code Perception Analysis\n\n"
+                                f"Target class: **{form_name}**\n"
+                                f"Project path: `{project_path}`{app_hint}\n\n"
+                                f"Please analyze the source code according to the following process and output test paths:\n\n"
+                                f"### Step 1: Locate target code\n"
                                 f"```\n"
                                 f"delphi_kb(query=\"{form_name}\", search_type=\"class\", "
                                 f"kb_type=\"project\", project_path=\"{project_path}\")\n"
@@ -1211,31 +1210,31 @@ async def run_server():
                                 f"type_name=\"{form_name}\", search_in=\"project\", "
                                 f"project_path=\"{project_path}\")\n"
                                 f"```\n\n"
-                                f"### 步骤 2：分析 DFM 控件结构\n"
-                                f"读取 `.dfm` 文件，列出：\n"
-                                f"- 所有控件的名称、类型、事件绑定\n"
-                                f"- 关键初始状态（Visible, Enabled, ReadOnly, MaxLength 等）\n"
-                                f"- 输出：控件映射表\n\n"
-                                f"### 步骤 3：分析 PAS 事件处理程序\n"
-                                f"对每个绑定事件的处理程序，分析：\n"
-                                f"- 代码路径：`if`/`case`/`try` 分支\n"
-                                f"- 验证逻辑：检查空值、范围、格式的代码\n"
-                                f"- 业务操作：数据创建、DB 写入、窗口关闭等\n"
-                                f"- 输出：事件处理程序分析表\n\n"
-                                f"### 步骤 4：推导测试路径\n"
-                                f"按代码到测试路径的映射规则，输出：\n\n"
-                                f"| # | 路径 | 操作 | 代码派生的断言 |\n"
+                                f"### Step 2: Analyze DFM control structure\n"
+                                f"Read the `.dfm` file and list:\n"
+                                f"- Names, types, and event bindings of all controls\n"
+                                f"- Key initial states (Visible, Enabled, ReadOnly, MaxLength, etc.)\n"
+                                f"- Output: control mapping table\n\n"
+                                f"### Step 3: Analyze PAS event handlers\n"
+                                f"For each bound event handler, analyze:\n"
+                                f"- Code paths: `if`/`case`/`try` branches\n"
+                                f"- Validation logic: code checking empty values, ranges, formats\n"
+                                f"- Business operations: data creation, DB writes, window closing, etc.\n"
+                                f"- Output: event handler analysis table\n\n"
+                                f"### Step 4: Derive test paths\n"
+                                f"Following the mapping rules from code to test paths, output:\n\n"
+                                f"| # | Path | Operation | Code-derived assertion |\n"
                                 f"|---|------|------|--------------|\n"
-                                f"| 1 | 成功路径 | ... | ... |\n"
-                                f"| 2 | 空值路径 | ... | ... |\n"
-                                f"| 3 | 边界值 | ... | ... |\n"
-                                f"| 4 | 异常路径 | ... | ... |\n"
+                                f"| 1 | Success path | ... | ... |\n"
+                                f"| 2 | Empty value path | ... | ... |\n"
+                                f"| 3 | Boundary value | ... | ... |\n"
+                                f"| 4 | Exception path | ... | ... |\n"
                                 f"| ... | ... | ... | ... |\n\n"
-                                f"### 步骤 5（可选）：整合到测试规划\n"
-                                f"使用 `prompts/get automate-test-plan` 将分析结果嵌入完整测试规划。\n\n"
-                                f"完整脚本生成流程见 MCP Resource "
-                                f"`delphi://automation/script-generation-workflow`，"
-                                f"方法论见 `get_coding_rules(section=\"automation\")` §H"
+                                f"### Step 5 (optional): Integrate into test planning\n"
+                                f"Use `prompts/get automate-test-plan` to embed analysis results into complete test planning.\n\n"
+                                f"For the complete script generation process, see MCP Resource "
+                                f"`delphi://automation/script-generation-workflow`,"
+                                f"methodology see `get_coding_rules(section=\"automation\")` §H"
                             ),
                         ),
                     ),
@@ -1243,17 +1242,17 @@ async def run_server():
             )
 
         if name == "automate-test-plan":
-            goal = args.get("goal", "未指定测试目标")
+            goal = args.get("goal", "no test goal specified")
             app_path = args.get("app_path", "")
             project_path = args.get("project_path", "")
-            app_line = f"\n应用路径: `{app_path}`" if app_path else ""
-            proj_line = f"\n项目路径: `{project_path}`" if project_path else ""
+            app_line = f"\nApplication path: `{app_path}`" if app_path else ""
+            proj_line = f"\nProject path: `{project_path}`" if project_path else ""
             code_analysis_step = (
-                f"\n\n### 阶段 0（前置）：代码感知分析\n"
-                f"在感知 UI 之前，先读源码理解被测功能：\n"
-                f"- 使用 `automate-code-analysis` prompt 分析目标单元的 DFM + PAS\n"
-                f"- 获取控件映射表 + 事件处理程序分析 + 代码派生的断言\n"
-                f"- 这些分析结果将直接指导后续的规划步骤"
+                f"\n\n### Stage 0 (preliminary): Code perception analysis\n"
+                f"Before perceiving the UI, first read the source code to understand the functionality under test:\n"
+                f"- Use `automate-code-analysis` prompt to analyze target unit's DFM + PAS\n"
+                f"- Obtain control mapping table + event handler analysis + code-derived assertions\n"
+                f"- These analysis results will directly guide subsequent planning steps"
             ) if project_path else ""
 
             return GetPromptResult(
@@ -1263,36 +1262,36 @@ async def run_server():
                         content=TextContent(
                             type="text",
                             text=(
-                                f"## 自动化测试规划\n\n"
-                                f"**目标**: {goal}{app_line}{proj_line}\n\n"
-                                f"角色身份：你是 **Delphi UI 自动化测试专家**。"
-                                f"按三层递进模型工作：代码感知 → 策略规划 → 执行验证。\n"
-                                f"完整角色定义见 `get_coding_rules(section=\"automation\")` §F0\n"
-                                f"代码感知方法论见 §H\n{code_analysis_step}"
-                                f"\n\n### 阶段 1：加载方法论\n"
-                                f"读取 `delphi://automation/script-generation-workflow`，并执行 "
-                                f"`get_coding_rules(section=\"automation\")` 获取完整的"
-                                f"感知·规划·执行·反馈架构、提示词模板(F)和经验优化闭环(G)\n\n"
-                                f"### 阶段 2：检索经验\n"
+                                f"## Automation Test Planning\n\n"
+                                f"**Goal**: {goal}{app_line}{proj_line}\n\n"
+                                f"Role: You are a **Delphi UI Automation Test Expert**."
+                                f"Work according to the three-tier progressive model: code perception → strategy planning → execution verification.\n"
+                                f"For complete role definition, see `get_coding_rules(section=\"automation\")` §F0\n"
+                                f"For code perception methodology, see §H\n{code_analysis_step}"
+                                f"\n\n### Stage 1: Load methodology\n"
+                                f"Read `delphi://automation/script-generation-workflow`, and execute "
+                                f"`get_coding_rules(section=\"automation\")` to obtain the complete"
+                                f"perceive·plan·execute·feedback architecture, prompt templates (F), and experience optimization loop (G)\n\n"
+                                f"### Stage 2: Retrieve experience\n"
                                 f"```\n"
                                 f"experience(action=\"search\", query=\"{goal}\", top_k=3)\n"
                                 f"```\n\n"
-                                f"### 阶段 3：感知当前状态\n"
-                                f"通过 `capture` / `dumpstate` / `listwnd` / `msgscan` "
-                                f"了解 UI 当前状态\n\n"
-                                f"### 阶段 4：规划步骤序列\n"
-                                f"输出结构化的步骤表，断言从代码逻辑推导：\n\n"
-                                f"| # | 阶段 | 工具 | 目标 | 预期结果 | 超时 | 失败处理 |\n"
+                                f"### Stage 3: Perceive current state\n"
+                                f"Use `capture` / `dumpstate` / `listwnd` / `msgscan` "
+                                f"to understand current UI state\n\n"
+                                f"### Stage 4: Plan step sequence\n"
+                                f"Output a structured step table, with assertions derived from code logic:\n\n"
+                                f"| # | Stage | Tool | Target | Expected result | Timeout | Failure handling |\n"
                                 f"|---|------|------|------|---------|------|---------|\n"
-                                f"| 0 | code | delphi_kb/delphi_file | 读源码分析 | 控件映射表 | — | — |\n"
-                                f"| 1 | perceive | capture/dumpstate | 初始状态 | 主窗口已打开 | 5s | 上报 |\n"
-                                f"| 2 | execute | goto+click | 操作目标 | 代码派生断言 | 10s | capture→分析 |\n"
-                                f"| 3 | verify | waitfor+rget | 验证结果 | 与代码逻辑一致 | 5s | 降级RTTI |\n"
+                                f"| 0 | code | delphi_kb/delphi_file | Read source analysis | Control mapping table | — | — |\n"
+                                f"| 1 | perceive | capture/dumpstate | Initial state | Main window opened | 5s | Report |\n"
+                                f"| 2 | execute | goto+click | Operation target | Code-derived assertion | 10s | capture→analyze |\n"
+                                f"| 3 | verify | waitfor+rget | Verification result | Consistent with code logic | 5s | Downgrade RTTI |\n"
                                 f"| ... | ... | ... | ... | ... | ... | ... |\n\n"
-                                f"### 阶段 5：确认后执行\n"
-                                f"每步严格按 `感知→执行→验证` 循环，失败即停不继续后续\n\n"
-                                f"详细模板见 MCP Resource `delphi://automation/script-schema` "
-                                f"和 `get_coding_rules(section=\"automation\")` §F1"
+                                f"### Stage 5: Execute after confirmation\n"
+                                f"Strictly follow the `perceive→execute→verify` loop for each step, stop on failure and do not continue subsequent steps\n\n"
+                                f"For detailed templates, see MCP Resource `delphi://automation/script-schema` "
+                                f"and `get_coding_rules(section=\"automation\")` §F1"
                             ),
                         ),
                     ),
@@ -1303,7 +1302,7 @@ async def run_server():
             phase = args.get("phase", "")
             tool = args.get("tool", "")
             target = args.get("target", "")
-            expected = args.get("expected", "未指定")
+            expected = args.get("expected", "Unspecified")
             return GetPromptResult(
                 messages=[
                     PromptMessage(
@@ -1311,22 +1310,22 @@ async def run_server():
                         content=TextContent(
                             type="text",
                             text=(
-                                f"## 单步自动化执行\n\n"
-                                f"**阶段**: {phase}\n"
-                                f"**工具**: {tool}\n"
-                                f"**目标**: {target}\n"
-                                f"**预期**: {expected}\n\n"
-                                f"### 执行协议\n\n"
-                                f"1. **前置感知** — `msgscan` 检查弹窗；必要时 `capture`/`dumpstate` 确认当前状态\n"
-                                f"2. **执行** — 调用 `{tool}` 操作 `{target}`\n"
-                                f"   - 同步命令 → 检查返回码\n"
-                                f"   - 异步命令 → 记录操作已发起\n"
-                                f"3. **等待** — 异步命令用 `wait(500~2000)` 或 `waitfor(控件, 10000)`\n"
-                                f"4. **验证** — `msgscan` 确认无弹窗；`capture`/`rget`/`ocr` 确认结果\n"
-                                f"   - 一致 → 标记完成\n"
-                                f"   - 不一致 → 切换到失败恢复流程\n\n"
-                                f"详细协议见 MCP Resource `delphi://automation/script-schema` "
-                                f"和 `get_coding_rules(section=\"automation\")` §F2"
+                                f"## Single-Step Automation Execution\n\n"
+                                f"**Phase**: {phase}\n"
+                                f"**Tool**: {tool}\n"
+                                f"**Target**: {target}\n"
+                                f"**Expected**: {expected}\n\n"
+                                f"### Execution Protocol\n\n"
+                                f"1. **Pre-perception** — `msgscan` to check for dialogs; if necessary, use `capture`/`dumpstate` to confirm current state\n"
+                                f"2. **Execute** — call `{tool}` to operate on `{target}`\n"
+                                f"   - Synchronous command → check return code\n"
+                                f"   - Asynchronous command → record that operation has been initiated\n"
+                                f"3. **Wait** — for asynchronous commands use `wait(500~2000)` or `waitfor(control, 10000)`\n"
+                                f"4. **Verify** — `msgscan` to confirm no dialog; `capture`/`rget`/`ocr` to confirm result\n"
+                                f"   - Consistent → mark complete\n"
+                                f"   - Inconsistent → switch to failure recovery flow\n\n"
+                                f"For detailed protocol, see MCP Resource `delphi://automation/script-schema` "
+                                f"and `get_coding_rules(section=\"automation\")` §F2"
                             ),
                         ),
                     ),
@@ -1334,9 +1333,9 @@ async def run_server():
             )
 
         if name == "automate-failure-recover":
-            signal = args.get("signal", "未指定")
-            expected = args.get("expected", "未记录")
-            actual = args.get("actual", "未记录")
+            signal = args.get("signal", "Unspecified")
+            expected = args.get("expected", "Not recorded")
+            actual = args.get("actual", "Not recorded")
             return GetPromptResult(
                 messages=[
                     PromptMessage(
@@ -1344,29 +1343,29 @@ async def run_server():
                         content=TextContent(
                             type="text",
                             text=(
-                                f"## 自动化测试失败恢复\n\n"
-                                f"**失败信号**: {signal}\n"
-                                f"**预期**: {expected}\n"
-                                f"**实际**: {actual}\n\n"
-                                f"### 诊断\n"
-                                f"1. `capture` 截图留存\n"
-                                f"2. `dumpstate` 获取当前控件树\n"
-                                f"3. `msgscan` 检测弹窗\n"
-                                f"4. 分析差异原因：控件状态/弹窗/时序/路径变更\n\n"
-                                f"### 恢复策略\n\n"
-                                f"| 条件 | 恢复动作 |\n"
+                                f"## Automation Test Failure Recovery\n\n"
+                                f"**Failure signal**: {signal}\n"
+                                f"**Expected**: {expected}\n"
+                                f"**Actual**: {actual}\n\n"
+                                f"### Diagnosis\n"
+                                f"1. `capture` screenshot for records\n"
+                                f"2. `dumpstate` to get current control tree\n"
+                                f"3. `msgscan` to detect dialogs\n"
+                                f"4. Analyze cause of difference: control state/dialog/timing/path changes\n\n"
+                                f"### Recovery Strategy\n\n"
+                                f"| Condition | Recovery Action |\n"
                                 f"|------|---------|\n"
-                                f"| 弹窗干扰 | msgclick(OK/Cancel) → 重试原操作 |\n"
-                                f"| 控件不可见 | dumpstate 查替代路径 → 修正 goto |\n"
-                                f"| 超时无错误 | 增加 waitfor 时间 → 重试 |\n"
-                                f"| RTTI 可用 | degrade 到 rcall/rset 绕过 GUI |\n"
-                                f"| 确定性失败 | 上报并保存经验 |\n\n"
-                                f"### 学习记录\n"
-                                f"恢复后保存经验：\n"
+                                f"| Dialog interference | msgclick(OK/Cancel) → retry original operation |\n"
+                                f"| Control not visible | dumpstate to find alternative path → correct goto |\n"
+                                f"| Timeout without error | increase waitfor time → retry |\n"
+                                f"| RTTI available | degrade to rcall/rset to bypass GUI |\n"
+                                f"| Deterministic failure | report and save experience |\n\n"
+                                f"### Learning Record\n"
+                                f"Save experience after recovery:\n"
                                 f"`experience(action=\"save\", problem=\"{signal} in {expected}\", "
-                                f"solution=\"...恢复方法...\", tags=[\"automation\", \"failure_recovery\"])`\n\n"
-                                f"完整恢复模板见 MCP Resource `delphi://automation/repair-loop` "
-                                f"和 `get_coding_rules(section=\"automation\")` §F3"
+                                f"solution=\"...recovery method...\", tags=[\"automation\", \"failure_recovery\"])`\n\n"
+                                f"For complete recovery template, see MCP Resource `delphi://automation/repair-loop` "
+                                f"and `get_coding_rules(section=\"automation\")` §F3"
                             ),
                         ),
                     ),
@@ -1381,29 +1380,29 @@ async def run_server():
                         content=TextContent(
                             type="text",
                             text=(
-                                f"## 保存自动化测试经验\n\n"
-                                f"测试执行完成，请按以下模板保存经验：\n\n"
-                                f"### 执行概况\n"
-                                f"- **总步骤数**: \n"
-                                f"- **成功**: \n"
-                                f"- **失败+恢复**: \n"
-                                f"- **不可恢复失败**: \n"
-                                f"- **总耗时**: \n\n"
-                                f"### 成功模式\n"
-                                f"- 稳定的工具组合: \n"
-                                f"- RTTI 使用情况: \n"
-                                f"- 关键时序调整: \n\n"
-                                f"### 失败模式\n"
-                                f"- 失败描述 → 原因 → 恢复方式 → 是否可自动化\n\n"
-                                f"### 保存\n"
+                                f"## Save Automation Test Experience\n\n"
+                                f"Test execution complete. Please save experience according to the following template:\n\n"
+                                f"### Execution Overview\n"
+                                f"- **Total steps**: \n"
+                                f"- **Success**: \n"
+                                f"- **Failure+Recovery**: \n"
+                                f"- **Unrecoverable failures**: \n"
+                                f"- **Total duration**: \n\n"
+                                f"### Success Patterns\n"
+                                f"- Stable tool combinations: \n"
+                                f"- RTTI usage: \n"
+                                f"- Key timing adjustments: \n\n"
+                                f"### Failure Patterns\n"
+                                f"- Failure description → Cause → Recovery method → Whether it can be automated\n\n"
+                                f"### Save\n"
                                 f"```\n"
                                 f"experience(action=\"save\",\n"
-                                f"    problem=\"<场景关键词>\",\n"
-                                f"    solution=\"<核心做法>\",\n"
-                                f"    tools_used=[\"<工具列表>\"],\n"
+                                f"    problem=\"<scenario keyword>\",\n"
+                                f"    solution=\"<core approach>\",\n"
+                                f"    tools_used=[\"<tool list>\"],\n"
                                 f"    tags=[\"automation\", \"<app_name>\"])\n"
                                 f"```\n\n"
-                                f"完整模板见 `get_coding_rules(section=\"automation\")` §F4"
+                                f"For complete template, see `get_coding_rules(section=\"automation\")` §F4"
                             ),
                         ),
                     ),
@@ -1420,61 +1419,61 @@ async def run_server():
                         content=TextContent(
                             type="text",
                             text=(
-                                f"## 结束自动化测试会话\n\n"
-                                f"测试执行完成，请按以下步骤收尾：\n\n"
-                                f"### 1. 保存本次测试经验\n"
-                                f"（save_experience={save_exp}）\n"
+                                f"## End Automation Test Session\n\n"
+                                f"Test execution complete. Please wrap up according to the following steps:\n\n"
+                                f"### 1. Save this test's experience\n"
+                                f"(save_experience={save_exp})\n"
                                 f"```\n"
                                 f"experience(action=\"save\",\n"
-                                f"    problem=\"<场景关键词>\",\n"
-                                f"    solution=\"<核心做法>\",\n"
-                                f"    tools_used=[\"<工具列表>\"],\n"
+                                f"    problem=\"<scenario keyword>\",\n"
+                                f"    solution=\"<core approach>\",\n"
+                                f"    tools_used=[\"<tool list>\"],\n"
                                 f"    tags=[\"automation\", \"<app_name>\"])\n"
                                 f"```\n\n"
-                                f"### 2. 导出可复用脚本\n"
-                                f"（export_script={export_script}）\n"
-                                f"将本次执行的脚本保存到 `tests/scripts/`：\n"
+                                f"### 2. Export reusable script\n"
+                                f"(export_script={export_script})\n"
+                                f"Save this execution's script to `tests/scripts/`:\n"
                                 f"```\n"
                                 f"delphi_file(action=\"write\",\n"
                                 f"    file_path=\"tests/scripts/<test_name>.json\",\n"
                                 f"    content=<script_json>)\n"
                                 f"```\n"
-                                f"详细格式见 MCP Resource `delphi://automation/script-schema` "
-                                f"和 `get_coding_rules(section=\"automation\")` §I2\n\n"
-                                f"### 3. 角色切换\n"
-                                f"自动化测试会话已结束。\n"
-                                f"角色从 **Delphi UI 自动化测试专家** 切回 **Delphi 开发专家**。\n"
-                                f"思维框架切换为编码模式：\n"
+                                f"For detailed format, see MCP Resource `delphi://automation/script-schema` "
+                                f"and `get_coding_rules(section=\"automation\")` §I2\n\n"
+                                f"### 3. Role switch\n"
+                                f"Automation test session has ended.\n"
+                                f"Role switches from **Delphi UI Automation Test Expert** back to **Delphi Development Expert**.\n"
+                                f"Thinking framework switches to coding mode:\n"
                                 f"```\n"
                                 f"get_coding_rules(section=\"coding\")\n"
                                 f"```\n"
-                                f"开始编码工作前，建议先执行 `get_coding_rules(section=\"workflow\")` "
-                                f"获取完整开发工作流。"
+                                f"Before starting coding work, it is recommended to first execute `get_coding_rules(section=\"workflow\")` "
+                                f"to obtain the complete development workflow."
                             ),
                         ),
                     ),
                 ]
             )
 
-        raise ValueError(f"未知提示词: {name}")
+        raise ValueError(f"Unknown prompt: {name}")
 
     # ============================================================
-    # 后台版本检查 — 启动时异步检测 GitHub 有无新版本（带自动重试）
+    # Background version check — asynchronously detect at startup whether GitHub has a new version (with auto-retry)
     # ============================================================
 
     async def _background_version_check():
-        """后台检查 Daofy 版本更新，使用 AsyncTaskManager 提交自动重试任务。
+        """Check Daofy version updates in the background, using AsyncTaskManager to submit auto-retry tasks.
 
-        类似 code_hosting git_push_retry 模式：
-        - 网络不可达时自动重试（5分钟间隔，最多12次≈1小时）
-        - 重试期间不阻塞 MCP 服务
-        - 成功时通过 on_complete 回调更新全局变量
+        Similar to the code_hosting git_push_retry pattern:
+        - Auto-retry when network is unreachable (5-minute interval, max 12 times ≈ 1 hour)
+        - Non-blocking to MCP service during retries
+        - Update global variable via on_complete callback on success
         """
         global _update_check_result, _update_check_done
         try:
-            logger.info("正在后台检查 Daofy 版本更新（异步自动重试）...")
+            logger.info("Checking Daofy version update in background (async auto-retry)...")
 
-            # 先快速尝试一次（不等待重试）
+            # First try quickly once (without waiting for retry)
             loop = asyncio.get_running_loop()
             quick_result = await loop.run_in_executor(
                 None, updater.check_for_update
@@ -1483,36 +1482,36 @@ async def run_server():
                 _update_check_result = quick_result
                 if quick_result.get("update_available"):
                     logger.warning(
-                        "发现新版本！当前: %s, 最新: %s → %s",
+                        "New version found! Current: %s, latest: %s → %s",
                         quick_result["current"], quick_result["latest"],
                         quick_result["release_url"],
                     )
                 else:
-                    logger.info("当前已是最新版本: %s", quick_result["current"])
+                    logger.info("Already the latest version: %s", quick_result["current"])
                 _update_check_done = True
                 return
 
-            # 快速尝试失败，提交后台自动重试任务
-            logger.info("版本检查快速尝试失败，提交后台自动重试任务...")
+            # Quick attempt failed, submit background auto-retry task
+            logger.info("Version check quick attempt failed, submitting background auto-retry task...")
 
             def _on_update_complete(task_info):
-                """后台重试任务完成回调 — 更新全局缓存。"""
+                """Background retry task completion callback — update global cache."""
                 global _update_check_result, _update_check_done
                 result = task_info.result
                 if isinstance(result, dict) and 'error' not in result:
                     _update_check_result = result
                     if result.get("update_available"):
                         logger.warning(
-                            "后台重试发现新版本！当前: %s, 最新: %s",
+                            "Background retry found new version! Current: %s, latest: %s",
                             result["current"], result["latest"],
                         )
                     else:
                         logger.info(
-                            "后台重试确认已是最新版本: %s", result["current"]
+                            "Background retry confirmed already the latest version: %s", result["current"]
                         )
                 elif isinstance(result, dict) and result.get('error'):
                     logger.warning(
-                        "后台版本检查重试全部失败: %s", result['error']
+                        "All background version check retries failed: %s", result['error']
                     )
                 _update_check_done = True
 
@@ -1523,8 +1522,8 @@ async def run_server():
                 on_complete=_on_update_complete,
             )
             logger.info(
-                "后台版本检查重试任务已提交: task_id=%s | "
-                "间隔=%ds | 最多%d次 | 最长约%dmin",
+                "Background version check retry task submitted: task_id=%s | "
+                "interval=%ds | max %d times | up to about %dmin",
                 task_id,
                 updater.RETRY_INTERVAL,
                 updater.MAX_RETRIES,
@@ -1533,46 +1532,46 @@ async def run_server():
 
         except ImportError as e:
             logger.warning(
-                "无法提交异步重试任务（AsyncTaskManager 不可用）: %s", e
+                "Unable to submit async retry task (AsyncTaskManager unavailable): %s", e
             )
             _update_check_done = True
         except Exception as e:
-            logger.debug("版本检查失败（不影响正常运行）: %s", e)
+            logger.debug("Version check failed (does not affect normal operation): %s", e)
             _update_check_done = True
 
-    # 启动后台版本检查（不阻塞启动）
+    # Start background version check (non-blocking to startup)
     asyncio.create_task(_background_version_check())
 
     # ============================================================
-    # 自动构建项目知识库 — 启动时检测项目目录并后台构建
+    # Auto-build project knowledge base — detect project directory at startup and build in background
     # ============================================================
 
     async def _auto_build_project_kb():
-        """自动检测项目目录并后台构建项目知识库（不阻塞启动）"""
+        """Automatically detect project directory and build project knowledge base in background (non-blocking to startup)"""
         try:
-            logger.info("正在自动检测项目目录...")
+            logger.info("Automatically detecting project directory...")
             loop = asyncio.get_running_loop()
 
-            # 在 executor 中执行 CWD 扫描（可能涉及文件系统 I/O）
+            # Execute CWD scan in executor (may involve file system I/O)
             project_path = await loop.run_in_executor(
                 None, _resolve_project_path, None
             )
 
             if not project_path:
                 logger.info(
-                    "未检测到项目文件（.dproj/.dpr/.dpk），跳过自动构建项目知识库"
+                    "No project file detected (.dproj/.dpr/.dpk), skipping auto-build of project knowledge base"
                 )
                 return
 
             logger.info(
-                "检测到项目: %s，正在后台自动构建项目知识库...",
+                "Detected project: %s, automatically building project knowledge base in background...",
                 project_path,
             )
 
-            # 使用现有异步任务机制提交后台构建
-            # rebuild=False → 增量更新（只索引变更文件）
-            # 首次运行时 KB 不存在，build_project_knowledge_base 会自动全量构建
-            # Step 1 的热切换机制保证：已有 KB 重建时不阻塞搜索
+            # Submit background build using existing async task mechanism
+            # rebuild=False → incremental update (only index changed files)
+            # On first run KB does not exist, build_project_knowledge_base will automatically perform full build
+            # Step 1's hot-swap mechanism guarantees: rebuilding existing KB does not block searches
             task_params = {
                 "project_path": project_path,
                 "rebuild": False,
@@ -1585,28 +1584,28 @@ async def run_server():
                 "show_progress": False,
             })
 
-            # start_async_task 返回 CallToolResult，isError=False 表示任务已成功提交到后台
+            # start_async_task returns CallToolResult; isError=False means the task has been successfully submitted to the background
             if call_tool_result_is_error(result):
                 logger.warning(
-                    "自动构建项目知识库提交失败: %s", project_path
+                    "Automatic project knowledge base build submission failed: %s", project_path
                 )
             else:
                 logger.info(
-                    "自动构建项目知识库任务已提交到后台: %s", project_path
+                    "Automatic project knowledge base build task submitted to the background: %s", project_path
                 )
 
-            # ── Step 3: 启动文件变更监听（如果 watchdog 可用） ──
+            # ── Step 3: start file change watcher (if watchdog is available) ──
             await _start_project_file_watcher(project_path)
 
         except Exception as e:
             logger.debug(
-                "自动构建项目知识库失败（不影响正常运行）: %s", e
+                "Automatic project knowledge base build failed (does not affect normal operation): %s", e
             )
 
     async def _start_project_file_watcher(project_path: str) -> None:
-        """启动项目文件变更监听器，自动触发增量 KB 更新。
+        """Start the project file change watcher, automatically triggering incremental KB updates.
 
-        在 executor 中启动，不阻塞事件循环。watchdog 不可用时静默降级。
+        Start in an executor without blocking the event loop. Silently degrade when watchdog is unavailable.
         """
         global _project_file_watcher
         try:
@@ -1626,23 +1625,23 @@ async def run_server():
             if watcher:
                 _project_file_watcher = watcher
                 logger.info(
-                    "文件变更监听已启动 (watchdog 可用): %s", project_dir
+                    "File change watcher started (watchdog available): %s", project_dir
                 )
             else:
                 logger.info(
-                    "文件变更监听未启动 (watchdog 不可用): %s", project_dir
+                    "File change watcher not started (watchdog unavailable): %s", project_dir
                 )
 
         except Exception as e:
             logger.debug(
-                "启动文件变更监听失败（不影响正常运行）: %s", e
+                "Failed to start file change watcher (does not affect normal operation): %s", e
             )
 
-    # 启动后台项目知识库自动构建（不阻塞启动）
+    # Start background automatic project knowledge base build (non-blocking at startup)
     asyncio.create_task(_auto_build_project_kb())
 
-    # 启动服务器
-    logger.info("MCP Server 启动完成,准备接收请求...")
+    # Start server
+    logger.info("MCP Server startup complete, ready to receive requests...")
     async with stdio_server() as (read_stream, write_stream):
         logger.info("mcp_lifecycle event=stdio_transport_opened")
         await _run_mcp_server(
@@ -1655,7 +1654,7 @@ async def run_server():
 
 
 def _cleanup_resources(shutdown_reason: str = "unknown") -> None:
-    """清理资源：关闭后台任务、DB连接、临时文件等"""
+    """Clean up resources: close background tasks, DB connections, temporary files, etc."""
     cleanup_started = time.monotonic()
     cleanup_failures = 0
     logger.info("mcp_cleanup event=started reason=%s", shutdown_reason)
@@ -1675,7 +1674,7 @@ def _cleanup_resources(shutdown_reason: str = "unknown") -> None:
             logger.info("mcp_cleanup event=step_completed step=%s", step_name)
 
     try:
-        from src.tools.knowledge_base import _cleanup_pkb_cache  # 延迟导入避免循环import
+        from src.tools.knowledge_base import _cleanup_pkb_cache  # Lazy import to avoid circular import
     except Exception:
         cleanup_failures += 1
         logger.warning(
@@ -1704,9 +1703,9 @@ def _cleanup_resources(shutdown_reason: str = "unknown") -> None:
         )
     else:
         run_cleanup_step("experience_service", _cleanup_exp)
-    # 注意：knowledge_base 模块没有公开的 getter 函数来获取服务实例，
-    # 全局变量 _delphi_kb_service 和 _thirdparty_kb_service 在进程退出时会自动清理。
-    # 这里不再尝试导入不存在的 get_knowledge_base_service / get_thirdparty_knowledge_base_service。
+    # Note: the knowledge_base module has no public getter function to obtain service instances,
+    # global variables _delphi_kb_service and _thirdparty_kb_service are automatically cleaned up on process exit.
+    # No longer attempt to import nonexistent get_knowledge_base_service / get_thirdparty_knowledge_base_service here.
     try:
         from src.tools.project_knowledge_base import _cleanup_project_kb_cache
     except Exception:
@@ -1736,29 +1735,29 @@ def _cleanup_resources(shutdown_reason: str = "unknown") -> None:
 
 
 def _build_arg_parser() -> "argparse.ArgumentParser":
-    """构建 CLI 参数解析器 (不依赖任何服务, --help/--version 立即退出)"""
+    """Build the CLI argument parser (does not depend on any service; --help/--version exit immediately)"""
     import argparse
     parser = argparse.ArgumentParser(
         prog="daofy",
-        description="Daofy for Delphi — MCP Server (Delphi 编译 + 知识库)",
+        description="Daofy for Delphi — MCP Server (Delphi compilation + knowledge base)",
     )
     parser.add_argument(
         "--version",
         action="store_true",
-        help="显示版本信息并退出",
+        help="Show version information and exit",
     )
     parser.add_argument(
         "--config",
         metavar="PATH",
-        help="自定义 compilers.json 路径 (默认: config/compilers.json)",
+        help="Custom compilers.json path (default: config/compilers.json)",
     )
     return parser
 
 
 def main():
-    """主函数"""
-    # ── 早退: --help/--version 不触发任何服务初始化 ──
-    # 避免在没装 Delphi / 默认路径失效的环境下 --help 报错
+    """Main function"""
+    # ── Early exit: --help/--version does not trigger any service initialization ──
+    # Avoid --help erroring in environments without Delphi installed / with invalid default paths
     parser = _build_arg_parser()
     args = parser.parse_args()
     if args.version:
@@ -1767,7 +1766,7 @@ def main():
         print(f"{__copyright__}")
         return
 
-    # ── dsh 子命令接口已移除（DSH 安装/卸载已并入 install_mcp.py，见 --agent DSH）──
+    # ── dsh subcommand interface has been removed (DSH install/uninstall has been merged into install_mcp.py, see --agent DSH) ──
     exit_code = 0
     shutdown_reason = "server_run_returned"
     try:

@@ -1,48 +1,48 @@
-<!-- @when: 处理 VCL Style / IFileDialog / TTaskDialog / 非 VCL 自绘弹窗 -->
+<!-- @when: Handle VCL Style / IFileDialog / TTaskDialog / non-VCL owner-drawn pop-ups -->
 <!-- @part-of: ui-testing -->
 
-#### J. DirectUI 弹窗 / 现代系统对话框
+#### J. DirectUI Pop-ups / Modern System Dialogs
 
-| 要素 | 内容 |
+| Element | Content |
 |------|------|
-| **目标** | 处理 VCL Style 渲染的 DirectUI 弹窗、Windows IFileDialog、TTaskDialog 等标准 Win32 消息无法覆盖的对话框 |
-| **策略** | 分三级：①优先 VCL 管道命令（RTTI 穿透）→ ②`uia.xxx` 回退 → ③截图 OCR 兜底 |
-| **关键命令** | `uia.click`, `uia.goto`, `uia.set`, `uia.scan`, `uia.wait`, `capture`+`daofy_ocr` |
+| **Goal** | Handle DirectUI pop-ups rendered by VCL Style, Windows IFileDialog, TTaskDialog, and other dialogs that cannot be covered by standard Win32 messages |
+| **Strategy** | Three levels: ① prefer VCL pipeline commands (RTTI penetration) → ② fall back to `uia.xxx` → ③ screenshot OCR as last resort |
+| **Key commands** | `uia.click`, `uia.goto`, `uia.set`, `uia.scan`, `uia.wait`, `capture`+`daofy_ocr` |
 
-**背景**：DirectUI 控件（VCL Style 渲染、OwnerDraw 自绘、DevExpress Skin）底层仍是 VCL 对象，DaofyAutomation 的 `goto`/`rget`/`click` 可通过管道内 RTTI 正常操作，无需特殊处理。**真正需要 `uia.xxx` 的是以下情况**：
+**Background**: DirectUI controls (VCL Style rendering, OwnerDraw custom drawing, DevExpress Skin) are still VCL objects underneath; DaofyAutomation's `goto`/`rget`/`click` can operate normally through in-pipeline RTTI without special handling. **The following cases truly require `uia.xxx`**:
 
-| 情况 | 原因 | 推荐手段 |
+| Situation | Cause | Recommended method |
 |------|------|---------|
-| IFileDialog（Windows 10+ 现代 Open/Save） | COM 对话框，非 VCL Form | `uia.click`/`uia.goto` |
-| TTaskDialog / TCustomTaskDialog | 使用 `TaskDialogIndirect` API，非标准 MessageBox | `uia.scan` + `uia.click` |
-| 第三方 DirectUI 框架（如 Chromium Embedded） | 单 HWND 内自绘所有控件 | `capture` + OCR |
-| VCL Styles 主题化的 TForm | 外观变了但 VCL 控件仍在 | 管道命令正常（无需 uia） |
+| IFileDialog (Windows 10+ modern Open/Save) | COM dialog, not VCL Form | `uia.click`/`uia.goto` |
+| TTaskDialog / TCustomTaskDialog | Uses `TaskDialogIndirect` API, not standard MessageBox | `uia.scan` + `uia.click` |
+| Third-party DirectUI frameworks (e.g., Chromium Embedded) | Draws all controls inside a single HWND | `capture` + OCR |
+| VCL Styles-themed TForm | Appearance changed but VCL controls still present | Pipeline commands work normally (no uia needed) |
 
-##### J0. `uia.xxx` 使用规则（强制）
+##### J0. `uia.xxx` usage rules (mandatory)
 
-当测试涉及以下对话框时，**必须**提供 `uia.xxx` 回退分支：
+When the test involves the following dialogs, **you must** provide a `uia.xxx` fallback branch:
 
-| 触发场景 | 必须用 uia.xxx 的理由 | 否则后果 |
+| Trigger scenario | Reason must use uia.xxx | Otherwise consequence |
 |---------|----------------------|---------|
-| `dlgfile` 操作后未检测到 OpenDialog | Windows 10+ 的 IFileDialog 是 COM 对话框，非 VCL 窗口 | `msgscan` 返回 NOD，测试卡死 |
-| 点击按钮后应弹出"另存为"标准对话框 | 现代 Windows 资源管理器对话框 | `dlgscan` 找不到，步骤挂起 |
-| 确认框使用 `TTaskDialog`（非 MessageBox） | 使用 `TaskDialogIndirect` API，无标准消息泵 | `msgscan` 一直 NOD |
-| 删除/批量操作出现自定义样式确认弹窗 | 不确定是 VCL 还是现代对话框 | 先 `msgscan` 尝试 → 超时后 fallback 到 `uia.scan` |
+| No OpenDialog detected after `dlgfile` operation | Windows 10+ IFileDialog is a COM dialog, not a VCL window | `msgscan` returns NOD, test hangs |
+| Clicking a button should pop up a standard "Save As" dialog | Modern Windows Explorer dialog | `dlgscan` cannot find it, step hangs |
+| Confirmation box uses `TTaskDialog` (not MessageBox) | Uses `TaskDialogIndirect` API, no standard message pump | `msgscan` always NOD |
+| Delete/batch operation shows a custom-styled confirmation pop-up | Unsure whether VCL or modern dialog | First try `msgscan` → after timeout fall back to `uia.scan` |
 
-`uia.xxx` 回退集成模式：
+`uia.xxx` fallback integration pattern:
 
 ```json
 [
-  {"cmd":"click","target":"BtnImport","note":"触发 OpenDialog"},
+  {"cmd":"click","target":"BtnImport","note":"Trigger OpenDialog"},
 
-  {"cmd":"msgscan","timeout":2000,"note":"先快速尝试 msgscan（VCL MessageBox）"},
-  {"cmd":"wait","ms":300,"note":"给对话框渲染时间"},
+  {"cmd":"msgscan","timeout":2000,"note":"First quickly try msgscan (VCL MessageBox)"},
+  {"cmd":"wait","ms":300,"note":"Give the dialog time to render"},
 
-  {"cmd":"uia.goto","target":"打开","timeout":5000,
-   "note":"msgscan 无结果，回退 uia.goto 找 IFileDialog 标题"},
+  {"cmd":"uia.goto","target":"Open","timeout":5000,
+   "note":"msgscan has no result, fall back to uia.goto to find IFileDialog title"},
 
-  {"cmd":"uia.set","target":"文件名(N):","text":"C:\\data\\import.xlsx"},
-  {"cmd":"uia.click","target":"打开(&O)"},
+  {"cmd":"uia.set","target":"File name(N):","text":"C:\\data\\import.xlsx"},
+  {"cmd":"uia.click","target":"Open(&O)"},
 
   {"cmd":"goto","target":"TMainForm","timeout":10000},
   {"cmd":"capture","target":"import_fallback_done"},
@@ -50,91 +50,92 @@
 ]
 ```
 
-**规则**：任何涉及文件对话框的测试步骤，必须 `msgscan`（快速尝试验 VCL 对话框）+ `wait 300ms`（给系统渲染时间）+ `uia.goto` 兜底（5s 超时）。三步保底确保不因对话框类型判断错误而卡死。
+**Rule**: Any test step involving file dialogs must `msgscan` (quickly try VCL dialog) + `wait 300ms` (give system rendering time) + `uia.goto` fallback (5s timeout). The three-step safeguard ensures it will not hang due to incorrect dialog type judgment.
 
-##### J1. 现代 OpenDialog（IFileDialog）— `uia.xxx`
+##### J1. Modern OpenDialog (IFileDialog) — `uia.xxx`
 
 ```json
 [
   {"cmd":"click","target":"BtnImport"},
 
-  {"cmd":"uia.goto","target":"打开","note":"UIA 穿透查找 IFileDialog","timeout":5000},
-  {"cmd":"uia.set","target":"文件名(N):","text":"C:\\data\\import.xlsx"},
-  {"cmd":"uia.click","target":"打开(&O)"},
+  {"cmd":"uia.goto","target":"Open","note":"UIA penetrates to find IFileDialog","timeout":5000},
+  {"cmd":"uia.set","target":"File name(N):","text":"C:\\data\\import.xlsx"},
+  {"cmd":"uia.click","target":"Open(&O)"},
 
   {"cmd":"waitfor","target":"TMainForm","prop":"Visible","value":"True","timeout":10000},
-  {"cmd":"rget","target":"StatusBar.Caption","assert_expr":"'导入' in actual or '成功' in actual"},
+  {"cmd":"rget","target":"StatusBar.Caption","assert_expr":"'Import' in actual or 'Success' in actual"},
   {"cmd":"capture","target":"import_uia_done"},
   {"cmd":"exit"}
 ]
 ```
 
-##### J2. TTaskDialog 确认弹窗 — `uia.xxx`
+##### J2. TTaskDialog confirmation pop-up — `uia.xxx`
 
 ```json
 [
   {"cmd":"click","target":"BtnDeleteBatch"},
 
   {"cmd":"uia.scan","target":"TTaskDialog","timeout":5000,
-   "expected":"检测到 TTaskDialog"},
-  {"cmd":"uia.click","target":"是(&Y)","note":"TaskDialog 按钮无 HWND，必须走 UIA"},
+   "expected":"TTaskDialog detected"},
+  {"cmd":"uia.click","target":"Yes(&Y)","note":"TaskDialog buttons have no HWND, must use UIA"},
 
-  {"cmd":"waitfor","target":"StatusBar","prop":"Caption","value":"批量删除完成","timeout":5000},
+  {"cmd":"waitfor","target":"StatusBar","prop":"Caption","value":"Batch delete completed","timeout":5000},
   {"cmd":"capture","target":"taskdialog_done"},
   {"cmd":"exit"}
 ]
 ```
 
-##### J3. VCL Style 主题弹窗 — 管道命令仍可用（仅示例）
+##### J3. VCL Style themed pop-up — pipeline commands still work (example only)
 
-即使 VCL Style 让 MessageBox 外观完全改变，标准 `msgscan` + `dlgclick` 仍有效（底层还是 `TForm`）：
+Even if VCL Style completely changes MessageBox appearance, standard `msgscan` + `dlgclick` still works (underneath it is still a `TForm`):
 
 ```json
 [
   {"cmd":"click","target":"BtnDelete"},
 
-  {"cmd":"msgscan","expected":"VCL Style 主题化的删除确认"},
-  {"cmd":"dlgclick","target":"btnYes","note":"VCL Style 下 dlgclick 仍有效，因为按钮是 VCL 控件"},
+  {"cmd":"msgscan","expected":"VCL Style-themed delete confirmation"},
+  {"cmd":"dlgclick","target":"btnYes","note":"Under VCL Style, dlgclick still works because the button is a VCL control"},
 
   {"cmd":"capture","target":"styled_after_delete"},
   {"cmd":"exit"}
 ]
 ```
 
-##### J4. 非 VCL 自绘弹窗 — 截图 OCR 兜底
+##### J4. Non-VCL owner-drawn pop-up — screenshot OCR fallback
 
-当 `uia.xxx` 也无法识别控件时（如 WebView2 内弹窗、DirectX Overlay），回退到图像识别：
+When `uia.xxx` also cannot identify controls (e.g., WebView2 pop-ups, DirectX Overlay), fall back to image recognition:
 
 ```json
 [
   {"cmd":"click","target":"BtnShowCustom"},
 
-  {"cmd":"waitfor","target":"自定义弹窗类名","prop":"Visible","value":"True","timeout":5000,"note":"等弹窗出现"},
-  {"cmd":"goto","target":"TDirectUIPopup","note":"VCL 下仍可 goto，非 VCL 下跳过此步"},
+  {"cmd":"waitfor","target":"Custom popup class name","prop":"Visible","value":"True","timeout":5000,"note":"Wait for pop-up to appear"},
+  {"cmd":"goto","target":"TDirectUIPopup","note":"Under VCL it can still use goto; skip this step under non-VCL"},
   {"cmd":"capture","target":"directui_popup"},
 
   {"cmd":"exit"}
 ]
 ```
 
-之后在 Python 侧用 `daofy_ocr` 分析截图：
+Afterwards analyze the screenshot on the Python side with `daofy_ocr`:
 ```python
-# 识别弹窗文字
+# Recognize pop-up text
 ocr = daofy_ocr(action="recognize", image_path="snapshots/directui_popup.png")
-# 或颜色分析检测选中状态
+# Or use color analysis to detect selected state
 color = daofy_ocr(action="color", image_path="snapshots/directui_popup.png", region=[100,200,50,20])
 ```
 
-**判断流程**（大模型按此决策，不猜测）：
+**Decision flow** (the large model makes decisions according to this, without guessing):
 
 ```
-遇到弹窗
-├─ 是 VCL Form（class 带 T 前缀）→ 管道命令 goto/rget/click，正常处理
-├─ 是 MessageBox（ShowMessage/MessageDlg）→ msgscan + dlgclick
-├─ 是 IFileDialog / TTaskDialog → uia.xxx
-├─ 是 #32770 标准 Dialog → dlgscan/dlgclick 优先，失败回退 uia.xxx
-├─ 是 WebView2 / Chromium 内弹窗 → capture + OCR
-└─ 完全未知 → capture → OCR 识别文字 → 再选方案
+Encounter pop-up
+├─ Is it a VCL Form (class has T prefix) → pipeline commands goto/rget/click, handle normally
+├─ Is it MessageBox (ShowMessage/MessageDlg) → msgscan + dlgclick
+├─ Is it IFileDialog / TTaskDialog → uia.xxx
+├─ Is it a standard #32770 Dialog → prefer dlgscan/dlgclick, fall back to uia.xxx on failure
+├─ Is it a WebView2 / Chromium internal pop-up → capture + OCR
+└─ Completely unknown → capture → OCR text recognition → then choose approach
 ```
 
-**陷阱**：`uia.xxx` 的 target 用 **UI 上显示的文字**（如"打开(&O)"、"是(&Y)"），不是 VCL 控件名；IFileDialog 的文件名输入框用 `uia.set` + `text` 而非 `type`；截图 OCR 兜底是最后手段，优先尝试管道和 UIA。
+**Pitfall**: `uia.xxx` target uses **the text displayed in the UI** (e.g., "Open(&O)", "Yes(&Y)"), not VCL control names; for IFileDialog file name input use `uia.set` + `text` instead of `type`; screenshot OCR fallback is the last resort, prefer pipeline and UIA first.
+

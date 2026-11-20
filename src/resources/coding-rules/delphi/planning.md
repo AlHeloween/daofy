@@ -1,171 +1,172 @@
-<!-- @when: 新功能、公共接口变更、大规模修改、跨模块修复、包/工程结构调整、数据格式/缓存/渲染/性能路径改造前，先完成需求澄清与方案审查 -->
+<!-- @when: Before new features, public interface changes, large-scale modifications, cross-module fixes, package/project structure adjustments, data format/cache/rendering/performance path refactoring, complete requirements clarification and solution review first -->
 <!-- @chain: after=index.md, before=workflow.md -->
 
-## P0 前置计划与审查
+## P0 Upfront Planning and Review
 
-新功能编码或大规模修改前，必须完成 P0 计划与审查。**跳过此步直接编码的修改，大概率需要返工。**
+Before coding new features or making large-scale modifications, you must complete P0 planning and review. **Modifications that skip this step and go straight to coding will most likely need rework.**
 
-P0 的目标不是写漂亮文档，而是让方案达到可执行、可验证、可回滚的状态。计划中未确认的内容必须标为"待确认"，不得伪装成已决策。
+The goal of P0 is not to write beautiful documentation, but to make the solution executable, verifiable, and rollback-capable. Content not yet confirmed in the plan must be marked as "To be confirmed" and must not be disguised as decided.
 
-### P0.0 触发条件
+### P0.0 Trigger Conditions
 
-以下情况必须先进入 P0，不得直接编码：
+The following situations must enter P0 first and must not go directly to coding:
 
-| 触发项 | 说明 |
+| Trigger | Description |
 |--------|------|
-| 新功能/大规模修改 | 新增用户可见能力、重构核心流程、跨多个模块修改 |
-| 公共接口变更 | 类型、函数签名、事件、配置项、协议、DFM/序列化格式变化 |
-| 包/工程结构调整 | dpr/dproj/dpk/groupproj、design-time/runtime 包、依赖链或安装方式变化 |
-| 数据格式/缓存策略变更 | 持久化格式、cache key、缓存淘汰、兼容迁移、索引语义变化 |
-| 渲染/性能路径改造 | 绘制后端、异步流程、批处理、性能关键路径、资源生命周期变化 |
-| 跨模块 bug 修复 | 修复点会影响调用方、被调用方、测试、文档或用户工作流 |
-| 自动化测试 | 需为功能编写自动化 UI/接口测试场景，或需新增/修改测试基础设施（inline-unit、脚本缓存、修复循环）时 |
+| New feature/large-scale modification | Adds user-visible capabilities, refactors core processes, modifies across multiple modules |
+| Public interface changes | Changes to types, function signatures, events, configuration items, protocols, DFM/serialization formats |
+| Package/project structure adjustments | Changes to dpr/dproj/dpk/groupproj, design-time/runtime packages, dependency chains, or installation methods |
+| Data format/cache policy changes | Changes to persistence formats, cache keys, cache eviction, compatible migration, index semantics |
+| Rendering/performance path refactoring | Changes to drawing backends, asynchronous flows, batching, performance-critical paths, resource lifecycles |
+| Cross-module bug fixes | The fix point affects callers, callees, tests, documentation, or user workflows |
+| Automated testing | When automated UI/interface test scenarios need to be written for features, or test infrastructure needs to be added/modified (inline-unit, script caching, fix loop) |
 
-可跳过 P0 的情况：纯注释、拼写、局部无行为变化的小修复。若不确定，按需要 P0 处理。
+Cases where P0 can be skipped: pure comments, spelling, small local fixes with no behavior change. If unsure, treat as requiring P0.
 
-#### 非平凡计划定义
+#### Definition of Non-trivial Plan
 
-"非平凡计划"指命中 P0.0 任一触发条件，或无法确认是否命中 P0.0 的计划。命中触发条件时必须走 P0；未命中 P0.0 且确认仅为纯注释、拼写或局部无行为变化的小修复，可视为平凡改动并跳过 P0。
+A "non-trivial plan" means a plan that hits any trigger condition in P0.0, or a plan for which it cannot be confirmed whether it hits P0.0. When a trigger condition is hit, P0 must be followed; when P0.0 is not hit and it is confirmed to be only a pure comment, spelling, or small local fix with no behavior change, it can be considered a trivial change and P0 can be skipped.
 
-如果某项改动显然需要计划，但没有命中 P0.0，说明 P0.0 触发条件存在遗漏，应先补充触发条件，再按非平凡计划处理。
+If a change obviously needs a plan but does not hit P0.0, it means the P0.0 trigger conditions have omissions; you should first supplement the trigger conditions, and then handle it as a non-trivial plan.
 
-### P0.S 计划状态
+### P0.S Plan Status
 
-计划文档必须显式标注状态：
+Plan documents must explicitly mark their status:
 
-| 状态 | 含义 |
+| Status | Meaning |
 |------|------|
-| 草案 | 初稿，不能实施 |
-| 审计反馈稿 | 已审计但存在 blocker 或待确认项，不能实施 |
-| 可实施稿 | P0.4 通过，可进入编码工作流 |
-| 实施中 | 已开始按计划编码，必须同步变更状态和检查项 |
-| 已验证 | 实现、测试、文档同步和清理完成 |
+| Draft | First draft, cannot be implemented |
+| Audit feedback draft | Audited but has blockers or items to be confirmed, cannot be implemented |
+| Implementable draft | Passed P0.4, can enter the coding workflow |
+| In progress | Coding has started according to the plan, and status and checklist items must be synchronized |
+| Verified | Implementation, testing, documentation synchronization, and cleanup are complete |
 
-状态只能根据实际审计结果更新。存在未决技术路线、未确认依赖、未知兼容影响时，不得标为"可实施稿"。
+Status can only be updated based on actual audit results. When there are unresolved technical routes, unconfirmed dependencies, or unknown compatibility impacts, it must not be marked as "Implementable draft".
 
-### P0.1 需求澄清
+### P0.1 Requirements Clarification
 
-理解显式需求和识别隐式需求：
+Understand explicit requirements and identify implicit requirements:
 
-| 检查项 | 说明 |
+| Checklist item | Description |
 |--------|------|
-| 📋 显式需求 | 用户明确说出要做什么 |
-| 🔍 隐式需求 | 用户没说但隐含的约束（兼容性、性能、安全性、错误处理） |
-| 🔲 边界范围 | 这个功能不做什么？明确排除项 |
-| 📐 输入/输出 | 功能的输入数据、输出产物、副作用 |
-| ❓ 假设/待确认 | 尚未验证的假设、需要用户确认的问题、外部依赖前置条件 |
-| ⚡ 性能需求 | 性能预算：预期延迟（p50/p95/p99）、吞吐量（QPS）、内存增量上限、启动时间增量、资源消耗上限 |
-| 🎯 性能场景 | 需验证的典型/极限性能场景：数据量级、并发数、操作频次、持续时长 |
-| 🔒 安全需求 | 数据敏感度等级、认证/授权模型、输入校验规则、传输/存储加密要求、审计日志需求 |
-| 📊 可观测性需求 | 运行时健康指标、关键路径耗时统计、错误/异常可诊断性需求、日志级别与采样策略 |
-| 📖 文档需求 | 用户可见的行为变化是否需要更新帮助文档/更新日志/发布说明？是否需要迁移指南？ |
+| 📋 Explicit requirements | What the user explicitly says they want to do |
+| 🔍 Implicit requirements | Constraints the user does not mention but that are implied (compatibility, performance, security, error handling) |
+| 🔲 Boundary scope | What this feature will not do? Explicit exclusions |
+| 📐 Inputs/outputs | Input data, output artifacts, side effects of the feature |
+| ❓ Assumptions/to be confirmed | Unverified assumptions, questions that need user confirmation, prerequisites of external dependencies |
+| ⚡ Performance requirements | Performance budget: expected latency (p50/p95/p99), throughput (QPS), upper limit of memory increment, startup time increment, upper limit of resource consumption |
+| 🎯 Performance scenarios | Typical/extreme performance scenarios to be verified: data volume, concurrency, operation frequency, duration |
+| 🔒 Security requirements | Data sensitivity level, authentication/authorization model, input validation rules, transport/storage encryption requirements, audit log requirements |
+| 📊 Observability requirements | Runtime health metrics, key-path duration statistics, error/exception diagnosability requirements, log level and sampling strategy |
+| 📖 Documentation requirements | Do user-visible behavior changes require updates to help documentation/changelog/release notes? Is a migration guide needed? |
 
-**产出**：需求清单（1-2 句/条），作为后续所有步骤的验证依据。待确认项必须单独列出，不能混入"已决策"。
+**Output**: A requirements list (1-2 sentences per item), used as the verification basis for all subsequent steps. Items to be confirmed must be listed separately and must not be mixed into "decided".
 
-### P0.2 影响分析
+### P0.2 Impact Analysis
 
-识别实现此需求需要修改的模块，**特别关注修改的连锁反应**：
+Identify the modules that need to be modified to implement this requirement, **with special attention to chain reactions of the modification**:
 
-| 分析项 | 说明 |
+| Analysis item | Description |
 |--------|------|
-| 📁 需修改的文件 | 具体到文件路径和大致修改点（新增函数/修改逻辑/改接口） |
-| 🔗 依赖链 | 被调用方/调用方/数据流影响范围（直接关系） |
-| 💥 连锁反应 | 接口签名变更、行为语义变化、数据格式/协议变化引起的**级联影响**。<br>示例：改函数签名 → 所有调用方需同步修改 → 调用方的调用方级联断裂；<br>改返回值格式 → 所有消费者解析逻辑失效；<br>改配置键名 → 所有读取方报错 |
-| ⚠️ 风险点 | 不熟悉的 API、可能破坏现有行为的改动 |
-| ⚡ 性能影响 | 改动涉及的热点路径、资源消耗变化（CPU/内存/IO/网络）、GC/分配频率变化、高负载下的瓶颈预测 |
-| 🔒 安全影响 | 改动涉及的数据面/权限面、外部输入入口点、网络通信路径、敏感数据存储/传输路径 |
-| 📖 文档影响 | 用户操作流程、配置项、界面文案、API 行为是否有用户可见变化？是否需要更新发布说明或迁移指南？ |
-| 📋 测试影响 | 现有测试是否需要更新？是否需要新增测试？ |
-| 🧾 脏状态/IDE 状态 | 是否有未提交改动、IDE 打开的缓冲区、DFM/设计器风险、用户改动需要保护 |
+| 📁 Files to modify | Specific file paths and approximate modification points (new functions/modified logic/changed interfaces) |
+| 🔗 Dependency chain | Impact scope of callees/callers/data flow (direct relationships) |
+| 💥 Chain reactions | **Cascading impacts** caused by interface signature changes, behavior semantics changes, data format/protocol changes. <br>Example: change a function signature → all callers need synchronous modification → callers of callers cascade and break; <br>change return value format → parsing logic of all consumers becomes invalid; <br>change configuration key name → all readers report errors |
+| ⚠️ Risk points | Unfamiliar APIs, changes that may break existing behavior |
+| ⚡ Performance impact | Hot paths involved in the change, changes in resource consumption (CPU/memory/IO/network), changes in GC/allocation frequency, bottleneck prediction under high load |
+| 🔒 Security impact | Data plane/permission plane involved in the change, external input entry points, network communication paths, sensitive data storage/transport paths |
+| 📖 Documentation impact | Are there user-visible changes to user operation flows, configuration items, UI copy, or API behavior? Do release notes or migration guides need to be updated? |
+| 📋 Test impact | Do existing tests need to be updated? Do new tests need to be added? |
+| 🧾 Dirty state/IDE state | Are there uncommitted changes, IDE-open buffers, DFM/designer risks, or user changes that need protection? |
 
-**产出**：影响范围表（文件列表 + 风险标记 + 连锁反应链），作为方案设计的基础。
+**Output**: An impact scope table (file list + risk marks + chain reaction chain), as the basis for solution design.
 
-#### P0.2.1 源码核验
+#### P0.2.1 Source Verification
 
-非平凡计划必须基于真实源码，不得只凭记忆或推测。至少核验：
+A non-trivial plan must be based on real source code, not just memory or speculation. At minimum verify:
 
-- 真实类型、函数、事件、属性、枚举、包依赖和调用点。
-- 真实测试项目、Demo、文档和构建入口。
-- 外部库或第三方代码的许可证、版本、平台和部署要求。
-- 涉及 Delphi 源码/DFM/工程文件时，优先使用 Daofy 的 Delphi 专用工具（如 `delphi_file` / `delphi_project`），不要绕过脏标记、备份和格式化保护。
+- Real types, functions, events, properties, enums, package dependencies, and call sites.
+- Real test projects, demos, documentation, and build entry points.
+- License, version, platform, and deployment requirements of external libraries or third-party code.
+- When Delphi source/DFM/project files are involved, prefer Daofy's Delphi-specific tools (such as `delphi_file` / `delphi_project`); do not bypass dirty-marking, backup, and formatting protection.
 
-**产出**：source-backed evidence 列表，写明文件路径、符号名或行号锚点。没有源码核验的计划只能是草案。
+**Output**: A list of source-backed evidence, stating file paths, symbol names, or line number anchors. A plan without source verification can only be a draft.
 
-### P0.3 方案设计
+### P0.3 Solution Design
 
-根据需求清单和影响范围，设计技术方案：
+Based on the requirements list and impact scope, design the technical solution:
 
-| 设计项 | 说明 |
+| Design item | Description |
 |--------|------|
-| 🏗 整体思路 | 方案的一句话概括 |
-| 🔧 技术选型 | 用什么 API/设计模式/工具，附理由；不能保留影响实现的二选一 |
-| ⚡ 性能设计 | 关键路径算法复杂度分析、缓存/资源池复用策略、异步/批处理设计、懒加载/预加载取舍、内存分配规划与对象生命周期管理 |
-| 📊 可观测性 | 是否需要新增性能埋点、耗时统计、计数器、内存快照、调试日志；异常检测与告警方式 |
-| 🔒 安全设计 | 输入校验与消毒方案、权限检查点设计、加密策略（传输/存储）、防注入/防篡改措施、审计日志策略 |
-| 📖 文档计划 | 需更新的文档列表（帮助文档、更新日志、发布说明、迁移指南），每项的负责人和交付时间点 |
-| 🧹 技术债务追踪 | 方案中已知的 workaround/hack/TODO，标记为技术债务项；预估偿还工作量；是否已有偿还计划或排期 |
-| 🧪 测试策略 | 测试层级分配（单元/集成/E2E/手动）、关键场景的测试用例思路、自动化覆盖目标、回归验证范围；<br>如果涉及自动化测试，先参考 `get_coding_rules(section="automation")`（`resources/coding-rules/testing/automation/`）获取方法论、场景模板和命令参考 |
-| 📐 接口/数据结构 | 新增的类型、函数签名、数据结构定义；说明兼容性和迁移方式 |
-| 🧩 拆分子任务 | 将实现拆解为可独立执行和验证的子任务 |
-| 🔄 与现有代码的交互 | 如何对接现有模块？接口兼容还是破坏性变更？ |
-| ✅ 验收标准 | 每个阶段的完成标准、验证命令、人工验证项和通过条件 |
-| ↩️ 回滚/迁移 | 失败时如何回滚？破坏性改动如何迁移？是否需要兼容垫片？ |
+| 🏗 Overall approach | A one-sentence summary of the solution |
+| 🔧 Technology selection | Which APIs/design patterns/tools to use, with reasons; no either-or choices that affect implementation may remain |
+| ⚡ Performance design | Algorithm complexity analysis of key paths, cache/resource pool reuse strategy, async/batch design, lazy loading/preloading trade-offs, memory allocation planning and object lifecycle management |
+| 📊 Observability | Whether new performance instrumentation, duration statistics, counters, memory snapshots, or debug logs are needed; exception detection and alerting methods |
+| 🔒 Security design | Input validation and sanitization scheme, permission check point design, encryption strategy (transport/storage), anti-injection/anti-tampering measures, audit log strategy |
+| 📖 Documentation plan | List of documents to update (help documentation, changelog, release notes, migration guide), with owner and delivery time for each |
+| 🧹 Technical debt tracking | Known workarounds/hacks/TODOs in the solution, marked as technical debt items; estimated repayment effort; whether there is already a repayment plan or schedule |
+| 🧪 Test strategy | Test level allocation (unit/integration/E2E/manual), test case ideas for key scenarios, automation coverage targets, regression verification scope; <br>if automated testing is involved, first refer to `get_coding_rules(section="automation")` (`resources/coding-rules/testing/automation/`) for methodology, scenario templates, and command reference |
+| 📐 Interfaces/data structures | New types, function signatures, data structure definitions; explain compatibility and migration methods |
+| 🧩 Subtask breakdown | Break implementation into subtasks that can be executed and verified independently |
+| 🔄 Interaction with existing code | How to connect to existing modules? Interface-compatible or breaking change? |
+| ✅ Acceptance criteria | Completion criteria, verification commands, manual verification items, and pass conditions for each stage |
+| ↩️ Rollback/migration | How to roll back on failure? How to migrate breaking changes? Are compatibility shims needed? |
 
-**产出**：设计方案（含子任务列表、验收标准、回滚/迁移方案），可被 P0.4 审查。
+**Output**: A design solution (including subtask list, acceptance criteria, and rollback/migration plan), reviewable by P0.4.
 
-### P0.4 方案自审
+### P0.4 Solution Self-review
 
-对 P0.3 的方案做自审，发现风险后**先修改方案，不急于编码**：
+Self-review the P0.3 solution; after finding risks, **modify the solution first and do not rush to code**:
 
-| # | 审查项 | 说明 |
+| # | Review item | Description |
 |---|--------|------|
-| 1 | 🔴 需求覆盖 | 方案是否覆盖 P0.1 的所有显式+隐式需求？有无遗漏？ |
-| 2 | 🔴 源码核验 | 方案是否基于真实源码、真实调用链、真实包/工程文件和真实测试入口？ |
-| 3 | 🔴 现有模式匹配 | 方案是否符合代码库现有设计模式和命名惯例？ |
-| 4 | 🔴 连锁反应 | 修改是否会通过接口签名、行为语义、数据格式引发级联断裂？<br>是否追踪了完整的传播链（A→B→C）？是否有兼容垫片或分阶段迁移计划？ |
-| 5 | 🟡 风险可控 | P0.2 标记的风险点是否已有应对措施？ |
-| 6 | 🟡 接口兼容 | 新接口是否会破坏现有调用方？是否有平滑过渡方案？ |
-| 7 | 🟡 边界处理 | 空值/异常/并发/超时/资源释放/权限/依赖缺失等边界场景是否已考虑？ |
-| 8 | 🟡 安全合规 | 方案是否满足 P0.1 定义的安全需求？是否存在注入、权限越界、数据泄露风险？<br>敏感数据在传输/存储时是否有加密保护？是否有足够的审计日志支持追溯？ |
-| 9 | 🟡 性能达标 | 方案是否满足 P0.1 定义的性能预算？关键路径是否存在算法复杂度退化（如 O(n)→O(n²)）？<br>是否有无节制的内存分配、不必要的 IO 或重复计算？高负载下是否有应对措施？ |
-| 10 | 🟡 可观测完备 | 关键路径是否有耗时统计/埋点？异常是否有清晰的错误上下文可诊断？<br>日志级别是否合理？上线后运维能否快速定位问题？ |
-| 11 | 🟡 文档同步 | 用户可见的变化是否有对应的文档更新？发布说明/迁移指南/更新日志是否已到位？ |
-| 12 | 🟢 测试完备 | 测试策略是否覆盖了关键场景？是否有明确的自动化测试目标和回归验证路径？ |
-| 13 | 🟢 技术债务可控 | 方案是否引入了可接受的债务？新增的 workaround/hack 是否有 TODO 标记和偿还计划？<br>是否避免了为了短期速度而引入长期不可维护的架构妥协？ |
-| 14 | 🟢 子任务合理 | 子任务的拆分粒度是否可独立执行、验证和回滚？ |
+| 1 | 🔴 Requirements coverage | Does the solution cover all explicit + implicit requirements in P0.1? Any omissions? |
+| 2 | 🔴 Source verification | Is the solution based on real source code, real call chains, real package/project files, and real test entry points? |
+| 3 | 🔴 Existing pattern matching | Does the solution conform to the codebase's existing design patterns and naming conventions? |
+| 4 | 🔴 Chain reactions | Will the modification cause cascading breakage through interface signatures, behavior semantics, or data formats? <br>Has the complete propagation chain (A→B→C) been traced? Are there compatibility shims or a phased migration plan? |
+| 5 | 🟡 Risk controllable | Do the risk points marked in P0.2 already have countermeasures? |
+| 6 | 🟡 Interface compatibility | Will the new interface break existing callers? Is there a smooth transition plan? |
+| 7 | 🟡 Boundary handling | Have boundary scenarios such as null values/exceptions/concurrency/timeouts/resource release/permissions/missing dependencies been considered? |
+| 8 | 🟡 Security compliance | Does the solution meet the security requirements defined in P0.1? Are there risks of injection, privilege escalation, or data leakage? <br>Is sensitive data protected by encryption during transport/storage? Are there sufficient audit logs for traceability? |
+| 9 | 🟡 Performance meets target | Does the solution meet the performance budget defined in P0.1? Is there algorithm complexity degradation on key paths (e.g., O(n)→O(n²))? <br>Are there uncontrolled memory allocations, unnecessary IO, or repeated calculations? Are there countermeasures under high load? |
+| 10 | 🟡 Observability complete | Are there duration statistics/instrumentation on key paths? Do exceptions have clear error context for diagnosis? <br>Are log levels reasonable? Can operations quickly locate problems after launch? |
+| 11 | 🟡 Documentation synchronized | Are there corresponding documentation updates for user-visible changes? Are release notes/migration guides/changelogs in place? |
+| 12 | 🟢 Test complete | Does the test strategy cover key scenarios? Are there clear automation test targets and regression verification paths? |
+| 13 | 🟢 Technical debt controllable | Does the solution introduce acceptable debt? Do new workarounds/hacks have TODO markers and repayment plans? <br>Has it avoided long-term unmaintainable architectural compromises for short-term speed? |
+| 14 | 🟢 Subtasks reasonable | Is the subtask breakdown granular enough to be independently executed, verified, and rolled back? |
 
-#### P0.4.1 硬性不通过条件
+#### P0.4.1 Hard Failure Conditions
 
-出现以下任一情况，审查结论必须为"不通过"，返回 P0.3 修正：
+If any of the following occurs, the review conclusion must be "Fail", and return to P0.3 to revise:
 
-- 没有具体文件路径、符号或调用链，只描述概念。
-- 技术路线仍有会影响实现的二选一或待确认项。
-- fallback、错误处理、资源生命周期、缓存失效或兼容迁移语义未定义。
-- 公共接口、数据格式、包依赖或持久化格式会变化，但没有迁移/兼容/回滚方案。
-- 未定义每个阶段的验收标准和验证命令/验证方式。
-- 涉及第三方库、许可证、平台或部署，却没有审查结论。
-- 会覆盖用户改动、Daofy 工具脏标记/备份边界或 DFM/设计器状态，但没有保护方案。
-- 测试只能靠"看起来应该没问题"，没有可执行验证路径。
-- 涉及性能关键路径但未定义性能预算（至少包含延迟或资源消耗上限），且方案无法证明不会引起退化。
-- 涉及用户数据、权限模型、网络通信或外部输入的安全敏感改动，但没有安全设计或安全审查结论。
-- 用户可见的接口/行为/配置发生变化，但没有对应的文档更新计划或发布说明。
+- No specific file paths, symbols, or call chains; only concepts are described.
+- The technical route still has either-or choices or items to be confirmed that affect implementation.
+- The semantics of fallback, error handling, resource lifecycle, cache invalidation, or compatible migration are undefined.
+- Public interfaces, data formats, package dependencies, or persistence formats will change, but there is no migration/compatibility/rollback plan.
+- The acceptance criteria and verification commands/methods for each stage are not defined.
+- Third-party libraries, licenses, platforms, or deployment are involved, but there is no review conclusion.
+- User changes, Daofy tool dirty-marking/backup boundaries, or DFM/designer state would be overwritten, but there is no protection plan.
+- Tests can only rely on "it should look fine"; there is no executable verification path.
+- Performance-critical paths are involved but no performance budget is defined (at least latency or resource consumption upper limits), and the solution cannot prove there will be no regression.
+- Security-sensitive changes involving user data, permission models, network communication, or external input are involved, but there is no security design or security review conclusion.
+- User-visible interfaces/behavior/configuration change, but there is no corresponding documentation update plan or release notes.
 
-**审查结论**：
-- ✅ **通过** → 标记计划为"可实施稿"，进入 P0.P
-- ❌ **不通过** → 标记计划为"审计反馈稿"，返回 P0.3 修改方案后重新审查
+**Review conclusion**:
+- ✅ **Pass** → Mark the plan as "Implementable draft" and enter P0.P
+- ❌ **Fail** → Mark the plan as "Audit feedback draft", return to P0.3 to revise the solution, and review again
 
-### P0.P 通过 → 进入 ① 执行
+### P0.P Pass → Enter ① Execution
 
-方案通过后，按标准编码工作流执行：
+After the solution passes, execute according to the standard coding workflow:
 
 ```
-get_coding_rules(section="workflow")    # 进入 ① 环境检查
+get_coding_rules(section="workflow")    # Enter ① Environment check
 ```
 
-进入编码前再次确认：计划状态是"可实施稿"，当前工作区/IDE 状态已检查，且没有未解决的待确认项。
+Before entering coding, confirm again: the plan status is "Implementable draft", the current workspace/IDE state has been checked, and there are no unresolved items to be confirmed.
 
-### P0.R 不通过 → 返回 P0.3
+### P0.R Fail → Return to P0.3
 
-方案不通过时，**不要直接编码**。根据审查中指出的问题修改方案，然后重新回到 P0.4 审查。反复此循环直到方案通过。
+When the solution fails, **do not code directly**. Revise the solution according to the problems pointed out in the review, then return to P0.4 for review. Repeat this loop until the solution passes.
 
-> **经验**：在方案阶段花 5 分钟思考，通常能节省编码后的 30 分钟返工。P0 阶段发现的设计缺陷，修复成本是编码后的 1/10。
+> **Experience**: Spending 5 minutes thinking at the solution stage usually saves 30 minutes of rework after coding. Design defects found in the P0 stage cost 1/10 of post-coding fixes.
+

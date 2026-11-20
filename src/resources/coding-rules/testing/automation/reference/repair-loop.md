@@ -1,46 +1,46 @@
-<!-- @when: 自动化测试失败，需分析失败原因并修复后重试 -->
+<!-- @when: an automated test failed and its cause must be analysed, repaired and retried -->
 <!-- @chain: after=report-schema.md -->
 
-# 失败修复循环
+# Failure Repair Loop
 
-当 `report.first_failure` 不为 null 时执行此流程。
+Run this procedure when `report.first_failure` is not null.
 
-MCP resource URI: `delphi://automation/repair-loop`。
+MCP resource URI: `delphi://automation/repair-loop`.
 
-## 步骤
+## Steps
 
-1. 停止依赖的自动化步骤。
-2. 根据 `report.first_failure.signal` 分类失败类型。
-3. 补充证据：
-   - 目标/控件问题 → `formsum`/`dumpstate`
-   - 非预期弹窗 → `msgscan`
-   - 视觉证据 → `capture`
-   - 属性/方法不匹配 → `rinspect`
-4. 判定是脚本问题还是产品代码问题。
-5. 脚本问题 → 更新缓存脚本并重跑。
-6. 代码问题 → 切到编码模式，用 `delphi_file` 编辑 Delphi 文件，用 `delphi_project` 编译，重跑自动化。
-7. 将稳定的事故恢复知识存入 `experience`。
+1. Stop the automated steps that depend on it.
+2. Classify the failure type from `report.first_failure.signal`.
+3. Gather additional evidence:
+   - Target/control problem → `formsum`/`dumpstate`
+   - Unexpected dialog → `msgscan`
+   - Visual evidence → `capture`
+   - Property/method mismatch → `rinspect`
+4. Decide whether the problem lies in the script or in the product code.
+5. Script problem → update the cached script and rerun.
+6. Code problem → switch to coding mode, edit the Delphi file with `delphi_file`, compile with `delphi_project`, then rerun the automation.
+7. Store the stabilised incident-recovery knowledge in `experience`.
 
-## 脚本 vs 代码判定
+## Script vs. Code Decision
 
-| 判定 | 典型场景 |
+| Verdict | Typical scenario |
 |------|---------|
-| **脚本问题** | 控件改名但行为正确；`assert_expr` 预期值错误；超时太短（证据显示应用仍在推进） |
-| **代码问题** | 源码预期的行为未发生；必要控件未被创建；正确事件触发后 UI 属性值错误；有效输入导致弹出错误对话框 |
+| **Script problem** | A control was renamed but behaves correctly; the `assert_expr` expected value is wrong; the timeout is too short (the evidence shows the application is still making progress) |
+| **Code problem** | The behaviour the source intends does not happen; a required control is never created; a UI property holds the wrong value after the correct event fires; valid input raises an error dialog |
 
-## 最终输出格式
+## Final Output Format
 
 ```markdown
-**自动化测试结果**
-通过: N/M，耗时 Xs
-执行模式: gui|console
+**Automation Test Result**
+Passed: N/M, elapsed Xs
+Execution mode: gui|console
 
-**首个失败**
-步骤 #、命令、目标、信号、实际值、期望值
+**First Failure**
+Step #, command, target, signal, actual value, expected value
 
-**解决方案**
-脚本修复或代码修复，附具体文件/步骤。
+**Solution**
+Script fix or code fix, with specific files/steps.
 
-**验证**
-编译结果和重跑结果。
+**Verification**
+Compile result and rerun result.
 ```

@@ -1,13 +1,13 @@
-<!-- @when: 验证程序可启动、主窗体渲染、关键控件就位 -->
+<!-- @when: Verify the program can start, the main form renders, and key controls are in place -->
 <!-- @part-of: ui-testing -->
 
-#### A. 冒烟测试 — 验证主窗体正常启动
+#### A. Smoke Test — Verify the main form starts normally
 
-| 要素 | 内容 |
+| Element | Content |
 |------|------|
-| **目标** | 确认程序可启动、主窗体渲染、关键控件就位 |
-| **策略** | goto 主窗体 → rget 关键控件状态 → capture 快照 → exit |
-| **关键命令** | `goto`, `rget`, `capture`, `exit` |
+| **Goal** | Confirm the program can start, the main form renders, and key controls are in place |
+| **Strategy** | goto main form → rget key control state → capture snapshot → exit |
+| **Key commands** | `goto`, `rget`, `capture`, `exit` |
 
 ```json
 [
@@ -20,4 +20,5 @@
 ]
 ```
 
-**陷阱**：启动动画/闪屏会导致 goto 超时 → 设超时 15s 或用 `waitfor` 等待闪屏消失。
+**Pitfall**: Startup animations/splash screens can cause goto to time out → set timeout to 15s or use `waitfor` to wait for the splash screen to disappear.
+

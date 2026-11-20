@@ -1,7 +1,7 @@
 """
-配置管理工具
+Configuration management tool
 
-提供编译器配置管理功能
+Provides compiler configuration management
 """
 
 from typing import Optional, Dict, Any
@@ -15,12 +15,12 @@ from pathlib import Path
 
 logger = get_logger(__name__)
 
-# 全局配置管理器实例
+# Global config manager instance
 _config_manager: Optional[ConfigManager] = None
 
 
 def set_config_manager(manager: ConfigManager):
-    """设置配置管理器实例"""
+    """Set the config manager instance"""
     global _config_manager
     _config_manager = manager
 
@@ -32,40 +32,40 @@ async def set_compiler_config(
     version: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    配置 Delphi 编译器
+    Configure a Delphi compiler
 
     Args:
-        name: 编译器版本名称
-        path: 编译器可执行文件路径
-        is_default: 是否设为默认编译器
-        version: 编译器版本号
+        name: the compiler version name
+        path: the compiler executable path
+        is_default: whether to make it the default compiler
+        version: the compiler version number
 
     Returns:
-        配置结果字典
+        The configuration result dict
     """
-    logger.info(f"收到配置编译器请求: {name}")
+    logger.info(f"Received a configure-compiler request: {name}")
 
     if _config_manager is None:
-        logger.error("配置管理器未初始化")
+        logger.error("The config manager is not initialized")
         return {
             "success": False,
-            "message": "配置管理器未初始化",
+            "message": "The config manager is not initialized",
             "compiler_name": name
         }
 
     try:
-        # 验证编译器路径
+        # Validate the compiler path
         validator = Validator()
         is_valid, error_msg = validator.validate_compiler_path(path)
         if not is_valid:
-            logger.error(f"编译器路径验证失败: {error_msg}")
+            logger.error(f"Compiler path validation failed: {error_msg}")
             return {
                 "success": False,
                 "message": error_msg,
                 "compiler_name": name
             }
 
-        # 创建编译器配置
+        # Create the compiler config
         compiler = CompilerConfig(
             name=name,
             path=path,
@@ -73,18 +73,18 @@ async def set_compiler_config(
             version=version
         )
 
-        # 添加配置
+        # Add the config
         _config_manager.add_compiler(compiler)
 
-        logger.info(f"编译器配置成功: {name}")
+        logger.info(f"Compiler configured successfully: {name}")
         return {
             "success": True,
-            "message": f"编译器配置成功: {name}",
+            "message": f"Compiler configured successfully: {name}",
             "compiler_name": name
         }
 
     except Exception as e:
-        error_msg = f"配置过程发生异常: {str(e)}"
+        error_msg = f"Exception during configuration: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return {
             "success": False,
@@ -95,18 +95,18 @@ async def set_compiler_config(
 
 async def get_compiler_list() -> Dict[str, Any]:
     """
-    获取所有编译器配置列表
+    Get the list of all compiler configurations
 
     Returns:
-        编译器配置列表字典
+        A dict holding the list of compiler configurations
     """
-    logger.info("收到获取编译器列表请求")
+    logger.info("Received a get-compiler-list request")
 
     if _config_manager is None:
-        logger.error("配置管理器未初始化")
+        logger.error("The config manager is not initialized")
         return {
             "success": False,
-            "message": "配置管理器未初始化",
+            "message": "The config manager is not initialized",
             "compilers": []
         }
 
@@ -116,13 +116,13 @@ async def get_compiler_list() -> Dict[str, Any]:
 
         return {
             "success": True,
-            "message": f"共 {len(compilers)} 个编译器配置",
+            "message": f"{len(compilers)} compiler configuration(s)",
             "compilers": [c.to_dict() for c in compilers],
             "default_compiler": default_compiler.name if default_compiler else None
         }
 
     except Exception as e:
-        error_msg = f"获取编译器列表过程发生异常: {str(e)}"
+        error_msg = f"Exception while listing compilers: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return {
             "success": False,
@@ -133,27 +133,27 @@ async def get_compiler_list() -> Dict[str, Any]:
 
 async def search_compilers(search_path: Optional[str] = None) -> CallToolResult:
     """
-    搜索 Delphi 编译器
+    Search for Delphi compilers
     
-    - 不带 search_path 参数：自动检测系统中的编译器
-    - 带 search_path 参数：在指定路径搜索编译器
-    仅返回有效的编译器
+    - without the search_path argument: auto-detect the compilers on this system
+    - with the search_path argument: search for compilers under the given path
+    Only valid compilers are returned
 
     Args:
-        search_path: 搜索路径，默认搜索常见安装位置
+        search_path: the search path; defaults to the common install locations
 
     Returns:
         CallToolResult with search results
     
     Note:
-        建议使用 check_environment 工具来验证编译器有效性并获取详细信息
+        Prefer the check_environment tool to validate a compiler and get full details
     """
-    logger.info(f"收到搜索编译器请求: {search_path or '自动检测'}")
+    logger.info(f"Received a search-compilers request: {search_path or 'auto-detect'}")
 
     if _config_manager is None:
-        logger.error("配置管理器未初始化")
+        logger.error("The config manager is not initialized")
         return CallToolResult(
-            content=[{"type": "text", "text": "配置管理器未初始化，请先启动服务"}],
+            content=[{"type": "text", "text": "The config manager is not initialized; start the service first"}],
             isError=True
         )
 
@@ -162,7 +162,7 @@ async def search_compilers(search_path: Optional[str] = None) -> CallToolResult:
         found_compilers = []
 
         if search_path is None:
-            # 自动检测模式：检测系统中已配置的编译器
+            # Auto-detect mode: check the compilers already configured on this system
             _config_manager._auto_detect_compilers()
             compilers = _config_manager.get_all_compilers()
             default_compiler = _config_manager.get_compiler()
@@ -177,19 +177,19 @@ async def search_compilers(search_path: Optional[str] = None) -> CallToolResult:
                         "is_default": c.name == (default_compiler.name if default_compiler else None)
                     })
             
-            logger.info(f"自动检测完成: {len(found_compilers)} 个有效编译器")
+            logger.info(f"Auto-detection finished: {len(found_compilers)} valid compiler(s)")
             
             # Format output
-            output = f"检测到 {len(found_compilers)} 个有效的 Delphi 编译器:\n\n"
+            output = f"Detected {len(found_compilers)} valid Delphi compiler(s):\n\n"
             for c in found_compilers:
-                default_mark = " (默认)" if c.get("is_default") else ""
+                default_mark = " (default)" if c.get("is_default") else ""
                 output += f"- {c['name']}{default_mark}\n"
-                output += f"  路径: {c['path']}\n"
-                output += f"  版本: {c.get('version', '未知')}\n\n"
+                output += f"  Path: {c['path']}\n"
+                output += f"  Version: {c.get('version', 'unknown')}\n\n"
             
             return CallToolResult(content=[{"type": "text", "text": output}])
         else:
-            # 搜索模式：在指定路径搜索
+            # Search mode: search under the given path
             common_paths = [search_path]
             
             for base_path in common_paths:
@@ -216,18 +216,18 @@ async def search_compilers(search_path: Optional[str] = None) -> CallToolResult:
                                     "version": version_dir
                                 })
             
-            logger.info(f"搜索完成: {len(found_compilers)} 个有效编译器")
+            logger.info(f"Search finished: {len(found_compilers)} valid compiler(s)")
             
-            output = f"找到 {len(found_compilers)} 个有效的 Delphi 编译器:\n\n"
+            output = f"Found {len(found_compilers)} valid Delphi compiler(s):\n\n"
             for c in found_compilers:
                 output += f"- {c['name']}\n"
-                output += f"  路径: {c['path']}\n"
-                output += f"  版本: {c.get('version', '未知')}\n\n"
+                output += f"  Path: {c['path']}\n"
+                output += f"  Version: {c.get('version', 'unknown')}\n\n"
             
             return CallToolResult(content=[{"type": "text", "text": output}])
 
     except Exception as e:
-        error_msg = f"搜索过程发生异常: {str(e)}"
+        error_msg = f"Exception during the search: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return CallToolResult(
             content=[{"type": "text", "text": error_msg}],
@@ -235,34 +235,34 @@ async def search_compilers(search_path: Optional[str] = None) -> CallToolResult:
         )
 
 
-# 兼容旧接口
+# Legacy interface compatibility
 async def detect_compilers() -> CallToolResult:
-    """自动检测系统中可用的 Delphi 编译器（兼容旧接口）"""
+    """Auto-detect the Delphi compilers available on this system (legacy interface)"""
     return await search_compilers()
 
 
 async def search_delphi_compilers(search_path: Optional[str] = None) -> CallToolResult:
-    """在指定路径搜索 Delphi 编译器（兼容旧接口）"""
+    """Search for Delphi compilers under the given path (legacy interface)"""
     return await search_compilers(search_path)
 
 
 async def remove_compiler_config(name: str) -> Dict[str, Any]:
     """
-    删除编译器配置
+    Remove a compiler configuration
 
     Args:
-        name: 编译器名称
+        name: the compiler name
 
     Returns:
-        删除结果字典
+        The removal result dict
     """
-    logger.info(f"收到删除编译器配置请求: {name}")
+    logger.info(f"Received a remove-compiler-config request: {name}")
 
     if _config_manager is None:
-        logger.error("配置管理器未初始化")
+        logger.error("The config manager is not initialized")
         return {
             "success": False,
-            "message": "配置管理器未初始化",
+            "message": "The config manager is not initialized",
             "compiler_name": name
         }
 
@@ -270,25 +270,26 @@ async def remove_compiler_config(name: str) -> Dict[str, Any]:
         result = _config_manager.remove_compiler(name)
 
         if result:
-            logger.info(f"编译器配置删除成功: {name}")
+            logger.info(f"Compiler config removed successfully: {name}")
             return {
                 "success": True,
-                "message": f"编译器配置删除成功: {name}",
+                "message": f"Compiler config removed successfully: {name}",
                 "compiler_name": name
             }
         else:
-            logger.warning(f"编译器配置不存在: {name}")
+            logger.warning(f"Compiler config not found: {name}")
             return {
                 "success": False,
-                "message": f"编译器配置不存在: {name}",
+                "message": f"Compiler config not found: {name}",
                 "compiler_name": name
             }
 
     except Exception as e:
-        error_msg = f"删除过程发生异常: {str(e)}"
+        error_msg = f"Exception during removal: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return {
             "success": False,
             "message": error_msg,
             "compiler_name": name
         }
+

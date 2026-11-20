@@ -1,9 +1,9 @@
 """
-StructuredNode — 结构化文档的统一数据模型。
+StructuredNode — the unified data model for structured documents.
 
-所有格式（DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf）
-都归一化为 StructuredNode 树，后续路径查询 / Schema 生成 /
-修改操作都在此模型上进行。
+Every format (DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf)
+is normalized into a StructuredNode tree, and the subsequent path queries, schema generation
+and modifications all operate on this model.
 """
 
 from __future__ import annotations
@@ -14,15 +14,15 @@ from typing import Any, Optional
 
 @dataclass
 class StructuredNode:
-    """结构化文档的通用节点模型。
+    """Generic node model for a structured document.
 
     Attributes:
-        key: 当前节点的键名（根节点为 ``""``）。
-        kind: 值类型 —  ``"object"`` / ``"array"`` / ``"string"`` /
-               ``"number"`` / ``"boolean"`` / ``"null"``。
-        value: 叶子节点的原生值（str / int / float / bool / None）。
-        children: 子节点列表（kind=object/array 时非空）。
-        attributes: 格式特定的元信息，如 DFM 的 class_name／XML 的 namespace。
+        key: the key name of this node (``""`` for the root).
+        kind: value type —  ``"object"`` / ``"array"`` / ``"string"`` /
+               ``"number"`` / ``"boolean"`` / ``"null"``.
+        value: the leaf node's native value (str / int / float / bool / None).
+        children: child node list (non-empty when kind=object/array).
+        attributes: format-specific metadata, such as class_name for DFM or namespace for XML.
     """
     key: str = ""
     kind: str = "object"  # object | array | string | number | boolean | null
@@ -30,17 +30,17 @@ class StructuredNode:
     children: list[StructuredNode] = field(default_factory=list)
     attributes: dict[str, str] = field(default_factory=dict)
 
-    # ── 导航 ──────────────────────────────────────────────────────
+    # ── Navigation ────────────────────────────────────────────────
 
     def child_by_key(self, key: str) -> Optional[StructuredNode]:
-        """按 key 查找直接子节点。"""
+        """Find a direct child node by key."""
         for c in self.children:
             if c.key == key:
                 return c
         return None
 
     def find_by_path_keys(self, keys: list[str]) -> Optional[StructuredNode]:
-        """按 key 链逐级查找（如 root/component/properties/Left）。"""
+        """Walk down a chain of keys (e.g. root/component/properties/Left)."""
         node: Optional[StructuredNode] = self
         for k in keys:
             if node is None:
@@ -49,13 +49,13 @@ class StructuredNode:
         return node
 
     def find_all(self, predicate) -> list[StructuredNode]:
-        """递归查找所有匹配的节点。
+        """Recursively find every matching node.
 
         Args:
-            predicate: 匹配条件 — str（按 key 匹配）或 callable（按自定义条件匹配）。
+            predicate: the match condition — a str (matched against key) or a callable (custom condition).
 
         Returns:
-            匹配节点列表。
+            The list of matching nodes.
         """
         result: list[StructuredNode] = []
         if callable(predicate):
@@ -68,10 +68,10 @@ class StructuredNode:
             result.extend(c.find_all(predicate))
         return result
 
-    # ── 序列化 ─────────────────────────────────────────────────────
+    # ── Serialization ─────────────────────────────────────────────
 
     def to_json_compatible(self) -> Any:
-        """递归转 JSON 原生类型（dict/list/str/int/float/bool/None）。"""
+        """Convert recursively into JSON native types (dict/list/str/int/float/bool/None)."""
         if self.kind == "object":
             d: dict[str, Any] = {}
             if self.attributes:
@@ -85,7 +85,7 @@ class StructuredNode:
 
     @classmethod
     def from_json_compatible(cls, data: Any, key: str = "") -> StructuredNode:
-        """从 JSON 原生类型反构造 StructuredNode。"""
+        """Rebuild a StructuredNode from JSON native types."""
         if isinstance(data, dict):
             node = cls(key=key, kind="object")
             attrs = data.get("@attributes")

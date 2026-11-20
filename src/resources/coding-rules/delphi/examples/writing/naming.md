@@ -1,53 +1,54 @@
-# 命名规范示例
+# Naming Convention Examples
 
-## 基础前缀
+## Basic Prefixes
 
-| 类别 | 约定 | ✅ 正确 | ❌ 错误 |
-|------|------|---------|---------|
-| 类/接口/异常 | T/I/E/P 前缀 | `TMyClass`, `IMyInterface` | `MyClass`, `MyInterface` |
-| 字段 | F 前缀 | `FName: string;` | `Name: string;` |
-| 属性/方法 | 大驼峰 | `property Name` / `procedure CalculateTotal` | `property name` / `procedure calculateTotal` |
-| 事件 | On→Form 后缀 | `Form1Create` | `CreateForm1` |
-| 参数 | A 前缀 | `procedure SetName(AName: string);` | `procedure SetName(Name: string);` |
-| 枚举 | 类型前缀缩写 | `taLeft, taRight, taCenter` | `Left, Right, Center` |
-| 常量 | 全大写 | `MAX_BUFFER_SIZE` | `MaxBufferSize` / `max_buffer_size` |
+| Category | Convention | ✅ Correct | ❌ Wrong |
+|----------|------------|------------|----------|
+| Class/Interface/Exception | T/I/E/P prefix | `TMyClass`, `IMyInterface` | `MyClass`, `MyInterface` |
+| Field | F prefix | `FName: string;` | `Name: string;` |
+| Property/Method | UpperCamelCase | `property Name` / `procedure CalculateTotal` | `property name` / `procedure calculateTotal` |
+| Event | On→Form suffix | `Form1Create` | `CreateForm1` |
+| Parameter | A prefix | `procedure SetName(AName: string);` | `procedure SetName(Name: string);` |
+| Enum | Type prefix abbreviation | `taLeft, taRight, taCenter` | `Left, Right, Center` |
+| Constant | All uppercase | `MAX_BUFFER_SIZE` | `MaxBufferSize` / `max_buffer_size` |
 
-## 完整示例
+## Complete Example
 
 ```pascal
 type
-  // 类：T 前缀
+  // Class: T prefix
   TCustomer = class
   private
-    FName: string;      // 字段：F 前缀
+    FName: string;      // Field: F prefix
     FAge: Integer;
   public
-    constructor Create(AName: string; AAge: Integer);  // 参数：A 前缀
-    function GetDisplayName: string;                   // 方法：大驼峰
-    property Name: string read FName write FName;      // 属性：大驼峰
+    constructor Create(AName: string; AAge: Integer);  // Parameter: A prefix
+    function GetDisplayName: string;                   // Method: UpperCamelCase
+    property Name: string read FName write FName;      // Property: UpperCamelCase
     property Age: Integer read FAge write FAge;
   end;
 
-  // 接口：I 前缀
+  // Interface: I prefix
   IRepository = interface
     function FindById(AId: Integer): TCustomer;
   end;
 
-  // 异常：E 前缀
+  // Exception: E prefix
   ECustomerNotFound = class(Exception);
 
-  // 枚举：类型前缀缩写
+  // Enum: type prefix abbreviation
   TAlignment = (taLeft, taCenter, taRight);
 
 const
-  MAX_RETRY_COUNT = 3;   // 常量：全大写
+  MAX_RETRY_COUNT = 3;   // Constant: all uppercase
 ```
 
-## 命名检查清单
+## Naming Checklist
 
-- [ ] 新类是否有 T/I/E/P 前缀
-- [ ] 私有字段是否 F 前缀
-- [ ] 方法参数是否 A 前缀
-- [ ] 属性/方法是否为大驼峰
-- [ ] 常量是否全大写（下划线分隔）
-- [ ] 事件处理器是否 Form/Control 后缀
+- [ ] Do new classes have the T/I/E/P prefix?
+- [ ] Do private fields have the F prefix?
+- [ ] Do method parameters have the A prefix?
+- [ ] Are properties/methods in UpperCamelCase?
+- [ ] Are constants all uppercase (underscore-separated)?
+- [ ] Do event handlers use the Form/Control suffix?
+

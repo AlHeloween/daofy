@@ -1,7 +1,7 @@
 """
-DFM 文本解析器 — 将文本格式 DFM 解析为组件树结构
+DFM text parser — parses text-format DFM into a component tree structure
 
-支持标准 DFM 文本格式:
+Supports the standard DFM text format:
   object Button1: TButton
     Left = 10
     Top = 20
@@ -11,16 +11,18 @@ DFM 文本解析器 — 将文本格式 DFM 解析为组件树结构
     end
   end
 
-解析结果为 DfmComponent 树，支持:
-  - 属性读取（普通属性 + 事件属性）
-  - 子组件遍历
-  - 增删改操作
-  - 序列化回 DFM 文本
+The parse result is a DfmComponent tree, supporting:
+  - Property reads (regular properties + event properties)
+  - Child component traversal
+  - Add, delete and modify operations
+  - Serialization back to DFM text
 
-事件判断 / 单元解析:
-  - 事件属性: 从 KB 查属性定义，判断类型是否为 method pointer (TNotifyEvent 等)
-  - 组件单元: 从 KB 查类定义所在文件，提取单元名 (Vcl.StdCtrls 等)
-  - KB 不可用时 fallback 到 On* 前缀启发式
+Event detection / unit resolution:
+  - Event properties: look the property definition up in the KB and check whether its type is
+    a method pointer (TNotifyEvent etc.)
+  - Component unit: look up the file holding the class definition in the KB, then extract the
+    unit name (Vcl.StdCtrls etc.)
+  - Falls back to the On* prefix heuristic when the KB is unavailable
 """
 
 import os
@@ -97,7 +99,7 @@ class DfmComponent:
 
 
 # ============================================================
-# KB 服务引用 + 缓存
+# KB service references + caches
 # ============================================================
 
 _KB_SERVICE = None
@@ -122,7 +124,7 @@ def set_kb_services(delphi_kb=None, thirdparty_kb=None):
 
 
 # ============================================================
-# 事件判断 — 从 KB 查属性类型，不猜 On* 前缀
+# Event detection — look the property type up in the KB instead of guessing from the On* prefix
 # ============================================================
 
 def is_event_property(class_name: str, prop_name: str) -> bool:
@@ -158,7 +160,7 @@ def _resolve_event_type(class_name: str, prop_name: str) -> Optional[str]:
                         if event_type:
                             return event_type
         except Exception as e:
-            logger.debug("解析事件类型失败: %s", str(e))
+            logger.debug("Failed to resolve event type: %s", str(e))
 
     for service in (_KB_SERVICE, _THIRDPARTY_KB_SERVICE):
         if service is None:
@@ -173,7 +175,7 @@ def _resolve_event_type(class_name: str, prop_name: str) -> Optional[str]:
                     if m:
                         return m.group(1)
         except Exception as e:
-            logger.debug("解析事件类型失败: %s", str(e))
+            logger.debug("Failed to resolve event type: %s", str(e))
 
     return None
 
@@ -193,7 +195,7 @@ def _scan_event_type_from_source(file_path: str, prop_name: str) -> Optional[str
 
 
 # ============================================================
-# 事件参数签名 — 从 KB 查 method pointer 定义
+# Event parameter signatures — look the method pointer definition up in the KB
 # ============================================================
 
 def resolve_event_params(class_name: str, event_name: str) -> str:
@@ -229,7 +231,7 @@ def _find_event_type_params(event_type_name: str) -> Optional[str]:
                         _EVENT_TYPE_CACHE[event_type_name] = params
                         return params
         except Exception as e:
-            logger.debug("解析事件类型失败: %s", str(e))
+            logger.debug("Failed to resolve event type: %s", str(e))
 
     return None
 
@@ -254,7 +256,7 @@ def _scan_method_pointer_params(file_path: str, type_name: str) -> Optional[str]
 
 
 # ============================================================
-# 组件单元解析 — 从 KB 查类所在文件，提取单元名
+# Component unit resolution — look up the file holding the class, extract the unit name
 # ============================================================
 
 def resolve_component_unit(class_name: str) -> Optional[str]:
@@ -276,7 +278,7 @@ def resolve_component_unit(class_name: str) -> Optional[str]:
                     _UNIT_CACHE[class_name] = unit_name
                     return unit_name
         except Exception as e:
-            logger.debug("解析事件类型失败: %s", str(e))
+            logger.debug("Failed to resolve event type: %s", str(e))
 
     _UNIT_CACHE[class_name] = None
     return None
@@ -304,11 +306,12 @@ def collect_all_units(root: DfmComponent) -> List[str]:
 
 
 # ============================================================
-# DFM 文本解析
+# DFM text parsing
 # ============================================================
 
 def parse_dfm_text(text: str, root_class_name: str = "") -> Optional[DfmComponent]:
-    # 移除 UTF-8 BOM（\ufeff），否则首行 object/inherited 因 \s* 不匹配 BOM 而被跳过
+    # Strip the UTF-8 BOM (\ufeff); otherwise the leading object/inherited line is skipped
+    # because \s* does not match the BOM
     text = text.lstrip('\ufeff')
     lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
     root = _parse_dfm_lines(lines, root_class_name)
@@ -384,7 +387,7 @@ def _fallback_is_event(name: str) -> bool:
 
 
 # ============================================================
-# 序列化
+# Serialization
 # ============================================================
 
 def serialize_component(comp: DfmComponent, indent: int = 0, indent_str: str = "  ") -> str:
@@ -403,7 +406,7 @@ def serialize_component(comp: DfmComponent, indent: int = 0, indent_str: str = "
 
 
 # ============================================================
-# 事件收集
+# Event collection
 # ============================================================
 
 def collect_all_events(root: DfmComponent) -> List[Tuple[str, str, str]]:

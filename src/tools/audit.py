@@ -1,16 +1,16 @@
 """
-代码审计 / AST 语法解析 MCP 工具
+Code audit / AST syntax parsing MCP tool
 
-对接 daudit.exe，支持两种模式:
-  --mode audit — 执行 Delphi 源码静态分析，输出违规报告
-  --mode ast   — AST 语法解析，输出实体结构信息
+Integrates with daudit.exe, supporting two modes:
+  --mode audit — run static analysis on Delphi source code, output violation report
+  --mode ast   — AST syntax parsing, output entity structure information
 
-daudit.exe 不存在时降级为引导提示，不影响其他功能。
+Falls back to a guidance prompt when daudit.exe is absent, without affecting other features.
 
-输出格式:
+Output format:
   {"mode":"audit|ast","status":"ok|error","data":{...},"summary":{...}}
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Left-Right Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
 """
 
@@ -30,12 +30,12 @@ from .layout_audit import run_layout_audit
 
 logger = logging.getLogger(__name__)
 
-# daudit.exe 路径缓存
+# daudit.exe path cache
 _DAUDIT_PATH: Optional[str] = None
 
 
 def _find_daudit() -> Optional[str]:
-    """查找 daudit.exe 路径"""
+    """Locate the daudit.exe path"""
     global _DAUDIT_PATH
     if _DAUDIT_PATH:
         return _DAUDIT_PATH
@@ -52,16 +52,16 @@ def _find_daudit() -> Optional[str]:
 
 
 def _run_daudit(cmd: List[str]) -> Optional[Dict]:
-    """运行 daudit.exe 并解析统一信封 JSON
+    """Run daudit.exe and parse the unified envelope JSON
 
-    daudit 新版输出纯 JSON，格式统一为:
+    The new daudit outputs pure JSON in a unified format:
     {"mode":"...","status":"ok|error","data":{...},"summary":{...}}
 
     Args:
-        cmd: daudit 命令行参数列表
+        cmd: List of daudit command-line arguments
 
     Returns:
-        解析后的完整 payload dict，或 None
+        The parsed full payload dict, or None
     """
     daudit = _find_daudit()
     if not daudit:
@@ -76,20 +76,20 @@ def _run_daudit(cmd: List[str]) -> Optional[Dict]:
         )
         if result.returncode in (0, 1) and result.stdout.strip():
             return json.loads(result.stdout)
-        logger.warning("daudit 异常 (exit=%d): %s", result.returncode, result.stderr[:200])
+        logger.warning("daudit error (exit=%d): %s", result.returncode, result.stderr[:200])
     except (subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as e:
-        logger.error("daudit 调用失败: %s", e)
+        logger.error("daudit invocation failed: %s", e)
 
     return None
 
 
 def _run_audit(paths: List[str], recursive: bool = False) -> Optional[Dict]:
-    """运行 daudit --mode audit
+    """Run daudit --mode audit
 
     CLI: daudit --mode audit --format json [--recursive] <path(s)>
 
     Returns:
-        data 段 dict ({findings, totalFindings})，或 None
+        The data section dict ({findings, totalFindings}), or None
     """
     cmd = ["--mode", "audit"]
     if recursive:
@@ -104,21 +104,21 @@ def _run_audit(paths: List[str], recursive: bool = False) -> Optional[Dict]:
 
 def _run_skeleton(base_dir: str, file_path: Optional[str] = None,
                    detail: str = "compact") -> Optional[List[Dict]]:
-    """运行 daudit --mode skeleton 提取代码骨架摘要
+    """Run daudit --mode skeleton to extract a code skeleton summary
 
     CLI: daudit --mode skeleton --skeleton-detail compact --format json <file(s)>
 
-    skeleton 模式专为 AI Agent 设计，输出预格式化的文本摘要：
-      单元名、uses、类/记录/接口、函数/过程、常量/变量
-    --skeleton-detail compact: 无调用链信息，最省 token
+    The skeleton mode is designed for AI Agents and outputs a preformatted text summary:
+      unit name, uses, classes/records/interfaces, functions/procedures, constants/variables
+    --skeleton-detail compact: no call chain information, most token-efficient
 
     Args:
-        base_dir: 审计基准目录（用于查找 .pas 文件）
-        file_path: 单文件路径（优先于 base_dir）
-        detail: skeleton 详细度: compact（推荐）/ normal / full
+        base_dir: Audit base directory (used to locate .pas files)
+        file_path: Single file path (takes priority over base_dir)
+        detail: skeleton detail level: compact (recommended) / normal / full
 
     Returns:
-        list of {"file": path, "data": text}，或 None
+        list of {"file": path, "data": text}, or None
     """
     daudit = _find_daudit()
     if not daudit:
@@ -164,14 +164,14 @@ def _run_skeleton(base_dir: str, file_path: Optional[str] = None,
                     files_list = files_data
                 else:
                     files_list = []
-                logger.info("Skeleton 解析完成: %d 个文件", len(files_list))
+                logger.info("Skeleton parsing complete: %d files", len(files_list))
                 return files_list
 
         stderr = result.stderr.strip()[:200] if result.stderr else ""
-        logger.warning("Skeleton 解析异常 (exit=%d): %s", result.returncode, stderr)
+        logger.warning("Skeleton parsing error (exit=%d): %s", result.returncode, stderr)
 
     except (subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as e:
-        logger.error("Skeleton 解析调用失败: %s", e)
+        logger.error("Skeleton parsing invocation failed: %s", e)
     finally:
         if tmp_path and os.path.exists(tmp_path):
             try:
@@ -183,11 +183,11 @@ def _run_skeleton(base_dir: str, file_path: Optional[str] = None,
 
 
 def _extract_json(text: str) -> Optional[str]:
-    """从 daudit 混合输出中提取第一个完整 JSON 对象（处理头部横幅+尾部摘要）"""
+    """Extract the first complete JSON object from mixed daudit output (handles leading banner + trailing summary)"""
     start = text.find('{')
     if start < 0:
         return None
-    # 逐字符找到匹配的闭合 }
+    # Find the matching closing } character by character
     depth = 0
     for i in range(start, len(text)):
         ch = text[i]
@@ -200,20 +200,20 @@ def _extract_json(text: str) -> Optional[str]:
     return None
 
 
-# ── 严重级别排序（映射 daudit 实际 severity → 显示级别）──
+# ── Severity ordering (maps daudit's actual severity → display level) ──
 _DAUDIT_SEVERITY_MAP = {
     "error": "critical",
     "warning": "warning",
     "hint": "suggestion",
 }
 _SEVERITY_ORDER = {"critical": 0, "warning": 1, "suggestion": 2}
-_SEVERITY_LABEL = {"critical": "🔴 严重", "warning": "🟡 一般", "suggestion": "🔵 建议"}
+_SEVERITY_LABEL = {"critical": "🔴 Critical", "warning": "🟡 Warning", "suggestion": "🔵 Suggestion"}
 
 
 def _format_report(data: Dict, min_severity: str = "suggestion") -> str:
-    """将审计 data 段格式化为 Markdown 报告
+    """Format the audit data section into a Markdown report
 
-    data 格式:
+    data format:
     {
         "findings": [
             {"rule_id":"...", "file":"...", "line":N, "column":N,
@@ -230,12 +230,12 @@ def _format_report(data: Dict, min_severity: str = "suggestion") -> str:
     min_level = _SEVERITY_ORDER.get(min_severity, 2)
 
     lines: List[str] = []
-    lines.append("# 代码审计报告")
+    lines.append("# Code Audit Report")
     lines.append("")
-    lines.append(f"**违规总数**: {total}")
+    lines.append(f"**Total violations**: {total}")
     lines.append("")
 
-    # 按严重级别分组
+    # Group by severity level
     groups: Dict[str, List[Dict]] = {"critical": [], "warning": [], "suggestion": []}
     for f in findings:
         raw_sev = f.get("severity", "hint")
@@ -244,13 +244,13 @@ def _format_report(data: Dict, min_severity: str = "suggestion") -> str:
         if lv <= min_level:
             groups[mapped_sev].append(f)
 
-    # 分类统计
+    # Category statistics
     cat_count: Dict[str, int] = {}
     for f in findings:
         cat = f.get("category", "Other")
         cat_count[cat] = cat_count.get(cat, 0) + 1
     if cat_count:
-        lines.append("### 按类别分布")
+        lines.append("### Distribution by category")
         for cat in sorted(cat_count):
             lines.append(f"- **{cat}**: {cat_count[cat]}")
         lines.append("")
@@ -259,7 +259,7 @@ def _format_report(data: Dict, min_severity: str = "suggestion") -> str:
         items = groups[display_sev]
         if not items:
             continue
-        lines.append(f"## {_SEVERITY_LABEL[display_sev]} ({len(items)} 条)")
+        lines.append(f"## {_SEVERITY_LABEL[display_sev]} ({len(items)} items)")
         lines.append("")
 
         for f in items:
@@ -290,76 +290,77 @@ def _format_report(data: Dict, min_severity: str = "suggestion") -> str:
 
 
 def _build_guide(mode: str = "audit") -> str:
-    """daudit.exe 不存在时的引导提示
+    """Guidance prompt shown when daudit.exe is absent
 
-    根据请求模式返回对应的 AI 人工审计指引，让 AI 直接按规则审查代码，
-    而非等待 daudit 安装。
+    Returns the AI manual audit guidance for the requested mode, so the AI can
+    review the code directly according to the rules rather than waiting for
+    daudit to be installed.
     """
     if mode == "ast":
         return (
-            "# daudit 不可用 — 请用 delphi_file 人工分析代码结构\n\n"
-            "AST 分析引擎 (daudit.exe) 尚未安装，无法自动提取代码骨架。\n\n"
-            "## 请按以下步骤人工分析\n\n"
-            "1. **获取待审文件列表**\n"
-            "   - `delphi_file(action=\"read\", file_path=\"...\", search_type=\"path\")` 列出目录下 .pas 文件\n\n"
-            "2. **逐文件读取并提取结构**\n"
-            "   - `delphi_file(action=\"read\", file_path=\"...\", search_type=\"class\")` — 提取类/接口定义\n"
-            "   - `delphi_file(action=\"read\", file_path=\"...\", search_type=\"function\")` — 提取函数/过程签名\n"
-            "   - `delphi_file(action=\"read\", file_path=\"...\", search_type=\"record\")` — 提取 record 类型\n\n"
-            "3. **关注要点**\n"
-            "   - uses 依赖关系（interface + implementation）\n"
-            "   - 类继承链和接口实现\n"
-            "   - 公共方法签名和可见性\n"
-            "   - 常量/类型定义\n\n"
-            "> 💡 daudit 安装后可直接 `delphi_project(action=\"ast\", ...)` 获取预格式化骨架摘要。"
+            "# daudit unavailable — please use delphi_file to analyze the code structure manually\n\n"
+            "The AST analysis engine (daudit.exe) is not installed, so the code skeleton cannot be extracted automatically.\n\n"
+            "## Please analyze manually by following the steps below\n\n"
+            "1. **Get the list of files to audit**\n"
+            "   - `delphi_file(action=\"read\", file_path=\"...\", search_type=\"path\")` lists the .pas files in a directory\n\n"
+            "2. **Read each file and extract its structure**\n"
+            "   - `delphi_file(action=\"read\", file_path=\"...\", search_type=\"class\")` — extract class/interface definitions\n"
+            "   - `delphi_file(action=\"read\", file_path=\"...\", search_type=\"function\")` — extract function/procedure signatures\n"
+            "   - `delphi_file(action=\"read\", file_path=\"...\", search_type=\"record\")` — extract record types\n\n"
+            "3. **Key points to focus on**\n"
+            "   - uses dependencies (interface + implementation)\n"
+            "   - Class inheritance chains and interface implementations\n"
+            "   - Public method signatures and visibility\n"
+            "   - Constant/type definitions\n\n"
+            "> 💡 Once daudit is installed, `delphi_project(action=\"ast\", ...)` can provide a preformatted skeleton summary."
         )
 
-    # 默认 audit 模式
+    # Default audit mode
     return (
-        "# daudit 不可用 — 请按审核规则进行人工代码审计\n\n"
-        "静态分析引擎 (daudit.exe) 尚未安装，无法自动运行 50+ 条审计规则。\n"
-        "**请直接按以下流程人工审计：**\n\n"
-        "## 审计流程\n\n"
-        "### ① 获取审核规则\n\n"
+        "# daudit unavailable — please perform a manual code audit according to the review rules\n\n"
+        "The static analysis engine (daudit.exe) is not installed, so the 50+ audit rules cannot be run automatically.\n"
+        "**Please perform a manual audit by following the process below:**\n\n"
+        "## Audit process\n\n"
+        "### ① Get the review rules\n\n"
         "```\nget_coding_rules(section=\"review\")\n```\n\n"
-        "返回 9 大维度 66 个检查项（一致性/完整性/资源泄露/Delphi 特有陷阱/\n"
-        "常见错误模式/代码质量/数据转换/安全/性能）。\n\n"
-        "### ② 读取待审源码\n\n"
+        "Returns 66 check items across 9 dimensions (consistency/integrity/resource leaks/Delphi-specific pitfalls/\n"
+        "common error patterns/code quality/data conversion/security/performance).\n\n"
+        "### ② Read the source code to audit\n\n"
         "```\ndelphi_file(action=\"read\", file_path=\"Unit1.pas\")\n```\n\n"
-        "### ③ 逐维度对照检查\n\n"
-        "按 `get_coding_rules(section=\"review\")` 中的检查项逐条审查，重点关注：\n\n"
-        "| 优先级 | 维度 | 关键检查 |\n"
+        "### ③ Check item by item across each dimension\n\n"
+        "Review each check item in `get_coding_rules(section=\"review\")` one by one, focusing on:\n\n"
+        "| Priority | Dimension | Key checks |\n"
         "|--------|------|----------|\n"
-        "| 🔴 P0 | 资源泄露 | Create/Free 配对、try/finally 资源释放 |\n"
-        "| 🔴 P0 | 安全 | SQL 注入、硬编码凭据、缓冲区溢出 |\n"
-        "| 🔴 P0 | Delphi 特有 | 接口循环引用、TComponent 重复 Free、Record 值语义 |\n"
-        "| 🟡 P1 | 完整性 | 分支覆盖、边界条件、输入验证 |\n"
-        "| 🟡 P1 | 常见错误 | 空 except、with 语句、线程访问 VCL |\n"
-        "| 🟢 P2 | 代码质量 | 方法规模、圈复杂度、魔法数字 |\n"
-        "| 🟢 P2 | 性能 | 循环内分配、不必要的类型转换 |\n\n"
-        "### ④ 输出审计报告\n\n"
-        "按以下格式输出发现的问题：\n\n"
+        "| 🔴 P0 | Resource leaks | Create/Free pairing, try/finally resource release |\n"
+        "| 🔴 P0 | Security | SQL injection, hard-coded credentials, buffer overflow |\n"
+        "| 🔴 P0 | Delphi-specific | Interface circular references, double Free of TComponent, Record value semantics |\n"
+        "| 🟡 P1 | Integrity | Branch coverage, boundary conditions, input validation |\n"
+        "| 🟡 P1 | Common errors | Empty except, with statements, accessing VCL from threads |\n"
+        "| 🟢 P2 | Code quality | Method size, cyclomatic complexity, magic numbers |\n"
+        "| 🟢 P2 | Performance | Allocations inside loops, unnecessary type casts |\n\n"
+        "### ④ Output the audit report\n\n"
+        "Output the issues found in the following format:\n\n"
         "```\n"
-        "## 审计报告\n\n"
-        "### 🔴 严重问题\n"
-        "- [文件:行号] 问题描述 → 修复建议\n\n"
-        "### 🟡 一般问题\n"
-        "- [文件:行号] 问题描述 → 修复建议\n\n"
-        "### 🔵 建议项\n"
-        "- [文件:行号] 优化建议\n```\n\n"
-        "> 💡 daudit 安装后可直接 `delphi_project(action=\"audit\", ...)` 自动运行规则检查。"
+        "## Audit report\n\n"
+        "### 🔴 Critical issues\n"
+        "- [file:line] Issue description → Fix suggestion\n\n"
+        "### 🟡 Warning issues\n"
+        "- [file:line] Issue description → Fix suggestion\n\n"
+        "### 🔵 Suggestions\n"
+        "- [file:line] Optimization suggestion\n```\n\n"
+        "> 💡 Once daudit is installed, `delphi_project(action=\"audit\", ...)` can run the rule checks automatically."
     )
 
 
 # ═══════════════════════════════════════════════════════════
-# Runtime 注册检查（模式 "runtime"）
+# Runtime registration check (mode "runtime")
 # ═══════════════════════════════════════════════════════════
 
 _RULES_PATH = Path(__file__).parent.parent / "rules" / "runtime_registry.json"
 
 
 def _load_runtime_rules() -> List[Dict]:
-    """加载运行时注册检查规则"""
+    """Load runtime registration check rules"""
     if not _RULES_PATH.exists():
         return []
     try:
@@ -367,12 +368,12 @@ def _load_runtime_rules() -> List[Dict]:
             data = json.load(f)
         return data.get("rules", [])
     except Exception as e:
-        logger.warning("加载运行时规则失败: %s", e)
+        logger.warning("Failed to load runtime rules: %s", e)
         return []
 
 
 def _find_pas_dfm_files(base_dir: str) -> tuple:
-    """扫描目录下的 .pas 和 .dfm 文件"""
+    """Scan the directory for .pas and .dfm files"""
     src = Path(base_dir)
     pas_files = list(src.rglob("*.pas"))
     dfm_files = list(src.rglob("*.dfm"))
@@ -380,27 +381,27 @@ def _find_pas_dfm_files(base_dir: str) -> tuple:
 
 
 def _extract_classes_from_dfm(filepath: Path) -> set:
-    """从 DFM 文件提取组件类名 (object Xxx: TYyy)"""
+    """Extract component class names from a DFM file (object Xxx: TYyy)"""
     classes = set()
     try:
         text = filepath.read_text(encoding="utf-8-sig")
         for m in re.finditer(r'object\s+\w+\s*:\s*(T\w+)', text):
             classes.add(m.group(1))
     except Exception as e:
-        logger.debug("提取 DFM 类名失败 %s: %s", filepath, e)
+        logger.debug("Failed to extract DFM class names %s: %s", filepath, e)
     return classes
 
 
 def _extract_uses_set(filepath: Path) -> set:
-    """从 PAS 文件提取所有 uses 中的单元名"""
+    """Extract all unit names from the uses clauses of a PAS file"""
     units = set()
     try:
         text = filepath.read_text(encoding="utf-8-sig")
-        # 移除字符串和注释
+        # Remove strings and comments
         text = re.sub(r"'(?:[^']*)'", '', text)
         text = re.sub(r'\{[^}]*\}', '', text)
         text = re.sub(r'//[^\n]*', '', text)
-        # 匹配 uses ... ; 段
+        # Match uses ... ; sections
         for m in re.finditer(
             r'\buses\b\s*(.*?)\s*;',
             text, re.DOTALL
@@ -412,18 +413,18 @@ def _extract_uses_set(filepath: Path) -> set:
                     continue
                 units.add(part)
     except Exception as e:
-        logger.debug("提取 uses 列表失败 %s: %s", filepath, e)
+        logger.debug("Failed to extract uses list %s: %s", filepath, e)
     return units
 
 
 def _check_runtime_rules(base_dir: str) -> List[Dict]:
-    """执行运行时注册规则检查"""
+    """Execute the runtime registration rule checks"""
     rules = _load_runtime_rules()
     if not rules:
         return [{
             "id": "N/A",
             "severity": "warning",
-            "message": "未找到运行时规则文件或规则为空",
+            "message": "Runtime rules file not found or rules are empty",
         }]
 
     pas_files, dfm_files = _find_pas_dfm_files(base_dir)
@@ -431,10 +432,10 @@ def _check_runtime_rules(base_dir: str) -> List[Dict]:
         return [{
             "id": "N/A",
             "severity": "info",
-            "message": f"在 {base_dir} 中未找到 .pas 或 .dfm 文件",
+            "message": f"No .pas or .dfm files found in {base_dir}",
         }]
 
-    # 收集项目中全部类名（从 DFM 最可靠）
+    # Collect all class names in the project (most reliable from DFM)
     project_classes: set = set()
     all_uses: set = set()
 
@@ -449,18 +450,18 @@ def _check_runtime_rules(base_dir: str) -> List[Dict]:
         dependencies = rule.get("dependencies", [])
         require_unit = rule.get("require_unit", "")
 
-        # 检查是否有触发器类
+        # Check whether any trigger class is present
         has_trigger = any(t in project_classes for t in triggers)
         if not has_trigger:
             continue
 
-        # 如果定义了依赖类，检查是否有命中
+        # If dependency classes are defined, check whether any match
         if dependencies:
             has_dep = any(d in project_classes for d in dependencies)
             if not has_dep:
                 continue
 
-        # 检查 require_unit 是否在 uses 中
+        # Check whether require_unit is in the uses clauses
         unit_found = False
         for u in all_uses:
             if u == require_unit or u.endswith('.' + require_unit):
@@ -481,22 +482,22 @@ def _check_runtime_rules(base_dir: str) -> List[Dict]:
 
 
 def _format_runtime_report(findings: List[Dict]) -> str:
-    """格式化运行时注册检查报告"""
+    """Format the runtime registration check report"""
     if not findings:
-        return "## ✅ 运行时注册检查通过\n\n未发现缺失的运行时注册单元。\n"
+        return "## ✅ Runtime registration check passed\n\nNo missing runtime registration units found.\n"
 
     errors = [f for f in findings if f["severity"] == "error"]
     warnings = [f for f in findings if f["severity"] == "warning"]
 
-    lines = ["## 🔍 运行时注册检查结果\n"]
-    lines.append(f"| 级别 | 规则 | 数量 |")
+    lines = ["## 🔍 Runtime registration check results\n"]
+    lines.append(f"| Level | Rule | Count |")
     lines.append(f"|------|------|------|")
-    lines.append(f"| 🔴 错误 | {len(errors)} 项 |" if errors else "| 🔴 错误 | 0 |")
-    lines.append(f"| 🟡 警告 | {len(warnings)} 项 |" if warnings else "| 🟡 警告 | 0 |")
+    lines.append(f"| 🔴 Errors | {len(errors)} |" if errors else "| 🔴 Errors | 0 |")
+    lines.append(f"| 🟡 Warnings | {len(warnings)} |" if warnings else "| 🟡 Warnings | 0 |")
     lines.append("")
 
     if not errors and not warnings:
-        lines.append("检查通过，未发现问题。\n")
+        lines.append("Check passed, no issues found.\n")
         return "\n".join(lines)
 
     for f in findings:
@@ -510,28 +511,28 @@ def _format_runtime_report(findings: List[Dict]) -> str:
             msg = msg.replace("{dependencies}", ", ".join(f["dependencies"]))
         lines.append(f"**{msg}**")
         lines.append("")
-        lines.append(f"- 触发类: `{'`, `'.join(f.get('trigger_classes', []))}`")
+        lines.append(f"- Trigger classes: `{'`, `'.join(f.get('trigger_classes', []))}`")
         if f.get("dependencies"):
-            lines.append(f"- 依赖类: `{'`, `'.join(f['dependencies'])}`")
-        lines.append(f"- 建议添加: `{f.get('require_unit', '')}` 到 uses 子句")
+            lines.append(f"- Dependency classes: `{'`, `'.join(f['dependencies'])}`")
+        lines.append(f"- Suggested addition: `{f.get('require_unit', '')}` to the uses clause")
         lines.append("")
 
     return "\n".join(lines)
 
 
 async def run_audit(arguments: Dict[str, Any]) -> CallToolResult:
-    """执行 Delphi 代码审计 / AST 语法解析 / Runtime 注册检查 / UI 布局审计
+    """Execute Delphi code audit / AST syntax parsing / Runtime registration check / UI layout audit
 
-    参数:
-        base_dir:   审计基准目录 — 审计/AST解析/runtime检查时查找项目及源码的根路径
-        file_path:    单文件路径（ast 模式可选，优先于 base_dir）
-        mode:         运行模式，默认 "audit"。可选 "ast"（AST 语法解析）、
-                      "runtime"（运行时注册检查）、"layout"（UI 布局审计）
-        severity:     最低严重级别，默认 "suggestion"（仅 audit 模式）
-        output_format: 输出格式，默认 "report"。可选 "json"
+    Args:
+        base_dir:   Audit base directory — the root path used to locate the project and source code during audit/AST parsing/runtime checks
+        file_path:    Single file path (optional for ast mode, takes priority over base_dir)
+        mode:         Run mode, defaults to "audit". Options: "ast" (AST syntax parsing),
+                      "runtime" (runtime registration check), "layout" (UI layout audit)
+        severity:     Minimum severity level, defaults to "suggestion" (audit mode only)
+        output_format: Output format, defaults to "report". Option: "json"
 
-    返回:
-        结构化 CallToolResult
+    Returns:
+        Structured CallToolResult
     """
     base_dir = str(arguments.get("base_dir", "") or "").strip()
     file_path = str(arguments.get("file_path", "") or "").strip() or None
@@ -539,13 +540,13 @@ async def run_audit(arguments: Dict[str, Any]) -> CallToolResult:
     severity = arguments.get("severity", "suggestion")
     output_format = arguments.get("output_format", "report")
 
-    # 校验参数
+    # Validate parameters
     if not base_dir and not file_path:
         return CallToolResult(
             content=[TextContent(
                 type="text",
-                text="# 参数错误\n\n请提供 `base_dir`（审计基准目录）或 `file_path`（文件）参数。\n\n"
-                     '示例: `run_audit(base_dir="C:\\\\Project\\\\src")`\n'
+                text="# Parameter error\n\nPlease provide the `base_dir` (audit base directory) or `file_path` (file) parameter.\n\n"
+                     'Example: `run_audit(base_dir="C:\\\\Project\\\\src")`\n'
                      '      `run_audit(mode="ast", file_path="Unit1.pas")`'
             )],
             isError=True,
@@ -557,7 +558,7 @@ async def run_audit(arguments: Dict[str, Any]) -> CallToolResult:
             return CallToolResult(
                 content=[TextContent(
                     type="text",
-                    text=f"# 路径不存在\n\n`{base_dir}` 不存在，请检查路径。"
+                    text=f"# Path does not exist\n\n`{base_dir}` does not exist, please check the path."
                 )],
                 isError=True,
             )
@@ -568,23 +569,23 @@ async def run_audit(arguments: Dict[str, Any]) -> CallToolResult:
             return CallToolResult(
                 content=[TextContent(
                     type="text",
-                    text=f"# 文件不存在\n\n`{file_path}` 不存在，请检查路径。"
+                    text=f"# File does not exist\n\n`{file_path}` does not exist, please check the path."
                 )],
                 isError=True,
             )
 
-    # ── UI 布局审计模式（不需要 daudit）──
+    # ── UI layout audit mode (does not require daudit) ──
     if mode == "layout":
         return await run_layout_audit(arguments)
 
-    # ── Runtime 注册检查模式（不需要 daudit）──
+    # ── Runtime registration check mode (does not require daudit) ──
     if mode == "runtime":
         if not base_dir:
             return CallToolResult(
                 content=[TextContent(
                     type="text",
-                    text="# 参数错误\n\nruntime 模式需要 `base_dir` 参数。\n\n"
-                         '示例: `run_audit(mode="runtime", base_dir="C:\\\\Project\\\\src")`'
+                    text="# Parameter error\n\nruntime mode requires the `base_dir` parameter.\n\n"
+                         'Example: `run_audit(mode="runtime", base_dir="C:\\\\Project\\\\src")`'
                 )],
                 isError=True,
             )
@@ -592,17 +593,17 @@ async def run_audit(arguments: Dict[str, Any]) -> CallToolResult:
         text = _format_runtime_report(findings)
         return CallToolResult(content=[TextContent(type="text", text=text)])
 
-    # 检查 daudit 是否可用
+    # Check whether daudit is available
     if not _find_daudit():
         guide = _build_guide(mode)
         guide += (
-            f"\n---\n**请求参数**: mode=`{mode}`, base_dir=`{base_dir}`, "
+            f"\n---\n**Request parameters**: mode=`{mode}`, base_dir=`{base_dir}`, "
             f"file_path=`{file_path or ''}`\n\n"
-            f"daudit.exe 就绪后，直接重新调用即可。"
+            f"Once daudit.exe is ready, simply call again."
         )
         return CallToolResult(content=[TextContent(type="text", text=guide)])
 
-    # ── AST 语法解析模式（实际调用 daudit --mode skeleton）──
+    # ── AST syntax parsing mode (actually invokes daudit --mode skeleton) ──
     if mode == "ast":
         detail = "compact"  # compact / normal / full
         files_list = _run_skeleton(base_dir, file_path, detail=detail)
@@ -610,13 +611,13 @@ async def run_audit(arguments: Dict[str, Any]) -> CallToolResult:
             return CallToolResult(
                 content=[TextContent(
                     type="text",
-                    text="# AST 解析执行失败\n\n"
-                         "daudit.exe 已找到但解析出错。请检查:\n"
-                         "1. daudit.exe 是否可执行\n"
-                         "2. 目录/文件是否包含 .pas 文件\n"
-                         "3. 是否有足够内存/磁盘空间\n\n"
-                         f"**目录**: {base_dir}\n"
-                         f"**文件**: {file_path or '（全部）'}"
+                    text="# AST parsing failed\n\n"
+                         "daudit.exe was found but parsing failed. Please check:\n"
+                         "1. Whether daudit.exe is executable\n"
+                         "2. Whether the directory/file contains .pas files\n"
+                         "3. Whether there is enough memory/disk space\n\n"
+                         f"**Directory**: {base_dir}\n"
+                         f"**File**: {file_path or '(all)'}"
                 )],
                 isError=True,
             )
@@ -624,35 +625,35 @@ async def run_audit(arguments: Dict[str, Any]) -> CallToolResult:
         if output_format == "json":
             text = json.dumps(files_list, indent=2, ensure_ascii=False)
         else:
-            # skeleton 模式返回的 data 已是预格式化文本，直接拼接输出
+            # The data returned by skeleton mode is already preformatted text; concatenate and output directly
             parts = []
             for fi in files_list:
                 fname = fi.get("file", "?")
                 fdata = fi.get("data", "")
                 header = f"## {fname}\n"
                 parts.append(header + fdata)
-            text = "# 代码结构摘要（Skeleton）\n\n" + "\n---\n\n".join(parts)
+            text = "# Code structure summary (Skeleton)\n\n" + "\n---\n\n".join(parts)
 
-            # 提示 AI Agent: normal/full 额外提供什么信息
+            # Hint to the AI Agent: what normal/full additionally provide
             text += (
                 "\n\n---\n"
-                "> 💡 当前 skeleton-detail=compact（最省 token）。若需要更多上下文，"
-                "可指定 `skeleton_detail=\"normal\"` 或 `skeleton_detail=\"full\"` 再调 run_audit：\n"
-                "> - **normal** — 同 compact，无额外信息（compact/normal 输出量相同）\n"
-                "> - **full** — 在每个函数/过程后追加 `// calls=[被调函数列表] | reads=[读取的全局变量列表]`，\n"
-                ">   用于分析调用链和变量依赖，token 约增加一倍\n"
+                "> 💡 Current skeleton-detail=compact (most token-efficient). If you need more context, "
+                "specify `skeleton_detail=\"normal\"` or `skeleton_detail=\"full\"` and call run_audit again:\n"
+                "> - **normal** — same as compact, no extra information (compact/normal produce the same output volume)\n"
+                "> - **full** — appends `// calls=[list of called functions] | reads=[list of global variables read]` after each function/procedure,\n"
+                ">   used to analyze call chains and variable dependencies, roughly doubling the token count\n"
             )
 
         return CallToolResult(content=[TextContent(type="text", text=text)])
 
-    # ── 代码审计模式（默认）──
-    # audit 模式需要 base_dir
+    # ── Code audit mode (default) ──
+    # audit mode requires base_dir
     if not base_dir:
         return CallToolResult(
             content=[TextContent(
                 type="text",
-                text="# 参数错误\n\n审计模式需要 `base_dir` 参数。\n\n"
-                     '示例: `run_audit(base_dir="C:\\\\Project\\\\src")`'
+                text="# Parameter error\n\nAudit mode requires the `base_dir` parameter.\n\n"
+                     'Example: `run_audit(base_dir="C:\\\\Project\\\\src")`'
             )],
             isError=True,
         )
@@ -662,20 +663,21 @@ async def run_audit(arguments: Dict[str, Any]) -> CallToolResult:
         return CallToolResult(
             content=[TextContent(
                 type="text",
-                text="# 审计执行失败\n\n"
-                     "daudit.exe 已找到但执行出错。请检查:\n"
-                     "1. daudit.exe 是否可执行\n"
-                     "2. 源码目录是否包含 .pas 文件\n"
-                     "3. 是否有足够内存/磁盘空间\n\n"
-                     f"**目录**: {base_dir}"
+                text="# Audit execution failed\n\n"
+                     "daudit.exe was found but execution failed. Please check:\n"
+                     "1. Whether daudit.exe is executable\n"
+                     "2. Whether the source directory contains .pas files\n"
+                     "3. Whether there is enough memory/disk space\n\n"
+                     f"**Directory**: {base_dir}"
             )],
             isError=True,
         )
 
-    # 格式化输出
+    # Format the output
     if output_format == "json":
         text = json.dumps(data, indent=2, ensure_ascii=False)
     else:
         text = _format_report(data, severity)
 
     return CallToolResult(content=[TextContent(type="text", text=text)])
+

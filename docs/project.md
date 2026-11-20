@@ -1,77 +1,77 @@
-# Delphi Project — 项目全生命周期管理
+# Delphi Project — Project Full Lifecycle Management
 
-> 版本：v1.3 | 最后更新：2026-07-15
-
----
-
-## 目录
-
-1. [概述](#1-概述)
-2. [Action 速查](#2-action-速查)
-3. [编译相关](#3-编译相关)
-4. [配置管理](#4-配置管理)
-5. [代码审计](#5-代码审计)
-6. [设备部署](#6-设备部署)
-7. [工作流场景](#7-工作流场景)
-8. [编译失败排查](#8-编译失败排查)
-9. [技术架构](#9-技术架构)
-10. [故障排除](#10-故障排除)
+> Version: v1.3 | Last updated: 2026-07-15
 
 ---
 
-## 1. 概述
+## Table of Contents
 
-`delphi_project` 是 Daofy 中最核心的工具，提供 Delphi 项目的**全生命周期管理**——从创建项目、配置编译选项、执行编译，到代码审计和设备部署。它合并了原有的 `compile_project`、`dproj_tool`、`run_audit` 三个工具的功能，并新增了设备部署能力。
+1. [Overview](#1-overview)
+2. [Action Quick Reference](#2-action-quick-reference)
+3. [Compilation](#3-compilation)
+4. [Configuration Management](#4-configuration-management)
+5. [Code Audit](#5-code-audit)
+6. [Device Deployment](#6-device-deployment)
+7. [Workflow Scenarios](#7-workflow-scenarios)
+8. [Compilation Failure Troubleshooting](#8-compilation-failure-troubleshooting)
+9. [Technical Architecture](#9-technical-architecture)
+10. [Troubleshooting](#10-troubleshooting)
 
-**一句话**：所有 Delphi 项目的编译、配置、审计、部署操作都通过此工具完成。
+---
 
-| 功能域 | 涵盖 |
+## 1. Overview
+
+`delphi_project` is the core tool in Daofy, providing **full lifecycle management** for Delphi projects—from creating projects and configuring compilation options to executing compilation, code auditing, and device deployment. It merges the functionality of the original three tools `compile_project`, `dproj_tool`, and `run_audit`, and adds device deployment capabilities.
+
+**In one sentence**: All Delphi project compilation, configuration, audit, and deployment operations are performed through this tool.
+
+| Function Domain | Covers |
 |--------|------|
-| **编译** | `.dproj`/`.dpr`/`.dpk` 项目编译、.pas 语法检查、参数预览 |
-| **配置** | 读取/创建/修改 `.dproj` 配置、增删源文件、增删编译配置 |
-| **审计** | AST 骨架提取、50+ 静态分析规则、运行时注册检查、DFM UI 布局审计 |
-| **部署** | 枚举连接设备（iOS/Android/Windows）、部署应用到设备 |
+| **Compilation** | `.dproj`/`.dpr`/`.dpk` project compilation, .pas syntax check, parameter preview |
+| **Configuration** | Read/create/modify `.dproj` configurations, add/remove source files, add/remove build configurations |
+| **Audit** | AST skeleton extraction, 50+ static analysis rules, runtime registration check, DFM UI layout audit |
+| **Deployment** | Enumerate connected devices (iOS/Android/Windows), deploy applications to devices |
 
-### 硬约束
+### Hard Constraints
 
-> ❌ **不得用 bash/cmd 运行 dcc32/msbuild**（绕过 MSBuild 事件处理和依赖解析）
+> ❌ **Do not run dcc32/msbuild via bash/cmd** (bypasses MSBuild event handling and dependency resolution)
 
 ---
 
-## 2. Action 速查
+## 2. Action Quick Reference
 
-| Action | 用途 | 必需参数 |
+| Action | Purpose | Required Parameters |
 |--------|------|---------|
-| `compile` | 编译 .dproj/.dpr/.dpk 项目 | `project_path` |
-| `compile_file` | 检查 .pas 文件语法 | `project_path` |
-| `dry_run` | 预览编译参数，不执行 | — |
-| `info` | 读取 .dproj 完整信息 | `project_path` |
-| `create` | 创建新 .dproj 文件 | `project_path`, `main_source` |
-| `set` | 设置 .dproj 属性值 | `project_path`, `property_name`, `value` |
-| `add_config` | 添加编译配置 | `project_path`, `config_name` |
-| `remove_config` | 删除编译配置 | `project_path`, `config_name` |
-| `add_source` | 添加源文件引用 | `project_path`, `source_file` |
-| `remove_source` | 删除源文件引用 | `project_path`, `source_file` |
-| `audit` | 运行 50+ 静态分析规则 | — |
-| `ast` | ⭐ 代码骨架提取（最省 token） | `base_dir` |
-| `runtime` | 运行时注册检查 | — |
-| `layout` | 静态 DFM UI 布局审计 | `base_dir` 或 `file_path` |
-| `devices` | 枚举连接的设备列表 | — |
-| `deploy` | 部署应用到设备 | `project_path`, `target_platform` |
+| `compile` | Compile .dproj/.dpr/.dpk project | `project_path` |
+| `compile_file` | Check .pas file syntax | `project_path` |
+| `dry_run` | Preview compilation parameters without executing | — |
+| `info` | Read complete .dproj information | `project_path` |
+| `create` | Create new .dproj file | `project_path`, `main_source` |
+| `set` | Set .dproj property value | `project_path`, `property_name`, `value` |
+| `add_config` | Add build configuration | `project_path`, `config_name` |
+| `remove_config` | Remove build configuration | `project_path`, `config_name` |
+| `add_source` | Add source file reference | `project_path`, `source_file` |
+| `remove_source` | Remove source file reference | `project_path`, `source_file` |
+| `audit` | Run 50+ static analysis rules | — |
+| `ast` | ⭐ Code skeleton extraction (most token-efficient) | `base_dir` |
+| `runtime` | Runtime registration check | — |
+| `layout` | Static DFM UI layout audit | `base_dir` or `file_path` |
+| `devices` | Enumerate connected devices | — |
+| `deploy` | Deploy application to device | `project_path`, `target_platform` |
 
 ---
 
-## 3. 编译相关
+## 3. Compilation
 
-### 3.1 `compile` — 编译项目
+### 3.1 `compile` — Compile Project
 
-编译 `.dproj`/`.dpr`/`.dpk` 项目。自动检测编译器版本和依赖路径。
+Compile `.dproj`/`.dpr`/`.dpk` projects. Automatically detects compiler version and dependency paths.
 
 ```python
-# 最简调用 — 自动检测项目类型和配置
+# Simplest call — automatically detects project type and configuration
 delphi_project(action="compile", project_path="Project.dproj")
 
-# 带参数的完整编译
+# Full compilation with parameters
 delphi_project(action="compile",
     project_path="App.dproj",
     build_configuration="Release",
@@ -84,72 +84,72 @@ delphi_project(action="compile",
     output_path=".\Build\Release")
 ```
 
-**参数说明**：
+**Parameters**:
 
-| 参数 | 必需 | 默认值 | 说明 |
+| Parameter | Required | Default | Description |
 |------|------|--------|------|
-| `project_path` | ✅ | — | .dproj/.dpr/.dpk/.pas 路径 |
+| `project_path` | ✅ | — | .dproj/.dpr/.dpk/.pas path |
 | `target_platform` | ❌ | win32 | win32/win64/osx64/... |
 | `build_configuration` | ❌ | Debug | Debug/Release |
-| `compiler_version` | ❌ | 自动检测最新 | 指定 Delphi 版本 |
-| `conditional_defines` | ❌ | — | 条件编译符号数组 |
-| `unit_search_paths` | ❌ | — | 额外单元搜索路径 |
-| `resource_search_paths` | ❌ | — | 资源搜索路径 |
-| `optimize` | ❌ | true | 是否启用优化 |
-| `debug` | ❌ | true | 是否生成调试信息 |
-| `warning_level` | ❌ | 2 | 警告级别 0-4 |
-| `disabled_warnings` | ❌ | — | 禁用警告编号数组 |
+| `compiler_version` | ❌ | Auto-detect latest | Specify Delphi version |
+| `conditional_defines` | ❌ | — | Conditional compilation symbol array |
+| `unit_search_paths` | ❌ | — | Additional unit search paths |
+| `resource_search_paths` | ❌ | — | Resource search paths |
+| `optimize` | ❌ | true | Whether to enable optimization |
+| `debug` | ❌ | true | Whether to generate debug information |
+| `warning_level` | ❌ | 2 | Warning level 0-4 |
+| `disabled_warnings` | ❌ | — | Disabled warning number array |
 | `output_type` | ❌ | gui | gui/console/dll |
 | `runtime_library` | ❌ | static | static/dynamic |
-| `timeout` | ❌ | 600 | 超时秒数 |
-| `auto_install` | ❌ | true | 仅 .dpk：是否自动安装到 IDE |
-| `run_verify` | ❌ | false | 编译后启动 3 秒验证是否崩溃 |
-| `output_path` | ❌ | — | 编译输出目录 |
-| `extra_args` | ❌ | — | 附加到实际编译后端的完整参数数组 |
+| `timeout` | ❌ | 600 | Timeout in seconds |
+| `auto_install` | ❌ | true | Only for .dpk: whether to auto-install to IDE |
+| `run_verify` | ❌ | false | After compilation, launch for 3 seconds to verify no crash |
+| `output_path` | ❌ | — | Compilation output directory |
+| `extra_args` | ❌ | — | Complete argument array appended to the actual compilation backend |
 
-#### 附加编译参数
+#### Additional Compilation Parameters
 
-`extra_args` 中每个元素必须是一个完整参数。Daofy 会在内建参数之后追加这些参数，并按实际后端解释：
+Each element in `extra_args` must be a complete argument. Daofy appends these parameters after the built-in parameters and interprets them according to the actual backend:
 
 ```python
-# .dproj 或存在同名 .dproj 的 .dpr：走 MSBuild，请求生成 TDS/RSM 调试符号
+# .dproj or a .dpr with a same-named .dproj: uses MSBuild; requests TDS/RSM debug symbols
 delphi_project(action="compile",
     project_path="Project.dproj",
     extra_args=["/p:DCC_DebugInfoInTds=true", "/p:DCC_RemoteDebug=true"])
 
-# 没有同名 .dproj 的 .dpr：直接走 DCC
+# .dpr without a same-named .dproj: goes directly to DCC
 delphi_project(action="compile",
     project_path="Project.dpr",
     extra_args=["-VT", "-VR"])
 ```
 
-如果编译器生成了 `.tds`、`.rsm` 文件，它们会列入编译结果的 `output_files`。不要在数组元素中自行添加外层引号；包含空格的单个参数仍作为一个数组元素传入。
+If the compiler generates `.tds` or `.rsm` files, they will be listed in the compilation result's `output_files`. Do not add outer quotes in array elements yourself; a single argument containing spaces is still passed as one array element.
 
-#### 编译事件
+#### Build Events
 
-`.dproj` 中的 `PreBuildEvent`/`PostBuildEvent`/`PreLinkEvent` 会自动执行，无需手动处理。
+`PreBuildEvent`/`PostBuildEvent`/`PreLinkEvent` in `.dproj` are executed automatically; no manual handling is required.
 
-#### `run_verify` — 崩溃检测
+#### `run_verify` — Crash Detection
 
-编译成功后自动启动 exe 运行 3 秒，若进程崩溃则标记验证失败。检测到 `exception.log` 时自动读取内容嵌入响应。
+After a successful compilation, automatically launches the exe for 3 seconds; if the process crashes, marks verification as failed. When `exception.log` is detected, automatically reads its contents and embeds them in the response.
 
-### 3.2 `compile_file` — 语法检查
+### 3.2 `compile_file` — Syntax Check
 
-编译单个 .pas 文件进行语法检查，不生成可执行文件。
+Compile a single .pas file for syntax checking; does not generate an executable.
 
 ```python
 delphi_project(action="compile_file", project_path="Unit1.pas")
 
-# 带搜索路径
+# With search paths
 delphi_project(action="compile_file",
     project_path="Unit1.pas",
     unit_search_paths=["..\Shared"],
     conditional_defines=["TEST"])
 ```
 
-### 3.3 `dry_run` — 预览编译参数
+### 3.3 `dry_run` — Preview Compilation Parameters
 
-不实际执行编译，只显示将要使用的编译器路径和完整命令行参数。
+Does not actually execute compilation; only displays the compiler path and full command-line arguments that would be used.
 
 ```python
 delphi_project(action="dry_run", project_path="Project.dproj", build_configuration="Release")
@@ -157,27 +157,27 @@ delphi_project(action="dry_run", project_path="Project.dproj", build_configurati
 
 ---
 
-## 4. 配置管理
+## 4. Configuration Management
 
-### 4.1 `info` — 读取项目信息
+### 4.1 `info` — Read Project Information
 
-读取 `.dproj` 文件的完整结构化信息：编译配置、源文件列表、资源文件、编译事件等。
+Read the complete structured information of a `.dproj` file: build configurations, source file list, resource files, build events, etc.
 
 ```python
 delphi_project(action="info", project_path="Project.dproj")
 ```
 
-### 4.2 `create` — 创建项目
+### 4.2 `create` — Create Project
 
-创建新的 `.dproj` 项目文件，可选同时生成 Form 桩代码。
+Create a new `.dproj` project file, optionally generating Form stub code at the same time.
 
 ```python
-# 最简创建
+# Minimal creation
 delphi_project(action="create",
     project_path="MyApp.dproj",
     main_source="MyApp.dpr")
 
-# 带 Form 桩代码
+# Creation with Form stub code
 delphi_project(action="create",
     project_path="MyApp.dproj",
     main_source="MyApp.dpr",
@@ -186,359 +186,10 @@ delphi_project(action="create",
     configs=["Debug", "Release", "Staging"])
 ```
 
-**参数说明**：
+**Parameters**:
 
-| 参数 | 必需 | 默认值 | 说明 |
+| Parameter | Required | Default | Description |
 |------|------|--------|------|
-| `project_path` | ✅ | — | 项目文件路径 |
-| `main_source` | ✅ | — | 主源文件（.dpr） |
-| `project_guid` | ❌ | 自动生成 | 项目 GUID |
-| `framework_type` | ❌ | VCL | VCL/FMX |
-| `unit_search_paths` | ❌ | — | 初始搜索路径 |
-| `namespace` | ❌ | — | 命名空间 |
-| `configs` | ❌ | ['Debug','Release'] | 编译配置列表 |
-| `sources` | ❌ | — | 初始源文件列表 |
-| `form_units` | ❌ | — | 同时生成 Form 桩代码 |
-
-### 4.3 `set` — 修改属性
-
-修改 `.dproj` 中的属性值（PropertyGroup），可指定配置和平台。
-
-```python
-# 设置条件编译符号
-delphi_project(action="set",
-    project_path="Project.dproj",
-    property_name="DCC_Define",
-    value="DEBUG;TEST",
-    config="Debug",
-    platform="Win32")
-```
-
-### 4.4 `add_config` / `remove_config` — 编译配置管理
-
-```python
-# 从现有配置复制创建 Staging 配置
-delphi_project(action="add_config",
-    project_path="Project.dproj",
-    config_name="Staging",
-    base_config="Debug",
-    defines=["STAGING"],
-    optimize=True)
-
-# 删除配置
-delphi_project(action="remove_config",
-    project_path="Project.dproj",
-    config_name="Staging")
-```
-
-### 4.5 `add_source` / `remove_source` — 源文件管理
-
-```python
-# 添加源文件到项目
-delphi_project(action="add_source",
-    project_path="Project.dproj",
-    source_file="Unit1.pas")
-
-# 添加为主源文件
-delphi_project(action="add_source",
-    project_path="Project.dproj",
-    source_file="MyApp.dpr",
-    main_source_flag=True)
-
-# 删除源文件
-delphi_project(action="remove_source",
-    project_path="Project.dproj",
-    source_file="Unit1.pas")
-```
-
----
-
-## 5. 代码审计
-
-### 5.1 `ast` — 代码骨架提取（推荐）
-
-⭐ **最省 token 的方式**，快速了解代码结构。使用 `daudit --mode skeleton --compact` 提取类、方法、字段等骨架信息。
-
-```python
-# 提取整个项目的代码骨架
-delphi_project(action="ast", base_dir="src")
-
-# 提取单个文件的骨架
-delphi_project(action="ast", file_path="Unit1.pas")
-```
-
-### 5.2 `audit` — 静态分析
-
-运行 50+ 条静态分析规则，覆盖安全、资源泄漏、代码质量等维度。
-
-```python
-# 全量审计
-delphi_project(action="audit", base_dir="src")
-
-# 单文件指定严重级别
-delphi_project(action="audit",
-    file_path="Unit1.pas",
-    rules="P0",
-    severity="warning",
-    output_format="report")
-```
-
-**参数说明**：
-
-| 参数 | 说明 |
-|------|------|
-| `base_dir` | 审计基准目录 |
-| `file_path` | 单文件审计 |
-| `rules` | 规则集 P0/P1，默认 P0 |
-| `severity` | 最低严重级别：suggestion/warning/critical |
-| `output_format` | report/json，默认 report |
-
-### 5.3 `runtime` — 运行时注册检查
-
-扫描 `.pas`/`.dfm` 中组件类名，匹配 `runtime_registry.json` 规则表，检测是否遗漏必需 uses 单元。独立于编译步骤，纯源码级分析。
-
-```python
-delphi_project(action="runtime", base_dir="src")
-```
-
-### 5.4 `layout` — UI 布局审计
-
-扫描 `.dfm` 控件坐标和属性，检测 AI 生成界面常见的布局问题：控件重叠、越界、同列 Left 不一致、垂直间距不一致、文本标签与字段未对齐、文本标签-字段间距异常、TabOrder 与视觉顺序不一致，以及可调整大小的父容器使用绝对坐标却未设置足够的最小尺寸。审计基于几何关系和 DFM 属性推断，不依赖固定控件类型名单。
-
-```python
-delphi_project(action="layout", base_dir="src")
-delphi_project(action="layout", file_path="MainForm.dfm", output_format="json")
-```
-
-`layout` 不需要 daudit；二进制 DFM 会尽量临时转换为文本，不修改原文件。静态审计通过后，再用 `automate_delphi` 做运行时 BoundsRect、截图和跨 DPI 验证。
-
----
-
-## 6. 设备部署
-
-### 6.1 `devices` — 枚举连接的设备
-
-枚举当前连接到开发机的设备列表，支持 iOS、Android、Windows 三种平台。
-
-```python
-# 枚举所有平台的设备
-delphi_project(action="devices")
-
-# 枚举 iOS 设备
-delphi_project(action="devices", target_platform="iosdevice64")
-
-# 枚举 Android 设备
-delphi_project(action="devices", target_platform="android64")
-
-# 从项目推断平台并枚举
-delphi_project(action="devices", project_path="App.dproj")
-```
-
-**返回格式**：
-
-```json
-{
-  "status": "ok",
-  "platform": "iosdevice64",
-  "devices": [
-    {
-      "udid": "00008020-001234567890001E",
-      "name": "iPhone 15 Pro",
-      "platform": "iosdevice64",
-      "source": "libimobiledevice"
-    }
-  ]
-}
-```
-
-**设备来源**：
-
-| 平台 | 工具 | 说明 |
-|------|------|------|
-| iOS | `libimobiledevice` / `iosdeploy` | 需安装命令行工具 |
-| Android | `adb` | 需安装 Android SDK Platform Tools |
-| Windows | 本机 | 始终返回本机设备 |
-
-### 6.2 `deploy` — 部署应用到设备
-
-将编译后的应用部署到目标设备。
-
-```python
-# 部署到 iOS 设备（默认设备）
-delphi_project(action="deploy",
-    project_path="App.dproj",
-    target_platform="iosdevice64")
-
-# 部署到指定 iOS 设备
-delphi_project(action="deploy",
-    project_path="App.dproj",
-    target_platform="iosdevice64",
-    device_id="00008020-001234567890001E",
-    build_configuration="Release")
-
-# 部署到 Android 模拟器
-delphi_project(action="deploy",
-    project_path="App.dproj",
-    target_platform="android64",
-    device_id="emulator-5554")
-```
-
-**参数说明**：
-
-| 参数 | 必需 | 默认值 | 说明 |
-|------|------|--------|------|
-| `project_path` | ✅ | — | .dproj/.dpr 路径 |
-| `target_platform` | ✅ | — | iosdevice64/iossimulator/android64/win32 等 |
-| `device_id` | ❌ | 默认设备 | iOS UDID 或 Android serial |
-| `build_configuration` | ❌ | Debug | Debug/Release |
-| `extra_args` | ❌ | — | 附加到 MSBuild 的参数数组 |
-| `timeout` | ❌ | 600 | 超时秒数 |
-
-**部署方式**：
-
-| 平台 | 底层工具 | 说明 |
-|------|----------|------|
-| iOS/macOS | MSBuild Deploy + PAServer | 需在 Mac 上运行 PAServer |
-| Android | MSBuild Deploy + ADB | 需安装 Android SDK |
-| Windows | 本地运行 | 编译后可直接运行 |
-
-**环境变量**：
-
-| 变量 | 说明 |
-|------|------|
-| `PAServer_PASSWORD` | PAServer 连接密码（iOS 部署时使用） |
-| `ANDROID_HOME` / `ANDROID_SDK_ROOT` | Android SDK 路径 |
-
----
-
-## 7. 工作流场景
-
-### 日常编译
-
-```
-delphi_project(action="compile", project_path="Project.dproj")
-  ↓ 成功 → 完成
-  ↓ 失败 → check_environment(action="check")
-          → 调整参数 → 重新 compile
-```
-
-### 创建新项目
-
-```
-delphi_project(action="create", project_path="NewApp.dproj", main_source="NewApp.dpr", form_units=["MainForm"])
-  ↓
-delphi_project(action="info", project_path="NewApp.dproj")          # 确认配置
-  ↓
-delphi_project(action="compile", project_path="NewApp.dproj")       # 验证可编译
-```
-
-### 代码审计流程
-
-```
-delphi_project(action="ast", base_dir="src")                         # 了解代码结构
-  ↓
-delphi_file(action="read", ...)                                # 查看具体文件
-  ↓
-delphi_project(action="audit", base_dir="src")                        # 运行静态分析
-  ↓
-AI 解读结果 → 排除误报 → 生成修复建议
-  ↓
-delphi_file(action="write", ...) → delphi_project(action="compile")  # 修复后验证编译
-```
-
-### 修改编译配置
-
-```
-delphi_project(action="set", property_name="DCC_Define", value="RELEASE", config="Release")
-  ↓
-delphi_project(action="compile", project_path="Project.dproj", build_configuration="Release")  # 验证
-```
-
-### 设备部署
-
-```
-delphi_project(action="devices", target_platform="iosdevice64")        # 枚举设备
-  ↓ 选择设备
-delphi_project(action="compile", project_path="App.dproj",            # 编译
-                target_platform="iosdevice64", build_configuration="Release")
-  ↓ 编译成功
-delphi_project(action="deploy", project_path="App.dproj",             # 部署
-                target_platform="iosdevice64", device_id="UDID")
-```
-
----
-
-## 7. 编译失败排查
-
-```
-失败 → check_environment(action="check") 确认编译器状态
-    → 检查是否缺少搜索路径（dproj 中 DCC_UnitSearchPath 配置）
-    → dproj 中的 DCC_UnitSearchPath 是否包含需要的三方库路径
-    → 确认目标平台（win32/win64）编译器可用
-    → 条件编译符号是否匹配（DEBUG/RELEASE）
-    → 3 次修复失败 → 申请人工介入（见 CODING_RULES 8.1）
-```
-
-### 常见编译错误
-
-| 错误现象 | 可能原因 | 解决 |
-|---------|---------|------|
-| `Fatal: Unable to execute file` | 编译器路径错误 | `check_environment(action="detect")` 重新检测 |
-| `Fatal: File not found: xxx.dcu` | 缺少搜索路径 | 补充 `unit_search_paths` 参数 |
-| `E1026 File not found: xxx.dproj` | 项目路径错误 | 确认 `project_path` 的正确性 |
-| Exit code 2 | 编译事件失败或语法错误 | 查看详细输出定位错误行 |
-| 运行验证崩溃 | `run_verify=true` 检测到崩溃 | 检查 `exception.log`，排查运行时错误 |
-
----
-
-## 9. 技术架构
-
-```
-AI Agent
-    │
-    ▼
-delphi_project(action="compile"|"info"|"audit"|"devices"|"deploy"|...)
-    │
-    ▼
-┌─────────────────────────────────────┐
-│         src/tools/project.py          │
-│   action 分派 + 参数校验 + 异常处理     │
-└──────┬────────┬──────────┬───────────┘
-       │        │          │
-       ▼        ▼          ▼
-┌──────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐
-│ compile  │ │ dproj  │ │  audit   │ │  deploy  │
-│_project  │ │_tool   │ │  /ast    │ │  /devices│
-│ .py      │ │ .py    │ │  .py     │ │  .py     │
-├──────────┤ ├────────┤ ├──────────┤ ├──────────┤
-│· MSBuild │ │· info  │ │· AST解析 │ │· iOS部署 │
-│· dcc32   │ │· create│ │· 50+规则 │ │· Android │
-│· 事件处理│ │· set   │ │· 骨架提取│ │  部署    │
-│· 路径解析│ │· add/  │ │· 运行时  │ │· 设备枚举│
-│          │ │ remove │ │  检查    │ │          │
-└──────────┘ └────────┘ └──────────┘ └──────────┘
-       │
-       ▼
-┌──────────────────────┐
-│  CompilerService      │
-│  · 编译器检测/选择    │
-│  · 进程执行/超时控制  │
-│  · 输出解析          │
-└──────────────────────┘
-```
-
----
-
-## 10. 故障排除
-
-| 现象 | 原因 | 解决 |
-|------|------|------|
-| 找不到编译器 | 未检测到注册表或无配置 | `check_environment(action="detect")` |
-| 编译事件超时 | PreBuildEvent 耗时过长 | 增大 `timeout` 参数 |
-| `run_verify` 失败 | 程序启动即崩溃 | 检查 `exception.log` 或降低复杂度排查 |
-| MSBuild 路径不正确 | Delphi 安装不完整 | 手动指定 `compiler_version` |
-| 命令行过长 | 搜索路径过多 | 自动优化：只包含实际依赖的三方库 |
-| `.dpk` 安装失败 | 缺少依赖或版本不兼容 | 检查 `auto_install` 参数和相关包依赖 |
-| iOS 设备未检测到 | 缺少 `libimobiledevice` | 安装 `iosdeploy` 或 `libimobiledevice` |
-| Android 设备未检测到 | 缺少 ADB 或未连接设备 | 安装 Android SDK Platform Tools |
-| 部署失败 | PAServer 未运行或密码错误 | 检查 `PAServer_PASSWORD` 环境变量 |
+| `project_path` | ✅ | — | Project file path |
+| `main_source` | ✅ | — | Main source file (.dpr) |
+| `project_guid` | ❌ | Auto-generated | Project GUID

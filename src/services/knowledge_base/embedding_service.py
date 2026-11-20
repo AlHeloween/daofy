@@ -1,12 +1,12 @@
 """
-Embedding 服务 —— 为知识库提供真语义搜索
+Embedding service — provides true semantic search for the knowledge base
 
-使用 intfloat/multilingual-e5-small 模型：
-- 中英双语支持
-- 本地 CPU 运行，无 API 依赖
-- 自动降级：模型未安装/加载失败时返回 None，调用方走兜底
+Uses the intfloat/multilingual-e5-small model:
+- Chinese-English bilingual support
+- Runs locally on CPU, no API dependency
+- Automatic degradation: returns None when the model is not installed / fails to load, and the caller falls back
 
-模型约 70MB，首次加载约 1-2s，后续 <100ms
+The model is about 70MB; the first load takes about 1-2s, later loads <100ms
 """
 
 import logging
@@ -17,7 +17,7 @@ from typing import Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# numpy 是可选依赖 —— 未安装时不影响知识库基本功能，仅语义搜索降级为反转索引
+# numpy is an optional dependency — without it the KB's basic features are unaffected; only semantic search degrades to the inverted index
 np: Any = None  # type: ignore
 numpy: Any = None  # type: ignore
 try:
@@ -26,22 +26,22 @@ try:
 except ImportError:
     pass
 
-# 确保用户 site-packages 在路径中（pip install 默认安装到用户目录）
+# Ensure the user site-packages is on the path (pip install defaults to the user directory)
 if site.USER_SITE is not None:
     try:
         site.addsitedir(site.USER_SITE)
     except Exception:
-        logger.debug("忽略非致命异常: site.addsitedir")
+        logger.debug("Ignoring non-fatal exception: site.addsitedir")
 
-# 全局单例
+# Global singleton
 _model = None
 _model_name = "intfloat/multilingual-e5-small"
-_MODEL_LOAD_TIMEOUT = 60  # 模型加载超时秒数（含下载）
-_env_lock = threading.Lock()  # 保护 os.environ 的线程安全
+_MODEL_LOAD_TIMEOUT = 60  # model load timeout in seconds (including download)
+_env_lock = threading.Lock()  # guards os.environ thread safety
 
 
 def is_available() -> bool:
-    """检查 embedding 依赖是否可用"""
+    """Check whether the embedding dependencies are available"""
     if np is None:
         return False
     try:
@@ -52,16 +52,16 @@ def is_available() -> bool:
 
 
 def is_model_loaded() -> bool:
-    """检查模型是否已加载（仅用于搜索时的快速判断，不触发加载）"""
+    """Check whether the model is loaded (a quick test for searches; does not trigger loading)"""
     return _model is not None
 
 
 def load_model(timeout: int = None):
-    """懒加载模型（全局单例），带超时保护。
+    """Lazily load the model (global singleton), with timeout protection.
 
     Args:
-        timeout: 超时秒数，None 使用 _MODEL_LOAD_TIMEOUT 默认值。
-            超时后返回 None，避免阻塞 MCP tool call。
+        timeout: timeout in seconds; None uses the _MODEL_LOAD_TIMEOUT default.
+            After the timeout it returns None, to avoid blocking the MCP tool call.
     """
     global _model
     if _model is not None:
@@ -72,19 +72,19 @@ def load_model(timeout: int = None):
 
     from sentence_transformers import SentenceTransformer
 
-    # 尝试多个镜像源
-    # 用户可通过 HF_ENDPOINT 环境变量强制指定
+    # Try several mirror sources
+    # The user can force one via the HF_ENDPOINT environment variable
     default_endpoint = os.environ.get("HF_ENDPOINT")
     _endpoints = []
     if default_endpoint:
         _endpoints = [default_endpoint]
     else:
         _endpoints = [
-            None,  # huggingface.co（默认）
+            None,  # huggingface.co (default)
             "https://hf-mirror.com",
         ]
 
-    # 保存原始环境变量，退出时恢复
+    # Save the original environment variables and restore them on exit
     _saved_env = {
         'HF_ENDPOINT': os.environ.get('HF_ENDPOINT'),
         'TRANSFORMERS_OFFLINE': os.environ.get('TRANSFORMERS_OFFLINE'),
@@ -100,45 +100,45 @@ def load_model(timeout: int = None):
                     os.environ.pop(k, None)
 
     def _try_load(endpoint):
-        """尝试从指定 endpoint 加载模型（在子线程中运行，可被超时中断）"""
-        result = [None]  # 用列表传递结果（线程间共享引用）
+        """Try loading the model from the given endpoint (runs in a child thread, interruptible by the timeout)"""
+        result = [None]  # pass the result through a list (shared reference across threads)
         error = [None]
         def _worker():
             try:
                 if endpoint:
-                    logger.info(f"加载 embedding 模型（镜像: {endpoint}）: {_model_name}")
+                    logger.info(f"Loading embedding model (mirror: {endpoint}): {_model_name}")
                     with _env_lock:
                         os.environ["HF_ENDPOINT"] = endpoint
                 else:
-                    logger.info(f"加载 embedding 模型: {_model_name}")
+                    logger.info(f"Loading embedding model: {_model_name}")
 
-                # 优先使用离线模式
+                # Prefer offline mode
                 with _env_lock:
                     os.environ["TRANSFORMERS_OFFLINE"] = "1"
                     os.environ["HF_HUB_OFFLINE"] = "1"
                 m = SentenceTransformer(_model_name, local_files_only=True)
-                logger.info("embedding 模型加载完成（离线模式）")
+                logger.info("embedding model loaded (offline mode)")
                 result[0] = m
                 return
             except Exception as e:
-                logger.warning(f"  镜像 {endpoint or 'default'} 离线加载失败: {e}，尝试联网下载...")
+                logger.warning(f"  Mirror {endpoint or 'default'} failed to load offline: {e}; trying an online download...")
                 with _env_lock:
                     os.environ.pop("TRANSFORMERS_OFFLINE", None)
                     os.environ.pop("HF_HUB_OFFLINE", None)
                 try:
                     m = SentenceTransformer(_model_name, local_files_only=False)
-                    logger.info("embedding 模型加载完成（联网模式）")
+                    logger.info("embedding model loaded (online mode)")
                     result[0] = m
                 except Exception as e2:
-                    logger.warning(f"  镜像 {endpoint or 'default'} 联网加载也失败: {e2}")
+                    logger.warning(f"  Mirror {endpoint or 'default'} also failed to load online: {e2}")
                     error[0] = e2
 
         thread = threading.Thread(target=_worker, daemon=True)
         thread.start()
         thread.join(timeout=timeout)
         if thread.is_alive():
-            # 线程超时仍在运行（daemon 线程会在主进程退出时自动终止）
-            logger.warning(f"加载 embedding 模型超时（{timeout}s），镜像 {endpoint or 'default'}")
+            # The thread is still running after the timeout (a daemon thread terminates automatically when the main process exits)
+            logger.warning(f"Timed out loading the embedding model ({timeout}s), mirror {endpoint or 'default'}")
             _restore_env()
             return None
         if result[0] is not None:
@@ -153,21 +153,21 @@ def load_model(timeout: int = None):
             _model = m
             return _model
 
-    logger.warning("所有镜像源均无法加载 embedding 模型（或加载超时）")
+    logger.warning("No mirror could load the embedding model (or loading timed out)")
     return None
 
 
 def encode_texts(texts: List[str], prefix: str = "query") -> Optional[Any]:
     """
-    对文本列表进行编码，返回归一化的 embedding 数组
+    Encode a list of texts and return normalized embedding arrays
 
     Args:
-        texts: 文本列表
-        prefix: E5 前缀，query 搜索时用 "query"，入库时用 "passage"
+        texts: list of texts
+        prefix: E5 prefix — "query" for searches, "passage" for indexing
 
     Returns:
-        numpy.ndarray shape=(n, 384)，归一化后可直接点积算 cosine
-        失败时返回 None
+        numpy.ndarray shape=(n, 384); normalized, so a dot product is the cosine
+        Returns None on failure
     """
     model = load_model()
     if model is None:
@@ -175,16 +175,16 @@ def encode_texts(texts: List[str], prefix: str = "query") -> Optional[Any]:
 
     try:
         prefixed = [f"{prefix}: {t}" for t in texts]
-        # normalize_embeddings=True 确保输出已归一化，dot = cosine
+        # normalize_embeddings=True ensures the output is normalized, so dot = cosine
         embeddings = model.encode(prefixed, normalize_embeddings=True, show_progress_bar=False)
         return np.array(embeddings, dtype=np.float32)
     except Exception as e:
-        logger.warning(f"embedding 编码失败: {e}")
+        logger.warning(f"embedding encoding failed: {e}")
         return None
 
 
 def encode_single(text: str, prefix: str = "query") -> Optional[Any]:
-    """编码单个文本"""
+    """Encode a single text"""
     result = encode_texts([text], prefix=prefix)
     if result is not None:
         return result[0]
@@ -193,23 +193,23 @@ def encode_single(text: str, prefix: str = "query") -> Optional[Any]:
 
 def cosine_similarity(query_emb: Any, db_embs: Any) -> Optional[Any]:
     """
-    计算 query 与一批向量的余弦相似度
+    Compute the cosine similarity between the query and a batch of vectors
 
     Args:
-        query_emb: (dim,) 归一化 query 向量
-        db_embs: (n, dim) 归一化向量矩阵
+        query_emb: (dim,) normalized query vector
+        db_embs: (n, dim) normalized vector matrix
 
     Returns:
-        (n,) 相似度分数，numpy 不可用时返回 None
+        (n,) similarity scores, or None when numpy is unavailable
     """
     if np is None:
         return None
-    # 已归一化 → dot = cosine
+    # Already normalized → dot = cosine
     return np.dot(db_embs, query_emb)
 
 
 def blob_to_vector(blob: bytes) -> Optional[Any]:
-    """SQLite BLOB → numpy 向量"""
+    """SQLite BLOB → numpy vector"""
     if np is None:
         return None
     try:
@@ -220,15 +220,15 @@ def blob_to_vector(blob: bytes) -> Optional[Any]:
 
 def batch_encode_and_store(cursor, rows, prefix: str = "passage") -> int:
     """
-    批量编码 vocabularies 并写入 vector 列
+    Batch-encode vocabularies and write them into the vector column
 
     Args:
         cursor: SQLite cursor
-        rows: [(id, name), ...] 待编码的 (vocab_id, name) 列表
-        prefix: E5 前缀
+        rows: [(id, name), ...] list of (vocab_id, name) to encode
+        prefix: E5 prefix
 
     Returns:
-        成功编码并写入的数量
+        The number successfully encoded and written
     """
     if np is None:
         return 0

@@ -1,68 +1,69 @@
-<!-- @when: 工作开始前了解目录约定，或需要创建/清理文件时 -->
+<!-- @when: Before work starts, to learn the directory conventions, or when files must be created/cleaned up -->
 <!-- @chain: after=workflow.md, before=agent-rules.md -->
 
-## 📁 目录约束
+## 📁 Directory Constraints
 
-AI Agent 工作时必须遵守以下目录约定，便于后期清理和维护。
+While working, the AI Agent must follow the directory conventions below, so that later cleanup and maintenance stay easy.
 
-### 标准目录结构
+### Standard Directory Structure
 
 ```
 project/
-├── src/                    ← 源码（Python/Delphi）
-├── tests/                  ← 测试用例（test_*.py, run_*.py）
-├── docs/                   ← 文档（用户手册、设计文档）
-├── scripts/                ← 辅助脚本（构建/部署/工具脚本）
-├── tools/                  ← 工具程序（pasfmt/7z/daudit 等）
-├── data/                   ← 知识库数据（运行时生成，gitignore）
-├── logs/                   ← 日志文件（运行时生成，gitignore）
-├── config/                 ← 配置文件（compilers.json 等）
-├── releases/               ← 发布包（gitignore）
-├── benchmarks/             ← 性能基准测试（gitignore）
-└── .tmp/                   ← 临时工作目录（gitignore）
+├── src/                    ← Source code (Python/Delphi)
+├── tests/                  ← Test cases (test_*.py, run_*.py)
+├── docs/                   ← Documentation (user manuals, design documents)
+├── scripts/                ← Helper scripts (build/deploy/tool scripts)
+├── tools/                  ← Tool programs (pasfmt/7z/daudit etc.)
+├── data/                   ← Knowledge base data (generated at runtime, gitignore)
+├── logs/                   ← Log files (generated at runtime, gitignore)
+├── config/                 ← Configuration files (compilers.json etc.)
+├── releases/               ← Release packages (gitignore)
+├── benchmarks/             ← Performance benchmarks (gitignore)
+└── .tmp/                   ← Temporary working directory (gitignore)
 ```
 
-### 目录用途约束
+### Directory Purpose Constraints
 
-| 目录 | 用途 | 清理策略 | gitignore |
+| Directory | Purpose | Cleanup policy | gitignore |
 |------|------|----------|-----------|
-| `tests/` | 正式测试用例（test_*.py） | 随项目维护 | ❌ 版本控制 |
-| `tests/tmp_*` | 临时测试脚本 | **用完即删** | ✅ `tmp_*.py` |
-| `.tmp/` | Agent 临时工作文件 | **任务结束清理** | ✅ `.*/` |
-| `.pytest-tmp-*/` | pytest 临时目录 | **测试结束自动清理** | ✅ `.*/` |
-| `docs/` | 正式文档 | 随项目维护 | ❌ 版本控制 |
-| `docs/todos.md` | 个人笔记 | 不入库 | ✅ |
-| `scripts/` | 可复用脚本 | 随项目维护 | ❌ 版本控制 |
-| `_dump_*.py` | 一次性调试脚本 | **用完即删** | ✅ `_dump_*.py` |
-| `_debug_*.py` | 调试脚本 | **用完即删** | ✅ `_debug_*.py` |
-| `logs/` | 运行日志 | **定期清理** | ✅ |
-| `data/` | 知识库数据 | 按需重建 | ✅ |
-| `snapshots/` | UI 截图快照 | **用完即删** | ✅ |
-| `__history/` | Delphi 文件备份 | IDE 自动管理 | ✅ |
-| `Win32/` `Win64/` | Delphi 编译输出 | **编译后清理** | ✅ |
+| `tests/` | Formal test cases (test_*.py) | Maintained with the project | ❌ Version controlled |
+| `tests/tmp_*` | Temporary test scripts | **Delete after use** | ✅ `tmp_*.py` |
+| `.tmp/` | Agent temporary working files | **Clean up when the task ends** | ✅ `.*/` |
+| `.pytest-tmp-*/` | pytest temporary directories | **Cleaned up automatically when tests finish** | ✅ `.*/` |
+| `docs/` | Formal documentation | Maintained with the project | ❌ Version controlled |
+| `docs/todos.md` | Personal notes | Not committed | ✅ |
+| `scripts/` | Reusable scripts | Maintained with the project | ❌ Version controlled |
+| `_dump_*.py` | One-off debug scripts | **Delete after use** | ✅ `_dump_*.py` |
+| `_debug_*.py` | Debug scripts | **Delete after use** | ✅ `_debug_*.py` |
+| `logs/` | Runtime logs | **Clean up periodically** | ✅ |
+| `data/` | Knowledge base data | Rebuild as needed | ✅ |
+| `snapshots/` | UI screenshot snapshots | **Delete after use** | ✅ |
+| `__history/` | Delphi file backups | Managed automatically by the IDE | ✅ |
+| `Win32/` `Win64/` | Delphi compile output | **Clean up after compiling** | ✅ |
 
-### 命名规范
+### Naming Conventions
 
-| 类型 | 命名模式 | 示例 |
+| Type | Naming pattern | Example |
 |------|---------|------|
-| 正式测试 | `test_*.py` | `test_compiler.py` |
-| 临时测试 | `tmp_test_*.py` | `tmp_test_new_feature.py` |
-| 调试脚本 | `_debug_*.py` / `_dump_*.py` | `_dump_ast.py` |
-| 临时输出 | `tmp_*` / `test_*.png` | `tmp_output.txt` |
+| Formal tests | `test_*.py` | `test_compiler.py` |
+| Temporary tests | `tmp_test_*.py` | `tmp_test_new_feature.py` |
+| Debug scripts | `_debug_*.py` / `_dump_*.py` | `_dump_ast.py` |
+| Temporary output | `tmp_*` / `test_*.png` | `tmp_output.txt` |
 
-### 清理规则
+### Cleanup Rules
 
 ```
-任务完成后必须清理：
-1. 临时文件 → 删除 tmp_*, _dump_*, _debug_*
-2. 临时目录 → 删除 .tmp/, .pytest-tmp-*
-3. 编译输出 → 删除 Win32/, Win64/, *.dcu, *.exe
-4. 调试产物 → 删除 test_*.png, temp_*.json
+Cleanup is mandatory once the task is complete:
+1. Temporary files → delete tmp_*, _dump_*, _debug_*
+2. Temporary directories → delete .tmp/, .pytest-tmp-*
+3. Compile output → delete Win32/, Win64/, *.dcu, *.exe
+4. Debug artifacts → delete test_*.png, temp_*.json
 ```
 
-### ⚠️ 禁止事项
+### ⚠️ Prohibitions
 
-- ❌ 在 `src/` 下创建临时文件或测试脚本
-- ❌ 在项目根目录散放临时脚本（应用 `.tmp/` 或 `scripts/`）
-- ❌ 临时文件使用无前缀命名（如 `test.py` 而非 `tmp_test.py`）
-- ❌ 任务结束后保留 `.pytest-tmp-*` 目录
+- ❌ Creating temporary files or test scripts under `src/`
+- ❌ Scattering temporary scripts in the project root (use `.tmp/` or `scripts/`)
+- ❌ Naming temporary files without a prefix (e.g. `test.py` instead of `tmp_test.py`)
+- ❌ Leaving `.pytest-tmp-*` directories behind after the task ends
+

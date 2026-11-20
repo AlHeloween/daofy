@@ -1,10 +1,10 @@
 """
-DFM 格式转换工具 — 按需编译 Delphi 转换器
+DFM format conversion tool — compiles a Delphi converter on demand
 
-使用 Delphi RTL 的 ObjectResourceToText / ObjectTextToResource
-在文本 DFM 和二进制 DFM 之间转换。
+Converts between text DFM and binary DFM using the Delphi RTL's
+ObjectResourceToText / ObjectTextToResource.
 
-转换器是一个临时生成的 .dpr，编译后运行即销毁。
+The converter is a temporary .dpr generated on the fly; it is destroyed once it has run.
 """
 
 import os
@@ -24,16 +24,16 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# 跟踪通过 ensure_dfm_text 创建的临时目录，供 _cleanup_dfm_temp_dirs 清理
+# Track temporary directories created by ensure_dfm_text for cleanup by _cleanup_dfm_temp_dirs
 _dfm_temp_dirs: Set[str] = set()
 
-# DFM 字符串 token 正则：匹配 #XXXX 转义序列或 '...' 单引号字符串（处理 '' 转义）
-# 编译为模块级别常量避免重复编译
+# DFM string token regex: matches #XXXX escape sequences or '...' single-quoted strings (handles '' escaping)
+# Compiled as a module-level constant to avoid repeated compilation
 _DFM_TOKEN_RE = re.compile(r"#[0-9]+|'[^']*(?:''[^']*)*'")
 
 
 def _cleanup_dfm_temp_dirs():
-    """清理 ensure_dfm_text 留下的所有临时目录。在服务关闭时调用。"""
+    """Remove every temp directory left behind by ensure_dfm_text. Called on service shutdown."""
     for d in list(_dfm_temp_dirs):
         try:
             shutil.rmtree(d, ignore_errors=True)
@@ -42,21 +42,21 @@ def _cleanup_dfm_temp_dirs():
     _dfm_temp_dirs.clear()
 
 
-# 全局编译器搜索路径缓存
+# Global compiler search path cache
 _compiler_dcc32_path: Optional[str] = None
 
-# 编译好的 dfmconv.exe 缓存路径（避免每次 DFM 转换都重新编译 dcc32）
+# Cached path of compiled dfmconv.exe (avoids recompiling dcc32 on every DFM conversion)
 _cached_dfmconv_exe: Optional[str] = None
 
 
 def set_compiler_path(path: str):
-    """设置 dcc32.exe 路径"""
+    """Set the dcc32.exe path."""
     global _compiler_dcc32_path
     _compiler_dcc32_path = path
 
 
 def _get_cached_dfmconv() -> Optional[str]:
-    """获取缓存的 dfmconv.exe 路径，存在且有效时返回，否则返回 None"""
+    """Return the cached dfmconv.exe path when it exists and is valid, otherwise None."""
     global _cached_dfmconv_exe
     if _cached_dfmconv_exe and os.path.isfile(_cached_dfmconv_exe):
         return _cached_dfmconv_exe
@@ -64,11 +64,11 @@ def _get_cached_dfmconv() -> Optional[str]:
 
 
 def _find_dcc32() -> Optional[str]:
-    """查找可用的 dcc32.exe"""
+    """Locate a usable dcc32.exe."""
     if _compiler_dcc32_path and os.path.isfile(_compiler_dcc32_path):
         return _compiler_dcc32_path
 
-    # 从 PATH 中查找
+    # Search from PATH
     which_cmd = "where" if sys.platform == "win32" else "which"
     try:
         result = subprocess.run(
@@ -86,8 +86,8 @@ def _find_dcc32() -> Optional[str]:
 
 
 def _dfmconv_dpr(cmd: str, in_file: str, out_file: str) -> str:
-    """生成 DFM 转换器 .dpr 源码"""
-    # 使用原始字符串避免路径转义问题
+    """Build the source of the DFM converter .dpr."""
+    # Use raw string to avoid path escaping issues
     return f'''program dfmconv;
 
 {{$APPTYPE CONSOLE}}
@@ -135,21 +135,21 @@ end.
 
 def _find_library_path(dcc32: str) -> Optional[str]:
     """
-    根据 dcc32 路径推导 RTL 库路径。
+    Derive the RTL library path from the dcc32 path.
 
-    Delphi 标准目录结构:
+    Standard Delphi directory layout:
       <root>/bin/dcc32.exe
-      <root>/lib/win32/release/  (DCU 文件)
+      <root>/lib/win32/release/  (DCU files)
 
     Args:
-        dcc32: dcc32.exe 完整路径
+        dcc32: Full path to dcc32.exe
 
     Returns:
-        库路径，未找到返回 None
+        The library path, or None when it cannot be found
     """
     dcc_dir = os.path.dirname(os.path.abspath(dcc32))
-    # 尝试 bin/../lib/win32/release
-    root = os.path.dirname(dcc_dir)  # <Studio版本号>/
+    # Try bin/../lib/win32/release
+    root = os.path.dirname(dcc_dir)  # <Studio version>/
     candidates = [
         os.path.join(root, "lib", "win32", "release"),
         os.path.join(root, "lib", "Win32", "Release"),
@@ -163,14 +163,14 @@ def _find_library_path(dcc32: str) -> Optional[str]:
 
 def _compile_dfmconv_to(exe_path: str, dcc32: str) -> bool:
     """
-    编译 DFM 转换器到指定路径。
+    Compile the DFM converter to the given path.
 
     Args:
-        exe_path: 目标 exe 路径
-        dcc32: dcc32.exe 路径
+        exe_path: Target exe path
+        dcc32: dcc32.exe path
 
     Returns:
-        是否编译成功
+        Whether the compilation succeeded
     """
     out_dir = os.path.dirname(exe_path)
     dpr_path = os.path.join(out_dir, "dfmconv.dpr")
@@ -181,71 +181,72 @@ def _compile_dfmconv_to(exe_path: str, dcc32: str) -> bool:
     try:
         lib_path = _find_library_path(dcc32)
 
-        # 先尝试不带库路径（某些环境通过注册表可自动找到）
+        # First try without library path (some environments can find it automatically via registry)
         cmd = [dcc32, dpr_path, f"-E{out_dir}", "-Q", "-B"]
-        logger.info(f"编译 DFM 转换器: {' '.join(cmd)}")
+        logger.info(f"Compiling DFM converter: {' '.join(cmd)}")
         result = subprocess.run(
             cmd, capture_output=True, text=True, timeout=TIMEOUT_DFM_COMPILE,
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)
         )
 
-        # 如果失败且有库路径，重试
+        # If it fails and a library path is available, retry
         first_error = result.stderr if result.returncode != 0 else None
         if result.returncode != 0 and lib_path:
             cmd2 = [dcc32, dpr_path, f"-E{out_dir}", "-Q", "-B", f"-U{lib_path}"]
-            logger.info(f"重试编译 DFM 转换器(带-U): {' '.join(cmd2)}")
+            logger.info(f"Retrying DFM converter compilation (with -U): {' '.join(cmd2)}")
             result = subprocess.run(
                 cmd2, capture_output=True, text=True, timeout=TIMEOUT_DFM_COMPILE,
                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)
             )
 
         if result.returncode != 0:
-            err_detail = result.stderr.strip() or first_error or "未知错误"
-            logger.error(f"编译 DFM 转换器失败: {err_detail}")
+            err_detail = result.stderr.strip() or first_error or "unknown error"
+            logger.error(f"Failed to compile DFM converter: {err_detail}")
             return False
 
         if os.path.isfile(exe_path):
             return True
-        logger.error(f"编译后未找到 exe: {exe_path}")
+        logger.error(f"Executable not found after compilation: {exe_path}")
         return False
     except subprocess.TimeoutExpired:
-        logger.error("编译 DFM 转换器超时")
+        logger.error("DFM converter compilation timed out")
         return False
     except Exception as e:
-        logger.error(f"编译 DFM 转换器异常: {e}")
+        logger.error(f"DFM converter compilation exception: {e}")
         return False
 
 
 def _ensure_dfmconv() -> Optional[str]:
     """
-    确保 DFM 转换器已编译，返回可执行文件路径。
+    Ensure the DFM converter is compiled and return the executable path.
 
-    首次调用时编译并缓存，后续直接返回缓存路径，避免重复编译。
+    It is compiled and cached on the first call; later calls return the cached path, so the
+    compilation is never repeated.
 
     Returns:
-        dfmconv.exe 路径，失败返回 None
+        The dfmconv.exe path, or None on failure
     """
     global _cached_dfmconv_exe
 
-    # 1. 检查缓存
+    # 1. Check cache
     cached = _get_cached_dfmconv()
     if cached:
         return cached
 
-    # 2. 查找 dcc32
+    # 2. Find dcc32
     dcc32 = _find_dcc32()
     if not dcc32:
-        logger.error("未找到 dcc32.exe，无法编译 DFM 转换器")
+        logger.error("dcc32.exe not found, cannot compile DFM converter")
         return None
 
-    # 3. 编译到固定缓存路径（系统 temp 下，持续进程生命周期）
+    # 3. Compile to a fixed cache path (under system temp, persists for process lifetime)
     cache_dir = os.path.join(tempfile.gettempdir(), "daofy_dfmconv_cache")
     os.makedirs(cache_dir, exist_ok=True)
     exe_path = os.path.join(cache_dir, "dfmconv.exe")
 
     if _compile_dfmconv_to(exe_path, dcc32):
         _cached_dfmconv_exe = exe_path
-        logger.info(f"DFM 转换器已编译并缓存: {exe_path}")
+        logger.info(f"DFM converter compiled and cached: {exe_path}")
         return exe_path
 
     return None
@@ -253,18 +254,18 @@ def _ensure_dfmconv() -> Optional[str]:
 
 def _compile_dfmconv(tmp_dir: str) -> Optional[str]:
     """
-    编译 DFM 转换器（兼容旧接口，直接委托给缓存机制）。
+    Compile the DFM converter (legacy entry point, delegating to the cache mechanism).
 
     Args:
-        tmp_dir: 临时目录
+        tmp_dir: Temporary directory
 
     Returns:
-        exe 路径，失败返回 None
+        The exe path, or None on failure
     """
     exe_path = _ensure_dfmconv()
     if exe_path:
         return exe_path
-    # 如果缓存失败但 tmp_dir 需要编译结果（回退路径），尝试直接编译到 tmp_dir
+    # If caching failed but tmp_dir needs the compilation result (fallback path), try compiling directly to tmp_dir
     dcc32 = _find_dcc32()
     if not dcc32:
         return None
@@ -275,7 +276,7 @@ def _compile_dfmconv(tmp_dir: str) -> Optional[str]:
 
 
 def _run_dfmconv(exe_path: str, cmd: str, in_file: str, out_file: str) -> bool:
-    """运行已编译的 DFM 转换器"""
+    """Run the compiled DFM converter."""
     try:
         result = subprocess.run(
             [exe_path, cmd, in_file, out_file],
@@ -283,40 +284,40 @@ def _run_dfmconv(exe_path: str, cmd: str, in_file: str, out_file: str) -> bool:
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)
         )
         if result.returncode != 0:
-            logger.error(f"DFM 转换失败 ({cmd}): {result.stderr or result.stdout}")
+            logger.error(f"DFM conversion failed ({cmd}): {result.stderr or result.stdout}")
             return False
         return True
     except subprocess.TimeoutExpired:
-        logger.error("DFM 转换超时")
+        logger.error("DFM conversion timed out")
         return False
     except Exception as e:
-        logger.error(f"DFM 转换异常: {e}")
+        logger.error(f"DFM conversion exception: {e}")
         return False
 
 
 def _detect_dfm_format(file_path: str) -> str:
     """
-    检测 DFM 文件格式。
+    Detect the format of a DFM file.
 
     Args:
-        file_path: .dfm 文件路径
+        file_path: Path to the .dfm file
 
     Returns:
-        "text" 或 "binary"
+        "text" or "binary"
 
     Raises:
-        FileNotFoundError: 文件不存在
-        PermissionError: 无权限读取
+        FileNotFoundError: The file does not exist
+        PermissionError: No permission to read it
     """
     if not os.path.isfile(file_path):
-        raise FileNotFoundError(f"DFM 文件不存在: {file_path}")
+        raise FileNotFoundError(f"DFM file does not exist: {file_path}")
     try:
         with open(file_path, 'rb') as f:
             header = f.read(32)
 
-        # 文本 DFM 以 object 或 inherited 开头（ASCII 可读）
-        # 二进制 DFM 开头通常是 FF FF FF FF 或其他非文本标记
-        # 先去除 UTF-8 BOM（EF BB BF），避免 BOM 导致 ASCII 解码失败
+        # Text DFM starts with object or inherited (ASCII-readable)
+        # Binary DFM usually starts with FF FF FF FF or other non-text markers
+        # First remove UTF-8 BOM (EF BB BF) to avoid BOM causing ASCII decoding failure
         if header[:3] == b'\xef\xbb\xbf':
             header = header[3:]
         try:
@@ -330,20 +331,20 @@ def _detect_dfm_format(file_path: str) -> str:
     except (FileNotFoundError, PermissionError):
         raise
     except Exception as e:
-        logger.warning(f"检测 DFM 格式失败: {e}")
-        return "text"  # 保守默认：无法判断时假设文本格式
+        logger.warning(f"Failed to detect DFM format: {e}")
+        return "text"  # Conservative default: assume text format when unable to determine
 
 
 async def convert_dfm(in_file: str, out_file: str, to_text: bool = True) -> Dict[str, Any]:
     """
-    转换 DFM 文件格式（文本 ↔ 二进制）。
+    Convert a DFM file between the text and binary formats.
 
-    按需编译一个临时 Delphi 转换器程序，执行转换后清理。
+    A temporary Delphi converter program is compiled on demand, run, then cleaned up.
 
     Args:
-        in_file: 输入文件路径
-        out_file: 输出文件路径
-        to_text: True=二进制→文本, False=文本→二进制
+        in_file: Input file path
+        out_file: Output file path
+        to_text: True = binary → text, False = text → binary
 
     Returns:
         {"success": bool, "message": str, "source_format": str, "target_format": str}
@@ -357,34 +358,34 @@ async def convert_dfm(in_file: str, out_file: str, to_text: bool = True) -> Dict
     if not os.path.isfile(in_file):
         return {
             "success": False,
-            "message": f"文件不存在: {in_file}",
+            "message": f"File does not exist: {in_file}",
             "source_format": source_fmt,
             "target_format": target_fmt
         }
 
-    # 检测源格式是否匹配
+    # Check whether source format matches
     actual_format = _detect_dfm_format(in_file)
     if to_text and actual_format != "binary":
         return {
             "success": False,
-            "message": f"文件已经是文本格式，无需转换",
+            "message": f"File is already in text format; no conversion needed",
             "source_format": "text",
             "target_format": "text"
         }
     if not to_text and actual_format != "text":
         return {
             "success": False,
-            "message": f"文件已经是二进制格式，无需转换",
+            "message": f"File is already in binary format; no conversion needed",
             "source_format": "binary",
             "target_format": "binary"
         }
 
-    # 使用缓存的 DFM 转换器（首次调用时编译一次，后续复用）
+    # Use cached DFM converter (compiled once on first call, reused afterward)
     exe_path = _ensure_dfmconv()
     if not exe_path:
         return {
             "success": False,
-            "message": "编译 DFM 转换器失败，请检查 Delphi 编译器是否可用",
+            "message": "Failed to compile DFM converter, please check whether the Delphi compiler is available",
             "source_format": source_fmt,
             "target_format": target_fmt
         }
@@ -394,14 +395,14 @@ async def convert_dfm(in_file: str, out_file: str, to_text: bool = True) -> Dict
     if not ok:
         return {
             "success": False,
-            "message": f"DFM 转换执行失败 ({cmd})",
+            "message": f"DFM conversion execution failed ({cmd})",
             "source_format": source_fmt,
             "target_format": target_fmt
         }
 
     return {
         "success": True,
-        "message": f"DFM 转换成功: {source_fmt} → {target_fmt}",
+        "message": f"DFM conversion succeeded: {source_fmt} → {target_fmt}",
         "source_format": source_fmt,
         "target_format": target_fmt
     }
@@ -409,49 +410,50 @@ async def convert_dfm(in_file: str, out_file: str, to_text: bool = True) -> Dict
 
 async def ensure_dfm_text(file_path: str) -> Optional[str]:
     """
-    确保 DFM 文件是文本格式。如果是二进制，转换为文本后返回临时路径。
+    Ensure a DFM file is in text format. If it is binary, convert it to text and return the
+    temporary path.
 
     Args:
-        file_path: .dfm 文件路径
+        file_path: Path to the .dfm file
 
     Returns:
-        如果是文本格式，返回原路径；
-        如果是二进制且转换成功，返回临时文本文件路径；
-        失败返回 None，并清理临时目录
+        The original path when the file is text;
+        the path of a temporary text file when it is binary and the conversion succeeded;
+        None on failure, with the temporary directory cleaned up
 
     Note:
-        返回的临时路径在进程生命周期内有效。
-        服务关闭时自动清理，也可手动调用 _cleanup_dfm_temp_dirs()。
+        The returned temporary path stays valid for the process lifetime.
+        It is cleaned up on service shutdown, or manually via _cleanup_dfm_temp_dirs().
     """
     fmt = _detect_dfm_format(file_path)
     if fmt == "text":
         return file_path
 
-    # 二进制 → 文本
+    # Binary → text
     tmp_dir = tempfile.mkdtemp(prefix="dfmconv_")
     tmp_text = os.path.join(tmp_dir, os.path.basename(file_path) + ".txt")
     result = await convert_dfm(file_path, tmp_text, to_text=True)
     if result["success"]:
         _dfm_temp_dirs.add(tmp_dir)
         return tmp_text
-    # 失败时立即清理
+    # Clean up immediately on failure
     shutil.rmtree(tmp_dir, ignore_errors=True)
     return None
 
 
 async def ensure_dfm_binary(text_path: str, original_binary_path: str) -> bool:
     """
-    将文本 DFM 转回二进制，替换目标文件。
+    Convert a text DFM back to binary, replacing the target file.
 
-    在 write 场景下使用：Agent 修改了文本 DFM 内容后，
-    需要转回原始格式（二进制）保存。
+    Used by the write path: once the agent has modified the text DFM content, it must be
+    converted back to the original format (binary) for saving.
 
     Args:
-        text_path: 修改后的文本 DFM 临时路径
-        original_binary_path: 原始二进制 DFM 路径（作为输出目标）
+        text_path: Temporary path of the modified text DFM
+        original_binary_path: Original binary DFM path (used as the output target)
 
     Returns:
-        是否成功
+        Whether it succeeded
     """
     result = await convert_dfm(text_path, original_binary_path, to_text=False)
     return result["success"]
@@ -459,26 +461,28 @@ async def ensure_dfm_binary(text_path: str, original_binary_path: str) -> bool:
 
 def escape_dfm_chinese(text: str) -> str:
     """
-    将 DFM 文本中单引号字符串内的非 ASCII 字符（如中文）转换为 #XXXX Delphi 转义序列。
+    Convert non-ASCII characters (such as Chinese) inside single-quoted strings in DFM text
+    into #XXXX Delphi escape sequences.
 
-    Delphi DFM 文件中，非 ASCII 字符（如中文）应使用 #XXXX（十进制 Unicode）形式表示，
-    而不是直接写 UTF-8 / GBK 编码文本，以确保编码无关的可移植性。
+    In Delphi DFM files, non-ASCII characters (such as Chinese) should be represented using
+    #XXXX (decimal Unicode) form, rather than writing UTF-8 / GBK encoded text directly, to ensure
+    encoding-independent portability.
 
-    转换规则：
-    - 对单引号 "'...'" 内的每个非 ASCII 字符 (ord > 127)，替换为 #XXXX（十进制 Unicode 码点）
-    - 相邻的 ASCII 字符保留在单引号字符串中
-    - 处理 Delphi 字符串中的 ''（双单引号转义）
+    Conversion rules:
+    - For each non-ASCII character (ord > 127) inside single quotes "'...'", replace it with #XXXX (decimal Unicode code point)
+    - Adjacent ASCII characters remain in the single-quoted string
+    - Handles '' (doubled single-quote escape) in Delphi strings
 
-    示例:
-        "Caption = '进度'"         → "Caption = #36827#24230"
-        "Text = 'abc测试123'"      → "Text = 'abc'#27979#35797'123'"
-        "Hint = 'it''s 测试'"      → "Hint = 'it''s'#27979#35797"
+    Examples:
+        "Caption = '<Chinese text>'"         → "Caption = #36827#24230"
+        "Text = 'abc<Chinese text>123'"      → "Text = 'abc'#27979#35797'123'"
+        "Hint = 'it''s <Chinese text>'"      → "Hint = 'it''s'#27979#35797"
 
     Args:
-        text: DFM 文本内容
+        text: DFM text content
 
     Returns:
-        转换后的 DFM 文本
+        Converted DFM text
     """
     result: list[str] = []
     i = 0
@@ -487,18 +491,18 @@ def escape_dfm_chinese(text: str) -> str:
     while i < length:
         ch = text[i]
         if ch == "'":
-            # 找到单引号字符串的结束位置（处理 '' 转义）
+            # Find the end position of the single-quoted string (handles '' escaping)
             start = i
             i += 1
             chars: list[str] = []
             while i < length:
                 if text[i] == "'":
                     if i + 1 < length and text[i + 1] == "'":
-                        # 转义的单引号 ''
+                        # Escaped single quote ''
                         chars.append("'")
                         i += 2
                     else:
-                        # 字符串结束
+                        # String end
                         i += 1
                         break
                 else:
@@ -507,10 +511,10 @@ def escape_dfm_chinese(text: str) -> str:
 
             string_content = ''.join(chars)
 
-            # 检查是否包含非 ASCII 字符
+            # Check whether it contains non-ASCII characters
             if any(ord(c) > 127 for c in string_content):
-                # 构建替换结果：非 ASCII → #XXXX, ASCII 保留在引号内
-                # 注意: Delphi 中单引号用 '' 转义，重建 ASCII 部分时需要恢复
+                # Build replacement result: non-ASCII → #XXXX, ASCII stays in quotes
+                # Note: in Delphi single quotes are escaped as ''; restore them when rebuilding the ASCII part
                 parts: list[str] = []
                 ascii_buf: list[str] = []
                 for c in string_content:
@@ -518,7 +522,7 @@ def escape_dfm_chinese(text: str) -> str:
                     if code > 127:
                         if ascii_buf:
                             ascii_str = ''.join(ascii_buf)
-                            # 恢复 Delphi 单引号转义: ' → ''
+                            # Restore Delphi single-quote escaping: ' → ''
                             ascii_str = ascii_str.replace("'", "''")
                             parts.append("'" + ascii_str + "'")
                             ascii_buf = []
@@ -531,7 +535,7 @@ def escape_dfm_chinese(text: str) -> str:
                     parts.append("'" + ascii_str + "'")
                 result.append(''.join(parts))
             else:
-                # 无中文，保持原样
+                # No Chinese, keep as-is
                 result.append(text[start:i])
         else:
             result.append(ch)
@@ -557,7 +561,7 @@ def _decode_dfm_tokens(tokens: List[Tuple[int, int, str]]) -> str:
                 code = int(tok[1:])
                 chars.append(chr(code))
             except (ValueError, OverflowError):
-                # 无效码点（如 #999999999 超出 Unicode 范围），保持原样
+                # Invalid code point (e.g. #999999999 exceeds Unicode range), keep as-is
                 chars.append(tok)
         else:
             # Quoted string: remove outer quotes, resolve '' escapes
@@ -568,32 +572,32 @@ def _decode_dfm_tokens(tokens: List[Tuple[int, int, str]]) -> str:
 
 
 def unescape_dfm_chinese(text: str) -> str:
-    """将 DFM 文本中的 #XXXX 转义序列还原为实际字符（只处理含非 ASCII 码点的字符串）。
+    """Restore #XXXX escape sequences in DFM text to actual characters (only handles strings containing non-ASCII code points).
 
-    与 escape_dfm_chinese() 互为逆操作：
-      - 读取时: #36827#24230 → '进度'
-      - 写入时: '进度' → #36827#24230
+    Inverse operation of escape_dfm_chinese():
+      - When reading: #36827#24230 → '<Chinese text>'
+      - When writing: '<Chinese text>' → #36827#24230
 
-    处理规则：
-      - 识别连续的 #XXXX 和 '...' token 组合
-      - 解码后若包含非 ASCII 字符，合并为一个带引号的字符串
-      - 纯 ASCII 的不动（保持原样）
+    Processing rules:
+      - Recognize contiguous #XXXX and '...' token combinations
+      - If the decoded result contains non-ASCII characters, merge into a quoted string
+      - Pure ASCII is left unchanged (kept as-is)
 
-    示例:
-        "Caption = #36827#24230"            → "Caption = '进度'"
-        "Text = 'abc'#27979#35797'123'"    → "Text = 'abc测试123'"
-        "Caption = 'Hello'"                 → "Caption = 'Hello'" (不变)
+    Examples:
+        "Caption = #36827#24230"            → "Caption = '<Chinese text>'"
+        "Text = 'abc'#27979#35797'123'"    → "Text = 'abc<Chinese text>123'"
+        "Caption = 'Hello'"                 → "Caption = 'Hello'" (unchanged)
 
     Args:
-        text: DFM 文本内容
+        text: DFM text content
 
     Returns:
-        还原后的 DFM 文本
+        Restored DFM text
     """
-    # 使用模块级缓存的正则（匹配 #XXXX 或 '...'，处理 '' 转义）
+    # Use module-level cached regex (matches #XXXX or '...', handles '' escaping)
     token_re = _DFM_TOKEN_RE
 
-    # 查找所有 token 及其位置
+    # Find all tokens and their positions
     tokens: List[Tuple[int, int, str]] = []
     for m in token_re.finditer(text):
         tokens.append((m.start(), m.end(), m.group()))
@@ -601,7 +605,7 @@ def unescape_dfm_chinese(text: str) -> str:
     if not tokens:
         return text
 
-    # 将相邻 token 分组（前一个的 end == 后一个的 start）
+    # Group adjacent tokens (previous token's end == next token's start)
     groups: List[List[Tuple[int, int, str]]] = []
     current_group = [tokens[0]]
     for tok in tokens[1:]:
@@ -612,30 +616,31 @@ def unescape_dfm_chinese(text: str) -> str:
             current_group = [tok]
     groups.append(current_group)
 
-    # 重建文本，替换含非 ASCII 的 token 组
+    # Rebuild text, replacing token groups containing non-ASCII
     result_parts: list[str] = []
     last_end = 0
     for group in groups:
-        # 本组之前的非 token 文本
+        # Non-token text before this group
         if group[0][0] > last_end:
             result_parts.append(text[last_end:group[0][0]])
 
-        # 解码本组
+        # Decode this group
         decoded = _decode_dfm_tokens(group)
         if any(ord(c) > 127 for c in decoded):
-            # 含非 ASCII → 还原为带引号的可见字符串
-            # 重新转义单引号: ' → '' (Delphi 字符串字面量要求)
+            # Contains non-ASCII → restore to a visible quoted string
+            # Re-escape single quotes: ' → '' (required by Delphi string literals)
             decoded_escaped = decoded.replace("'", "''")
             result_parts.append("'" + decoded_escaped + "'")
         else:
-            # 纯 ASCII → 保持原样
+            # Pure ASCII → keep as-is
             for _, _, tok_text in group:
                 result_parts.append(tok_text)
 
         last_end = group[-1][1]
 
-    # 尾部的非 token 文本
+    # Trailing non-token text
     if last_end < len(text):
         result_parts.append(text[last_end:])
 
     return ''.join(result_parts)
+

@@ -1,7 +1,7 @@
 """
-MessagePack 格式适配器 — 读写 .msgpack 文件 ↔ StructuredNode。
+MessagePack format adapter — reads and writes .msgpack files ↔ StructuredNode.
 
-依赖: pip install msgpack
+Requires: pip install msgpack
 """
 
 from __future__ import annotations
@@ -13,21 +13,21 @@ from .schema import StructuredNode
 
 
 def parse(data: bytes) -> StructuredNode:
-    """解析 MessagePack 字节数据为 StructuredNode。"""
+    """Parse MessagePack bytes into a StructuredNode."""
     import msgpack
     decoded = msgpack.unpackb(data, raw=False)
     return StructuredNode.from_json_compatible(decoded, key="")
 
 
 def serialize(node: StructuredNode) -> bytes:
-    """将 StructuredNode 序列化为 MessagePack 字节。"""
+    """Serialize a StructuredNode into MessagePack bytes."""
     import msgpack
     data = node.to_json_compatible()
     return msgpack.packb(data, default=str)
 
 
 def can_parse(data: bytes) -> bool:
-    """检测是否为合法 MessagePack。"""
+    """Check whether the data is valid MessagePack."""
     if not isinstance(data, bytes) or len(data) < 2:
         return False
     try:
@@ -39,18 +39,18 @@ def can_parse(data: bytes) -> bool:
 
 
 def parse_text(text: str) -> StructuredNode:
-    """从 Base64 编码的 MessagePack 文本解析。"""
+    """Parse from Base64-encoded MessagePack text."""
     import base64
     try:
         data = base64.b64decode(text)
     except Exception:
-        # 尝试直接 hex
+        # Try plain hex instead
         data = bytes.fromhex(text.strip())
     return parse(data)
 
 
 def serialize_text(node: StructuredNode) -> str:
-    """序列化为 Base64 编码的文本。"""
+    """Serialize into Base64-encoded text."""
     import base64
     data = serialize(node)
     return base64.b64encode(data).decode("ascii")

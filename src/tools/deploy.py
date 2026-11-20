@@ -1,10 +1,10 @@
 """
-Delphi 部署工具
+Delphi deployment tool
 
-提供 Delphi 项目部署功能，支持：
-- 枚举连接的设备列表（iOS/Android/Windows）
-- 部署编译后的应用到设备
-- 支持 PAServer (iOS/macOS) 和 ADB (Android) 等部署方式
+Provides Delphi project deployment, supporting:
+- Enumerate connected devices (iOS/Android/Windows)
+- Deploy a compiled application to a device
+- Supports PAServer (iOS/macOS) and ADB (Android) deployment routes
 """
 
 import asyncio
@@ -28,25 +28,25 @@ logger = get_logger(__name__)
 
 
 class DeployService:
-    """Delphi 部署服务"""
+    """Delphi deployment service."""
 
     def __init__(self):
         self._paserver_path: Optional[str] = None
         self._adb_path: Optional[str] = None
 
-    # ─── 设备枚举 ───────────────────────────────────────────────
+    # ─── Device enumeration ────────────────────────────────────────
 
     async def list_devices(self, platform: Optional[str] = None,
                            project_path: Optional[str] = None) -> Dict[str, Any]:
-        """枚举连接的设备列表
+        """Enumerate connected devices
 
         Args:
-            platform: 目标平台 (iosdevice64/iossimulator/android64/androidarm64/win32/win64)。
-                      不传则根据项目推断，仍无法推断则枚举所有可用平台。
-            project_path: 项目文件路径（可选，用于推断目标平台）
+            platform: Target platform (iosdevice64/iossimulator/android64/androidarm64/win32/win64).
+                      When omitted, inferred from the project; if that fails, every available platform is enumerated.
+            project_path: Project file path (optional; used to infer the target platform)
 
         Returns:
-            设备列表字典
+            Device list dictionary
         """
         platform = self._resolve_platform(platform, project_path)
         devices: List[Dict[str, Any]] = []
@@ -58,7 +58,7 @@ class DeployService:
         elif platform in ("win32", "win64"):
             devices = self._list_windows_devices(platform)
         else:
-            # 枚举所有可用平台
+            # Enumerate every available platform
             all_devices: Dict[str, List[Dict[str, Any]]] = {}
             for plat in ("iosdevice64", "android64", "win32"):
                 try:
@@ -66,7 +66,7 @@ class DeployService:
                     if result.get("devices"):
                         all_devices[plat] = result["devices"]
                 except Exception as e:
-                    logger.debug("枚举 %s 设备失败: %s", plat, e)
+                    logger.debug("Failed to enumerate %s devices: %s", plat, e)
             return {
                 "status": "ok",
                 "platform": "all",
@@ -80,15 +80,15 @@ class DeployService:
         }
 
     async def _list_ios_devices(self, platform: str) -> List[Dict[str, Any]]:
-        """枚举 iOS 设备（通过 PAServer 或 iosdeploy）
+        """Enumerate iOS devices (via PAServer or iosdeploy)
 
-        iOS 部署需要：
-        1. PAServer (Platform Assistant Server) 运行在 Mac 上
-        2. 或者使用 iosdeploy / libimobiledevice 工具
+        iOS deployment requires either:
+        1. PAServer (Platform Assistant Server) running on a Mac
+        2. Or the iosdeploy / libimobiledevice tools
         """
         devices: List[Dict[str, Any]] = []
 
-        # 方法 1: 尝试使用 iosdeploy (libimobiledevice)
+        # Method 1: try iosdeploy (libimobiledevice)
         iosdeploy_path = self._find_iosdeploy()
         if iosdeploy_path:
             try:
@@ -100,7 +100,7 @@ class DeployService:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15)
                 output = stdout.decode("utf-8", errors="replace")
                 for line in output.splitlines():
-                    # 解析 iosdeploy 输出格式: "Found Apple Device: <UDID> (<Name>)"
+                    # Parse the iosdeploy output format: "Found Apple Device: <UDID> (<Name>)"
                     match = re.search(
                         r"Found\s+(?:Apple\s+)?Device:\s+(\S+)\s+\(([^)]+)\)", line
                     )
@@ -114,9 +114,9 @@ class DeployService:
                 if devices:
                     return devices
             except (asyncio.TimeoutError, FileNotFoundError, OSError) as e:
-                logger.debug("iosdeploy 检测失败: %s", e)
+                logger.debug("iosdeploy detection failed: %s", e)
 
-        # 方法 2: 尝试使用 idevice_id (libimobiledevice)
+        # Method 2: try idevice_id (libimobiledevice)
         idevice_id_path = shutil.which("idevice_id")
         if idevice_id_path:
             try:
@@ -130,7 +130,7 @@ class DeployService:
                 for line in output.splitlines():
                     udid = line.strip()
                     if udid:
-                        # 获取设备名称
+                        # Get the device name
                         name = await self._get_ios_device_name(idevice_id_path, udid)
                         devices.append({
                             "udid": udid,
@@ -141,17 +141,17 @@ class DeployService:
                 if devices:
                     return devices
             except (asyncio.TimeoutError, FileNotFoundError, OSError) as e:
-                logger.debug("idevice_id 检测失败: %s", e)
+                logger.debug("idevice_id detection failed: %s", e)
 
-        # 方法 3: 尝试使用 MSBuild 部署目标探测
-        # MSBuild 在编译时会自动检测连接的 iOS 设备
-        logger.info("未检测到 iOS 设备枚举工具 (iosdeploy/libimobiledevice)")
-        logger.info("提示: 请确保设备已通过 USB 连接并信任此电脑")
-        logger.info("提示: 可安装 libimobiledevice: https://libimobiledevice.org/")
+        # Method 3: try MSBuild's deploy-target probing
+        # MSBuild detects connected iOS devices automatically during a build
+        logger.info("No iOS device enumeration tool found (iosdeploy/libimobiledevice)")
+        logger.info("Hint: make sure the device is connected over USB and trusts this computer")
+        logger.info("Hint: you can install libimobiledevice: https://libimobiledevice.org/")
         return devices
 
     async def _get_ios_device_name(self, idevice_id_path: str, udid: str) -> Optional[str]:
-        """获取 iOS 设备名称"""
+        """Get the iOS device name."""
         idevice_name = shutil.which("ideviceinfo")
         if not idevice_name:
             return None
@@ -163,7 +163,7 @@ class DeployService:
             )
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
             output = stdout.decode("utf-8", errors="replace").strip()
-            # 输出格式: "DeviceName: <name>"
+            # Output format: "DeviceName: <name>"
             if ": " in output:
                 return output.split(": ", 1)[1].strip()
         except Exception:
@@ -171,14 +171,14 @@ class DeployService:
         return None
 
     async def _list_android_devices(self) -> List[Dict[str, Any]]:
-        """枚举 Android 设备（通过 ADB）"""
+        """Enumerate Android devices (via ADB)."""
         devices: List[Dict[str, Any]] = []
 
         adb_path = self._find_adb()
         if not adb_path:
-            logger.info("未找到 ADB 工具")
-            logger.info("提示: 请安装 Android SDK Platform Tools")
-            logger.info("提示: 或设置 ANDROID_HOME 环境变量")
+            logger.info("ADB tool not found")
+            logger.info("Hint: install the Android SDK Platform Tools")
+            logger.info("Hint: or set the ANDROID_HOME environment variable")
             return devices
 
         try:
@@ -191,14 +191,14 @@ class DeployService:
             output = stdout.decode("utf-8", errors="replace")
 
             for line in output.splitlines():
-                # 跳过标题行和空行
+                # Skip the header line and blank lines
                 if line.startswith("List of") or not line.strip():
                     continue
-                # 解析 ADB 设备输出格式: "<serial>   device [usb:<path>] [model:<name>]"
+                # Parse the ADB device output format: "<serial>   device [usb:<path>] [model:<name>]"
                 parts = line.split()
                 if len(parts) >= 2 and parts[1] == "device":
                     serial = parts[0]
-                    # 提取 model
+                    # Extract the model
                     model = ""
                     for part in parts[2:]:
                         if part.startswith("model:"):
@@ -212,14 +212,14 @@ class DeployService:
                         "source": "adb",
                     })
         except asyncio.TimeoutError:
-            logger.warning("ADB 设备列表获取超时")
+            logger.warning("Timed out while listing ADB devices")
         except FileNotFoundError:
-            logger.warning("ADB 工具执行失败")
+            logger.warning("ADB tool execution failed")
 
         return devices
 
     def _list_windows_devices(self, platform: str) -> List[Dict[str, Any]]:
-        """列出 Windows 本地设备（始终返回本机）"""
+        """List local Windows devices (always returns this machine)."""
         import socket
         hostname = socket.gethostname()
         return [{
@@ -230,42 +230,42 @@ class DeployService:
             "source": "local",
         }]
 
-    # ─── 部署 ───────────────────────────────────────────────────
+    # ─── Deployment ────────────────────────────────────────────────
 
     async def deploy(self, project_path: str, target_platform: str,
                      device_id: Optional[str] = None,
                      build_configuration: str = "Debug",
                      extra_args: Optional[List[str]] = None,
                      timeout: int = 600) -> Dict[str, Any]:
-        """部署编译后的应用到设备
+        """Deploy a compiled application to a device
 
         Args:
-            project_path: 项目文件路径 (.dproj/.dpr)
-            target_platform: 目标平台 (iosdevice64/android64/win32 等)
-            device_id: 目标设备 ID（如 iOS UDID 或 Android serial），
-                       不传则部署到默认设备
-            build_configuration: 编译配置 (Debug/Release)
-            extra_args: 附加到 MSBuild 的参数
-            timeout: 超时秒数
+            project_path: Project file path (.dproj/.dpr)
+            target_platform: Target platform (iosdevice64/android64/win32, etc.)
+            device_id: Target device ID (an iOS UDID or an Android serial);
+                       deploys to the default device when omitted
+            build_configuration: Build configuration (Debug/Release)
+            extra_args: Extra arguments passed to MSBuild
+            timeout: Timeout in seconds
 
         Returns:
-            部署结果字典
+            Deployment result dictionary
         """
         project_path_obj = Path(project_path)
         if not project_path_obj.exists():
-            return {"status": "failed", "message": f"项目文件不存在: {project_path}"}
+            return {"status": "failed", "message": f"Project file not found: {project_path}"}
 
-        # 确定 .dproj 路径
+        # Resolve the .dproj path
         dproj_path = project_path
         if project_path_obj.suffix.lower() == ".dpr":
             dproj_path = str(project_path_obj.with_suffix(".dproj"))
 
         if not Path(dproj_path).exists():
-            return {"status": "failed", "message": f"未找到 .dproj 文件: {dproj_path}"}
+            return {"status": "failed", "message": f".dproj file not found: {dproj_path}"}
 
         target_platform = target_platform.lower()
 
-        # 根据平台选择部署方式
+        # Choose the deployment route by platform
         if target_platform.startswith("ios"):
             return await self._deploy_ios(
                 dproj_path, target_platform, device_id,
@@ -284,27 +284,27 @@ class DeployService:
         else:
             return {
                 "status": "failed",
-                "message": f"不支持的部署平台: {target_platform}。"
-                           f"支持的平台: iosdevice64, android64, win32, win64",
+                "message": f"Unsupported deployment platform: {target_platform}. "
+                           f"Supported platforms: iosdevice64, android64, win32, win64",
             }
 
     async def _deploy_ios(self, dproj_path: str, platform: str,
                           device_id: Optional[str], build_configuration: str,
                           extra_args: Optional[List[str]], timeout: int) -> Dict[str, Any]:
-        """部署到 iOS 设备
+        """Deploy to an iOS device
 
-        使用 MSBuild 的 Deploy 目标进行部署。
-        需要 PAServer (Platform Assistant Server) 运行在 Mac 上。
+        Deploys through MSBuild's Deploy target.
+        Requires PAServer (Platform Assistant Server) running on a Mac.
         """
-        # 查找 MSBuild
+        # Locate MSBuild
         msbuild_path = self._find_msbuild(dproj_path)
         if not msbuild_path:
             return {
                 "status": "failed",
-                "message": "未找到 MSBuild。iOS 部署需要 MSBuild。",
+                "message": "MSBuild not found. iOS deployment requires MSBuild.",
             }
 
-        # 构建 MSBuild 参数
+        # Build the MSBuild argument list
         msbuild_args = [
             msbuild_path,
             dproj_path,
@@ -313,20 +313,20 @@ class DeployService:
             f"/p:Config={build_configuration}",
         ]
 
-        # 添加设备 ID
+        # Add the device ID
         if device_id:
             msbuild_args.append(f"/p:DevId={device_id}")
 
-        # 添加 PAServer 密码（如果有）
+        # Add the PAServer password (if any)
         paserver_password = os.environ.get("PASERVER_PASSWORD", "")
         if paserver_password:
             msbuild_args.append(f"/p:DevicePassword={paserver_password}")
 
-        # 添加额外参数
+        # Add the extra arguments
         if extra_args:
             msbuild_args.extend(extra_args)
 
-        logger.info("iOS 部署命令: %s", " ".join(msbuild_args))
+        logger.info("iOS deploy command: %s", " ".join(msbuild_args))
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -345,7 +345,7 @@ class DeployService:
             if return_code == 0:
                 return {
                     "status": "ok",
-                    "message": "iOS 部署成功",
+                    "message": "iOS deployment succeeded",
                     "platform": platform,
                     "device_id": device_id,
                     "log": stdout_text[-2000:] if len(stdout_text) > 2000 else stdout_text,
@@ -353,7 +353,7 @@ class DeployService:
             else:
                 return {
                     "status": "failed",
-                    "message": f"iOS 部署失败 (exit code: {return_code})",
+                    "message": f"iOS deployment failed (exit code: {return_code})",
                     "platform": platform,
                     "device_id": device_id,
                     "log": stdout_text[-2000:] if len(stdout_text) > 2000 else stdout_text,
@@ -362,32 +362,32 @@ class DeployService:
         except asyncio.TimeoutError:
             return {
                 "status": "failed",
-                "message": f"iOS 部署超时 ({timeout}秒)",
+                "message": f"iOS deployment timed out ({timeout}s)",
                 "platform": platform,
             }
         except Exception as e:
             return {
                 "status": "failed",
-                "message": f"iOS 部署异常: {str(e)}",
+                "message": f"iOS deployment error: {str(e)}",
                 "platform": platform,
             }
 
     async def _deploy_android(self, dproj_path: str, platform: str,
                               device_id: Optional[str], build_configuration: str,
                               extra_args: Optional[List[str]], timeout: int) -> Dict[str, Any]:
-        """部署到 Android 设备
+        """Deploy to an Android device
 
-        使用 MSBuild 的 Deploy 目标进行部署。
-        需要 Android SDK 和 ADB。
+        Deploys through MSBuild's Deploy target.
+        Requires the Android SDK and ADB.
         """
         msbuild_path = self._find_msbuild(dproj_path)
         if not msbuild_path:
             return {
                 "status": "failed",
-                "message": "未找到 MSBuild。Android 部署需要 MSBuild。",
+                "message": "MSBuild not found. Android deployment requires MSBuild.",
             }
 
-        # 构建 MSBuild 参数
+        # Build the MSBuild argument list
         msbuild_args = [
             msbuild_path,
             dproj_path,
@@ -396,15 +396,15 @@ class DeployService:
             f"/p:Config={build_configuration}",
         ]
 
-        # 添加设备 ID
+        # Add the device ID
         if device_id:
             msbuild_args.append(f"/p:DeviceId={device_id}")
 
-        # 添加额外参数
+        # Add the extra arguments
         if extra_args:
             msbuild_args.extend(extra_args)
 
-        logger.info("Android 部署命令: %s", " ".join(msbuild_args))
+        logger.info("Android deploy command: %s", " ".join(msbuild_args))
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -423,7 +423,7 @@ class DeployService:
             if return_code == 0:
                 return {
                     "status": "ok",
-                    "message": "Android 部署成功",
+                    "message": "Android deployment succeeded",
                     "platform": platform,
                     "device_id": device_id,
                     "log": stdout_text[-2000:] if len(stdout_text) > 2000 else stdout_text,
@@ -431,7 +431,7 @@ class DeployService:
             else:
                 return {
                     "status": "failed",
-                    "message": f"Android 部署失败 (exit code: {return_code})",
+                    "message": f"Android deployment failed (exit code: {return_code})",
                     "platform": platform,
                     "device_id": device_id,
                     "log": stdout_text[-2000:] if len(stdout_text) > 2000 else stdout_text,
@@ -440,50 +440,50 @@ class DeployService:
         except asyncio.TimeoutError:
             return {
                 "status": "failed",
-                "message": f"Android 部署超时 ({timeout}秒)",
+                "message": f"Android deployment timed out ({timeout}s)",
                 "platform": platform,
             }
         except Exception as e:
             return {
                 "status": "failed",
-                "message": f"Android 部署异常: {str(e)}",
+                "message": f"Android deployment error: {str(e)}",
                 "platform": platform,
             }
 
     async def _deploy_windows(self, dproj_path: str, platform: str,
                               build_configuration: str,
                               extra_args: Optional[List[str]], timeout: int) -> Dict[str, Any]:
-        """Windows 本地部署
+        """Local Windows deployment
 
-        Windows 部署本质上是编译后的文件复制到目标目录。
+        A Windows deployment is essentially the built files copied to the target directory.
         """
-        # 对于 Windows，"部署"主要是确保编译产物在正确位置
-        # 可以调用 compile 然后返回产物路径
+        # On Windows, "deploy" mainly means ensuring the build output is in the right place
+        # The compile action can be called, and it returns the output path
         return {
             "status": "ok",
-            "message": "Windows 本地部署：编译产物已在本地",
+            "message": "Local Windows deployment: the build output is already local",
             "platform": platform,
-            "hint": "Windows 无需远程部署，编译后可直接运行",
-            "action_required": "请使用 action='compile' 编译项目",
+            "hint": "Windows needs no remote deployment; run the build directly after compiling",
+            "action_required": "Use action='compile' to build the project",
         }
 
-    # ─── 工具查找 ───────────────────────────────────────────────
+    # ─── Tool lookup ────────────────────────────────────────────────
 
     def _find_adb(self) -> Optional[str]:
-        """查找 ADB 工具"""
-        # 1. 检查 ANDROID_HOME
+        """Locate the ADB tool."""
+        # 1. Check ANDROID_HOME
         android_home = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
         if android_home:
             adb_path = Path(android_home) / "platform-tools" / "adb.exe"
             if adb_path.exists():
                 return str(adb_path)
 
-        # 2. 检查 PATH
+        # 2. Check PATH
         adb_in_path = shutil.which("adb")
         if adb_in_path:
             return adb_in_path
 
-        # 3. 常见安装路径
+        # 3. Common install paths
         common_paths = [
             Path(os.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk" / "platform-tools" / "adb.exe",
             Path(os.environ.get("PROGRAMFILES", "")) / "Android" / "sdk" / "platform-tools" / "adb.exe",
@@ -495,7 +495,7 @@ class DeployService:
         return None
 
     def _find_iosdeploy(self) -> Optional[str]:
-        """查找 iosdeploy 工具"""
+        """Locate the iosdeploy tool."""
         return shutil.which("iosdeploy")
 
     def _resolve_project_delphi_version(
@@ -503,7 +503,7 @@ class DeployService:
         project_path: Optional[str],
         settings: Optional[ProjectSettings] = None,
     ) -> Optional[str]:
-        """解析工程使用的 Delphi 注册表版本（供部署时选 MSBuild）。"""
+        """Resolve the Delphi registry version the project uses (to pick MSBuild for deployment)."""
         if not project_path:
             return None
 
@@ -518,7 +518,7 @@ class DeployService:
         except ImportError:
             config_manager = None
 
-        # 与编译服务的优先级一致：compiler_version > delphi_version
+        # Same priority as the compile service: compiler_version > delphi_version
         if settings and settings.compiler_version:
             resolved = resolve_registry_version(
                 settings.compiler_version,
@@ -531,7 +531,7 @@ class DeployService:
             if version_hint:
                 return version_hint
             logger.warning(
-                "无法解析项目配置的编译器 %r，改用 delphi_version/自动探测",
+                "Cannot resolve the project's configured compiler %r; falling back to delphi_version/auto-detection",
                 settings.compiler_version,
             )
 
@@ -552,9 +552,9 @@ class DeployService:
         return project_version_to_registry_version(project_version)
 
     def _find_msbuild(self, project_path: Optional[str] = None) -> Optional[str]:
-        """查找 MSBuild 工具（按工程配置解析版本，避免多版本机器上串用）"""
-        # 复用 compiler_service 的解析逻辑：项目配置 > 版本映射 > 自动探测；
-        # 不同工程可以使用不同 MSBuild。
+        """Locate the MSBuild tool (resolving the version from the project config, so multi-version machines do not cross-use)"""
+        # Reuse compiler_service's resolution logic: project config > version mapping > auto-detection;
+        # different projects may use different MSBuild versions.
         try:
             from .compile_project import _compiler_service
             if _compiler_service:
@@ -569,8 +569,8 @@ class DeployService:
                 )
                 if settings and settings.compiler_version and not version:
                     logger.error(
-                        "项目配置的 compiler_version=%r 无法解析，"
-                        "部署已停止（不会改用其它 Delphi 版本）",
+                        "The project's configured compiler_version=%r cannot be resolved; "
+                        "deployment stopped (no other Delphi version will be used)",
                         settings.compiler_version,
                     )
                     return None
@@ -581,21 +581,21 @@ class DeployService:
                     )
                 )
                 if resolved:
-                    logger.info("部署使用 MSBuild（%s）: %s", source, resolved)
+                    logger.info("Deployment uses MSBuild (%s): %s", source, resolved)
                     return resolved
                 if explicit_error:
                     logger.error(
-                        "配置的 MSBuild 无效，部署已停止（不回退其它版本）: %s",
+                        "The configured MSBuild is invalid; deployment stopped (no fallback to another version): %s",
                         source,
                     )
                     return None
-                logger.warning("未能解析 MSBuild: %s", source)
+                logger.warning("Could not resolve MSBuild: %s", source)
         except ImportError:
             pass
         except Exception:
-            logger.warning("通过编译服务解析 MSBuild 失败", exc_info=True)
+            logger.warning("Failed to resolve MSBuild through the compile service", exc_info=True)
 
-        # 回退: 查找 vswhere
+        # Fallback: look for vswhere
         program_files_x86 = os.environ.get("ProgramFiles(x86)", "")
         vswhere = Path(program_files_x86) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
         if vswhere.exists():
@@ -620,11 +620,11 @@ class DeployService:
 
     def _resolve_platform(self, platform: Optional[str],
                           project_path: Optional[str]) -> str:
-        """解析目标平台"""
+        """Resolve the target platform."""
         if platform:
             return platform.lower()
 
-        # 尝试从项目推断
+        # Try to infer it from the project
         if project_path:
             try:
                 from ..utils.dproj_parser import DprojParser
@@ -642,7 +642,7 @@ class DeployService:
         return "win32"
 
     def _msbuild_platform(self, platform: str) -> str:
-        """转换平台名为 MSBuild 格式"""
+        """Convert a platform name to MSBuild form."""
         platform_map = {
             "win32": "Win32",
             "win64": "Win64",
@@ -657,35 +657,35 @@ class DeployService:
         return platform_map.get(platform, platform.capitalize())
 
 
-# 全局实例
+# Global instance
 _deploy_service: Optional[DeployService] = None
 
 
 def get_deploy_service() -> DeployService:
-    """获取部署服务单例"""
+    """Get the deployment service singleton."""
     global _deploy_service
     if _deploy_service is None:
         _deploy_service = DeployService()
     return _deploy_service
 
 
-# ─── MCP 工具入口 ──────────────────────────────────────────────
+# ─── MCP tool entry point ───────────────────────────────────────
 
 
 async def deploy_project(**kwargs) -> Dict[str, Any]:
-    """部署 Delphi 项目到设备
+    """Deploy a Delphi project to a device
 
     Args:
-        action: 操作类型 (devices/deploy)
-        project_path: 项目文件路径 (.dproj/.dpr)
-        target_platform: 目标平台
-        device_id: 目标设备 ID
-        build_configuration: 编译配置
-        extra_args: 附加参数
-        timeout: 超时秒数
+        action: Operation type (devices/deploy)
+        project_path: Project file path (.dproj/.dpr)
+        target_platform: Target platform
+        device_id: Target device ID
+        build_configuration: Build configuration
+        extra_args: Extra arguments
+        timeout: Timeout in seconds
 
     Returns:
-        操作结果
+        The operation result
     """
     action = kwargs.get("action", "devices")
     service = get_deploy_service()
@@ -699,11 +699,11 @@ async def deploy_project(**kwargs) -> Dict[str, Any]:
         elif action == "deploy":
             project_path = kwargs.get("project_path", "")
             if not project_path:
-                return {"status": "failed", "message": "缺少必需参数: project_path"}
+                return {"status": "failed", "message": "Missing required parameter: project_path"}
 
             target_platform = kwargs.get("target_platform", "")
             if not target_platform:
-                return {"status": "failed", "message": "缺少必需参数: target_platform"}
+                return {"status": "failed", "message": "Missing required parameter: target_platform"}
 
             return await service.deploy(
                 project_path=project_path,
@@ -716,8 +716,8 @@ async def deploy_project(**kwargs) -> Dict[str, Any]:
         else:
             return {
                 "status": "failed",
-                "message": f"未知 action: {action}。可用 actions: devices, deploy",
+                "message": f"Unknown action: {action}. Available actions: devices, deploy",
             }
     except Exception as e:
-        logger.exception("部署操作失败")
+        logger.exception("Deploy operation failed")
         return {"status": "failed", "message": str(e)}

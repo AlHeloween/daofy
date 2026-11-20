@@ -1,7 +1,7 @@
 """
-工程编译工具
+Project compilation tool
 
-提供 Delphi 工程整体编译功能
+Provides overall Delphi project compilation functionality
 """
 
 from pathlib import Path
@@ -26,7 +26,7 @@ import subprocess as _subprocess
 
 from ..constants import TIMEOUT_PROCESS_TERMINATE
 
-# 导入 install_package 中的函数（复用已有逻辑）
+# Import functions from install_package (reuse existing logic)
 try:
     from .install_package import (
         _is_runtime_only_package,
@@ -40,18 +40,18 @@ except ImportError:
 
 logger = get_logger(__name__)
 
-# 全局编译服务实例
+# Global compiler service instance
 _compiler_service: Optional[CompilerService] = None
 
 
 def _verify_tools_dir() -> Path:
-    """返回验证工具单元所在目录 (tools/stacktrace/)。"""
+    """Return the directory containing the verification tool units (tools/stacktrace/)."""
     return Path(__file__).parent.parent.parent / "tools" / "stacktrace"
 
 
 def _compute_verify_exe_path(dproj_path: str, target_platform: str,
                               build_configuration: str) -> Path:
-    """计算编译后的 .exe 路径（优先从 .dproj 解析，再回退默认）。"""
+    """Calculate the compiled .exe path (prefer parsing from .dproj, then fall back to default)."""
     proj = Path(dproj_path)
     proj_dir = proj.parent
     plat_map = {"win32": "Win32", "win64": "Win64"}
@@ -59,7 +59,7 @@ def _compute_verify_exe_path(dproj_path: str, target_platform: str,
     cfg = build_configuration or "Debug"
     exe_name = proj.stem + ".exe"
 
-    # 优先从 .dproj 读取 DCC_ExeOutput
+    # Prefer reading DCC_ExeOutput from .dproj
     dproj_file = proj if proj.suffix.lower() == '.dproj' else proj.with_suffix('.dproj')
     if dproj_file.exists():
         try:
@@ -75,7 +75,7 @@ def _compute_verify_exe_path(dproj_path: str, target_platform: str,
 
 
 def _verify_backup_paths(dproj: Path) -> dict:
-    """生成 .dproj/.dpr 的备份路径"""
+    """Generate backup paths for .dproj/.dpr"""
     stem = dproj.stem
     return {
         '.dproj': dproj.with_name(stem + '.dproj.verify_bak'),
@@ -84,34 +84,34 @@ def _verify_backup_paths(dproj: Path) -> dict:
 
 
 def _inject_verify_units(dproj_path: str) -> str:
-    """修改 .dproj + .dpr 注入 StackTrace 验证单元，返回 .dproj 备份路径。
+    """Modify .dproj + .dpr to inject StackTrace verification units, return the .dproj backup path.
 
-    注入内容 (.dproj):
-       1. DCCReference 添加 StackTrace.pas
-       2. DCC_UnitSearchPath 添加 tools/stacktrace/ 路径
-       3. DCC_MapFile=3 (detailed) — 生成完整 .map 文件供堆栈解析
+    Injection content (.dproj):
+       1. Add StackTrace.pas to DCCReference
+       2. Add tools/stacktrace/ path to DCC_UnitSearchPath
+       3. DCC_MapFile=3 (detailed) — generate a complete .map file for stack parsing
 
-    注入内容 (.dpr):
-       1. uses 子句追加 StackTrace
-       2. begin 块后插入 TStackTraceManager 初始化调用
+    Injection content (.dpr):
+       1. Append StackTrace to the uses clause
+       2. Insert TStackTraceManager initialization call after the begin block
 
     Args:
-        dproj_path: .dproj 文件路径
+        dproj_path: .dproj file path
 
     Returns:
-        .dproj 备份文件路径
+        .dproj backup file path
     """
     import shutil
 
     dproj = Path(dproj_path)
     backs = _verify_backup_paths(dproj)
 
-    # ── 备份 .dproj ──
+    # ── Back up .dproj ──
     shutil.copy2(str(dproj), str(backs['.dproj']))
 
     content = dproj.read_text(encoding="utf-8-sig")
 
-    # ── 1a. 添加 DCCReference for StackTrace.pas ──
+    # ── 1a. Add DCCReference for StackTrace.pas ──
     tools_dir = _verify_tools_dir()
     rel_stacktrace = os.path.relpath(str(tools_dir / "StackTrace.pas"), str(dproj.parent))
     inject_refs = (
@@ -131,7 +131,7 @@ def _inject_verify_units(dproj_path: str) -> str:
 
     import re
 
-    # DCC_UnitSearchPath 也加上（兜底）
+    # Also add DCC_UnitSearchPath (fallback)
     rel_path = os.path.relpath(str(tools_dir), str(dproj.parent))
     usp_pattern = r'(<DCC_UnitSearchPath>)(.*?)(</DCC_UnitSearchPath>)'
     if re.search(usp_pattern, content, flags=re.DOTALL):
@@ -147,18 +147,18 @@ def _inject_verify_units(dproj_path: str) -> str:
             1
         )
 
-    # ── 1b. DCC_MapFile=3 (detailed map) — 供 StackTrace 解析函数名+行号 ──
-    # 写入 Base PropertyGroup（第一个无条件 PropertyGroup）
+    # ── 1b. DCC_MapFile=3 (detailed map) — for StackTrace to resolve function names + line numbers ──
+    # Write into the Base PropertyGroup (the first unconditional PropertyGroup)
     dcc_map_pattern = r'<DCC_MapFile>\d+</DCC_MapFile>'
     if not re.search(dcc_map_pattern, content):
-        # 插入到第一个 </PropertyGroup> 之前
+        # Insert before the first </PropertyGroup>
         content = content.replace(
             '</PropertyGroup>',
             '  <DCC_MapFile>3</DCC_MapFile>\n</PropertyGroup>',
             1
         )
     else:
-        # 已存在则设为 3
+        # If already present, set it to 3
         content = re.sub(dcc_map_pattern, '<DCC_MapFile>3</DCC_MapFile>', content)
 
     record_authorized_write(
@@ -167,36 +167,36 @@ def _inject_verify_units(dproj_path: str) -> str:
         operation="run_verify_inject_dproj",
     )
     dproj.write_text(content, encoding="utf-8-sig")
-    logger.info("已注入 StackTrace 单元到 .dproj: %s", dproj_path)
+    logger.info("Injected StackTrace unit into .dproj: %s", dproj_path)
 
-    # ── 2. 备份并修改 .dpr（TStackTraceManager 初始化）──
+    # ── 2. Back up and modify .dpr (TStackTraceManager initialization) ──
     _inject_dpr_stacktrace(dproj, backs)
 
     return str(backs['.dproj'])
 
 
 def _inject_dpr_stacktrace(dproj: Path, backs: dict):
-    """备份 .dpr；注入 TStackTraceManager 初始化代码
+    """Back up .dpr; inject TStackTraceManager initialization code
 
-    在 uses 子句添加 StackTrace 单元。
-    在 begin 块后插入 TStackTraceManager 初始化调用。
+    Add the StackTrace unit to the uses clause.
+    Insert TStackTraceManager initialization call after the begin block.
     """
     import shutil
 
     dpr_path = dproj.with_suffix('.dpr')
     if not dpr_path.exists():
-        logger.warning("未找到 .dpr，跳过注入: %s", dpr_path)
+        logger.warning("No .dpr found, skipping injection: %s", dpr_path)
         return
 
     original = dpr_path.read_text(encoding='utf-8-sig')
     if '{STACKTRACE_INJECT}' in original or 'TStackTraceManager.Enabled' in original:
-        logger.info(".dpr 已注入过 TStackTraceManager，跳过")
+        logger.info(".dpr already has TStackTraceManager injected, skipping")
         return
 
-    # 备份 .dpr
+    # Back up .dpr
     shutil.copy2(str(dpr_path), str(backs['.dpr']))
 
-    # ── 1. 在 uses 中追加 StackTrace ──
+    # ── 1. Append StackTrace in uses ──
     uses_pos = original.lower().find('uses\n') if original.lower().find('uses\n') >= 0 else original.lower().find('uses ')
     if uses_pos >= 0:
         end_uses = original.find(';', uses_pos + 4)
@@ -205,7 +205,7 @@ def _inject_dpr_stacktrace(dproj: Path, backs: dict):
             if 'StackTrace' not in uses_section:
                 original = original[:end_uses] + ', StackTrace' + original[end_uses:]
 
-    # ── 2. 在 begin 后添加 TStackTraceManager 初始化 ──
+    # ── 2. Add TStackTraceManager initialization after begin ──
     lines = original.split('\n')
     begin_idx = -1
     for i in range(len(lines)):
@@ -215,7 +215,7 @@ def _inject_dpr_stacktrace(dproj: Path, backs: dict):
             break
 
     if begin_idx < 0:
-        logger.warning(".dpr 中未找到 main begin，跳过 .dpr 注入")
+        logger.warning("main begin not found in .dpr, skipping .dpr injection")
         return
 
     indent = '  '
@@ -233,11 +233,11 @@ def _inject_dpr_stacktrace(dproj: Path, backs: dict):
         operation="run_verify_inject_dpr",
     )
     dpr_path.write_text('\n'.join(lines), encoding='utf-8-sig')
-    logger.info("已注入 TStackTraceManager 初始化到 .dpr: %s", dpr_path)
+    logger.info("Injected TStackTraceManager initialization into .dpr: %s", dpr_path)
 
 
 def _restore_dproj(dproj_path: str, backup_path: str):
-    """从备份恢复原始 .dproj 和 .dpr 文件"""
+    """Restore the original .dproj and .dpr files from backup"""
     import shutil
     dproj = Path(dproj_path)
     backs = _verify_backup_paths(dproj)
@@ -251,9 +251,9 @@ def _restore_dproj(dproj_path: str, backup_path: str):
         )
         shutil.copy2(str(dproj_bak), str(dproj_path))
         dproj_bak.unlink()
-        logger.info("已恢复原始 .dproj")
+        logger.info("Restored original .dproj")
     else:
-        logger.warning("验证备份文件不存在: %s", backup_path)
+        logger.warning("Verification backup file does not exist: %s", backup_path)
 
     dpr_bak = backs['.dpr']
     if dpr_bak.exists():
@@ -264,29 +264,29 @@ def _restore_dproj(dproj_path: str, backup_path: str):
         )
         shutil.copy2(str(dpr_bak), str(dproj.with_suffix('.dpr')))
         dpr_bak.unlink()
-        logger.info("已恢复原始 .dpr")
+        logger.info("Restored original .dpr")
 
 
 def set_compiler_service(service: CompilerService):
-    """设置编译服务实例"""
+    """Set the compiler service instance"""
     global _compiler_service
     _compiler_service = service
 
 
 def _detect_compiler_from_project(project_path: str, target_platform: str) -> Optional[str]:
     """
-    从项目中自动检测最适配的编译器
+    Automatically detect the most suitable compiler from the project
 
     Args:
-        project_path: 项目文件路径
-        target_platform: 目标平台
+        project_path: Project file path
+        target_platform: Target platform
 
     Returns:
-        编译器名称,如果检测失败则返回 None
+        Compiler name, or None if detection fails
     """
     project_path_obj = Path(project_path)
     if not project_path_obj.exists():
-        logger.warning(f"项目文件不存在: {project_path}")
+        logger.warning(f"Project file does not exist: {project_path}")
         return None
 
     dproj_path = project_path
@@ -294,18 +294,18 @@ def _detect_compiler_from_project(project_path: str, target_platform: str) -> Op
         dproj_path = str(project_path_obj.with_suffix('.dproj'))
 
     if not Path(dproj_path).exists():
-        logger.warning(f"未找到 .dproj 文件: {dproj_path}")
+        logger.warning(f".dproj file not found: {dproj_path}")
         return None
 
-    # 项目级配置优先：同一台机器上不同工程可能使用不同 Delphi 版本，
-    # 工程目录下的 .daofy/project.json 声明的版本必须先于 .dproj 推断。
+    # Project-level configuration takes precedence: different projects on the same machine may use different Delphi versions,
+    # the version declared in .daofy/project.json under the project directory must take precedence over .dproj inference.
     settings = load_project_settings(dproj_path)
     if settings and _compiler_service and _compiler_service.config_manager:
         manager = _compiler_service.config_manager
         if settings.compiler_version:
             compiler = manager.get_compiler(settings.compiler_version)
             if not compiler:
-                # 兼容把版本号/产品名写进 compiler_version（如 "11.0"、"XE4"）
+                # Support writing version number/product name into compiler_version (e.g. "11.0", "XE4")
                 lookup = getattr(
                     _compiler_service,
                     "_lookup_compiler_by_name_or_version",
@@ -318,33 +318,33 @@ def _detect_compiler_from_project(project_path: str, target_platform: str) -> Op
                     )
             if compiler:
                 logger.info(
-                    "按项目配置使用编译器: %s（来源 %s）",
+                    "Using compiler according to project configuration: %s (source %s)",
                     compiler.name,
                     settings.source,
                 )
                 return compiler.name
             if settings.delphi_version:
                 logger.warning(
-                    "项目配置的 compiler_version=%r 不可用，改用 delphi_version=%s"
-                    "（来源 %s）",
+                    "Project-configured compiler_version=%r is unavailable, falling back to delphi_version=%s"
+                    " (source %s)",
                     settings.compiler_version,
                     settings.delphi_version,
                     settings.source,
                 )
                 return None
             logger.error(
-                "项目配置指定的编译器 %r 不存在（来源 %s）",
+                "Compiler %r specified by project configuration does not exist (source %s)",
                 settings.compiler_version,
                 settings.source,
             )
             return None
         if settings.delphi_version:
-            # 不要在工具层把项目版本“翻译”成某个编译器名再回传：
-            # 那会被编译服务当成显式 compiler_version，反而覆盖项目声明的
-            # delphi_version（compilers.json 里该编译器的 registry_version
-            # 若配错就会串版本）。留空交给编译服务按项目版本解析。
+            # Do not "translate" the project version into some compiler name at the tool layer and pass it back:
+            # that would be treated by the compilation service as an explicit compiler_version, overriding the project-declared
+            # delphi_version (if the compiler's registry_version in compilers.json
+            # is misconfigured, it would mix versions). Leave it empty and let the compilation service resolve by project version.
             logger.info(
-                "项目配置指定 Delphi %s（来源 %s），交由编译服务按该版本解析",
+                "Project configuration specifies Delphi %s (source %s), leaving it to the compilation service to resolve by that version",
                 settings.delphi_version,
                 settings.source,
             )
@@ -352,27 +352,27 @@ def _detect_compiler_from_project(project_path: str, target_platform: str) -> Op
 
     parser = DprojParser(dproj_path)
     if not parser.parse():
-        logger.error(f"解析 .dproj 文件失败: {dproj_path}")
+        logger.error(f"Failed to parse .dproj file: {dproj_path}")
         return None
 
     project_version = parser.get_project_version()
     if not project_version:
-        logger.warning(f"未获取到项目版本号: {dproj_path}")
+        logger.warning(f"Could not obtain project version number: {dproj_path}")
         return None
 
-    logger.info(f"项目版本号: {project_version}")
+    logger.info(f"Project version number: {project_version}")
 
     if _compiler_service and _compiler_service.config_manager:
         compiler = _compiler_service.config_manager.get_compiler_for_project(project_version, target_platform)
         if compiler:
-            logger.info(f"自动匹配编译器: {compiler.name}")
+            logger.info(f"Automatically matched compiler: {compiler.name}")
             return compiler.name
 
     return None
 
 
 def _cleanup_project_dcu(project_dir: Path):
-    """递归清理项目目录下的所有 .dcu / .dcpp / .dpu 缓存文件"""
+    """Recursively clean all .dcu / .dcpp / .dpu cache files under the project directory"""
     patterns = ['**/*.dcu', '**/*.dcpp', '**/*.dpu']
     deleted = 0
     for pattern in patterns:
@@ -381,30 +381,30 @@ def _cleanup_project_dcu(project_dir: Path):
                 f.unlink()
                 deleted += 1
             except OSError as e:
-                logger.debug(f"删除缓存文件失败: {f}: {e}")
+                logger.debug(f"Failed to delete cache file: {f}: {e}")
     if deleted > 0:
-        logger.info(f"已清理 {deleted} 个编译器缓存文件")
+        logger.info(f"Cleaned {deleted} compiler cache files")
 
 
 def _check_and_clean_stale_resources(project_path: str, build_configuration: Optional[str] = None, target_platform: str = "win32") -> bool:
     """
-    检测 .dproj 中引用的资源文件是否比已生成的 exe 更新。
-    如果资源文件更新，则删除对应的 .res 文件，强制 brcc32 重新编译。
+    Check whether resource files referenced in .dproj are newer than the generated exe.
+    If a resource file is newer, delete the corresponding .res file to force brcc32 to recompile.
 
-    .dproj 中每个 <RcItem Include="..."> 对应一个资源源文件，
-    编译器通过 brcc32 将其编译为 .res 后链接到 exe。
-    但 MSBuild 增量编译对 <RcItem> 的变更检测不可靠，
-    修改源文件后可能不会触发重新编译。
+    Each <RcItem Include="..."> in .dproj corresponds to a resource source file;
+    the compiler compiles it to .res via brcc32 and then links it into the exe.
+    However, MSBuild incremental build detection of <RcItem> changes is unreliable,
+    so modifying the source file may not trigger recompilation.
 
     Returns:
-        True 表示有资源文件变更（已处理），False 表示无需处理
+        True if resource file changes were found (and handled), False if no handling is needed
     """
     try:
         proj_path = Path(project_path)
         if not proj_path.exists():
             return False
 
-        # 解析 .dproj 获取资源引用
+        # Parse .dproj to get resource references
         parser = DprojParser(str(proj_path))
         if not parser.parse():
             return False
@@ -413,21 +413,21 @@ def _check_and_clean_stale_resources(project_path: str, build_configuration: Opt
         if not resources:
             return False
 
-        # 获取输出 exe 路径
+        # Get output exe path
         config = build_configuration or "Debug"
         platform = target_platform or "win32"
-        # 统一平台名首字母大写: win32 → Win32, win64 → Win64
+        # Normalize platform name capitalization: win32 → Win32, win64 → Win64
         platform_cap = platform.capitalize() if platform in ("win32", "win64") else platform
 
         exe_dir_str = parser.get_output_path(config=config, platform=platform_cap)
         if not exe_dir_str:
-            # 尝试从 dproj 目录默认输出路径查找
+            # Try to find from the default output path under the dproj directory
             project_dir = proj_path.parent
             exe_dir = project_dir / platform_cap / config
         else:
             exe_dir = Path(exe_dir_str)
 
-        # 查找 exe
+        # Find exe
         project_name = proj_path.stem
         exe_path = exe_dir / f"{project_name}.exe"
         if not exe_path.exists():
@@ -441,47 +441,47 @@ def _check_and_clean_stale_resources(project_path: str, build_configuration: Opt
             src_file = Path(src_path)
             if not src_file.exists():
                 continue
-            # 资源源文件比 exe 新 → 需要重新编译
+            # Resource source file is newer than exe → recompile is needed
             if src_file.stat().st_mtime > exe_mtime:
                 stale_resources.append(res)
 
         if not stale_resources:
             return False
 
-        # 有资源变更: 删除可能生成的 .res 文件（brcc32 产物）和 .dcu 缓存
+        # Resource changes found: delete possibly generated .res files (brcc32 output) and .dcu cache
         res_files_cleaned = 0
         for res in stale_resources:
-            # brcc32 输出: 项目目录下同名的 .res 文件
+            # brcc32 output: a .res file with the same name under the project directory
             src_file = Path(res["source_path"])
             possible_res = src_file.with_suffix(".res")
             if possible_res.exists():
                 possible_res.unlink()
                 res_files_cleaned += 1
-                logger.info(f"资源变更 → 已删除旧 .res: {possible_res.name}")
+                logger.info(f"Resource changed → deleted old .res: {possible_res.name}")
 
-        # 同时清理项目目录下可能存在的 .res 缓存
-        # Delphi 有时会在 $(BDS)\lib\$(Platform)\release 下生成 .res
+        # Also clean up possible .res caches under the project directory
+        # Delphi sometimes generates .res under $(BDS)\lib\$(Platform)\release
         for res in stale_resources:
             res_name = f"{res['resource_id']}.res"
             for cached in proj_path.parent.rglob(res_name):
                 try:
                     cached.unlink()
-                    logger.info(f"资源变更 → 已删除缓存: {cached}")
+                    logger.info(f"Resource changed → deleted cache: {cached}")
                 except Exception as e:
-                    logger.debug("忽略非致命异常: %s", str(e))
+                    logger.debug("Ignoring non-fatal exception: %s", str(e))
 
-        # 也清理 .dcu 缓存（资源变动可能影响代码路径）
+        # Also clean .dcu cache (resource changes may affect code paths)
         _cleanup_project_dcu(proj_path.parent)
 
         logger.info(
-            f"检测到 {len(stale_resources)} 个资源文件已变更: "
+            f"Detected {len(stale_resources)} changed resource files: "
             + ", ".join(r["resource_id"] or r["include"] for r in stale_resources)
-            + "，已清理缓存，将执行完整重新编译"
+            + ", cache cleaned; a full rebuild will be performed"
         )
         return True
 
     except Exception as e:
-        logger.warning(f"资源变更检测异常(不影响编译): {e}")
+        logger.warning(f"Resource change detection exception (does not affect compilation): {e}")
         return False
 
 
@@ -507,38 +507,38 @@ async def compile_project(
     run_verify: bool = False
 ) -> CallToolResult:
     """
-    编译 Delphi 工程
+    Compile a Delphi project
 
     Args:
-        project_path: 项目文件路径(.dproj/.dpr/.dpk/.groupproj)
-        target_platform: 目标平台(win32/win64/osx64/osxarm64/iosdevice64/android/linux64等，不传时从 .dproj 读取)
-        output_path: 输出路径
-        compiler_version: 编译器版本名称
-        timeout: 超时时间(秒)
-        conditional_defines: 条件编译符号列表
-        unit_search_paths: 单元搜索路径列表
-        resource_search_paths: 资源搜索路径列表
-        optimize: 是否启用优化
-        debug: 是否生成调试信息
-        warning_level: 警告级别(0-4)
-        disabled_warnings: 禁用的警告列表
-        output_type: 输出类型(console/gui/dll)
-        runtime_library: 运行时库链接方式(static/dynamic)
-        build_configuration: 编译配置名称
-        extra_args: 附加到实际编译后端的完整参数列表
-        auto_install: 如果是设计期包，是否自动安装（默认 True）
-        run_after_compile: 编译成功后，以末次运行参数启动程序
-        run_verify: 编译成功后，启动程序 3 秒验证是否崩溃（自动结束进程）
+        project_path: Project file path (.dproj/.dpr/.dpk/.groupproj)
+        target_platform: Target platform (win32/win64/osx64/osxarm64/iosdevice64/android/linux64, etc.; read from .dproj when not passed)
+        output_path: Output path
+        compiler_version: Compiler version name
+        timeout: Timeout (seconds)
+        conditional_defines: List of conditional compilation symbols
+        unit_search_paths: List of unit search paths
+        resource_search_paths: List of resource search paths
+        optimize: Whether to enable optimization
+        debug: Whether to generate debug information
+        warning_level: Warning level (0-4)
+        disabled_warnings: List of disabled warnings
+        output_type: Output type (console/gui/dll)
+        runtime_library: Runtime library linking method (static/dynamic)
+        build_configuration: Build configuration name
+        extra_args: Complete argument list appended to the actual compilation backend
+        auto_install: If it is a design-time package, whether to install automatically (default True)
+        run_after_compile: After successful compilation, launch the program with the last run parameters
+        run_verify: After successful compilation, launch the program for 3 seconds to verify whether it crashes (automatically terminates the process)
 
     Returns:
-        编译结果字典
+        Compilation result dictionary
     """
-    logger.info(f"收到工程编译请求: {project_path}")
+    logger.info(f"Received project compilation request: {project_path}")
 
     if _compiler_service is None:
-        logger.error("编译服务未初始化")
+        logger.error("Compiler service is not initialized")
         return CallToolResult(
-            content=[{"type": "text", "text": "编译服务未初始化"}],
+            content=[{"type": "text", "text": "Compiler service is not initialized"}],
             isError=True
         )
 
@@ -550,10 +550,10 @@ async def compile_project(
                 isError=True,
             )
 
-        # 检查是否为 .dpk 文件
+        # Check whether it is a .dpk file
         project_ext = Path(project_path).suffix.lower()
 
-        # Lazarus 工程 (.lpi/.lpr): 直接走 lazbuild 编译
+        # Lazarus project (.lpi/.lpr): compile directly via lazbuild
         if project_ext in ('.lpi', '.lpr'):
             target_platform = (target_platform or "win32").lower()
 
@@ -576,7 +576,7 @@ async def compile_project(
             )
 
         if project_ext == '.groupproj':
-            # 处理项目组文件 (.groupproj)
+            # Handle project group file (.groupproj)
             return await _compile_group_project(
                 project_path=project_path,
                 target_platform=target_platform,
@@ -587,7 +587,7 @@ async def compile_project(
             )
 
         if project_ext == '.dpk':
-            # 处理 DPK 包文件
+            # Handle DPK package file
             return await _compile_dpk_package(
                 project_path=project_path,
                 target_platform=target_platform,
@@ -597,29 +597,29 @@ async def compile_project(
                 extra_args=extra_args,
             )
 
-        # 仅当用户未指定目标平台时才从 .dproj 读取
-        # （显式传入 win32/win64 等均不得被 .dproj 的 Active Platform 覆盖）
+        # Read from .dproj only when the user did not specify a target platform
+        # (explicitly passing win32/win64, etc. must not be overridden by the .dproj Active Platform)
         if not target_platform:
             target_platform = resolve_target_platform_from_dproj(project_path)
-            logger.info(f"从 .dproj 读取到目标平台: {target_platform}")
+            logger.info(f"Read target platform from .dproj: {target_platform}")
         else:
             target_platform = target_platform.lower()
         
-        # 自动检测编译器版本(如果未指定)
+        # Automatically detect compiler version (if not specified)
         if not compiler_version:
             detected = _detect_compiler_from_project(project_path, target_platform)
             if detected:
                 compiler_version = detected
-                logger.info(f"自动检测到编译器: {compiler_version}")
+                logger.info(f"Automatically detected compiler: {compiler_version}")
             else:
                 logger.info(
-                    "未自动检测到编译器,将由编译服务按项目配置/默认编译器解析"
+                    "No compiler was automatically detected; the compilation service will resolve it by project configuration/default compiler"
                 )
 
-        # 检查资源文件是否变更（自动清理缓存，强制重新编译）
+        # Check whether resource files changed (automatically clean cache to force recompilation)
         _check_and_clean_stale_resources(project_path, build_configuration, target_platform)
 
-        # 构建编译选项
+        # Build compilation options
         options = CompileOptions(
             target_platform=TargetPlatform(target_platform),
             output_path=output_path,
@@ -638,36 +638,36 @@ async def compile_project(
             extra_args=extra_args or [],
         )
 
-        # 构建编译请求
+        # Build compilation request
         request = ProjectCompileRequest(
             project_path=project_path,
             options=options
         )
 
-        # 执行编译
+        # Execute compilation
         result = await _compiler_service.compile_project(request)
 
-        # F2084 Internal Error: 编译器内部错误，通常由损坏的 .dcu 缓存引起
-        # 自动清理 .dcu 后重新编译一次
+        # F2084 Internal Error: compiler internal error, usually caused by corrupted .dcu cache
+        # automatically clean .dcu and recompile once
         if (result.status.value == "failed" and result.log and
             ("F2084" in result.log or "Internal Error" in result.log)):
-            logger.warning("检测到编译器内部错误(F2084)，清理 .dcu 缓存后重新编译...")
+            logger.warning("Detected compiler internal error (F2084), cleaning .dcu cache and recompiling...")
             _cleanup_project_dcu(Path(project_path).parent)
             result = await _compiler_service.compile_project(request)
             if result.status.value == "success":
-                logger.info("清理 .dcu 后编译成功")
+                logger.info("Compilation succeeded after cleaning .dcu")
             else:
-                logger.warning("清理 .dcu 后编译仍然失败")
+                logger.warning("Compilation still failed after cleaning .dcu")
 
-        # 返回结果 - 对 AI Agent 友好：结构化的产物路径列表
+        # Return result - AI Agent friendly: structured list of output artifact paths
         result_dict = result.to_dict()
 
-        # 编译成功后，如需启动程序
+        # After successful compilation, launch the program if requested
         if run_after_compile and result.status.value == "success":
             try:
                 exe_path = result.output_file
                 if exe_path and Path(exe_path).exists():
-                    # 从 .dproj 读取末次运行参数
+                    # Read last run parameters from .dproj
                     parser = DprojParser(project_path)
                     run_params = None
                     if parser.parse():
@@ -691,39 +691,39 @@ async def compile_project(
                         "pid": proc.pid,
                         "params": run_params,
                     }
-                    logger.info(f"编译后启动程序: {exe_path} PID={proc.pid} args={run_params}")
+                    logger.info(f"Launching program after compilation: {exe_path} PID={proc.pid} args={run_params}")
                 else:
-                    logger.warning(f"编译后启动: 未找到输出文件 {exe_path}")
+                    logger.warning(f"Launch after compilation: output file not found {exe_path}")
             except Exception as e:
-                logger.warning(f"编译后启动失败: {e}")
+                logger.warning(f"Launch after compilation failed: {e}")
 
-        # ── 运行验证（注入 StackTrace 单元，编译，运行后检查 exception.log）──
+        # ── Run verification (inject StackTrace unit, compile, run and check exception.log) ──
         if run_verify and result.status.value == "success":
             verify_info = {}
             backup_path = None
             try:
-                # 先求 exe 路径
+                # First compute the exe path
                 exe_path = str(_compute_verify_exe_path(
                     project_path,
                     target_platform or "win32",
                     build_configuration or "Debug"
                 ))
                 if not Path(exe_path).exists():
-                    logger.warning("运行验证: 未找到输出文件 %s", exe_path)
+                    logger.warning("Run verification: output file not found %s", exe_path)
                     verify_info = {"error": "output file not found"}
                 else:
-                    # 1. 备份并注入 StackTrace 单元到 .dproj
+                    # 1. Back up and inject StackTrace unit into .dproj
                     backup_path = _inject_verify_units(project_path)
 
-                    # 2. 重新编译（注入后的 .dproj 会被 msbuild 读取）
+                    # 2. Recompile (the injected .dproj will be read by msbuild)
                     verify_result = await _compiler_service.compile_project(request)
 
                     if verify_result.status.value != "success":
                         err_detail = verify_result.log or verify_result.error_message or "(no log)"
-                        logger.warning("注入 StackTrace 后编译失败: %s", err_detail[:500])
+                        logger.warning("Compilation failed after injecting StackTrace: %s", err_detail[:500])
                         verify_info = {"error": "injected compile failed", "log": err_detail[:1000]}
                     else:
-                        # 3. 运行验证 exe（无管道，读 exception.log）
+                        # 3. Run the verification exe (no pipe, read exception.log)
                         verify_exe = str(_compute_verify_exe_path(
                             project_path,
                             target_platform or "win32",
@@ -738,7 +738,7 @@ async def compile_project(
                                 try:
                                     log_path.unlink()
                                 except Exception as e:
-                                    logger.debug("清理 exception.log 失败: %s", e)
+                                    logger.debug("Failed to clean exception.log: %s", e)
 
                             proc = _subprocess.Popen([verify_exe], cwd=exe_dir)
                             try:
@@ -752,21 +752,21 @@ async def compile_project(
                                     enc = detect_encoding(str(log_path))
                                     log_content = log_path.read_text(encoding=enc, errors='replace')
                                     verify_info = {"error": "runtime exception", "log": log_content}
-                                    logger.warning("运行时异常: %s", log_content[:200])
+                                    logger.warning("Runtime exception: %s", log_content[:200])
                                 except Exception as read_err:
                                     verify_info = {"error": "runtime exception", "read_error": str(read_err)}
                             else:
                                 verify_info = {"passed": True}
-                                logger.info("运行验证通过")
+                                logger.info("Run verification passed")
             except Exception as e:
-                logger.warning("运行验证异常: %s", e, exc_info=True)
+                logger.warning("Run verification exception: %s", e, exc_info=True)
                 verify_info = {"error": str(e)}
             finally:
                 if backup_path:
                     try:
                         _restore_dproj(project_path, backup_path)
                     except Exception as e:
-                        logger.error("恢复 .dproj 失败: %s", e)
+                        logger.error("Failed to restore .dproj: %s", e)
                         verify_info.setdefault("errors", []).append(f"restore dproj failed: {e}")
 
             result_dict["_verify"] = verify_info
@@ -777,7 +777,7 @@ async def compile_project(
             isError=result.status.value != "success"
         )
     except Exception as e:
-        error_msg = f"编译过程发生异常: {str(e)}"
+        error_msg = f"Exception occurred during compilation: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return CallToolResult(
             content=[{"type": "text", "text": error_msg}],
@@ -794,30 +794,30 @@ async def _compile_dpk_package(
     extra_args: Optional[List[str]] = None,
 ) -> CallToolResult:
     """
-    编译 DPK 包文件
+    Compile a DPK package file
 
     Args:
-        project_path: DPK 文件路径
-        target_platform: 目标平台
-        build_configuration: 构建配置
-        timeout: 超时时间
-        auto_install: 是否安装设计期包
-        extra_args: 附加到 MSBuild 的完整参数列表
+        project_path: DPK file path
+        target_platform: Target platform
+        build_configuration: Build configuration
+        timeout: Timeout
+        auto_install: Whether to install design-time package
+        extra_args: Complete argument list appended to MSBuild
 
     Returns:
-        编译结果
+        Compilation result
     """
-    # 查找对应的 .dproj 文件
+    # Find the corresponding .dproj file
     dproj_path = Path(project_path).with_suffix('.dproj')
     
     if not dproj_path.exists():
-        # 如果没有 .dproj，尝试直接编译 .dpk
-        logger.warning(f"未找到对应的 .dproj 文件: {dproj_path}，尝试直接编译 .dpk")
+        # If there is no .dproj, try compiling .dpk directly
+        logger.warning(f"Corresponding .dproj file not found: {dproj_path}, trying to compile .dpk directly")
         dproj_path = Path(project_path)
     
-    # 使用 install_package 中的函数编译和检测
+    # Use functions in install_package to compile and detect
     if _has_install_package:
-        # 复用 install_package 的完整编译逻辑
+        # Reuse the full compilation logic of install_package
         compile_result = await _compile_single_package(
             str(dproj_path),
             target_platform,
@@ -833,7 +833,7 @@ async def _compile_dpk_package(
         errors = compile_result.get("errors", [])
         warnings = compile_result.get("warnings", [])
     else:
-        # 降级方案
+        # Fallback plan
         is_design_package = _is_design_package_simple(project_path)
         
         options = CompileOptions(
@@ -856,48 +856,48 @@ async def _compile_dpk_package(
         errors = result.errors
         warnings = result.warnings
     
-    logger.info(f"包类型: {'设计期包' if is_design_package else '运行期包'}")
+    logger.info(f"Package type: {'design-time package' if is_design_package else 'runtime package'}")
     
-    # 如果编译成功且是设计期包，自动安装
+    # If compilation succeeds and it is a design-time package, install automatically
     if success and is_design_package and auto_install:
-        logger.info("编译成功，开始安装设计期包...")
+        logger.info("Compilation succeeded, starting to install design-time package...")
         
-        # 使用 install_package 中的注册函数
+        # Use registration function in install_package
         if _has_install_package:
             version = _get_delphi_version()
             install_success = _register_packages_to_ide([output_file], version)
             install_result = "installed to IDE" if install_success else "auto-install failed, manual install required"
         else:
-            install_result = f"请手动安装: {output_file}"
+            install_result = f"Please install manually: {output_file}"
         
-        # 扫描所有输出产物
+        # Scan all output artifacts
         try:
             of = CompilerService._collect_output_files(
                 project_path, target_platform, build_configuration,
             )
         except Exception:
             of = []
-        output_text = f"编译成功: {output_file}\n"
-        output_text += f"包类型: 设计期包\n"
+        output_text = f"Compilation succeeded: {output_file}\n"
+        output_text += f"Package type: design-time package\n"
         if of:
             output_text += "\n[Output Files]\n"
             for f in of:
                 output_text += f"  {f}\n"
-        output_text += f"\n安装结果: {install_result}"
+        output_text += f"\nInstallation result: {install_result}"
         
         return CallToolResult(
             content=[{"type": "text", "text": output_text}],
             isError=False
         )
     
-    # 返回编译结果
-    output_text = f"编译{'成功' if success else '失败'}\n"
-    output_text += f"输出文件: {output_file}\n"
-    output_text += f"包类型: {'设计期包' if is_design_package else '运行期包'}\n"
+    # Return compilation result
+    output_text = f"Compilation {'succeeded' if success else 'failed'}\n"
+    output_text += f"Output file: {output_file}\n"
+    output_text += f"Package type: {'design-time package' if is_design_package else 'runtime package'}\n"
 
-    # 显示所有输出产物路径（对 AI Agent 后续操作至关重要）
+    # Display all output artifact paths (critical for subsequent AI Agent operations)
     if success:
-        # 尝试扫描输出产物
+        # Try to scan output artifacts
         try:
             of = CompilerService._collect_output_files(
                 project_path,
@@ -909,15 +909,15 @@ async def _compile_dpk_package(
                 for f in of:
                     output_text += f"  {f}\n"
         except Exception as e:
-            logger.debug("收集输出文件列表失败: %s", e)
+            logger.debug("Failed to collect output file list: %s", e)
         
     if errors:
-        output_text += f"\n错误:\n"
+        output_text += f"\nErrors:\n"
         for err in errors:
             output_text += f"  {err}\n"
         
     if warnings:
-        output_text += f"\n警告:\n"
+        output_text += f"\nWarnings:\n"
         for warn in warnings:
             output_text += f"  {warn}\n"
         
@@ -936,26 +936,26 @@ async def _compile_group_project(
     extra_args: Optional[List[str]] = None,
 ) -> CallToolResult:
     """
-    编译项目组 (.groupproj) 中的所有子项目
+    Compile all child projects in a project group (.groupproj)
 
-    解析 .groupproj XML 文件，提取所有 Projects 条目，
-    按 <BuildOrder> 排序后逐个编译，汇总所有结果。
+    Parse the .groupproj XML file, extract all Projects entries,
+    sort by <BuildOrder>, compile one by one, and aggregate all results.
 
-    支持的 XML 节点：
-      - <Projects Include="..."> + <Dependencies>  (旧格式)
-      - <ProjectReference Include="...">             (新格式)
-      - <BuildOrder>                                 (编译顺序)
+    Supported XML nodes:
+      - <Projects Include="..."> + <Dependencies>  (old format)
+      - <ProjectReference Include="...">             (new format)
+      - <BuildOrder>                                 (build order)
 
     Args:
-        project_path: .groupproj 文件路径
-        target_platform: 目标平台
-        build_configuration: 编译配置
-        timeout: 单个子项目超时时间
-        compiler_version: 编译器版本
-        extra_args: 附加编译参数
+        project_path: .groupproj file path
+        target_platform: Target platform
+        build_configuration: Build configuration
+        timeout: Timeout for a single child project
+        compiler_version: Compiler version
+        extra_args: Extra compilation arguments
 
     Returns:
-        汇总编译结果
+        Aggregated compilation result
     """
     import xml.etree.ElementTree as ET
     from ..utils.groupproj_parser import (
@@ -965,19 +965,19 @@ async def _compile_group_project(
     )
     from ..utils.dproj_parser import resolve_target_platform_from_dproj
 
-    logger.info("编译项目组: %s", project_path)
+    logger.info("Compiling project group: %s", project_path)
     group_path = Path(project_path)
 
     try:
         info = parse_groupproj(group_path)
     except FileNotFoundError:
         return CallToolResult(
-            content=[{"type": "text", "text": f".groupproj 文件不存在: {project_path}"}],
+            content=[{"type": "text", "text": f".groupproj file does not exist: {project_path}"}],
             isError=True,
         )
     except ET.ParseError as e:
         return CallToolResult(
-            content=[{"type": "text", "text": f"解析 .groupproj XML 失败: {e}"}],
+            content=[{"type": "text", "text": f"Failed to parse .groupproj XML: {e}"}],
             isError=True,
         )
 
@@ -985,22 +985,22 @@ async def _compile_group_project(
 
     if not child_projects:
         return CallToolResult(
-            content=[{"type": "text", "text": f"项目组中未找到有效的子项目: {project_path}"}],
+            content=[{"type": "text", "text": f"No valid child projects found in project group: {project_path}"}],
             isError=True,
         )
 
-    # 使用 .groupproj 中的默认配置（如果未指定）
+    # Use the default configuration in .groupproj (if not specified)
     if not build_configuration or build_configuration == "Debug":
         build_configuration = get_config_for_project(info, fallback=build_configuration or "Debug")
 
     logger.info(
-        "项目组包含 %d 个子项目 (BuildOrder: %s): %s",
+        "Project group contains %d child projects (BuildOrder: %s): %s",
         len(child_projects),
-        "有" if info.build_order else "无",
+        "yes" if info.build_order else "no",
         [p.name for p in child_projects],
     )
 
-    # 逐个子项目编译并汇总结果
+    # Compile child projects one by one and aggregate results
     total_errors = 0
     total_warnings = 0
     success_count = 0
@@ -1010,11 +1010,11 @@ async def _compile_group_project(
 
     for child in child_projects:
         child_ext = child.suffix.lower()
-        logger.info(f"编译子项目 [{child.name}] ...")
+        logger.info(f"Compiling child project [{child.name}] ...")
 
         try:
             if child_ext in ('.dproj', '.dpr'):
-                # 解析子项目的目标平台
+                # Resolve target platform of child project
                 child_platform = (target_platform or "win32").lower()
                 if child_ext == '.dproj' or (child_ext == '.dpr' and child.with_suffix('.dproj').exists()):
                     try:
@@ -1024,7 +1024,7 @@ async def _compile_group_project(
                     except Exception:
                         pass
 
-                # 构建 CompileOptions
+                # Build CompileOptions
                 options = CompileOptions(
                     target_platform=TargetPlatform(child_platform),
                     build_configuration=build_configuration,
@@ -1042,7 +1042,7 @@ async def _compile_group_project(
                 child_warnings = result.warnings or []
 
             elif child_ext == '.dpk':
-                # DPK 包通过 _compile_dpk_package 编译
+                # DPK packages are compiled via _compile_dpk_package
                 dpk_result = await _compile_dpk_package(
                     project_path=str(child),
                     target_platform=target_platform or "win32",
@@ -1051,27 +1051,27 @@ async def _compile_group_project(
                     auto_install=False,
                     extra_args=extra_args,
                 )
-                # 从 dpk_result 提取状态（CallToolResult）
+                # Extract status from dpk_result (CallToolResult)
                 child_success = not dpk_result.isError
                 child_errors = [dpk_result.content[0].text] if not child_success else []
                 child_warnings = []
             else:
-                logger.warning(f"项目组中子项目类型不受支持，已跳过: {child} (扩展名: {child_ext})")
-                results_text_parts.append(f"  ⚠ {child.name}: 不支持的文件类型 ({child_ext})，已跳过")
+                logger.warning(f"Unsupported child project type in project group, skipped: {child} (extension: {child_ext})")
+                results_text_parts.append(f"  ⚠ {child.name}: unsupported file type ({child_ext}), skipped")
                 skip_count += 1
                 continue
 
             if child_success:
                 success_count += 1
-                results_text_parts.append(f"  ✅ {child.name}: 编译成功")
+                results_text_parts.append(f"  ✅ {child.name}: compilation succeeded")
             else:
-                results_text_parts.append(f"  ❌ {child.name}: 编译失败")
+                results_text_parts.append(f"  ❌ {child.name}: compilation failed")
                 all_success = False
 
             total_errors += len(child_errors) if isinstance(child_errors, list) else (1 if child_errors else 0)
             total_warnings += len(child_warnings) if isinstance(child_warnings, list) else 0
 
-            # 错误详情（截断显示）
+            # Error details (truncated display)
             if not child_success and child_errors:
                 for err in (child_errors[:5] if isinstance(child_errors, list) else [str(child_errors)[:300]]):
                     results_text_parts.append(f"      {err}")
@@ -1080,17 +1080,17 @@ async def _compile_group_project(
                     results_text_parts.append(f"      ⚠ {w}")
 
         except Exception as e:
-            logger.error(f"编译子项目 {child.name} 异常: {e}", exc_info=True)
-            results_text_parts.append(f"  ❌ {child.name}: 异常 — {e}")
+            logger.error(f"Child project {child.name} compilation exception: {e}", exc_info=True)
+            results_text_parts.append(f"  ❌ {child.name}: exception — {e}")
             all_success = False
             total_errors += 1
 
     output_text = (
-        f"项目组编译{'完成' if all_success else '完成（部分失败）'}\n"
-        f"项目组: {group_path.name}\n"
-        f"子项目: {len(child_projects)} 个, "
-        f"成功: {success_count}, 失败: {len(child_projects) - success_count - skip_count}, 跳过: {skip_count}\n"
-        f"总错误: {total_errors}, 总警告: {total_warnings}\n\n"
+        f"Project group compilation {'completed' if all_success else 'completed (with partial failure)'}\n"
+        f"Project group: {group_path.name}\n"
+        f"Child projects: {len(child_projects)}, "
+        f"Succeeded: {success_count}, Failed: {len(child_projects) - success_count - skip_count}, Skipped: {skip_count}\n"
+        f"Total errors: {total_errors}, Total warnings: {total_warnings}\n\n"
         + "\n".join(results_text_parts)
     )
 
@@ -1102,19 +1102,19 @@ async def _compile_group_project(
 
 def _is_design_package_simple(package_path: str) -> bool:
     """
-    简单检测是否为设计期包（降级方案，当 install_package 不可用时使用）
+    Simple detection of whether it is a design-time package (fallback used when install_package is unavailable)
 
     Args:
-        package_path: 包文件路径
+        package_path: Package file path
 
     Returns:
-        是否为设计期包
+        Whether it is a design-time package
     """
     try:
         with open(package_path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read().upper()
         
-        # 检测设计期包标记
+        # Detect design-time package markers
         design_markers = [
             '{$DESIGNONLY',
             'DSNIDE',
@@ -1128,5 +1128,5 @@ def _is_design_package_simple(package_path: str) -> bool:
         
         return False
     except Exception as e:
-        logger.error(f"检测包类型失败: {e}")
+        logger.error(f"Failed to detect package type: {e}")
         return False

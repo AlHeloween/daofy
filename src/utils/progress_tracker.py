@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-进度跟踪器
+Progress tracker
 
-用于长时间运行的任务的进度跟踪和反馈
+Progress tracking and feedback for long-running tasks.
 """
 
 import time
@@ -14,18 +14,18 @@ from dataclasses import dataclass
 
 @dataclass
 class ProgressInfo:
-    """进度信息"""
-    current: int  # 当前进度
-    total: int  # 总数
-    message: str  # 当前状态消息
-    percentage: float  # 百分比 (0-100)
-    elapsed_time: float  # 已用时间（秒）
-    estimated_remaining: float  # 预估剩余时间（秒）
-    speed: float  # 处理速度（项目/秒）
+    """Progress information"""
+    current: int  # Current progress
+    total: int  # Total count
+    message: str  # Current status message
+    percentage: float  # Percentage (0-100)
+    elapsed_time: float  # Elapsed time (seconds)
+    estimated_remaining: float  # Estimated remaining time (seconds)
+    speed: float  # Processing speed (items/second)
 
 
 class ProgressTracker:
-    """进度跟踪器"""
+    """Progress tracker"""
 
     def __init__(
         self,
@@ -34,12 +34,12 @@ class ProgressTracker:
         update_interval: float = 1.0
     ):
         """
-        初始化进度跟踪器
+        Initialize the progress tracker.
 
         Args:
-            total: 总项目数
-            callback: 进度回调函数
-            update_interval: 更新间隔（秒）
+            total: Total number of items
+            callback: Progress callback function
+            update_interval: Update interval (seconds)
         """
         self.total = total
         self.current = 0
@@ -52,36 +52,36 @@ class ProgressTracker:
 
     def update(self, increment: int = 1, message: str = ""):
         """
-        更新进度
+        Update progress.
 
         Args:
-            increment: 增量
-            message: 状态消息
+            increment: Increment
+            message: Status message
         """
         self.current += increment
         current_time = time.time()
 
-        # 检查是否需要更新（基于时间间隔）
+        # Check whether an update is due (based on the time interval)
         if current_time - self.last_update_time >= self.update_interval:
             self._notify_progress(message)
             self.last_update_time = current_time
             self.last_update_count = self.current
 
     def _notify_progress(self, message: str = ""):
-        """通知进度更新"""
+        """Notify a progress update"""
         if not self.callback:
             return
 
         elapsed_time = time.time() - self.start_time
         percentage = (self.current / self.total * 100) if self.total > 0 else 0
 
-        # 计算处理速度
+        # Compute the processing speed
         if elapsed_time > 0:
             speed = self.current / elapsed_time
         else:
             speed = 0
 
-        # 估算剩余时间
+        # Estimate the remaining time
         if speed > 0 and self.current < self.total:
             remaining_items = self.total - self.current
             estimated_remaining = remaining_items / speed
@@ -91,7 +91,7 @@ class ProgressTracker:
         progress_info = ProgressInfo(
             current=self.current,
             total=self.total,
-            message=message or f"处理中... ({self.current}/{self.total})",
+            message=message or f"Processing... ({self.current}/{self.total})",
             percentage=percentage,
             elapsed_time=elapsed_time,
             estimated_remaining=estimated_remaining,
@@ -100,47 +100,47 @@ class ProgressTracker:
 
         self.callback(progress_info)
 
-    def finish(self, message: str = "完成"):
+    def finish(self, message: str = "Done"):
         """
-        完成进度跟踪
+        Finish progress tracking.
 
         Args:
-            message: 完成消息
+            message: Completion message
         """
         self.current = self.total
         self._notify_progress(message)
 
     def get_progress_text(self, progress: ProgressInfo) -> str:
         """
-        获取格式化的进度文本
+        Get the formatted progress text.
 
         Args:
-            progress: 进度信息
+            progress: Progress information
 
         Returns:
-            格式化的进度文本
+            Formatted progress text
         """
         elapsed = self._format_time(progress.elapsed_time)
         remaining = self._format_time(progress.estimated_remaining)
 
         text = (
-            f"进度: {progress.current}/{progress.total} "
+            f"Progress: {progress.current}/{progress.total} "
             f"({progress.percentage:.1f}%) | "
-            f"速度: {progress.speed:.1f}项/秒 | "
-            f"已用: {elapsed} | "
-            f"剩余: {remaining} | "
+            f"Speed: {progress.speed:.1f} items/s | "
+            f"Elapsed: {elapsed} | "
+            f"Remaining: {remaining} | "
             f"{progress.message}"
         )
 
         return text
 
     def _format_time(self, seconds: float) -> str:
-        """格式化时间"""
+        """Format a duration"""
         if seconds < 60:
-            return f"{seconds:.0f}秒"
+            return f"{seconds:.0f}s"
         elif seconds < 3600:
             minutes = seconds / 60
-            return f"{minutes:.1f}分钟"
+            return f"{minutes:.1f} min"
         else:
             hours = seconds / 3600
-            return f"{hours:.1f}小时"
+            return f"{hours:.1f} h"

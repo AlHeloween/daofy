@@ -255,12 +255,12 @@ def _extract_document_metadata(text: str) -> tuple[str, str]:
     version = ""
     updated = ""
     for line in text.splitlines()[:20]:
-        if "版本:" in line:
-            match = re.search(r"版本:\s*([^|]+)", line)
+        if "版本:" in line or re.search(r"Version\s*:", line):
+            match = re.search(r"(?:版本|Version)\s*:\s*([^|]+)", line)
             if match:
                 version = match.group(1).strip()
-        if "最后更新:" in line:
-            match = re.search(r"最后更新:\s*([^|]+)", line)
+        if "最后更新:" in line or re.search(r"Last updated\s*:", line):
+            match = re.search(r"(?:最后更新|Last updated)\s*:\s*([^|]+)", line)
             if match:
                 updated = match.group(1).strip()
         if re.match(r"^\s*version\s*:", line, flags=re.IGNORECASE) and not version:

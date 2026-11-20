@@ -1,13 +1,13 @@
-<!-- @when: 测试树控件（TreeView/VirtualStringTree）的展开/折叠/选中 -->
+<!-- @when: Test expanding/collapsing/selecting tree controls (TreeView/VirtualStringTree) -->
 <!-- @part-of: ui-testing -->
 
-#### E. 树形导航
+#### E. Tree Navigation
 
-| 要素 | 内容 |
+| Element | Content |
 |------|------|
-| **目标** | 展开/折叠树节点，选中叶子节点 |
-| **策略** | click 展开 → waitfor 子节点可见 → click 选中叶子 → capture |
-| **关键命令** | `click`（`@` 节点定位）, `waitfor`, `capture` |
+| **Goal** | Expand/collapse tree nodes, select leaf nodes |
+| **Strategy** | click expand → waitfor child nodes visible → click select leaf → capture |
+| **Key commands** | `click` (`@` node targeting), `waitfor`, `capture` |
 
 ```json
 [
@@ -22,4 +22,5 @@
 ]
 ```
 
-**陷阱**：`@` 节点匹配是首次匹配 → 同名节点时用 `expand` 命令展开父节点再选；虚拟树节点需 scroll 后才加载。
+**Pitfall**: `@` node matching is first-match → when node names are duplicated, use the `expand` command to expand the parent node before selecting; virtual tree nodes need to be scrolled before they load.
+

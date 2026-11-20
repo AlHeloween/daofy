@@ -1,16 +1,16 @@
 """
-第三方库知识库服务
+Third-party library knowledge base service
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Zuoyou Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
-Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
+Update & Mod By Crystalxp (Dark Night Killer QQ:281309196)
 
-为 Delphi 第三方库提供知识库功能:
-1. 从注册表读取 Delphi 版本的 Library 路径
-2. 解析 Browsing Path 和 Search Path
-3. 展开环境变量并去重
-4. 排除 Delphi 自带路径
-5. 构建第三方库知识库
+Provides knowledge base functionality for Delphi third-party libraries:
+1. Read Library paths for Delphi version from registry
+2. Parse Browsing Path and Search Path
+3. Expand environment variables and deduplicate
+4. Exclude Delphi built-in paths
+5. Build third-party library knowledge base
 """
 
 import os
@@ -29,7 +29,7 @@ try:
     from ...utils.delphi_env import expand_delphi_path_macros, get_delphi_version, get_catalog_repository_paths
     logger = get_logger(__name__)
 except ImportError:
-    # 支持直接运行测试
+    # Support direct test running
     from src.constants import REG_KEY_EMBARCADERO_BDS, REG_KEY_EMBARCADERO_STUDIO
     from zvec_adapter import ZVecKnowledgeBaseAdapter
     import logging
@@ -40,7 +40,7 @@ except ImportError:
         handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
         logger.addHandler(handler)
 
-    # 测试模式下 fallback 实现
+    # Test mode fallback implementation
     def expand_delphi_path_macros(path: str, version: Optional[str] = None) -> str:
         return os.path.expandvars(path)
 
@@ -52,19 +52,19 @@ except ImportError:
 
 
 class ThirdPartyKnowledgeBase:
-    """第三方库知识库管理器"""
+    """Third-party library knowledge base manager"""
 
     def __init__(self, kb_dir: Optional[str] = None, progress_callback: Optional[Callable] = None) -> None:
         """
-        初始化第三方库知识库
+        Initialize third-party library knowledge base
 
         Args:
-            kb_dir: 知识库目录路径,如果为 None 则使用默认路径
-            progress_callback: 进度回调函数
+            kb_dir: Knowledge base directory path; if None, use default path
+            progress_callback: Progress callback function
         """
         self.kb_dir: Path
         if kb_dir is None:
-            # 默认路径: MCP 服务器目录下的 data/thirdparty-knowledge-base
+            # Default path: data/thirdparty-knowledge-base under MCP server directory
             server_root = Path(__file__).parent.parent.parent.parent
             kb_dir = server_root / "data" / "thirdparty-knowledge-base"
         else:
@@ -73,32 +73,32 @@ class ThirdPartyKnowledgeBase:
         self.kb_dir = kb_dir
         self.kb_instance = None
         self.delphi_versions = []
-        self.environment_variables = {}  # 环境变量缓存
+        self.environment_variables = {}  # Environment variable cache
         self.progress_callback = progress_callback
 
-        # 创建必要的目录
+        # Create necessary directories
         self.kb_dir.mkdir(parents=True, exist_ok=True)
 
-        # 元数据文件
+        # Metadata file
         self.metadata_file = self.kb_dir / "thirdparty_metadata.json"
         self.paths_file = self.kb_dir / "thirdparty_paths.json"
 
-        # 加载元数据
+        # Load metadata
         self.metadata = self._load_metadata()
 
-        # 检测 Delphi 版本
+        # Detect Delphi versions
         self.detect_delphi_versions()
 
-        logger.info("第三方库知识库初始化完成")
+        logger.info("Third-party library knowledge base initialization complete")
 
     def _load_metadata(self) -> Dict:
-        """加载元数据"""
+        """Load metadata"""
         if self.metadata_file.exists():
             try:
                 with open(self.metadata_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except Exception as e:
-                logger.warning(f"加载元数据失败: {e}")
+                logger.warning(f"Failed to load metadata: {e}")
 
         return {
             "created_at": datetime.now().isoformat(),
@@ -109,17 +109,17 @@ class ThirdPartyKnowledgeBase:
         }
 
     def _save_metadata(self):
-        """保存元数据"""
+        """Save metadata"""
         self.metadata["last_updated"] = datetime.now().isoformat()
         with open(self.metadata_file, 'w', encoding='utf-8') as f:
             json.dump(self.metadata, f, ensure_ascii=False, indent=2)
 
     def detect_delphi_versions(self) -> List[Dict]:
         """
-        检测已安装的 Delphi 版本
+        Detect installed Delphi versions
 
         Returns:
-            Delphi 版本列表
+            List of Delphi versions
         """
         import winreg
 
@@ -156,16 +156,16 @@ class ThirdPartyKnowledgeBase:
             winreg.CloseKey(key)
 
         except Exception as e:
-            logger.warning(f"检测 Delphi 版本失败: {e}")
+            logger.warning(f"Failed to detect Delphi versions: {e}")
 
         self.delphi_versions = versions
         return versions
 
     def get_latest_version(self) -> Optional[Dict]:
-        """获取最新安装的 Delphi 版本"""
+        """Get latest installed Delphi version"""
         if not self.delphi_versions:
             return None
-        # 按版本号排序，返回最新版本
+        # Sort by version number, return latest version
         sorted_versions = sorted(
             self.delphi_versions,
             key=lambda x: tuple(int(p) for p in x["version"].split('.')),
@@ -174,23 +174,23 @@ class ThirdPartyKnowledgeBase:
         return sorted_versions[0]
 
     def _get_delphi_name_by_version_key(self, version_key: str) -> str:
-        """根据注册表版本键（如 "22.0"）获取 Delphi 版本名称
+        """Get Delphi version name from registry version key (e.g. "22.0")
 
-        注意与 config_manager._get_delphi_version_name 的区别：
-        后者按安装路径解析版本名，本方法按注册表键名解析。
+        Note the difference from config_manager._get_delphi_version_name:
+        the latter resolves version name by installation path, while this method resolves by registry key name.
         """
         from src.utils.delphi_versions import get_version_name
         return get_version_name(version_key)
 
     def _load_environment_variables(self, version: str) -> Dict[str, str]:
         """
-        加载指定 Delphi 版本的环境变量
+        Load environment variables for specified Delphi version
 
         Args:
-            version: Delphi 版本号 (如 "37.0")
+            version: Delphi version number (e.g. "37.0")
 
         Returns:
-            环境变量字典
+            Environment variable dictionary
         """
         import winreg
 
@@ -212,59 +212,59 @@ class ThirdPartyKnowledgeBase:
             winreg.CloseKey(key)
 
         except Exception as e:
-            logger.warning(f"加载环境变量失败 (版本 {version}): {e}")
+            logger.warning(f"Failed to load environment variables (version {version}): {e}")
 
         return env_vars
 
     def _expand_path_variables(self, path: str, env_vars: Dict[str, str]) -> str:
         """
-        展开路径中的环境变量
+        Expand environment variables in path
 
         Args:
-            path: 原始路径 (可能包含 $(VAR) 格式)
-            env_vars: 环境变量字典
+            path: Original path (may contain $(VAR) format)
+            env_vars: Environment variable dictionary
 
         Returns:
-            展开后的路径
+            Expanded path
         """
-        # 匹配 $(VAR) 格式的变量
+        # Match variables in $(VAR) format
         pattern = r'\$\(([^)]+)\)'
 
         def replace_var(match):
             var_name = match.group(1)
             if var_name in env_vars:
                 return env_vars[var_name]
-            # 保留未定义的变量
+            # Keep undefined variables
             return match.group(0)
 
         return re.sub(pattern, replace_var, path)
 
     def _is_delphi_system_path(self, path: str, version_key: Optional[str] = None) -> bool:
         """
-        检查路径是否是 Delphi 系统路径
+        Check if path is a Delphi system path
 
         Args:
-            path: 路径字符串
-            version_key: Delphi 版本号
+            path: Path string
+            version_key: Delphi version number
 
         Returns:
-            是否是系统路径
+            Whether it is a system path
         """
         path_lower = path.lower()
 
-        # 检查是否包含 Delphi 系统路径变量
+        # Check if contains Delphi system path variables
         system_vars = ['$(bdsccommondir)', '$(bdslib)', '$(bds)', '$(bdsbin)', '$(bdsuserdir)']
         for var in system_vars:
             if var in path_lower:
                 return True
 
-        # 检查是否在 Delphi 安装目录下
+        # Check if under Delphi installation directory
         for version in self.delphi_versions:
             root_dir = version.get("root_dir", "")
             if root_dir and path_lower.startswith(root_dir.lower()):
                 return True
 
-        # 检查是否是公共文档下的 Delphi 系统目录
+        # Check if it is a Delphi system directory under public documents
         user_docs = os.path.expanduser("~\\Documents").lower()
         delphi_common_dirs = ['imports', 'bpl', 'dcp', 'bpl\\win32', 'bpl\\win64', 'dcp\\win32', 'dcp\\win64']
         if path_lower.startswith(user_docs + '\\embarcadero\\studio\\'):
@@ -277,26 +277,26 @@ class ThirdPartyKnowledgeBase:
 
     def get_library_paths(self, version: Optional[str] = None) -> List[str]:
         """
-        获取指定 Delphi 版本的 Library 路径
+        Get Library paths for specified Delphi version
 
         Args:
-            version: Delphi 版本号,如果为 None 则使用最新版本
+            version: Delphi version number; if None, use latest version
 
         Returns:
-            第三方库路径列表
+            List of third-party library paths
         """
         import winreg
 
-        # 长驻服务场景：服务在安装编译器前启动，__init__ 时 detect_delphi_versions
-        # 的结果被缓存为空。若直接返回 [] 会让 delphi_kb build kb_type=thirdparty
-        # 空跑成功。此处缓存为空时重新检测注册表，拾取新安装的编译器。
+        # Long-running service scenario: service starts before compiler installation; detect_delphi_versions at __init__
+        # caches empty result. Directly returning [] would make delphi_kb build kb_type=thirdparty
+        # succeed without doing work. Here, when cache is empty, re-detect registry to pick up newly installed compiler.
         if not self.delphi_versions:
-            logger.info("Delphi 版本缓存为空，重新检测注册表...")
+            logger.info("Delphi version cache is empty, re-detecting registry...")
             self.detect_delphi_versions()
 
-        # 选择 Delphi 版本
+        # Select Delphi version
         if not self.delphi_versions:
-            logger.error("未检测到 Delphi 版本")
+            logger.error("No Delphi version detected")
             return []
 
         if version is None:
@@ -309,37 +309,37 @@ class ThirdPartyKnowledgeBase:
                     break
 
         if not selected_version:
-            logger.error(f"未找到 Delphi 版本: {version}")
+            logger.error(f"Delphi version not found: {version}")
             return []
 
         version_key = selected_version["version"]
-        logger.info(f"使用 Delphi 版本: {selected_version['name']} ({version_key})")
+        logger.info(f"Using Delphi version: {selected_version['name']} ({version_key})")
 
-        # 加载环境变量
+        # Load environment variables
         env_vars = self._load_environment_variables(version_key)
         self.environment_variables = env_vars
 
         all_paths = []
 
-        # 读取 BDS Library 路径
+        # Read BDS Library paths
         try:
             library_key_path = f"{REG_KEY_EMBARCADERO_BDS}\\{version_key}\\Library"
             library_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, library_key_path)
             all_paths.extend(self._read_library_paths(library_key, version_key))
             winreg.CloseKey(library_key)
         except Exception as e:
-            logger.debug(f"读取 BDS Library 路径失败: {e}")
+            logger.debug(f"Failed to read BDS Library paths: {e}")
 
-        # 读取 Studio Library 路径（公共库路径）
+        # Read Studio Library paths (common library paths)
         try:
             studio_key_path = f"{REG_KEY_EMBARCADERO_STUDIO}\\{version_key}\\Library"
             studio_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, studio_key_path)
             all_paths.extend(self._read_library_paths(studio_key, version_key))
             winreg.CloseKey(studio_key)
         except Exception as e:
-            logger.debug(f"读取 Studio Library 路径失败: {e}")
+            logger.debug(f"Failed to read Studio Library paths: {e}")
 
-        # 去重并保持顺序
+        # Deduplicate and preserve order
         seen = set()
         unique_paths = []
         for path in all_paths:
@@ -347,33 +347,33 @@ class ThirdPartyKnowledgeBase:
                 seen.add(path)
                 unique_paths.append(path)
 
-        logger.info(f"从注册表读取到 {len(unique_paths)} 个唯一路径")
+        logger.info(f"Read {len(unique_paths)} unique paths from registry")
 
-        # 展开环境变量并过滤
+        # Expand environment variables and filter
         thirdparty_paths = []
         for path in unique_paths:
-            # 先展开环境变量，再用展开后的路径判断是否系统路径
+            # Expand environment variables first, then use expanded path to determine if system path
             try:
                 expanded_path = expand_delphi_path_macros(path, version=version_key)
             except Exception:
-                # 回退到原有的展开方法
+                # Fall back to original expansion method
                 expanded_path = self._expand_path_variables(path, env_vars)
 
-            # 跳过 Delphi 系统路径（展开后判断，避免 $(BDS) 宏误杀所有路径）
+            # Skip Delphi system paths (judge after expansion to avoid $(BDS) macro mistakenly killing all paths)
             if self._is_delphi_system_path(expanded_path):
-                logger.debug(f"跳过 Delphi 系统路径: {expanded_path}")
+                logger.debug(f"Skipping Delphi system path: {expanded_path}")
                 continue
 
-            # 检查路径是否存在
+            # Check if path exists
             path_obj = Path(expanded_path)
             if path_obj.exists():
                 thirdparty_paths.append(str(path_obj.resolve()))
             else:
-                # 尝试展开 GetIt CatalogRepository 路径
+                # Try to expand GetIt CatalogRepository path
                 if 'CatalogRepository' in expanded_path:
-                    logger.debug(f"GetIt 路径不存在: {expanded_path}")
+                    logger.debug(f"GetIt path does not exist: {expanded_path}")
 
-        # 最终去重
+        # Final deduplication
         seen = set()
         final_paths = []
         for path in thirdparty_paths:
@@ -381,31 +381,31 @@ class ThirdPartyKnowledgeBase:
                 seen.add(path)
                 final_paths.append(path)
 
-        logger.info(f"过滤后得到 {len(final_paths)} 个第三方库路径")
+        logger.info(f"After filtering, got {len(final_paths)} third-party library paths")
 
-        # 额外添加 GetIt CatalogRepository 中的组件源码路径
+        # Additionally add component source paths from GetIt CatalogRepository
         try:
             getit_paths = get_catalog_repository_paths(version_key)
             for getit_path in getit_paths:
                 if getit_path not in final_paths:
                     final_paths.append(getit_path)
-                    logger.debug(f"添加 GetIt 组件路径: {getit_path}")
+                    logger.debug(f"Adding GetIt component path: {getit_path}")
         except Exception as e:
-            logger.warning(f"获取 GetIt 路径失败: {e}")
+            logger.warning(f"Failed to get GetIt paths: {e}")
 
-        logger.info(f"最终得到 {len(final_paths)} 个第三方库路径")
+        logger.info(f"Finally got {len(final_paths)} third-party library paths")
 
-        # 保存路径列表
+        # Save path list
         self._save_paths(final_paths, selected_version)
 
         return final_paths
 
     def _read_library_paths(self, library_key, version_key: str) -> List[str]:
-        """从注册表 Library 键读取路径"""
+        """Read paths from registry Library key"""
         import winreg
         paths = []
         
-        # 遍历所有平台 (Win32, Win64, etc.)
+        # Iterate over all platforms (Win32, Win64, etc.)
         i = 0
         while True:
             try:
@@ -415,23 +415,23 @@ class ThirdPartyKnowledgeBase:
                 platform_key = winreg.OpenKey(library_key, platform_name)
 
                 try:
-                    # 读取 Browsing Path
+                    # Read Browsing Path
                     try:
                         browsing_path = winreg.QueryValueEx(platform_key, "Browsing Path")[0]
                         if browsing_path:
                             p_list = [p.strip() for p in browsing_path.split(';') if p.strip()]
                             paths.extend(p_list)
-                            logger.debug(f"平台 {platform_name} Browsing Path: {len(p_list)} 个路径")
+                            logger.debug(f"Platform {platform_name} Browsing Path: {len(p_list)} paths")
                     except OSError:
                         pass
 
-                    # 读取 Search Path
+                    # Read Search Path
                     try:
                         search_path = winreg.QueryValueEx(platform_key, "Search Path")[0]
                         if search_path:
                             p_list = [p.strip() for p in search_path.split(';') if p.strip()]
                             paths.extend(p_list)
-                            logger.debug(f"平台 {platform_name} Search Path: {len(p_list)} 个路径")
+                            logger.debug(f"Platform {platform_name} Search Path: {len(p_list)} paths")
                     except OSError:
                         pass
 
@@ -444,15 +444,15 @@ class ThirdPartyKnowledgeBase:
         return paths
 
     def _report_progress(self, percent: float, message: str) -> None:
-        """报告进度（安全调用 progress_callback）"""
+        """Report progress (safely call progress_callback)"""
         if self.progress_callback:
             try:
                 self.progress_callback(percent, message)
             except Exception as e:
-                logger.debug("忽略非致命异常: %s", str(e))
+                logger.debug("Ignoring non-fatal exception: %s", str(e))
 
     def _save_paths(self, paths: List[str], version_info: Dict):
-        """保存路径列表"""
+        """Save path list"""
         data = {
             "version": version_info,
             "paths": paths,
@@ -463,10 +463,10 @@ class ThirdPartyKnowledgeBase:
         with open(self.paths_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-        logger.info(f"路径列表已保存到: {self.paths_file}")
+        logger.info(f"Path list saved to: {self.paths_file}")
 
     def build_thirdparty_knowledge_base(self, version: Optional[str] = None, rebuild: bool = False) -> bool:
-        "构建三方库知识库 (ZVec)"
+        """Build third-party library knowledge base (ZVec)"""
         import time, shutil
         from pathlib import Path
         _bt = time.time()
@@ -488,7 +488,7 @@ class ThirdPartyKnowledgeBase:
             logger.warning("No chunks"); return False
         logger.info("Chunked: " + str(len(chunks)))
 
-        # 迁移旧版 zvec_thirdparty/ 子目录到根目录
+        # Migrate old zvec_thirdparty/ subdirectory to root directory
         from .zvec_adapter import _migrate_old_zvec_data
         old_zvec = self.kb_dir / "zvec_thirdparty"
         if old_zvec.exists() and old_zvec != self.kb_dir:
@@ -498,7 +498,7 @@ class ThirdPartyKnowledgeBase:
         import zvec
         from zvec import CollectionSchema, FieldSchema, DataType, FtsIndexParam, InvertIndexParam, Doc
 
-        # 打开或创建集合：存在有效集合则 open，否则删除目录后 create_and_open
+        # Open or create collection: open if valid collection exists, otherwise remove directory and create_and_open
         kv_path = Path(kv_dir)
         has_valid = kv_path.exists() and any(
             f.name.startswith("manifest") for f in kv_path.iterdir()
@@ -506,8 +506,8 @@ class ThirdPartyKnowledgeBase:
         if has_valid:
             col = zvec.open(kv_dir)
             if rebuild:
-                # 重建：先关闭集合释放 Windows 句柄，再删目录。
-                # 若不关闭，打开的句柄（如 RocksDB LOCK）会让 rmtree 静默失败。
+                # Rebuild: close collection first to release Windows handles, then delete directory.
+                # If not closed, open handles (e.g. RocksDB LOCK) will make rmtree fail silently.
                 try:
                     col.close()
                 except Exception:
@@ -519,7 +519,7 @@ class ThirdPartyKnowledgeBase:
             if kv_path.exists():
                 import shutil as _shutil
                 _shutil.rmtree(kv_dir, ignore_errors=True)
-            # 简化 schema：entity_name 合并到 chunk_text 中
+            # Simplified schema: entity_name merged into chunk_text
             schema = CollectionSchema("thirdparty_kb", fields=[
                 FieldSchema("chunk_text", DataType.STRING),
                 FieldSchema("chunk_type", DataType.STRING),
@@ -530,7 +530,7 @@ class ThirdPartyKnowledgeBase:
             ])
             col = zvec.create_and_open(path=kv_dir, schema=schema)
 
-        # 先插入数据
+        # Insert data first
         for offset in range(0, len(chunks), 500):
             batch = chunks[offset:offset+500]
             docs = []
@@ -546,14 +546,14 @@ class ThirdPartyKnowledgeBase:
             col.insert(docs)
         col.flush()
 
-        # 再建索引（对已有集合重复 create_index 安全，zvec 不会报错）
+        # Then create indexes (repeating create_index on existing collection is safe, zvec will not error)
         col.create_index("chunk_text", FtsIndexParam(tokenizer_name="jieba"))
         col.create_index("chunk_type", InvertIndexParam())
         col.create_index("base_class", InvertIndexParam())
         col.optimize()
         col.flush()
 
-        # 保存构建元数据
+        # Save build metadata
         class_count = sum(1 for c in chunks if c.get('chunk_type') in ('class', 'record', 'interface'))
         try:
             metadata = {
@@ -566,14 +566,14 @@ class ThirdPartyKnowledgeBase:
                 encoding="utf-8"
             )
         except Exception as e:
-            logger.warning(f"保存三方库 KB metadata 失败: {e}")
+            logger.warning(f"Failed to save third-party KB metadata: {e}")
 
         self.kb_instance = ZVecKnowledgeBaseAdapter(str(self.kb_dir), source_dirs=dirs)
         logger.info("3rd party KB done: %d chunks in %ds" % (len(chunks), int(time.time()-_bt)))
         return True
 
     def _collect_thirdparty_files(self, dirs: list) -> list:
-        """收集三方库目录下的 .pas 文件"""
+        """Collect .pas files under third-party library directories"""
         files = []
         for d in dirs:
             p = Path(d)
@@ -585,32 +585,32 @@ class ThirdPartyKnowledgeBase:
 
     def _scan_help_documents(self, base_path: str) -> List[Dict]:
         """
-        扫描帮助文档 (HTML/CHM)
+        Scan help documents (HTML/CHM)
         
         Args:
-            base_path: 基础路径
+            base_path: Base path
             
         Returns:
-            帮助文档列表
+            List of help documents
         """
         help_docs = []
         
-        # 扫描 HTML 文件 - 更宽松的扫描
+        # Scan HTML files - more lenient scanning
         for root, dirs, files in os.walk(base_path):
-            # 跳过隐藏目录和常见无关目录
+            # Skip hidden directories and common irrelevant directories
             dirs[:] = [d for d in dirs if not d.startswith('.') and d not in [
                 'node_modules', 'vendor', 'lib', 'dist', 'bin', 'obj', '__pycache__'
             ]]
             
             for file in files:
                 if file.lower().endswith(('.html', '.htm')):
-                    # 跳过索引文件
+                    # Skip index files
                     if file.lower() in ['index.html', 'index.htm', 'toc.html', 'contents.html']:
                         continue
                     
                     file_path = os.path.join(root, file)
                     try:
-                        # 只处理较小的文件 (帮助文档通常不会太大)
+                        # Only process smaller files (help documents are usually not too large)
                         if os.path.getsize(file_path) > 5 * 1024 * 1024:  # 5MB
                             continue
                             
@@ -618,20 +618,20 @@ class ThirdPartyKnowledgeBase:
                         if doc and (doc.get('classes') or doc.get('functions')):
                             help_docs.append(doc)
                     except Exception as e:
-                        logger.debug(f"解析帮助文档失败: {file_path}, {e}")
+                        logger.debug(f"Failed to parse help document: {file_path}, {e}")
         
         return help_docs
 
     def _parse_html_help(self, file_path: str, base_path: str) -> Optional[Dict]:
         """
-        解析 HTML 帮助文档
+        Parse HTML help document
         
         Args:
-            file_path: 文件路径
-            base_path: 基础路径
-            
+            file_path: File path
+            base_path: Base path
+
         Returns:
-            解析后的文档
+            Parsed document
         """
         try:
             from bs4 import BeautifulSoup
@@ -641,7 +641,7 @@ class ThirdPartyKnowledgeBase:
             
             soup = BeautifulSoup(content, 'html.parser')
             
-            # 提取标题
+            # Extract title
             title = ''
             h1 = soup.find('h1')
             if h1:
@@ -653,17 +653,17 @@ class ThirdPartyKnowledgeBase:
             if not title:
                 title = os.path.basename(file_path)
             
-            # 提取类名 (从标题或内容中)
+            # Extract class names (from title or content)
             classes = []
             functions = []
             properties = []
             events = []
             
-            # 常见模式: TClassName, TInterfaceName
+            # Common patterns: TClassName, TInterfaceName
             import re
             class_pattern = re.compile(r'\b(T[A-Z][A-Za-z0-9_]+)\b')
             
-            # 从标题提取
+            # Extract from title
             if title:
                 matches = class_pattern.findall(title)
                 for match in matches:
@@ -674,7 +674,7 @@ class ThirdPartyKnowledgeBase:
                             'description': title
                         })
             
-            # 从内容提取
+            # Extract from content
             text = soup.get_text()
             matches = class_pattern.findall(text)
             for match in matches:
@@ -685,17 +685,17 @@ class ThirdPartyKnowledgeBase:
                         'description': ''
                     })
             
-            # 提取函数/方法
+            # Extract functions/methods
             func_pattern = re.compile(r'\b([A-Z][a-zA-Z0-9_]+)\s*\([^)]*\)\s*(?:of\s+object)?;?', re.IGNORECASE)
             func_matches = func_pattern.findall(text)
-            for func_name in func_matches[:20]:  # 限制数量
+            for func_name in func_matches[:20]:  # Limit quantity
                 if func_name not in [f['name'] for f in functions]:
                     functions.append({
                         'name': func_name,
                         'description': ''
                     })
             
-            # 提取属性
+            # Extract properties
             prop_pattern = re.compile(r'\bproperty\s+([A-Za-z_][A-Za-z0-9_]*)', re.IGNORECASE)
             prop_matches = prop_pattern.findall(text)
             for prop_name in prop_matches[:20]:
@@ -705,7 +705,7 @@ class ThirdPartyKnowledgeBase:
                         'description': ''
                     })
             
-            # 提取事件
+            # Extract events
             event_pattern = re.compile(r'\bOn([A-Z][a-zA-Z0-9_]+)', re.IGNORECASE)
             event_matches = event_pattern.findall(text)
             for event_name in event_matches[:20]:
@@ -733,17 +733,17 @@ class ThirdPartyKnowledgeBase:
             }
             
         except Exception as e:
-            logger.debug(f"解析HTML失败: {file_path}, {e}")
+            logger.debug(f"Failed to parse HTML: {file_path}, {e}")
             return None
 
     def load_knowledge_base(self) -> bool:
         try:
-            # 迁移旧版 zvec_thirdparty/ 子目录到根目录
+            # Migrate old zvec_thirdparty/ subdirectory to root directory
             from .zvec_adapter import _migrate_old_zvec_data
             old_zvec = self.kb_dir / "zvec_thirdparty"
             if old_zvec.exists() and old_zvec != self.kb_dir:
                 _migrate_old_zvec_data(old_zvec, self.kb_dir)
-            # 检查展平后的 ZVec 数据
+            # Check flattened ZVec data
             if any(f.name.startswith("manifest") for f in self.kb_dir.iterdir()):
                 self.kb_instance = ZVecKnowledgeBaseAdapter(str(self.kb_dir))
                 return True
@@ -767,7 +767,7 @@ class ThirdPartyKnowledgeBase:
         if not self.kb_instance: return []
         return self.kb_instance.semantic_search_functions(query, top_k)
     def get_statistics(self) -> Dict:
-        # 优先从 metadata.json 读取实际统计
+        # Prefer reading actual statistics from metadata.json
         metadata_file = self.kb_dir / "metadata.json"
         if metadata_file.exists():
             try:
@@ -780,7 +780,7 @@ class ThirdPartyKnowledgeBase:
                 }
             except Exception:
                 pass
-        # fallback: zvec 内部文件计数（旧数据）
+        # fallback: zvec internal file count (old data)
         if not any(f.name.startswith("manifest") for f in self.kb_dir.iterdir() if self.kb_dir.exists()):
             return {"files": 0, "classes": 0, "database_size_mb": 0}
         chunk_count = 0
@@ -792,7 +792,7 @@ class ThirdPartyKnowledgeBase:
         return {"files": chunk_count, "classes": chunk_count // 2, "database_size_mb": round(sz / (1024*1024), 1)}
 
     def close(self):
-        """关闭知识库连接"""
+        """Close knowledge base connection"""
         if self.kb_instance:
             self.kb_instance.close()
             self.kb_instance = None

@@ -147,3 +147,10 @@ tools/daudit/
 
 # Dot-prefixed directories (AI agent workdirs, etc.)
 .*/
+.opencode
+.temp
+.infigraph
+.fossil-settings
+_FOSSIL_*
+_fossil*
+/config.json

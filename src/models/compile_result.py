@@ -1,7 +1,7 @@
 """
-编译结果模型
+Compile result model
 
-定义编译结果相关的数据模型
+Defines the data models related to compilation results.
 """
 
 from dataclasses import dataclass, field, asdict
@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 class CompileStatus(Enum):
-    """编译状态枚举"""
+    """Compile status enum"""
     SUCCESS = "success"
     FAILED = "failed"
     TIMEOUT = "timeout"
@@ -19,7 +19,7 @@ class CompileStatus(Enum):
 
 @dataclass
 class CompileMessage:
-    """编译消息(错误或警告)"""
+    """Compile message (error or warning)"""
     file_path: str
     line: int
     column: int
@@ -27,35 +27,35 @@ class CompileMessage:
     message_type: str  # "error" | "warning" | "fatal"
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
+        """Convert to a dictionary"""
         return asdict(self)
 
 
 @dataclass
 class CompileResult:
-    """编译结果"""
+    """Compile result"""
     status: CompileStatus
     error_code: Optional[str] = None
     error_message: Optional[str] = None
     output_file: Optional[str] = None
-    output_files: List[str] = field(default_factory=list)  # 所有输出产物路径（exe/dll/bpl/bpi/dcp等）
+    output_files: List[str] = field(default_factory=list)  # Paths of all output artifacts (exe/dll/bpl/bpi/dcp, etc.)
     warnings: List[CompileMessage] = field(default_factory=list)
     errors: List[CompileMessage] = field(default_factory=list)
-    duration: int = 0  # 毫秒
-    log: str = ""  # 完整编译日志
+    duration: int = 0  # milliseconds
+    log: str = ""  # Full compile log
 
     def to_dict(self, strip_log: bool = True) -> Dict[str, Any]:
-        """转换为字典
+        """Convert to a dictionary
 
         Args:
-            strip_log: 是否去除编译器版权横幅（Embarcadero / Copyright 行）
+            strip_log: Whether to strip the compiler copyright banner (Embarcadero / Copyright lines)
         """
         log = self._strip_compiler_header(self.log) if strip_log else self.log
         result: Dict[str, Any] = {
             "status": self.status.value,
             "duration": self.duration,
         }
-        # 输出产物列表（首项即主目标文件 exe/dll/bpl）
+        # List of output artifacts (the first item is the main target file: exe/dll/bpl)
         if self.output_files:
             result["output_files"] = self.output_files
         if self.status != CompileStatus.SUCCESS:
@@ -73,16 +73,16 @@ class CompileResult:
 
     @staticmethod
     def _strip_compiler_header(log: str) -> str:
-        """移除编译器输出中每次重复的版权/版本横幅行
-        
-        MSBuild 输出：
+        """Remove the repeated copyright/version banner lines from compiler output
+
+        MSBuild output:
           Microsoft(R) 生成引擎版本 4.8.9221.0
           [Microsoft .NET Framework 版本 4.0.30319.42000]
           版权所有 (C) Microsoft Corporation。保留所有权利。
-        dcc32 输出：
+        dcc32 output:
           Embarcadero Delphi for Win32 compiler version 37.0
           Copyright (c) 1983,2026 Embarcadero Technologies, Inc.
-        保留有用行：
+        Useful lines kept:
           256 lines, 0.14 seconds, 1000288 bytes code, 44080 bytes data.
         """
         if not log:
@@ -93,39 +93,39 @@ class CompileResult:
             s = l.strip()
             if not s:
                 continue
-            # MSBuild 版本横幅
+            # MSBuild version banner
             if s.startswith('Microsoft(') or s.startswith('[Microsoft .NET Framework'):
                 continue
-            # MSBuild 中文版权
+            # MSBuild Chinese copyright line
             if s.startswith('版权所有'):
                 continue
-            # Delphi 编译器版本 + 版权
+            # Delphi compiler version + copyright
             if s.startswith('Embarcadero Delphi') or s.startswith('Copyright (c)'):
                 continue
             keep.append(l)
         return ''.join(keep)
 
     def has_errors(self) -> bool:
-        """是否有错误"""
+        """Whether there are errors"""
         return len(self.errors) > 0 or self.status == CompileStatus.FAILED
 
     def has_warnings(self) -> bool:
-        """是否有警告"""
+        """Whether there are warnings"""
         return len(self.warnings) > 0
 
     def get_error_count(self) -> int:
-        """获取错误数量"""
+        """Get the error count"""
         return len(self.errors)
 
     def get_warning_count(self) -> int:
-        """获取警告数量"""
+        """Get the warning count"""
         return len(self.warnings)
 
     def get_summary(self) -> str:
-        """获取编译结果摘要"""
+        """Get a compile result summary"""
         if self.status == CompileStatus.SUCCESS:
-            return f"编译成功,耗时 {self.duration}ms,警告 {self.get_warning_count()} 个"
+            return f"Compile succeeded, took {self.duration}ms, {self.get_warning_count()} warning(s)"
         elif self.status == CompileStatus.TIMEOUT:
-            return f"编译超时,耗时 {self.duration}ms"
+            return f"Compile timed out, took {self.duration}ms"
         else:
-            return f"编译失败,错误 {self.get_error_count()} 个,警告 {self.get_warning_count()} 个,耗时 {self.duration}ms"
+            return f"Compile failed, {self.get_error_count()} error(s), {self.get_warning_count()} warning(s), took {self.duration}ms"

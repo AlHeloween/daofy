@@ -1,11 +1,13 @@
-<!-- @when: 首次运行/环境异常时，需确认编译器状态 -->
+<!-- @when: First run, or when the environment is abnormal — confirm the compiler status -->
 <!-- @chain: after=workflow.md, before=kb-search.md -->
 
-## ① 环境检查
+## ① Environment Check
+
 ```python
-check_environment(action="check")       # 确认编译器状态
-get_coding_rules()                       # 获取工作流总览 + 章节索引（默认）
-get_coding_rules(section="writing")      # 编码前：拉取编码规范
-get_coding_rules(section="review")       # 编译后：拉取审核表
-get_coding_rules(section="list")         # 列出所有可用章节名
+check_environment(action="check")       # Confirm compiler status
+get_coding_rules()                       # Get the workflow overview + section index (default)
+get_coding_rules(section="writing")      # Before coding: fetch the coding standards
+get_coding_rules(section="review")       # After compiling: fetch the review table
+get_coding_rules(section="list")         # List all available section names
 ```
+

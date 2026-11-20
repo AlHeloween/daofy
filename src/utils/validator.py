@@ -1,7 +1,7 @@
 """
-验证工具
+Validation utilities
 
-提供通用的验证功能
+Provides common validation helpers.
 """
 
 import os
@@ -13,203 +13,203 @@ logger = get_logger(__name__)
 
 
 class Validator:
-    """验证工具类"""
+    """Validation helper class."""
 
     @staticmethod
     def validate_project_path(path: str) -> Tuple[bool, str]:
         """
-        验证项目路径
+        Validate a project path.
 
         Args:
-            path: 项目文件路径
+            path: Project file path
 
         Returns:
-            (是否有效, 错误消息)
+            (is_valid, error_message)
         """
         if not path:
-            return False, "项目路径不能为空"
+            return False, "Project path must not be empty"
 
-        # 使用 Path.parts 检测路径遍历（比简单的 ".." in path 更准确）
+        # Use Path.parts to detect path traversal (more accurate than a plain ".." in path)
         if ".." in Path(path).parts:
-            return False, "项目路径不能包含 '..'"
+            return False, "Project path must not contain '..'"
 
-        # 检查文件是否存在
+        # Check that the file exists
         if not os.path.exists(path):
-            return False, f"项目文件不存在: {path}"
+            return False, f"Project file does not exist: {path}"
 
-        # 检查是否为文件
+        # Check that the path is a file
         if not os.path.isfile(path):
-            return False, f"项目路径不是文件: {path}"
+            return False, f"Project path is not a file: {path}"
 
-        # 检查文件扩展名
+        # Check the file extension
         if not (path.endswith('.dproj') or path.endswith('.dpr')):
-            return False, f"项目文件必须是 .dproj 或 .dpr 格式"
+            return False, f"Project file must be a .dproj or .dpr file"
 
-        logger.debug(f"项目路径验证通过: {path}")
+        logger.debug(f"Project path validated: {path}")
         return True, ""
 
     @staticmethod
     def validate_file_path(path: str) -> Tuple[bool, str]:
         """
-        验证文件路径
+        Validate a file path.
 
         Args:
-            path: 文件路径
+            path: File path
 
         Returns:
-            (是否有效, 错误消息)
+            (is_valid, error_message)
         """
         if not path:
-            return False, "文件路径不能为空"
+            return False, "File path must not be empty"
 
-        # 使用 Path.parts 检测路径遍历
+        # Use Path.parts to detect path traversal
         if ".." in Path(path).parts:
-            return False, "文件路径不能包含 '..'"
+            return False, "File path must not contain '..'"
 
-        # 检查文件是否存在
+        # Check that the file exists
         if not os.path.exists(path):
-            return False, f"文件不存在: {path}"
+            return False, f"File does not exist: {path}"
 
-        # 检查是否为文件
+        # Check that the path is a file
         if not os.path.isfile(path):
-            return False, f"路径不是文件: {path}"
+            return False, f"Path is not a file: {path}"
 
-        # 检查文件扩展名
+        # Check the file extension
         if not path.endswith('.pas'):
-            return False, f"文件必须是 .pas 格式"
+            return False, f"File must be a .pas file"
 
-        logger.debug(f"文件路径验证通过: {path}")
+        logger.debug(f"File path validated: {path}")
         return True, ""
 
     @staticmethod
     def validate_compiler_path(path: str) -> Tuple[bool, str]:
         """
-        验证编译器路径
+        Validate a compiler path.
 
         Args:
-            path: 编译器可执行文件路径
+            path: Compiler executable path
 
         Returns:
-            (是否有效, 错误消息)
+            (is_valid, error_message)
         """
         if not path:
-            return False, "编译器路径不能为空"
+            return False, "Compiler path must not be empty"
 
-        # 去除尾部空白（注册表读取的路径可能带多余空格）
+        # Strip trailing whitespace (paths read from the registry may carry extra spaces)
         path = path.strip()
 
-        # 使用 Path.parts 检测路径遍历
+        # Use Path.parts to detect path traversal
         if ".." in Path(path).parts:
-            return False, "编译器路径不能包含 '..'"
+            return False, "Compiler path must not contain '..'"
 
-        # 检查文件是否存在
+        # Check that the file exists
         if not os.path.exists(path):
-            return False, f"编译器文件不存在: {path}"
+            return False, f"Compiler file does not exist: {path}"
 
-        # 检查是否为文件
+        # Check that the path is a file
         if not os.path.isfile(path):
-            return False, f"编译器路径不是文件: {path}"
+            return False, f"Compiler path is not a file: {path}"
 
-        # 检查是否为可执行文件（不区分大小写，Windows 上 .EXE 同样有效）
+        # Check that it is an executable (case-insensitive; .EXE is equally valid on Windows)
         if not (path.lower().endswith('.exe') or path.lower().endswith('.bat') or path.lower().endswith('.cmd')):
-            return False, f"编译器必须是可执行文件(.exe, .bat, .cmd), 当前路径: {path}"
+            return False, f"Compiler must be an executable (.exe, .bat, .cmd), current path: {path}"
 
-        logger.debug(f"编译器路径验证通过: {path}")
+        logger.debug(f"Compiler path validated: {path}")
         return True, ""
 
     @staticmethod
     def validate_output_path(path: str) -> Tuple[bool, str]:
         """
-        验证输出路径
+        Validate an output path.
 
         Args:
-            path: 输出目录路径
+            path: Output directory path
 
         Returns:
-            (是否有效, 错误消息)
+            (is_valid, error_message)
         """
         if not path:
-            return True, ""  # 输出路径可选,为空时使用默认路径
+            return True, ""  # Output path is optional; the default path is used when empty
 
-        # 使用 Path.parts 检测路径遍历
+        # Use Path.parts to detect path traversal
         if ".." in Path(path).parts:
-            return False, "输出路径不能包含 '..'"
+            return False, "Output path must not contain '..'"
 
-        # 检查目录是否存在
+        # Check that the directory exists
         if not os.path.exists(path):
-            return False, f"输出目录不存在: {path}"
+            return False, f"Output directory does not exist: {path}"
 
-        # 检查是否为目录
+        # Check that the path is a directory
         if not os.path.isdir(path):
-            return False, f"输出路径不是目录: {path}"
+            return False, f"Output path is not a directory: {path}"
 
-        # 检查是否有写入权限
+        # Check write permission
         if not os.access(path, os.W_OK):
-            return False, f"输出目录无写入权限: {path}"
+            return False, f"Output directory is not writable: {path}"
 
-        logger.debug(f"输出路径验证通过: {path}")
+        logger.debug(f"Output path validated: {path}")
         return True, ""
 
     @staticmethod
     def validate_search_paths(paths: list) -> Tuple[bool, str]:
         """
-        验证搜索路径列表
+        Validate a list of search paths.
 
         Args:
-            paths: 搜索路径列表
+            paths: List of search paths
 
         Returns:
-            (是否有效, 错误消息)
+            (is_valid, error_message)
         """
         if not paths:
-            return True, ""  # 搜索路径可选
+            return True, ""  # Search paths are optional
 
         for path in paths:
-            # 使用 Path.parts 检测路径遍历
+            # Use Path.parts to detect path traversal
             if ".." in Path(path).parts:
-                return False, f"搜索路径不能包含 '..': {path}"
+                return False, f"Search path must not contain '..': {path}"
 
-            # 检查目录是否存在
+            # Check that the directory exists
             if not os.path.exists(path):
-                logger.warning(f"搜索路径不存在: {path}")
-                # 不阻止编译,只记录警告
+                logger.warning(f"Search path does not exist: {path}")
+                # Do not block the build; record a warning only
 
-        logger.debug(f"搜索路径验证通过")
+        logger.debug(f"Search paths validated")
         return True, ""
 
     @staticmethod
     def validate_timeout(timeout: int) -> Tuple[bool, str]:
         """
-        验证超时时间
+        Validate a timeout value.
 
         Args:
-            timeout: 超时时间(秒)
+            timeout: Timeout in seconds
 
         Returns:
-            (是否有效, 错误消息)
+            (is_valid, error_message)
         """
         if timeout <= 0:
-            return False, f"超时时间必须为正数: {timeout}"
+            return False, f"Timeout must be a positive number: {timeout}"
 
-        if timeout > 3600:  # 最大 1 小时
-            return False, f"超时时间不能超过 3600 秒: {timeout}"
+        if timeout > 3600:  # Maximum 1 hour
+            return False, f"Timeout must not exceed 3600 seconds: {timeout}"
 
-        logger.debug(f"超时时间验证通过: {timeout}")
+        logger.debug(f"Timeout validated: {timeout}")
         return True, ""
 
     @staticmethod
     def validate_warning_level(level: int) -> Tuple[bool, str]:
         """
-        验证警告级别
+        Validate a warning level.
 
         Args:
-            level: 警告级别(0-4)
+            level: Warning level (0-4)
 
         Returns:
-            (是否有效, 错误消息)
+            (is_valid, error_message)
         """
         if not 0 <= level <= 4:
-            return False, f"警告级别必须在 0-4 之间: {level}"
+            return False, f"Warning level must be between 0 and 4: {level}"
 
-        logger.debug(f"警告级别验证通过: {level}")
+        logger.debug(f"Warning level validated: {level}")
         return True, ""

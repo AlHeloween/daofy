@@ -1,55 +1,56 @@
-# 异常诊断六步法流程图
+# Six-Step Exception Diagnosis Flowchart
 
 ```
-        ① 分析
-        采集信息 → 定位根因 → 确定问题性质
+        ① Analysis
+        Collect information → Identify root cause → Determine problem nature
          ▲                    │  
-         │   审计退回(🔴)     │  ← 验证退回方向
-         │   计划退回(🟡)     │    (⑥ 失败→回 ①)
+         │   Audit return (🔴)│  ← Verification return direction
+         │   Plan return (🟡) │    (⑥ Failure → back to ①)
          │                    │  
        ┌─┼─────────────────┐
-       │ ② 计划             │
-       │ 设计方案→多方案对比→验证标准 │
+       │ ② Plan             │
+       │ Design solution→Compare multiple solutions→Verification criteria │
        └───────────┬────────┘
-                   │ 审计退回(🟡边界/规范)
+                   │ Audit return (🟡 boundary/spec)
                    ▼
        ┌───────────────────┐
-       │ ③ 审计             │
-       │ 检查表逐项审查方案    │
-       │ ├─ ✅ 通过 → 继续   │
-       │ └─ ❌ 问题 → 退回①②│
+       │ ③ Audit            │
+       │ Review solution item by item with checklist │
+       │ ├─ ✅ Pass → Continue │
+       │ └─ ❌ Issue → Return to ①②│
        └───────────┬───────┘
                    │
        ┌───────────┴───────┐
-       │ ④ 备份             │
+       │ ④ Backup           │
        │ __history + WIP commit │
        └───────────┬───────┘
                    │
        ┌───────────┴───────┐
-       │ ⑤ 执行             │
-       │ Preview→修改→格式化→编译→commit│
+       │ ⑤ Execute          │
+       │ Preview→Modify→Format→Compile→commit│
        └───────────┬───────┘
                    ▼
        ┌───────────────────┐
-       │ ⑥ 验证             │
-       │ 按标准验证→清理→保存经验 │
-       ├─ ✅ 通过 → 完成    │
-       └─ ❌ 失败 → 回①分析 │
+       │ ⑥ Verify           │
+       │ Verify per criteria→Clean up→Save experience │
+       ├─ ✅ Pass → Done      │
+       └─ ❌ Fail → Back to ① Analysis │
 ```
 
-## 审计回退循环规则
+## Audit Return Loop Rules
 
-- 🔴 安全/根因遗漏 → 退回 ①
-- 🟡 边界/规范 → 退回 ②
-- 同一问题连续退回 3 次 → 触发 P0 介入
+- 🔴 Security/root cause missed → Return to ①
+- 🟡 Boundary/spec → Return to ②
+- Same issue returned 3 times consecutively → Trigger P0 intervention
 
-## 六步法输入输出
+## Six-Step Inputs and Outputs
 
-| 步骤 | 输入 | 输出 |
+| Step | Input | Output |
 |------|------|------|
-| ① | 异常信息 | 根因假设/问题分类 |
-| ② | 根因假设 | 修改方案/验证标准 |
-| ③ | 方案 | 审计结论(通过/退回) |
-| ④ | 通过审计 | 备份确认 |
-| ⑤ | 备份确认 | 编译结果/commit |
-| ⑥ | 编译结果 | 验证报告/经验/复盘判定 |
+| ① | Exception information | Root cause hypothesis / problem classification |
+| ② | Root cause hypothesis | Modification plan / verification criteria |
+| ③ | Plan | Audit conclusion (pass/return) |
+| ④ | Audit passed | Backup confirmation |
+| ⑤ | Backup confirmation | Compile result / commit |
+| ⑥ | Compile result | Verification report / experience / retrospective decision |
+

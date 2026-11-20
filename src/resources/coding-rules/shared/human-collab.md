@@ -1,32 +1,33 @@
-<!-- @when: 遇到异常、卡点、不确定下一步时 -->
+<!-- @when: An anomaly appears, you are stuck, or the next step is uncertain -->
 <!-- @chain: before=experience.md, after=testing/console.md -->
 
-## 人机协同 — 异常诊断与人工介入
+## Human–AI Collaboration — Anomaly Diagnosis and Human Intervention
 
-### 前置自检（所有任务通用）
-开始执行或遇到卡点时，按以下清单自检：
-- 🔴 工具返回异常 → 交叉验证一次，仍异常则暂停
-- 🟡 不确定选哪个方案 → 检查「方案选择歧义」
-- 🟡 准备重试与上次本质相同 → 检查「连续同质方案」
-- 🟡 缺少关键信息需猜测 → 检查「信息不足猜测」
+### Pre-checks (common to every task)
+When starting work or when stuck, self-check against this list:
+- 🔴 A tool returns something abnormal → cross-verify once; if still abnormal, pause
+- 🟡 Unsure which option to choose → check "Option Selection Ambiguity"
+- 🟡 About to retry something essentially the same as last time → check "Consecutive Homogeneous Options"
+- 🟡 Missing key information and forced to guess → check "Guessing with Insufficient Information"
 
-### 诊断流程
+### Diagnostic Flow
 
-详细的调试流程、触发条件、六步法、审核表、假设驱动、DCC 错误解码、二分法隔离、崩溃分类、尝试升级等深入内容见以下章节：
+Detailed debugging procedures, trigger conditions, the six-step method, review tables, hypothesis-driven debugging, DCC error decoding, binary-search isolation, crash classification, attempt escalation and other in-depth content are covered in the following sections:
 
-| 章节 | 内容 | 适用场景 |
+| Section | Content | Applicable scenario |
 |------|------|---------|
-| 8.1 人工介入触发条件 | P0/P1/P2 触发条件表 + 优先级交互 | 卡点时判断是否申请介入 |
-| 8.2 异常诊断六步法 | 分析→计划→审计→备份→执行→验证 | 通用异常排查流程 |
-| 8.3 异常信息采集 | Python/Delphi 异常采集模板 | 需要采集异常现场时 |
-| 8.4 人工介入交接清单 | 申请模板（六项缺一不可） | 触发介入后填写 |
-| 8.5 协同工作流 | AI→人工协作流程 + 5 条关键规则 | 介入后的工作方式 |
-| 8.6 MCP 工具异常处理约定 | 各层异常处理方式 | 工具开发/调试时 |
-| 8.7 假设驱动调试 | 四步循环：采集→假设→验证→决策 | 根因不明时系统排查 |
-| 8.8 DCC 编译错误分类与解码 | 错误级别 + 速查表 + 处理流程 | 编译报错时 |
-| 8.9 二分法与隔离调试 | 文件级/代码级/项目级二分 + git bisect | 大型项目难以定位时 |
-| 8.10 调试状态日志 | 结构化日志模板 + 使用规则 | 开始调试任何问题前 |
-| 8.11 调试工具选择决策树 | 按问题类型选工具的决策树 | 不确定用什么工具时 |
-| 8.12 修复后复盘 | 根因归类→防御评估→经验保存→规则联动 | 每次修复通过后 |
-| 8.13 运行时崩溃分类排查 | A/B/C/D 四类崩溃 + 决策树 | 运行时崩溃时 |
-| 8.14 尝试升级检查点 | 每次失败后的检查点 + 升级总图 | 第 1/2/3 次失败时 |
+| 8.1 Human-intervention trigger conditions | P0/P1/P2 trigger-condition table + priority interaction | Deciding whether to request intervention when stuck |
+| 8.2 Six-step anomaly diagnosis | Analyze→Plan→Audit→Back up→Execute→Verify | General anomaly troubleshooting flow |
+| 8.3 Exception information collection | Python/Delphi exception collection templates | When the exception scene must be captured |
+| 8.4 Human-intervention handover checklist | Request template (all six items required) | Filled in after intervention is triggered |
+| 8.5 Collaboration workflow | AI→human collaboration flow + 5 key rules | How to work after intervention |
+| 8.6 MCP tool exception-handling conventions | Exception handling per layer | When developing/debugging tools |
+| 8.7 Hypothesis-driven debugging | Four-step loop: collect→hypothesize→verify→decide | Systematic troubleshooting when the root cause is unknown |
+| 8.8 DCC compile error classification and decoding | Error levels + quick reference + handling flow | When a compile error occurs |
+| 8.9 Binary search and isolation debugging | File-level/code-level/project-level bisection + git bisect | When a large project is hard to localize |
+| 8.10 Debug status log | Structured log template + usage rules | Before starting to debug any problem |
+| 8.11 Debug tool selection decision tree | Decision tree for choosing tools by problem type | When unsure which tool to use |
+| 8.12 Post-fix retrospective | Root-cause classification→defense evaluation→experience saving→rule linkage | After every fix passes |
+| 8.13 Runtime crash classification and troubleshooting | Four crash classes A/B/C/D + decision tree | When a runtime crash occurs |
+| 8.14 Attempt escalation checkpoints | Checkpoint after each failure + overall escalation map | On the 1st/2nd/3rd failure |
+

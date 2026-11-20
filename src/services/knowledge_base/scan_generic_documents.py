@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-通用文档扫描器
-支持 doc/docx/txt/md/html/pdf/epub/hlp/网页等多种文档格式
+Generic document scanner
+Supports doc/docx/txt/md/html/pdf/epub/hlp/web pages and other document formats
 """
 
 import re
@@ -36,7 +36,7 @@ from src.constants import (
 
 logger = logging.getLogger(__name__)
 
-# 默认排除的多语言子目录
+# Default excluded multilingual subdirectories
 DEFAULT_EXCLUDE_DIRS = {'ja', 'fr', 'de', 'es', 'it', 'ko', 'pt', 'ru', 'zh'}
 
 try:
@@ -51,7 +51,7 @@ except ImportError:
 
 
 class DocumentProcessor:
-    """文档处理器基类"""
+    """Document processor base class"""
     
     def __init__(self):
         self.supported_extensions = []
@@ -64,7 +64,7 @@ class DocumentProcessor:
 
 
 class TextProcessor(DocumentProcessor):
-    """纯文本处理器 (.txt)"""
+    """Plain text processor (.txt)"""
     
     def __init__(self):
         self.supported_extensions = ['.txt']
@@ -92,7 +92,7 @@ class TextProcessor(DocumentProcessor):
 
 
 class MarkdownProcessor(DocumentProcessor):
-    """Markdown 处理器 (.md)"""
+    """Markdown processor (.md)"""
     
     def __init__(self):
         self.supported_extensions = ['.md', '.markdown']
@@ -140,7 +140,7 @@ class MarkdownProcessor(DocumentProcessor):
 
 
 class HTMLProcessor(DocumentProcessor):
-    """HTML 处理器 (.htm, .html) — 用 html2text 转换，无需 BeautifulSoup"""
+    """HTML processor (.htm, .html) — converts with html2text, no BeautifulSoup needed"""
     
     def __init__(self):
         self.supported_extensions = ['.htm', '.html']
@@ -158,11 +158,11 @@ class HTMLProcessor(DocumentProcessor):
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 html_content = f.read()
             
-            # 正则提取 <title>（首次匹配即可）
+            # Extract <title> with regex (first match is enough)
             title_match = re.search(r'<title[^>]*>(.*?)</title>', html_content, re.IGNORECASE | re.DOTALL)
             title = title_match.group(1).strip() if title_match else Path(file_path).stem
             
-            # html2text 将 HTML 转为 Markdown（自带跳过 script/style）
+            # html2text converts HTML to Markdown (skips script/style automatically)
             markdown = self.converter.handle(html_content)
             
             hash_val = hashlib.md5(markdown.encode()).hexdigest()
@@ -182,7 +182,7 @@ class HTMLProcessor(DocumentProcessor):
 
 
 class DocxProcessor(DocumentProcessor):
-    """Word 文档处理器 (.docx)"""
+    """Word document processor (.docx)"""
     
     def __init__(self):
         self.supported_extensions = ['.docx']
@@ -199,7 +199,7 @@ class DocxProcessor(DocumentProcessor):
         if not self.has_docx:
             return {
                 'title': file_path.stem,
-                'content': f"Word .docx 处理需要安装依赖:\n"
+                'content': f"Word .docx processing requires installing dependencies:\n"
                           f"  pip install python-docx",
                 'content_type': 'docx',
                 'size': 0,
@@ -266,7 +266,7 @@ class DocxProcessor(DocumentProcessor):
 
 
 class DocProcessor(DocumentProcessor):
-    """旧版 Word 文档处理器 (.doc) - 需要 antiword 或 catdoc"""
+    """Legacy Word document processor (.doc) - requires antiword or catdoc"""
     
     def __init__(self):
         self.supported_extensions = ['.doc']
@@ -318,7 +318,7 @@ class DocProcessor(DocumentProcessor):
 
 
 class PDFProcessor(DocumentProcessor):
-    """PDF 文档处理器 (.pdf) - 需要 pdfplumber 或 PyMuPDF"""
+    """PDF document processor (.pdf) - requires pdfplumber or PyMuPDF"""
     
     def __init__(self):
         self.supported_extensions = ['.pdf']
@@ -340,20 +340,20 @@ class PDFProcessor(DocumentProcessor):
             return False
     
     def process(self, file_path: Path) -> Optional[Dict]:
-        # 优先使用 PyMuPDF（性能更好）
+        # Prefer PyMuPDF (better performance)
         if self.has_pymupdf:
             return self._process_with_pymupdf(file_path)
         
-        # 备选：使用 pdfplumber
+        # Fallback: use pdfplumber
         if self.has_pdfplumber:
             return self._process_with_pdfplumber(file_path)
         
-        # 都没有安装，返回提示信息
+        # If neither is installed, return a hint message
         return {
             'title': file_path.stem,
-            'content': f"PDF 处理需要安装依赖（推荐优先使用 PyMuPDF）:\n"
+            'content': f"PDF processing requires installing dependencies (PyMuPDF is recommended first):\n"
                       f"  pip install PyMuPDF\n"
-                      f"  或（备选）\n"
+                      f"  or (fallback)\n"
                       f"  pip install pdfplumber",
             'content_type': 'pdf',
             'size': 0,
@@ -366,7 +366,7 @@ class PDFProcessor(DocumentProcessor):
         }
     
     def _process_with_pymupdf(self, file_path: Path) -> Optional[Dict]:
-        """使用 PyMuPDF 处理（高性能）"""
+        """Process using PyMuPDF (high performance)"""
         try:
             import fitz
             
@@ -379,7 +379,7 @@ class PDFProcessor(DocumentProcessor):
                 text = page.get_text()
                 text_content.append(text)
                 
-                # 提取标题（基于字体大小）
+                # Extract titles (based on font size)
                 blocks = page.get_text("dict")["blocks"]
                 for block in blocks:
                     if "lines" in block:
@@ -415,7 +415,7 @@ class PDFProcessor(DocumentProcessor):
             return None
     
     def _process_with_pdfplumber(self, file_path: Path) -> Optional[Dict]:
-        """使用 pdfplumber 处理"""
+        """Process using pdfplumber"""
         try:
             import pdfplumber
             
@@ -451,7 +451,7 @@ class PDFProcessor(DocumentProcessor):
 
 
 class EPUBProcessor(DocumentProcessor):
-    """EPUB 电子书处理器 - 使用 zipfile + BeautifulSoup 直接解析"""
+    """EPUB ebook processor - parses directly with zipfile + BeautifulSoup"""
     
     def __init__(self):
         self.supported_extensions = ['.epub']
@@ -559,13 +559,13 @@ class EPUBProcessor(DocumentProcessor):
 
 
 class ChmProcessor(DocumentProcessor):
-    """Microsoft Compiled HTML Help 处理器 (.chm).
+    """Microsoft Compiled HTML Help processor (.chm).
 
-    使用 7-Zip 解压 CHM 文件后，将内部的 HTML 文件作为文档导入。
-    需要系统安装 7-Zip (https://www.7-zip.org/)。
+    Uses 7-Zip to extract CHM files, then imports the internal HTML files as documents.
+    Requires 7-Zip to be installed on the system (https://www.7-zip.org/).
     """
 
-    # 7z 解压时跳过的辅助文件类型
+    # Auxiliary file types skipped during 7z extraction
     EXCLUDE_PATTERNS = [
         '-x!*.png', '-x!*.gif', '-x!*.jpg', '-x!*.jpeg',
         '-x!*.css', '-x!*.js', '-x!*.ico', '-x!*.svg',
@@ -580,7 +580,7 @@ class ChmProcessor(DocumentProcessor):
     def _find_7zip(self) -> Optional[str]:
         if self._sevenzip_path:
             return self._sevenzip_path
-        # _find_7zip_path 是 GenericDocumentScanner 的静态方法（同一模块，运行时已加载）
+        # _find_7zip_path is a static method of GenericDocumentScanner (same module, already loaded at runtime)
         import sys
         _mod = sys.modules[__name__]
         self._sevenzip_path = _mod.GenericDocumentScanner._find_7zip_path()
@@ -592,21 +592,21 @@ class ChmProcessor(DocumentProcessor):
             return [{
                 'title': file_path.stem,
                 'content': (
-                    '需要安装 7-Zip 才能处理 CHM 文件\n\n'
-                    '下载地址:\n'
-                    '  官网: https://www.7-zip.org/download.html\n'
+                    '7-Zip must be installed to process CHM files\n\n'
+                    'Download address:\n'
+                    '  Official site: https://www.7-zip.org/download.html\n'
                     '  SourceForge: https://sourceforge.net/projects/sevenzip/files/7-Zip/\n\n'
-                    'Windows 64位用户下载 7z2301-x64.exe 安装即可'
+                    'Windows 64-bit users can download and install 7z2301-x64.exe'
                 ),
                 'content_type': 'chm',
                 'size': 0, 'line_count': 0, 'hash': '', 'sections': [], 'code_examples': [],
                 'requires_dependencies': True,
-                'install_hint': '需要安装 7-Zip: https://www.7-zip.org/download.html'
+                'install_hint': 'Requires installing 7-Zip: https://www.7-zip.org/download.html'
             }]
 
         tmpdir = None
         try:
-            # 用 7z 解压到临时目录（跳过图片/CSS/JS等辅助文件，只保留 HTML）
+            # Extract to a temporary directory with 7z (skip auxiliary files such as images/CSS/JS, keep only HTML)
             tmpdir = tempfile.mkdtemp(prefix='chm_')
             result = subprocess.run(
                 [sevenzip, 'x', '-y', f'-o{tmpdir}', str(file_path), *self.EXCLUDE_PATTERNS],
@@ -617,13 +617,13 @@ class ChmProcessor(DocumentProcessor):
             if result.returncode != 0:
                 return None
 
-            # 搜集所有 htm/html 文件
+            # Collect all htm/html files
             extracted_dir = Path(tmpdir)
             html_files = list(extracted_dir.rglob('*.htm')) + list(extracted_dir.rglob('*.html'))
             if not html_files:
                 return None
 
-            # 用 HTMLProcessor 逐一处理
+            # Process them one by one with HTMLProcessor
             html_proc = HTMLProcessor()
             docs = []
             seen_hashes = set()
@@ -639,7 +639,7 @@ class ChmProcessor(DocumentProcessor):
                         doc['last_modified'] = datetime.fromtimestamp(
                             hf.stat().st_mtime
                         ).isoformat()
-                        # 去重
+                        # Deduplicate
                         doc_hash = doc.get('hash', '')
                         if doc_hash and doc_hash in seen_hashes:
                             continue
@@ -656,19 +656,17 @@ class ChmProcessor(DocumentProcessor):
         finally:
             if tmpdir:
                 shutil.rmtree(tmpdir, ignore_errors=True)
-
-
 class HlpProcessor(DocumentProcessor):
-    """Windows Help 文件处理器 (.hlp) — 纯 Python, 输出 Markdown.
-    解析 |TTLBTREE 获得标题, |TOPIC 解压后通过 Hall/Phrase 解码获得正文.
-    支持 HC30/HC31/HCW 4.00 格式, LZ77 压缩.
+    """Windows Help file processor (.hlp) — pure Python, outputs Markdown.
+    Parses |TTLBTREE to get titles; after decompressing |TOPIC, decodes body through Hall/Phrase.
+    Supports HC30/HC31/HCW 4.00 formats, LZ77 compression.
     """
 
     def __init__(self):
         self.supported_extensions = ['.hlp']
 
     # ═══════════════════════════════════════════
-    #  公开入口 — 按 RT2 topic header 拆分为多个文档
+    #  Public entry point — split into multiple documents by RT2 topic header
     # ═══════════════════════════════════════════
 
     def process(self, file_path: Path) -> Optional[List[Dict]]:
@@ -728,7 +726,7 @@ class HlpProcessor(DocumentProcessor):
         return docs if docs else None
 
     # ═══════════════════════════════════════════
-    #  目录 B+ 树
+    #  Directory B+ tree
     # ═══════════════════════════════════════════
 
     def _parse_directory(self, f, dir_start):
@@ -807,7 +805,7 @@ class HlpProcessor(DocumentProcessor):
                 'minor': minor, 'has_hall': has_hall, 'has_old_phrases': has_old_phrases}
 
     # ═══════════════════════════════════════════
-    #  短语表 (Hall / old-style)
+    #  Phrase table (Hall / old-style)
     # ═══════════════════════════════════════════
 
     def _parse_phrases(self, f, internal_files, system_info):
@@ -931,7 +929,7 @@ class HlpProcessor(DocumentProcessor):
         return phrases
 
     # ═══════════════════════════════════════════
-    #  |TOPIC 文本提取 (含 Hall / Phrase 解压)
+    #  |TOPIC text extraction (including Hall / Phrase decompression)
     # ═══════════════════════════════════════════
 
     def _extract_topic_text(self, f, internal_files, system_info, phrases, titles):
@@ -1157,7 +1155,7 @@ class HlpProcessor(DocumentProcessor):
             return (b & 0x7F) | (data[off + 1] << 7)
         return b
 
-    # ── Hall LinkData2 解压 ──
+    # ── Hall LinkData2 decompression ──
 
     @staticmethod
     def _hall_decompress(data, phrases, expected_len):
@@ -1190,7 +1188,7 @@ class HlpProcessor(DocumentProcessor):
             else: i += 1
         return bytes(result[:expected_len])
 
-    # ── old-style Phrase LinkData2 解压 ──
+    # ── old-style Phrase LinkData2 decompression ──
 
     @staticmethod
     def _phrase_decompress(data, phrases, expected_len):
@@ -1215,7 +1213,7 @@ class HlpProcessor(DocumentProcessor):
                     if val % 2 == 1: result.append(0x20)
         return bytes(result[:expected_len])
 
-    # ── 共享后处理 ──
+    # ── Shared post-processing ──
 
     @staticmethod
     def _clean_text(raw):
@@ -1227,7 +1225,7 @@ class HlpProcessor(DocumentProcessor):
         return re.sub(r'\s+', ' ', ''.join(clean)).strip()
 
     # ═══════════════════════════════════════════
-    #  LZ77 解压 (ring buffer, zero-init)
+    #  LZ77 decompression (ring buffer, zero-init)
     # ═══════════════════════════════════════════
 
     @staticmethod
@@ -1265,7 +1263,7 @@ class HlpProcessor(DocumentProcessor):
         return bytes(output)
 
     # ═══════════════════════════════════════════
-    #  |TTLBTREE → 标题
+    #  |TTLBTREE → titles
     # ═══════════════════════════════════════════
 
     def _read_ttlbtree(self, f, internal_files):
@@ -1294,14 +1292,12 @@ class HlpProcessor(DocumentProcessor):
 
         ttl_pstart = ttl_start + 38
         return self._traverse_btree_leaves(f, ttl_pstart, ttl_root, ttl_nlevels, ttl_psize, read_ttl_leaf)
-
-
 class WebDocumentProcessor:
-    """网页文档处理器（在线文档）— 用 html2text 转换，无需 BeautifulSoup"""
+    """Web document processor (online documents) — uses html2text for conversion, no BeautifulSoup required"""
     
     def __init__(self):
         if not html2text:
-            raise ImportError("需要 html2text: pip install html2text")
+            raise ImportError("html2text is required: pip install html2text")
         
         self.converter = html2text.HTML2Text()
         self.converter.ignore_links = False
@@ -1320,11 +1316,11 @@ class WebDocumentProcessor:
             
             html_content = response.text
             
-            # 正则提取 <title>（首次匹配即可）
+            # Extract <title> with regex (first match is sufficient)
             title_match = re.search(r'<title[^>]*>(.*?)</title>', html_content, re.IGNORECASE | re.DOTALL)
             title = title_match.group(1).strip() if title_match else url
             
-            # html2text 将 HTML 转为 Markdown
+            # html2text converts HTML to Markdown
             markdown = self.converter.handle(html_content)
             
             return {
@@ -1352,8 +1348,8 @@ def _has_lxml() -> bool:
 
 def _pool_worker(work_queue, result_queue, directory_str):
     """
-    池化 worker：从 work_queue 取文件路径，处理后结果放入 result_queue。
-    收到 None 哨兵后退出，并在 result_queue 回传 None 通知消费者。
+    Pool worker: takes file paths from work_queue, processes them, and puts results into result_queue.
+    Exits after receiving a None sentinel, and sends None back through result_queue to notify the consumer.
     """
     directory = Path(directory_str)
     processors = [
@@ -1399,11 +1395,11 @@ def _pool_worker(work_queue, result_queue, directory_str):
         except Exception:
             pass
 
-    result_queue.put(None)  # 哨兵：此 worker 已完成
+    result_queue.put(None)  # Sentinel: this worker has finished
 
 
 class GenericDocumentScanner:
-    """通用文档扫描器"""
+    """Generic document scanner"""
     
     SUPPORTED_EXTENSIONS = [
         '.txt', '.md', '.markdown',
@@ -1418,7 +1414,7 @@ class GenericDocumentScanner:
         self.config = config or self._load_config()
         self.progress_callback = progress_callback
         
-        # ZVec 集合直接存放在 kb_dir 根目录
+        # ZVec collections are stored directly in the kb_dir root
         self.zvec_dir = self.kb_dir
         
         self._scanning = False
@@ -1427,31 +1423,31 @@ class GenericDocumentScanner:
     @staticmethod
     def _detect_language(title: str, content: str = '') -> str:
         """
-        检测文档语言
+        Detect document language
         
         Args:
-            title: 文档标题
-            content: 文档内容
+            title: Document title
+            content: Document content
         
         Returns:
-            语言代码: 'zh' (中文), 'ja' (日文), 'ko' (韩文), 'en' (英文), 'other' (其他)
+            Language code: 'zh' (Chinese), 'ja' (Japanese), 'ko' (Korean), 'en' (English), 'other' (Other)
         """
         import re
         
-        # 合并标题和内容前1000字符进行检测
+        # Merge title and first 1000 characters of content for detection
         sample = (title + ' ' + content[:1000])
         
-        # 统计各语言字符数
+        # Count characters for each language
         zh_chars = len(re.findall(r'[\u4e00-\u9fff]', sample))
         ja_chars = len(re.findall(r'[\u3040-\u309f\u30a0-\u30ff]', sample))
         ko_chars = len(re.findall(r'[\uac00-\ud7af]', sample))
         en_chars = len(re.findall(r'[A-Za-z]', sample))
         
-        # 选择字符数最多的语言
+        # Select the language with the most characters
         counts = {'zh': zh_chars, 'ja': ja_chars, 'ko': ko_chars, 'en': en_chars}
         max_lang = max(counts, key=counts.get)
         
-        # 如果最大字符数太少，返回 other
+        # If the maximum character count is too small, return other
         if counts[max_lang] < 10:
             return 'other'
         
@@ -1459,7 +1455,7 @@ class GenericDocumentScanner:
     
     @staticmethod
     def _find_7zip_path() -> Optional[str]:
-        """查找 7-Zip 可执行文件路径"""
+        """Find the 7-Zip executable path"""
         tools_dir = Path(__file__).parent.parent.parent.parent / 'tools'
         candidates = [str(tools_dir / '7z' / '7z.exe')]
         for name in ('7z', '7z.exe'):
@@ -1473,7 +1469,7 @@ class GenericDocumentScanner:
 
     @staticmethod
     def _estimate_total_docs(all_files: List[Path]) -> int:
-        """估算文档扫描的总文档数（展开 CHM 内子文档数），用于准确进度"""
+        """Estimate the total number of documents for scanning (expanding subdocuments inside CHM) for accurate progress"""
         estimated = 0
         sevenzip = GenericDocumentScanner._find_7zip_path()
         for f in all_files:
@@ -1499,14 +1495,14 @@ class GenericDocumentScanner:
         return max(estimated, 1)
 
     def _load_config(self) -> Dict:
-        """加载配置文件"""
+        """Load configuration file"""
         config_path = self.kb_dir / "config.json"
         if config_path.exists():
             try:
                 with open(config_path, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except Exception as e:
-                logger.debug("忽略非致命异常: %s", str(e))
+                logger.debug("Ignoring non-fatal exception: %s", str(e))
         
         return {
             'database': {'file': 'documents.sqlite'},
@@ -1518,7 +1514,7 @@ class GenericDocumentScanner:
         }
     
     def save_config(self):
-        """保存配置到文件"""
+        """Save configuration to file"""
         config_path = self.kb_dir / "config.json"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         
@@ -1542,7 +1538,7 @@ class GenericDocumentScanner:
             json.dump(merged, f, indent=2, ensure_ascii=False)
 
     def _clean_zvec_files(self):
-        """清除 kb_dir 下的 ZVec 数据文件"""
+        """Clear ZVec data files under kb_dir"""
         import shutil
         for item in list(self.kb_dir.iterdir()):
             name = item.name
@@ -1560,21 +1556,21 @@ class GenericDocumentScanner:
                       exclude: Optional[List[str]] = None,
                       rebuild: bool = False) -> Dict:
         """
-        扫描目录中的文档
+        Scan documents in a directory
         
         Args:
-            directory: 要扫描的目录
-            extensions: 要处理的文件扩展名列表
-            max_workers: 最大工作进程数
-            exclude: 要排除的子目录名列表（默认排除多语言帮助子目录）
-            rebuild: 是否强制重建（跳过 mtime 对比，重新处理所有文件）
+            directory: Directory to scan
+            extensions: List of file extensions to process
+            max_workers: Maximum number of worker processes
+            exclude: List of subdirectory names to exclude (by default excludes multilingual help subdirectories)
+            rebuild: Whether to force rebuild (skip mtime comparison and reprocess all files)
         
         Returns:
-            扫描统计信息
+            Scan statistics
         """
         directory = Path(directory)
         if not directory.exists():
-            return {'error': f'目录不存在: {directory}'}
+            return {'error': f'Directory does not exist: {directory}'}
         
         extensions = extensions or self.config.get('build', {}).get('supported_extensions', self.SUPPORTED_EXTENSIONS)
         extensions = [e.lower() for e in extensions]
@@ -1584,7 +1580,7 @@ class GenericDocumentScanner:
         all_files = []
         for ext in extensions:
             for f in directory.rglob(f'*{ext}'):
-                # 排除语言子目录（如 ja/、fr/、de/ 等）
+                # Exclude language subdirectories (such as ja/, fr/, de/, etc.)
                 if exclude_set.intersection(f.relative_to(directory).parts):
                     continue
                 all_files.append(f)
@@ -1601,11 +1597,11 @@ class GenericDocumentScanner:
                 max_workers = max(1, parallel_workers_config)
             else:
                 cpu_cores = cpu_count()
-                # 至少 2 个 worker（帮助知识库策略: max(2, cpu_cores-1)），不超过文件数
+                # At least 2 workers (help knowledge base strategy: max(2, cpu_cores-1)), not exceeding the number of files
                 max_workers = min(max(2, cpu_cores - 1), total_files)
         
         batch_size_config = self.config.get('build', {}).get('batch_size', 50)
-        # chunksize 不能超过平均每 worker 文件数，否则重文件会堆积
+        # chunksize cannot exceed the average number of files per worker, otherwise heavy files will pile up
         files_per_worker = max(1, total_files // max_workers) if max_workers > 0 else 50
         chunk_size = min(max(1, files_per_worker), max(20, batch_size_config))
         
@@ -1614,7 +1610,7 @@ class GenericDocumentScanner:
         warnings = []
         install_hints = []
         
-        # 检测 PDF 文件依赖
+        # Check PDF file dependencies
         if '.pdf' in extensions:
             has_pymupdf = False
             has_pdfplumber = False
@@ -1631,15 +1627,15 @@ class GenericDocumentScanner:
             
             pdf_files = [f for f in all_files if f.suffix.lower() == '.pdf']
             if pdf_files and not (has_pymupdf or has_pdfplumber):
-                warnings.append(f"发现 {len(pdf_files)} 个 PDF 文件，但缺少依赖（PyMuPDF 或 pdfplumber）")
+                warnings.append(f"Found {len(pdf_files)} PDF files, but dependencies are missing (PyMuPDF or pdfplumber)")
                 install_hints.append({
                     'type': 'pdf',
-                    'message': 'PDF 处理需要安装依赖（推荐优先使用 PyMuPDF）',
+                    'message': 'PDF processing requires installing dependencies (PyMuPDF is recommended first)',
                     'commands': ['pip install PyMuPDF', 'pip install pdfplumber'],
                     'affected_files': len(pdf_files)
                 })
         
-        # 检测 DOCX 文件依赖
+        # Check DOCX file dependencies
         if '.docx' in extensions:
             has_docx = False
             try:
@@ -1650,15 +1646,15 @@ class GenericDocumentScanner:
             
             docx_files = [f for f in all_files if f.suffix.lower() == '.docx']
             if docx_files and not has_docx:
-                warnings.append(f"发现 {len(docx_files)} 个 DOCX 文件，但缺少依赖（python-docx）")
+                warnings.append(f"Found {len(docx_files)} DOCX files, but the dependency is missing (python-docx)")
                 install_hints.append({
                     'type': 'docx',
-                    'message': 'Word .docx 处理需要安装依赖',
+                    'message': 'Word .docx processing requires installing dependencies',
                     'commands': ['pip install python-docx'],
                     'affected_files': len(docx_files)
                 })
         
-        # 检测 DOC 文件依赖（需要系统工具）
+        # Check DOC file dependencies (requires system tools)
         if '.doc' in extensions:
             doc_files = [f for f in all_files if f.suffix.lower() == '.doc']
             if doc_files:
@@ -1666,25 +1662,25 @@ class GenericDocumentScanner:
                 has_catdoc = shutil.which('catdoc') is not None
                 
                 if not (has_antiword or has_catdoc):
-                    warnings.append(f"发现 {len(doc_files)} 个 DOC 文件，但缺少工具（antiword 或 catdoc）")
+                    warnings.append(f"Found {len(doc_files)} DOC files, but tools are missing (antiword or catdoc)")
                     install_hints.append({
                         'type': 'doc',
-                        'message': 'Word .doc 处理需要安装系统工具',
-                        'commands': ['winget install antiword', 'choco install catdoc', '或从官网下载'],
+                        'message': 'Word .doc processing requires installing system tools',
+                        'commands': ['winget install antiword', 'choco install catdoc', 'or download from the official website'],
                         'affected_files': len(doc_files),
-                        'note': '这是系统级工具，不是 Python 包'
+                        'note': 'This is a system-level tool, not a Python package'
                     })
         
         import time; _build_start = time.time()
         
         if rebuild:
-            logger.info("强制重建：清除旧 ZVec 数据...")
+            logger.info("Force rebuild: clearing old ZVec data...")
             self._clean_zvec_files()
-            # 重建模式：处理所有文件
+            # Rebuild mode: process all files
             changed = list(all_files)
             skipped = 0
         else:
-            # ZVec 暂不支持增量更新，全部重新处理（后续可加本 mtime 追踪文件）
+            # ZVec does not currently support incremental updates, so reprocess everything (an mtime tracking file can be added later)
             changed = list(all_files)
         
         skipped = total_files - len(changed)
@@ -1694,7 +1690,7 @@ class GenericDocumentScanner:
             return {'total_files': total_files, 'processed': 0, 'failed': 0,
                     'skipped': skipped, 'warnings': warnings, 'install_hints': install_hints}
         
-        # ZVec 要求在空目录创建，用临时子目录方案
+        # ZVec requires creation in an empty directory, so use a temporary subdirectory approach
         col_schema = zvec.CollectionSchema("documents", fields=[
             zvec.FieldSchema("chunk_text", zvec.DataType.STRING, index_param=zvec.FtsIndexParam(tokenizer_name="jieba")),
             zvec.FieldSchema("path", zvec.DataType.STRING),
@@ -1706,24 +1702,24 @@ class GenericDocumentScanner:
         tmp_zvec_path = self.kb_dir / tmp_zvec_name
         col = zvec.create_and_open(str(tmp_zvec_path), schema=col_schema)
 
-        BATCH_SIZE = 500  # 每批插入数
+        BATCH_SIZE = 500  # Number of inserts per batch
         batch_buffer = []
 
         try:
             import multiprocessing as mp
             ctx = mp.get_context('spawn')
-            # work_queue: 分发给 worker 的文件路径（不限大小）
-            # result_queue: 有界队列，超过 200 条时背压 worker，防止内存暴涨
+            # work_queue: file paths distributed to workers (no size limit)
+            # result_queue: bounded queue; when it exceeds 200 entries, apply backpressure to workers to prevent memory spikes
             work_queue = ctx.Queue()
             result_queue = ctx.Queue(maxsize=200)
 
-            # 向 work_queue 放入所有文件路径 + 每个 worker 一个 None 哨兵
+            # Put all file paths into work_queue + one None sentinel for each worker
             for f in all_files:
                 work_queue.put(str(f))
             for _ in range(max_workers):
                 work_queue.put(None)
 
-            # 启动固定数量 worker 进程
+            # Start a fixed number of worker processes
             workers = []
             for _ in range(max_workers):
                 p = ctx.Process(
@@ -1733,7 +1729,7 @@ class GenericDocumentScanner:
                 p.start()
                 workers.append(p)
 
-            # 消费者循环：从 result_queue 读取结果，批量写入 ZVec
+            # Consumer loop: read results from result_queue and write them to ZVec in batches
             workers_remaining = max_workers
 
             while workers_remaining > 0:
@@ -1796,24 +1792,24 @@ class GenericDocumentScanner:
 
                 if self.progress_callback and processed % 50 == 0:
                     pct = (processed / estimated_total * 100) if estimated_total > 0 else 0
-                    self.progress_callback(pct, f"{processed}/{estimated_total} 文件", {"processed": processed, "total": estimated_total})
+                    self.progress_callback(pct, f"{processed}/{estimated_total} files", {"processed": processed, "total": estimated_total})
 
-            # 等待所有 worker 进程退出
+            # Wait for all worker processes to exit
             for p in workers:
                 p.join(timeout=TIMEOUT_DOCUMENT_WORKER_JOIN)
                 if p.is_alive():
                     p.terminate()
 
-            # 插入剩余批次
+            # Insert remaining batch
             if batch_buffer:
                 col.insert(batch_buffer)
                 col.flush()
                 batch_buffer.clear()
 
-            # 构建 FTS 全文索引（Schema 已内置，但旧集合可能缺少）
+            # Build FTS full-text index (already built into Schema, but older collections may lack it)
             if processed > 0:
                 if self.progress_callback:
-                    self.progress_callback(99, "正在构建全文索引...")
+                    self.progress_callback(99, "Building full-text index...")
                 try:
                     has_fts = any(f.name == "chunk_text" and f.index_param is not None
                                   for f in col.schema.fields)
@@ -1821,11 +1817,11 @@ class GenericDocumentScanner:
                         col.create_index("chunk_text", zvec.FtsIndexParam(tokenizer_name="jieba"))
                     col.optimize()
                 except Exception as e:
-                    logger.warning(f"全文索引构建失败（搜索自动降级）: {e}")
+                    logger.warning(f"Full-text index build failed (search will automatically degrade): {e}")
 
         finally:
-            # 释放 ZVec 文件锁后合并到 kb_dir
-            # zvec.Collection 无 close() 方法，需 del + gc 释放文件锁
+            # Release the ZVec file lock, then merge into kb_dir
+            # zvec.Collection has no close() method; use del + gc to release the file lock
             del col
             import gc
             gc.collect()
@@ -1859,19 +1855,19 @@ class GenericDocumentScanner:
                             max_workers: Optional[int] = None, callback: Optional[Callable] = None,
                             exclude: Optional[List[str]] = None):
         """
-        异步扫描目录中的文档（立即返回，后台处理）
+        Asynchronously scan documents in a directory (returns immediately, processes in the background)
         
         Args:
-            directory: 要扫描的目录
-            extensions: 要处理的文件扩展名列表
-            max_workers: 最大工作进程数
-            callback: 完成后的回调函数
+            directory: Directory to scan
+            extensions: List of file extensions to process
+            max_workers: Maximum number of worker processes
+            callback: Callback function after completion
         
         Returns:
-            立即返回，实际处理在后台线程中进行
+            Returns immediately; actual processing happens in a background thread
         """
         if self._scanning:
-            logger.warning("扫描已在进行中")
+            logger.warning("Scanning is already in progress")
             return
 
         def _scan_task():
@@ -1881,28 +1877,28 @@ class GenericDocumentScanner:
                 if callback:
                     callback(result)
                 if self.progress_callback:
-                    self.progress_callback(100, "扫描完成")
+                    self.progress_callback(100, "Scan complete")
             finally:
                 self._scanning = False
 
         self._scan_thread = threading.Thread(target=_scan_task, daemon=True)
         self._scan_thread.start()
 
-        logger.info(f"异步扫描已启动: {directory}")
+        logger.info(f"Asynchronous scan started: {directory}")
     
     def is_scanning(self) -> bool:
-        """检查是否正在扫描"""
+        """Check whether scanning is in progress"""
         return self._scanning
     
     def wait_scan_complete(self, timeout: Optional[float] = None) -> bool:
         """
-        等待扫描完成
+        Wait for scanning to complete
         
         Args:
-            timeout: 超时时间（秒）
+            timeout: Timeout time (seconds)
         
         Returns:
-            是否完成（True=完成，False=超时）
+            Whether it is complete (True=complete, False=timeout)
         """
         if self._scan_thread is None:
             return True
@@ -1912,13 +1908,13 @@ class GenericDocumentScanner:
     
     def add_web_document(self, url: str) -> Optional[Dict]:
         """
-        添加网页文档
+        Add a web document
 
         Args:
-            url: 网页 URL
+            url: Web page URL
 
         Returns:
-            文档信息或 None
+            Document information or None
         """
         try:
             processor = WebDocumentProcessor()
@@ -1927,14 +1923,14 @@ class GenericDocumentScanner:
             if result:
                 title = result.get('title', '')
                 content = result.get('content', '')
-                # 防御性清理 Base64 data URI
+                # Defensively clean Base64 data URIs
                 content = re.sub(
                     r'data:image/[^;]+;base64,[A-Za-z0-9+/=]{100,}',
                     '[Base64 Image]',
                     content
                 )
 
-                # 按固定行数切块写入 ZVec
+                # Split into chunks by fixed line count and write to ZVec
                 content_lines = content.split('\n')
                 chunk_size = CHUNK_SIZE_DOCUMENT_LINES
                 docs = []
@@ -1953,13 +1949,13 @@ class GenericDocumentScanner:
                     ))
 
                 if docs:
-                    # 检查 ZVec 集合是否已存在（任何 manifest.* 文件）
+                    # Check whether the ZVec collection already exists (any manifest.* file)
                     import glob as _glob
                     manifest_files = _glob.glob(str(Path(str(self.zvec_dir)) / 'manifest.*'))
                     if manifest_files:
                         col = zvec.open(str(self.zvec_dir))
                     else:
-                        # create_and_open 要求目录不存在
+                        # create_and_open requires that the directory does not exist
                         zvec_path = Path(str(self.zvec_dir))
                         if zvec_path.exists():
                             import shutil as _shutil
@@ -1973,7 +1969,7 @@ class GenericDocumentScanner:
                         col = zvec.create_and_open(str(self.zvec_dir), schema=col_schema)
                     col.insert(docs)
                     col.flush()
-                    # zvec.Collection 无 close() 方法，del+gc 释放锁
+                    # zvec.Collection has no close() method; use del+gc to release the lock
                     del col
                     import gc
                     gc.collect()
@@ -1993,21 +1989,21 @@ class GenericDocumentScanner:
                       domain_filter: Optional[str] = None,
                       url_pattern: Optional[str] = None) -> Dict:
         """
-        广度优先爬取网站，解析页面链接并存入 ZVec 文档知识库（非递归）。
+        Breadth-first crawl a website, parse page links, and store them in the ZVec document knowledge base (non-recursive).
 
         Args:
-            start_url: 起始 URL
-            max_pages: 最大爬取页数
-            max_depth: 最大爬取深度（1=只爬起始页的直接链接）
-            domain_filter: 域名过滤，只爬匹配的域名（如 \"www.postgresql.org\"）
-            url_pattern: URL 模式过滤（如 \"/docs/19/\"）
+            start_url: Start URL
+            max_pages: Maximum number of pages to crawl
+            max_depth: Maximum crawl depth (1 = only crawl direct links from the start page)
+            domain_filter: Domain filter; only crawl matching domains (e.g. \"www.postgresql.org\")
+            url_pattern: URL pattern filter (e.g. \"/docs/19/\")
 
         Returns:
             {"success": int, "failed": int, "total": int, "total_size": int}
         """
         processor = WebDocumentProcessor()
         visited: set = set()
-        # BFS 队列: (url, depth)
+        # BFS queue: (url, depth)
         from collections import deque
         queue: deque = deque()
         queue.append((start_url, 0))
@@ -2018,13 +2014,13 @@ class GenericDocumentScanner:
         total_size = 0
         import time as _time
 
-        # 确保 ZVec 集合已初始化
+        # Ensure the ZVec collection is initialized
         import glob as _glob
         manifest_files = _glob.glob(str(Path(str(self.zvec_dir)) / 'manifest.*'))
         if manifest_files:
             col = zvec.open(str(self.zvec_dir))
         else:
-            # create_and_open 要求目录不存在
+            # create_and_open requires that the directory does not exist
             zvec_path = Path(str(self.zvec_dir))
             if zvec_path.exists():
                 import shutil as _shutil
@@ -2037,22 +2033,22 @@ class GenericDocumentScanner:
             ])
             col = zvec.create_and_open(str(self.zvec_dir), schema=col_schema)
 
-        # 检查 FTS 索引，若不存在（旧集合可能缺少），尝试创建
+        # Check the FTS index; if it does not exist (older collections may lack it), try to create it
         has_fts = any(f.name == "chunk_text" and f.index_param is not None
                       for f in col.schema.fields)
         if not has_fts:
-            logger.warning("chunk_text 字段缺少 FTS 索引，尝试重建")
+            logger.warning("The chunk_text field is missing an FTS index; attempting to rebuild")
             try:
                 col.create_index("chunk_text", zvec.FtsIndexParam(tokenizer_name="jieba"))
                 col.flush()
             except Exception as e:
-                logger.error(f"FTS 索引重建失败: {e}")
+                logger.error(f"FTS index rebuild failed: {e}")
 
         try:
             while queue and (success + failed) < max_pages:
                 url, depth = queue.popleft()
 
-                # 爬取并处理页面
+                # Crawl and process the page
                 result = processor.process_url(url)
                 if not result:
                     failed += 1
@@ -2061,14 +2057,14 @@ class GenericDocumentScanner:
                 content = result.get('content', '')
                 total_size += len(content)
 
-                # 清理 Base64
+                # Clean Base64
                 content = re.sub(
                     r'data:image/[^;]+;base64,[A-Za-z0-9+/=]{100,}',
                     '[Base64 Image]',
                     content
                 )
 
-                # 写入 ZVec
+                # Write to ZVec
                 title = result.get('title', '')
                 content_lines = content.split('\n')
                 chunk_size = CHUNK_SIZE_DOCUMENT_LINES
@@ -2093,14 +2089,14 @@ class GenericDocumentScanner:
 
                 success += 1
 
-                # 进度回调
+                # Progress callback
                 if self.progress_callback:
                     pct = min(99.0, (success + failed) / max_pages * 100)
-                    self.progress_callback(pct, f"爬取中: {success}/{max_pages} 页 (深度 {depth})")
+                    self.progress_callback(pct, f"Crawling: {success}/{max_pages} pages (depth {depth})")
 
-                # 非递归：只在当前深度 < max_depth 时，从页面提取新链接
+                # Non-recursive: extract new links from the page only when current depth < max_depth
                 if depth < max_depth:
-                    # 重新获取原始 HTML 以解析链接
+                    # Re-fetch raw HTML to parse links
                     try:
                         import requests
                         headers = {
@@ -2113,39 +2109,39 @@ class GenericDocumentScanner:
                         raw_html = ''
 
                     if raw_html:
-                        # 提取所有 href 链接
+                        # Extract all href links
                         found_links = re.findall(r'href="([^"]*)"', raw_html)
                         found_links += re.findall(r"href='([^']*)'", raw_html)
 
                         for link in found_links:
-                            # 跳过锚点和非 HTTP(S) 协议
+                            # Skip anchors and non-HTTP(S) protocols
                             if link.startswith('#') or link.startswith('mailto:') or link.startswith('javascript:'):
                                 continue
 
-                            # 用 urljoin 统一补全所有格式的相对路径
-                            # 包括 "preface.html"、"/docs/19/sql.html"、"../../manual" 等
+                            # Use urljoin to uniformly complete relative paths in all formats
+                            # Including "preface.html", "/docs/19/sql.html", "../../manual", etc.
                             from urllib.parse import urljoin as _urljoin
                             full_url = _urljoin(url, link)
                             if not full_url.startswith('http'):
                                 continue
 
-                            # 域名过滤
+                            # Domain filtering
                             if domain_filter and domain_filter not in full_url:
                                 continue
-                            # URL 模式过滤
+                            # URL pattern filtering
                             if url_pattern and url_pattern not in full_url:
                                 continue
-                            # 去重
+                            # Deduplicate
                             clean_link = full_url.split('#')[0]
                             if clean_link not in visited:
                                 visited.add(clean_link)
                                 queue.append((clean_link, depth + 1))
 
-                # 礼貌延迟
+                # Polite delay
                 _time.sleep(POLL_INTERVAL_AUTOMATION)
 
         finally:
-            # 优化索引
+            # Optimize index
             try:
                 col.optimize()
                 col.flush()
@@ -2164,16 +2160,16 @@ class GenericDocumentScanner:
 
     def search(self, query: str, content_type: Optional[str] = None, top_k: int = 10, use_fts5: bool = True) -> List[Dict]:
         """
-        搜索文档（使用 ZVec 全文搜索）
+        Search documents (using ZVec full-text search)
 
         Args:
-            query: 搜索关键词
-            content_type: 文档类型过滤
-            top_k: 返回结果数
-            use_fts5: 兼容参数，已弃用
+            query: Search keywords
+            content_type: Document type filter
+            top_k: Number of returned results
+            use_fts5: Compatibility parameter, deprecated
 
         Returns:
-            匹配的文档列表
+            List of matching documents
         """
         try:
             col = zvec.open(str(self.zvec_dir))
@@ -2186,7 +2182,7 @@ class GenericDocumentScanner:
             seen_paths = set()
             for r in results:
                 path_val = r.fields.get('path', '')
-                # 去重：同一 path 只保留最高分结果
+                # Deduplicate: keep only the highest-scoring result for the same path
                 if path_val in seen_paths:
                     continue
                 seen_paths.add(path_val)
@@ -2201,7 +2197,7 @@ class GenericDocumentScanner:
                     'extension': r.fields.get('extension', ''),
                     'score': r.score or 0,
                 }
-                # 从 chunk_text 首行提取 title
+                # Extract title from first line of chunk_text
                 first_newline = chunk_text.find('\n')
                 if first_newline > 0:
                     doc_entry['title'] = chunk_text[:first_newline].strip()
@@ -2214,16 +2210,16 @@ class GenericDocumentScanner:
                 formatted = [r for r in formatted if r.get('content_type') == content_type]
             return formatted[:top_k]
         except Exception as e:
-            logger.warning(f"ZVec 搜索失败: {e}")
+            logger.warning(f"ZVec search failed: {e}")
             return []
 
     def get_statistics(self) -> Dict:
-        """获取统计信息（基于 ZVec）"""
+        """Get statistics (based on ZVec)"""
         try:
             col = zvec.open(str(self.zvec_dir))
             total_documents = col.stats.doc_count
 
-            # 按 extension / content_type 统计（需 FTS 查询，若失败则跳过分布）
+            # Count by extension / content_type (requires FTS query; skip distribution if it fails)
             ext_stats = {}
             type_stats = {}
             if total_documents > 0:
@@ -2240,7 +2236,7 @@ class GenericDocumentScanner:
                         ct = d.fields.get('content_type', 'unknown')
                         type_stats[ct] = type_stats.get(ct, 0) + 1
                 except Exception:
-                    pass  # 分布统计失败时返回空分布
+                    pass  # Return empty distribution if distribution statistics fail
 
             return {
                 'total_documents': total_documents,
@@ -2251,5 +2247,5 @@ class GenericDocumentScanner:
                 'last_build_duration': None,
             }
         except Exception as e:
-            logger.warning(f"ZVec 统计获取失败: {e}")
+            logger.warning(f"Failed to get ZVec statistics: {e}")
             return {'total_documents': 0, 'by_type': {}, 'by_extension': {}, 'database_size_mb': 0}

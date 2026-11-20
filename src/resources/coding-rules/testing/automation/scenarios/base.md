@@ -1,36 +1,36 @@
-<!-- @when: 编译通过后，需对 GUI 程序进行 UI 交互验证。首次接入自动化测试时按此流程操作 -->
+<!-- @when: After compilation passes, UI interaction verification is required for GUI programs. Follow this process when first integrating automated testing -->
 <!-- @part-of: testing -->
 <!-- @chain: after=../../ui.md, before=a-smoke.md -->
 
-## 自动化测试基础设施
+## Automated Testing Infrastructure
 
-### 前置判断
+### Pre-check
 
-执行以下检查以确定当前状态：
+Perform the following checks to determine the current state:
 
-1. 读取目标项目的 `.dpr` 文件
-2. 如果 `.dpr` 的 `uses` 中已包含 `Vcl.DaofyAutomation` 或 `Fmx.DaofyAutomation` → **跳过启用步骤**，直接执行脚本
-3. 如果未包含 → 按下方「启用流程」操作
+1. Read the target project's `.dpr` file
+2. If the `.dpr` `uses` clause already contains `Vcl.DaofyAutomation` or `Fmx.DaofyAutomation` → **skip the enablement steps** and execute the script directly
+3. If not included → follow the "Enablement Process" below
 
-### 启用流程（AI 可执行）
+### Enablement Process (AI-executable)
 
-#### 步骤 1：确认框架文件存在
+#### Step 1: Confirm the framework files exist
 
-检查 `tools/auto/` 下是否包含必需文件：
+Check whether `tools/auto/` contains the required files:
 
-| 框架 | 必需文件 |
+| Framework | Required files |
 |------|---------|
 | VCL | `DaofyAutomation.Base.pas` + `Vcl.DaofyAutomation.pas` |
 | FMX | `DaofyAutomation.Base.pas` + `Fmx.DaofyAutomation.pas` |
-| callgraph optional | `DaofyAutomation.CallGraph.pas` + `tools\stacktrace\StackTrace.pas` |
+| callgraph (optional) | `DaofyAutomation.CallGraph.pas` + `tools\stacktrace\StackTrace.pas` |
 
-> ⚠️ `DaofyAutomation.Base.pas` 是 VCL 和 FMX 的共同基础依赖，两个都必须引用。
+> ⚠️ `DaofyAutomation.Base.pas` is the common base dependency for both VCL and FMX; both must reference it.
 
-如果文件不存在，检查 Daofy 安装目录是否正确，或从源码复制 `tools/auto/` 目录。
+If the files do not exist, check whether the Daofy installation directory is correct, or copy the `tools/auto/` directory from the source.
 
-#### 步骤 2：修改 .dpr
+#### Step 2: Modify the .dpr
 
-**方式 A（推荐）：用 `in` 子句直接引用（最可靠，无需改 .dproj）**
+**Option A (recommended): Reference directly with an `in` clause (most reliable; no need to modify .dproj)**
 
 ```pascal
 program MyApp;
@@ -42,7 +42,7 @@ uses
   MainForm in 'MainForm.pas';
 
 begin
-  Vcl.DaofyAutomation.AutoStart;    // ← ⚠️ 必须在 Application.Initialize 之前
+  Vcl.DaofyAutomation.AutoStart;    // ← ⚠️ Must be before Application.Initialize
   Application.Initialize;
   Application.CreateForm(TMainForm, MainForm);
   Application.Run;
@@ -50,7 +50,7 @@ begin
 end.
 ```
 
-FMX 版本：
+FMX version:
 
 ```pascal
 uses
@@ -59,31 +59,31 @@ uses
   DaofyAutomation.Base in '$(DaofyRoot)\tools\auto\DaofyAutomation.Base.pas';
 ```
 
-**方式 B（如已配搜索路径，或项目不允许 `in` 子句）**
+**Option B (if search paths are already configured, or the project does not allow `in` clauses)**
 
-将 `tools/auto` 目录加入项目搜索路径（IDE: Project → Options → Delphi Compiler → Search path），
-如果需要 `callgraph`/`callgraph_diff`/`callgraph_path`/`callgraph_impact` 及用途层 `callgraph_*` 可选诊断命令，还需加入 `tools/stacktrace` 并在项目 `uses` 中增加 `DaofyAutomation.CallGraph`。`callgraph` 支持 `direction=callees|callers`、`project_only`、`exclude_prefixes`、`include_prefixes`、`edge_limit`，响应包含 `edge_count`、`returned_count`、`truncated`，每条边包含 `call_addr`、`call_file`、`call_line`、`category`、`from_category`、`to_category`；`callgraph_path` 接收 `source`、`target`、`max_depth`、`max_paths`、`include_prefixes`，返回 `found` 和 `paths`；`callgraph_diff` 用 baseline JSON 或 `baseline_path` 快照文件对比当前调用边变化，默认 `compare_by=name`，可选 `addr|full`，并可用 `save_as` 保存当前快照；`save_as` 必须是 `snapshots_dir` 下的相对 JSON 路径，读取型快照路径必须 resolve 后仍在 `snapshots_dir` 内；`callgraph_impact` 接收 `functions`/`targets` 或 `file`+`line`/`locations`，批量查询 callers 并汇总入口候选和 unresolved。用途层命令包括测试选择、失败诊断、边界检查、重构检查、孤岛候选和异常栈解释。
-然后 `.dpr` 中只需单元名，无需 `in` 子句：
+Add the `tools/auto` directory to the project search path (IDE: Project → Options → Delphi Compiler → Search path).
+If you need the optional diagnostic commands `callgraph`/`callgraph_diff`/`callgraph_path`/`callgraph_impact` and the purpose-layer `callgraph_*` commands, you also need to add `tools/stacktrace` and add `DaofyAutomation.CallGraph` to the project `uses` clause. `callgraph` supports `direction=callees|callers`, `project_only`, `exclude_prefixes`, `include_prefixes`, and `edge_limit`; the response contains `edge_count`, `returned_count`, and `truncated`; each edge contains `call_addr`, `call_file`, `call_line`, `category`, `from_category`, and `to_category`. `callgraph_path` accepts `source`, `target`, `max_depth`, `max_paths`, and `include_prefixes`, and returns `found` and `paths`. `callgraph_diff` compares current call-edge changes using baseline JSON or a `baseline_path` snapshot file; it defaults to `compare_by=name`, optionally `addr|full`, and can use `save_as` to save the current snapshot; `save_as` must be a relative JSON path under `snapshots_dir`, and read-type snapshot paths must still be within `snapshots_dir` after resolution. `callgraph_impact` accepts `functions`/`targets` or `file`+`line`/`locations`, queries callers in batches, and summarizes entry candidates and unresolved items. Purpose-layer commands include test selection, failure diagnosis, boundary checks, refactoring checks, island candidates, and exception stack interpretation.
+Then the `.dpr` only needs the unit name, with no `in` clause:
 
 ```pascal
 uses
   Vcl.Forms,
-  Vcl.DaofyAutomation;          // ← 依赖搜索路径解析
+  Vcl.DaofyAutomation;          // ← Resolved via search path
 ```
 
-> 方式 A 不需要动 .dproj 配置，对任意环境都可靠，AI 可直接用 `delphi_file(action="write", edits=[...])` 修改 `.dpr`。如果项目已有搜索路径体系且不接受 `in` 子句，改用方式 B 但需要人为确认搜索路径添加无误。
+> Option A does not require changing .dproj configuration and is reliable in any environment; AI can directly use `delphi_file(action="write", edits=[...])` to modify the `.dpr`. If the project already has a search-path system and does not accept `in` clauses, use Option B instead, but a human must confirm that the search path was added correctly.
 
-#### 步骤 3：编译验证
+#### Step 3: Compile and verify
 
 ```python
 delphi_project(action="compile", project_path="MyApp.dproj")
 ```
 
-确认 0 error 0 warning。
+Confirm 0 errors, 0 warnings.
 
-#### 步骤 4：冒烟测试
+#### Step 4: Smoke test
 
-启动目标程序，用 `automate_delphi` 发送一条简单命令验证管道通信：
+Start the target program and use `automate_delphi` to send a simple command to verify pipe communication:
 
 ```python
 automate_delphi(
@@ -97,100 +97,100 @@ automate_delphi(
 )
 ```
 
-如果返回 `"status": "ok"` 且截图文件生成 → **启用成功**。
+If it returns `"status": "ok"` and the screenshot file is generated → **enablement succeeded**.
 
-#### 常见失败恢复
+#### Common Failure Recovery
 
-| 失败现象 | 原因 | AI 处理动作 |
+| Failure symptom | Cause | AI action |
 |----------|------|------------|
-| `File not found: 'DaofyAutomation.Base.pas'` | 搜索路径未包含 `tools/auto` | 检查搜索路径配置；或改用方式 B `in` 子句 |
-| `automate_delphi` 返回 `target_not_found` | 窗体类名不匹配 | 先用 `{"cmd": "listwnd"}` 扫描实际窗体列表，取返回的 class 修正 target |
-| `automate_delphi` 连不上管道（超时） | AutoStart 未调用，或被异常跳过 | 读 `.dpr` 确认 AutoStart 在 `Application.Initialize` 前；或 exe 启动后手动等 1-2 秒 |
-| 编译报 `Duplicate resource` | `in` 子句和搜索路径双重引用导致重复编译 | 删除 `in` 子句，统一用搜索路径 |
+| `File not found: 'DaofyAutomation.Base.pas'` | Search path does not include `tools/auto` | Check the search path configuration; or use the `in` clause approach instead |
+| `automate_delphi` returns `target_not_found` | Form class name does not match | First use `{"cmd": "listwnd"}` to scan the actual form list, then use the returned class to correct target |
+| `automate_delphi` cannot connect to the pipe (timeout) | AutoStart was not called, or was skipped by an exception | Read the `.dpr` to confirm AutoStart is before `Application.Initialize`; or manually wait 1–2 seconds after the exe starts |
+| Compilation reports `Duplicate resource` | Dual reference via the `in` clause and search path causes duplicate compilation | Remove the `in` clause and use the search path consistently |
 
-#### 管道建立失败诊断
+#### Pipe Establishment Failure Diagnosis
 
-当 `automate_delphi` 连接管道超时或失败时，按以下流程诊断。**注意：管道失败时 `listwnd`/`formsum`/`dumpstate` 等管道命令不可用，必须走 Python UIA（`uia.xxx`）。**
+When `automate_delphi` times out or fails to connect to the pipe, diagnose using the following process. **Note: when the pipe fails, pipe commands such as `listwnd`/`formsum`/`dumpstate` are unavailable, and you must use Python UIA (`uia.xxx`).**
 
 ```
-管道失败
+Pipe failure
   │
-  ├─ 检查进程是否存在（tasklist / PowerShell Get-Process）
+  ├─ Check whether the process exists (tasklist / PowerShell Get-Process)
   │
-  ├─ 进程不存在（启动失败或已崩溃）
+  ├─ Process does not exist (startup failed or has crashed)
   │   │
-  │   └─ 检查 exception.log
-  │       ├─ 存在 → 读取 StackTrace 输出，定位崩溃原因（异常类名+出错行号）
-  │       └─ 不存在 → 进程未启动成功，检查：
-  │           ├─ exe 路径是否正确
-  │           ├─ 缺少 DLL 依赖（用 dumpbin / Dependencies 工具检查）
-  │           └─ Windows Defender / 杀毒软件拦截
+  │   └─ Check exception.log
+  │       ├─ Exists → read the StackTrace output and locate the crash cause (exception class name + error line number)
+  │       └─ Does not exist → the process did not start successfully; check:
+  │           ├─ Whether the exe path is correct
+  │           ├─ Missing DLL dependencies (check with dumpbin / Dependencies tools)
+  │           └─ Windows Defender / antivirus blocking
   │
-  └─ 进程存在但管道不通（AutoStart 未调用或管道名不匹配）
+  └─ Process exists but pipe is unreachable (AutoStart not called or pipe name mismatch)
       │
-      ├─ 1. uia.scan 扫描顶层窗口，确认程序界面已加载
+      ├─ 1. uia.scan scans top-level windows to confirm the program UI has loaded
       │     {"cmd": "uia.scan", "depth": 2, "props": "name,class,rect"}
       │
-      ├─ 2. uia.screenshot 截图 + OCR 识别报错信息
+      ├─ 2. uia.screenshot takes a screenshot + OCR recognizes error information
       │     {"cmd": "uia.screenshot", "path": "pipe_fail_diag.png"}
       │     → daofy_ocr(action="recognize", image_path="pipe_fail_diag.png")
       │
-      └─ 3. 根据 OCR 结果判断：
-            ├─ 识别到异常对话框 → 截图作为证据，分析异常内容
-            ├─ 识别到权限/UAC 弹窗 → 需要管理员权限运行
-            └─ 界面正常但管道不通 → 读 .dpr 确认 AutoStart 在 Application.Initialize 前
+      └─ 3. Determine based on the OCR result:
+            ├─ Exception dialog recognized → use the screenshot as evidence and analyze the exception content
+            ├─ Permission/UAC prompt recognized → requires running as administrator
+            └─ UI is normal but pipe is unreachable → read the .dpr to confirm AutoStart is before Application.Initialize
 ```
 
-**诊断工具对照**：
+**Diagnostic Tool Comparison**:
 
-| 场景 | 可用工具 | 不可用工具 |
+| Scenario | Available tools | Unavailable tools |
 |------|---------|-----------|
-| 进程不存在 | `tasklist`, `powershell Get-Process`, 读 `exception.log` | 管道命令全部不可用 |
-| 进程存在+管道失败 | `uia.scan`, `uia.screenshot`, `uia.goto`, OCR | `listwnd`, `formsum`, `dumpstate`, `rget` |
-| 管道正常 | 所有命令 | — |
+| Process does not exist | `tasklist`, `powershell Get-Process`, read `exception.log` | All pipe commands are unavailable |
+| Process exists + pipe fails | `uia.scan`, `uia.screenshot`, `uia.goto`, OCR | `listwnd`, `formsum`, `dumpstate`, `rget` |
+| Pipe normal | All commands | — |
 
-**快速检查脚本**（Python 侧）：
+**Quick check script** (Python side):
 ```python
 import subprocess, os
-# 检查进程是否存在
+# Check whether the process exists
 result = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {exe_name}"], 
                        capture_output=True, text=True)
 if exe_name not in result.stdout:
-    # 进程不存在，检查 exception.log
+    # Process does not exist; check exception.log
     log_path = os.path.join(exe_dir, "exception.log")
     if os.path.exists(log_path):
-        # 读取 StackTrace
+        # Read StackTrace
         with open(log_path, encoding="utf-8", errors="replace") as f:
             print(f.read())
 else:
-    # 进程存在，走 UIA 诊断
+    # Process exists; use UIA diagnosis
     # uia.scan → uia.screenshot → OCR
     pass
 ```
 
-### 工具调用
+### Tool Invocation
 
 ```python
 automate_delphi(app_path="App.exe", script=[...])
 automate_delphi(action="gui", app_path="App.exe", script=[...])
 automate_delphi(action="auto", app_path="App.exe", script="script.json", keep_alive=True)
 ```
-`action="auto"` 自动检测 PE 头 Subsystem 字段（GUI vs Console）。
+`action="auto"` automatically detects the PE header Subsystem field (GUI vs Console).
 
-`action="console"` 用于控制台程序 stdin/stdout 交互，无需 Delphi 端改造。
+`action="console"` is used for stdin/stdout interaction with console programs and requires no changes on the Delphi side.
 
-### 通信架构
+### Communication Architecture
 
 ```
 Python                              Delphi
-  ── CreateFile(\\.\pipe\daofy_auto) → 管道线程接收 JSON
-  ── WriteFile(JSON request)        → 主线程执行
-  ←── ReadFile(JSON response)       ← 返回结果/ACK
+  ── CreateFile(\\.\pipe\daofy_auto) → pipe thread receives JSON
+  ── WriteFile(JSON request)        → main thread executes
+  ←── ReadFile(JSON response)       ← returns result/ACK
 ```
 
-### 命令同步/异步分类
+### Synchronous/Asynchronous Command Classification
 
-| 同步 | 异步 |
+| Synchronous | Asynchronous |
 |------|------|
 | goto, capture, dumpstate, listwnd, formsum | click, rclick, dblclick |
 | wait, waitfor, dlgscan, msgscan, msgclose | hover, move, drag |
@@ -199,99 +199,100 @@ Python                              Delphi
 
 ### keep_alive
 
-- `keep_alive=True` 进程保持运行，5 分钟未用自动清理
-- 新建进程首次调用自动设置 `snapdir`
-- 返回 `process_reused` / `process_alive` 字段让 AI 感知状态
+- `keep_alive=True` keeps the process running; it is automatically cleaned up after 5 minutes of inactivity
+- The first call on a newly created process automatically sets `snapdir`
+- Returns `process_reused` / `process_alive` fields so the AI can perceive the state
 
-### 测试质量红线
+### Test Quality Red Lines
 
-> ⚠️ **以下 6 条为一票否决红线。违反任何一条，测试用例不合格，必须修改后重新提交。适用于所有测试用例（Delphi 自动化测试、pytest 单元测试、集成测试）。**
+> ⚠️ **The following 6 items are veto red lines. Violating any one of them makes the test case unacceptable; it must be modified and resubmitted. Applies to all test cases (Delphi automated tests, pytest unit tests, integration tests).**
 
-#### 红线 1：禁止跳过式通过
+#### Red Line 1: No Skip-style Passing
 
-- ❌ Runtime/组件不可用时 `Assert(True)` / `assert True` 混入 passed 计数
-- ❌ 初始化失败后静默执行空操作，最终断言"没有异常"
-- ✅ 检测前置条件 → 不满足则**显式 skip + 说明原因**，或 **Fail + 说明原因**
+- ❌ When a runtime/component is unavailable, mix `Assert(True)` / `assert True` into the passed count
+- ❌ After initialization fails, silently perform no-ops and finally assert "no exception"
+- ✅ Detect preconditions → if not met, **explicitly skip + explain why**, or **Fail + explain why**
 
 ```
-// ❌ Delphi 错误示例
-{"cmd":"rget","target":"WebView2.IsAvailable","assert_expr":"true","note":"跳过检查"}
+// ❌ Delphi incorrect example
+{"cmd":"rget","target":"WebView2.IsAvailable","assert_expr":"true","note":"Skip check"}
 
-// ✅ Delphi 正确示例
+// ✅ Delphi correct example
 {"cmd":"rget","target":"WebView2.IsAvailable","assert_expr":"actual=='True'",
- "on_fail":"skip","skip_reason":"WebView2 Runtime 未安装"}
+ "on_fail":"skip","skip_reason":"WebView2 Runtime not installed"}
 ```
 
 ```python
-# ❌ pytest 错误示例
+# ❌ pytest incorrect example
 def test_webview2_create():
     try:
         wv = CreateWebView2()
     except:
         pass
-    assert True  # 假通过
+    assert True  # false pass
 
-# ✅ pytest 正确示例
-@pytest.mark.skipif(not is_webview2_available(), reason="WebView2 Runtime 未安装")
+# ✅ pytest correct example
+@pytest.mark.skipif(not is_webview2_available(), reason="WebView2 Runtime not installed")
 def test_webview2_create():
     wv = CreateWebView2()
     assert wv IsNot None
     assert wv.NativeWindow > 0
 ```
 
-#### 红线 2：断言必须验证具体状态
+#### Red Line 2: Assertions Must Verify Specific State
 
-- ❌ `assert_expr: "true"` / `assert_expr: "actual != ''"` — 无信息量，无法定位问题
+- ❌ `assert_expr: "true"` / `assert_expr: "actual != ''"` — uninformative; cannot locate the problem
 - ✅ `assert_expr: "len(actual) > 0"` / `assert_expr: "actual == 'ExpectedValue'"` / `assert_expr: "FileExists(actual)"`
-- **判断标准**：如果断言失败，能否定位到**具体哪个状态不对**？不能 = 断言无效
+- **Criterion**: If the assertion fails, can you locate **which specific state is wrong**? If not = the assertion is invalid
 
-#### 红线 3：截图必须有内容验证
+#### Red Line 3: Screenshots Must Have Content Verification
 
-- ❌ `capture` 后直接 `exit`，截图存了不检查
-- ❌ pytest 中 `screenshot()` 后不调用 `image_diff` / `ocr` / `pixel_assert`
-- ✅ `capture` 后接 `recognize`/`detect`/`diff`/`match`，或至少 `rget` 验证截图相关的 UI 状态
+- ❌ `exit` directly after `capture`; the screenshot is saved but not checked
+- ❌ In pytest, `screenshot()` is not followed by calling `image_diff` / `ocr` / `pixel_assert`
+- ✅ Follow `capture` with `recognize`/`detect`/`diff`/`match`, or at least use `rget` to verify the screenshot-related UI state
 
-#### 红线 4：外部依赖必须测试降级路径
+#### Red Line 4: External Dependencies Must Test Degradation Paths
 
-依赖 WebView2/Runtime/COM/DLL 等外部组件时：
+When depending on external components such as WebView2/Runtime/COM/DLL:
 
-1. **正向测试**：组件可用时验证功能正常
-2. **降级测试**：组件不可用时验证程序行为（报错/降级/跳过），不得静默无操作
+1. **Positive test**: verify the function works when the component is available
+2. **Degradation test**: verify program behavior when the component is unavailable (error/degrade/skip); must not silently do nothing
 
-构建脚本中调用外部工具（`brcc32`/`dcc32`/`msbuild`）时：
+When build scripts call external tools (`brcc32`/`dcc32`/`msbuild`):
 
-- ❌ 工具缺失时返回 exit code 0
-- ✅ 工具缺失时返回非零退出码 + stderr 输出错误信息
+- ❌ Return exit code 0 when the tool is missing
+- ✅ Return a non-zero exit code + output an error message to stderr when the tool is missing
 
-#### 红线 5：执行时间必须与操作量匹配
+#### Red Line 5: Execution Time Must Match the Amount of Work
 
-| 操作规模 | 最低耗时 | 说明 |
+| Operation scale | Minimum duration | Description |
 |---------|---------|------|
-| 单次 goto + capture + exit | ≥ 2 秒 | 含进程启动/管道建立/截图 |
-| 10 次循环操作 | ≥ 5 秒 | 含中间验证 |
-| 100 次循环操作 | ≥ 30 秒 | 不可能 1 秒完成 100 次真实操作 |
+| Single goto + capture + exit | ≥ 2 seconds | Includes process startup/pipe establishment/screenshot |
+| 10 loop operations | ≥ 5 seconds | Includes intermediate verification |
+| 100 loop operations | ≥ 30 seconds | It is impossible to complete 100 real operations in 1 second |
 
-- 若实际耗时远低于预期，必须在 `note` 中说明原因（mock/桩/环境差异）
-- 测试报告中必须包含**实际执行时间**，不得只报告 passed/failed 数量
+- If actual duration is far below expectations, you must explain why in `note` (mock/stub/environment differences)
+- The test report must include the **actual execution time**; do not report only passed/failed counts
 
-#### 红线 6：审计结论必须有运行证据支撑
+#### Red Line 6: Audit Conclusions Must Be Supported by Runtime Evidence
 
-- ❌ 设计文档写 "支持外部 URI 拒绝" → 结论 "功能完整"
-- ✅ 运行证据：测试脚本实际请求外部 URI → 返回 403/404 → 截图/日志佐证
-- 审计报告中的标记含义：
+- ❌ Design doc says "supports external URI rejection" → conclusion "feature complete"
+- ✅ Runtime evidence: test script actually requests an external URI → returns 403/404 → screenshots/logs corroborate
+- Meaning of markers in audit reports:
 
-| 审计标记 | 含义 | 可否得出 COMPLETE |
+| Audit marker | Meaning | Can it lead to COMPLETE |
 |---------|------|------------------|
-| `DESIGN` | 仅设计审查，未实际运行 | ❌ 不可 |
-| `IMPLEMENTED` | 代码已实现，已编译通过 | ❌ 不可 |
-| `TESTED` | 已运行测试，有截图/日志证据 | ✅ 可 |
+| `DESIGN` | Design review only, not actually run | ❌ No |
+| `IMPLEMENTED` | Code implemented, compiled successfully | ❌ No |
+| `TESTED` | Tests have been run, with screenshot/log evidence | ✅ Yes |
 
-### 协议
+### Protocol
 
-- 同步命令阻塞等待返回；异步立即 ACK
-- 响应：`{"reqId":"step_0","status":"ok","data":"OK"}`
-- >64KB 自动分块（ERROR_MORE_DATA 循环读）
+- Synchronous commands block and wait for a response; asynchronous commands ACK immediately
+- Response: `{"reqId":"step_0","status":"ok","data":"OK"}`
+- >64KB is automatically chunked (ERROR_MORE_DATA loop read)
 
-### 测试场景总览
+### Test Scenario Overview
 
-场景文件索引见 [index.md](../index.md)。各场景文件提供策略描述 + 可复用 JSON 模板。
+See [index.md](../index.md) for the scenario file index. Each scenario file provides a strategy description + reusable JSON templates.
+

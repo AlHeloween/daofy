@@ -1,16 +1,16 @@
 """
-.groupproj 文件解析器
+.groupproj file parser
 
-提供 Delphi 项目组文件(.groupproj)的统一解析逻辑，
-被 compile_project 和 install_package 共用。
+Provides unified parsing of Delphi project group files (.groupproj), shared by
+compile_project and install_package.
 
-支持的 XML 节点：
-  - <Projects Include="...">           (XE/XE2 旧格式，含 <Dependencies>)
-  - <ProjectReference Include="...">   (新版格式)
-  - <BuildOrder>                       (编译顺序)
-  - <Platforms>                        (支持的平台列表)
-  - <Config>/<Platform>                (默认配置)
-  - <PropertyGroup>/<ProjectGuid>      (项目 GUID)
+Supported XML nodes:
+  - <Projects Include="...">           (XE/XE2 legacy format, with <Dependencies>)
+  - <ProjectReference Include="...">   (newer format)
+  - <BuildOrder>                       (build order)
+  - <Platforms>                        (list of supported platforms)
+  - <Config>/<Platform>                (default configuration)
+  - <PropertyGroup>/<ProjectGuid>      (project GUID)
 """
 
 from __future__ import annotations
@@ -30,39 +30,39 @@ MSBUILD_NS = "http://schemas.microsoft.com/developer/msbuild/2003"
 
 @dataclass
 class GroupProjectInfo:
-    """解析后的 .groupproj 结构化信息"""
+    """Structured information parsed from a .groupproj"""
 
-    # 子项目路径列表（已按 BuildOrder 排序、已去重）
+    # Child project paths (sorted by BuildOrder, deduplicated)
     child_projects: List[Path] = field(default_factory=list)
 
-    # 每个子项目的依赖列表（key = 文件名，value = 依赖文件名列表）
+    # Dependency list per child project (key = file name, value = dependency file names)
     dependencies: dict[str, List[str]] = field(default_factory=dict)
 
-    # BuildOrder 中定义的编译顺序（文件名列表，可能为空）
+    # Build order defined in BuildOrder (list of file names, may be empty)
     build_order: List[str] = field(default_factory=list)
 
-    # 支持的平台列表（来自 <Platforms> 节点）
+    # Supported platforms (from the <Platforms> node)
     supported_platforms: List[str] = field(default_factory=list)
 
-    # 默认配置（来自 <Config> 节点）
+    # Default configuration (from the <Config> node)
     default_config: Optional[str] = None
 
-    # 默认平台（来自 <Platform> 节点）
+    # Default platform (from the <Platform> node)
     default_platform: Optional[str] = None
 
-    # 项目 GUID
+    # Project GUID
     project_guid: Optional[str] = None
 
 
 def _tag(ns: str, local: str) -> str:
-    """构建带命名空间的标签名"""
+    """Build a namespaced tag name"""
     return f"{{{ns}}}{local}"
 
 
 def _find_all_with_fallback(
     root: ET.Element, ns: str, tag: str
 ) -> List[ET.Element]:
-    """递归搜索带命名空间和不带命名空间的元素（使用 .// 前缀确保搜索嵌套子元素）"""
+    """Recursively search elements both with and without the namespace (the .// prefix keeps nested children in scope)"""
     results = []
     results.extend(root.findall(f".//{_tag(ns, tag)}"))
     results.extend(root.findall(f".//{tag}"))
@@ -73,34 +73,34 @@ def parse_groupproj(
     group_path: str | Path,
 ) -> GroupProjectInfo:
     """
-    解析 .groupproj 文件，返回结构化信息。
+    Parse a .groupproj file and return its structured information.
 
-    支持的 XML 节点：
-      - <Projects Include="..."> + <Dependencies>  (旧格式)
-      - <ProjectReference Include="...">             (新格式)
-      - <BuildOrder>                                 (编译顺序)
-      - <Platforms>                                  (支持的平台)
-      - <Config>/<Platform>                          (默认配置)
-      - <PropertyGroup>/<ProjectGuid>                (项目 GUID)
+    Supported XML nodes:
+      - <Projects Include="..."> + <Dependencies>  (legacy format)
+      - <ProjectReference Include="...">             (new format)
+      - <BuildOrder>                                 (build order)
+      - <Platforms>                                  (supported platforms)
+      - <Config>/<Platform>                          (default configuration)
+      - <PropertyGroup>/<ProjectGuid>                (project GUID)
 
     Args:
-        group_path: .groupproj 文件路径
+        group_path: .groupproj file path
 
     Returns:
-        GroupProjectInfo 结构化信息
+        GroupProjectInfo structured information
 
     Raises:
-        FileNotFoundError: 文件不存在
-        ET.ParseError: XML 解析失败
+        FileNotFoundError: The file does not exist
+        ET.ParseError: XML parsing failed
     """
     group_path = Path(group_path)
     group_dir = group_path.parent
 
-    tree = ET.parse(str(group_path))  # noqa: S318 - .groupproj 是本地受信文件，XXE 风险可控
+    tree = ET.parse(str(group_path))  # noqa: S318 - .groupproj is a trusted local file; XXE risk is contained
     root = tree.getroot()
     info = GroupProjectInfo()
 
-    # ── 1. PropertyGroup / ProjectGuid ──
+    # -- 1. PropertyGroup / ProjectGuid --
     for pg in _find_all_with_fallback(root, MSBUILD_NS, "PropertyGroup"):
         guid_elem = pg.find(_tag(MSBUILD_NS, "ProjectGuid"))
         if guid_elem is None:
@@ -109,7 +109,7 @@ def parse_groupproj(
             info.project_guid = guid_elem.text.strip()
             break
 
-    # ── 2. Config / Platform 默认值 ──
+    # -- 2. Config / Platform defaults --
     for pg in _find_all_with_fallback(root, MSBUILD_NS, "PropertyGroup"):
         config_elem = pg.find(_tag(MSBUILD_NS, "Config"))
         if config_elem is None:
@@ -123,11 +123,11 @@ def parse_groupproj(
         if platform_elem is not None and platform_elem.text:
             info.default_platform = platform_elem.text.strip()
 
-    # ── 3. ItemGroup → Projects / ProjectReference（收集子项目引用） ──
+    # -- 3. ItemGroup -> Projects / ProjectReference (collect the child references) --
     seen: set[str] = set()
     deps_map: dict[str, List[str]] = {}
 
-    # 3a. <Projects Include="..."> 旧格式（XE/XE2）
+    # 3a. <Projects Include="..."> legacy format (XE/XE2)
     for proj_elem in _find_all_with_fallback(root, MSBUILD_NS, "Projects"):
         include = proj_elem.get("Include", "")
         if not include:
@@ -138,7 +138,7 @@ def parse_groupproj(
             if child_key not in seen:
                 seen.add(child_key)
                 info.child_projects.append(child_path)
-            # 解析 <Dependencies>
+            # Parse <Dependencies>
             deps_elem = proj_elem.find(_tag(MSBUILD_NS, "Dependencies"))
             if deps_elem is None:
                 deps_elem = proj_elem.find("Dependencies")
@@ -147,9 +147,9 @@ def parse_groupproj(
                     d.strip() for d in deps_elem.text.split(";") if d.strip()
                 ]
         else:
-            logger.warning("项目组引用的文件不存在，已跳过: %s", child_path)
+            logger.warning("File referenced by the project group does not exist; skipped: %s", child_path)
 
-    # 3b. <ProjectReference Include="..."> 新格式
+    # 3b. <ProjectReference Include="..."> newer format
     for proj_elem in _find_all_with_fallback(root, MSBUILD_NS, "ProjectReference"):
         include = proj_elem.get("Include", "")
         if not include:
@@ -161,18 +161,18 @@ def parse_groupproj(
                 seen.add(child_key)
                 info.child_projects.append(child_path)
         else:
-            logger.warning("项目组引用的文件不存在，已跳过: %s", child_path)
+            logger.warning("File referenced by the project group does not exist; skipped: %s", child_path)
 
     info.dependencies = deps_map
 
-    # ── 4. BuildOrder ──
+    # -- 4. BuildOrder --
     for bo in _find_all_with_fallback(root, MSBUILD_NS, "BuildOrder"):
         for ref in bo:
             text = (ref.text or "").strip()
             if text:
                 info.build_order.append(text)
 
-    # ── 5. ProjectExtensions → Platforms ──
+    # -- 5. ProjectExtensions -> Platforms --
     for pe in _find_all_with_fallback(root, MSBUILD_NS, "ProjectExtensions"):
         for bp in _find_all_with_fallback(pe, MSBUILD_NS, "BorlandProject"):
             for platforms in _find_all_with_fallback(bp, MSBUILD_NS, "Platforms"):
@@ -181,7 +181,7 @@ def parse_groupproj(
                     if value:
                         info.supported_platforms.append(value)
 
-    # ── 6. 按 BuildOrder 排序子项目 ──
+    # -- 6. Sort the child projects by BuildOrder --
     _sort_by_build_order(info)
 
     return info
@@ -189,22 +189,22 @@ def parse_groupproj(
 
 def _sort_by_build_order(info: GroupProjectInfo) -> None:
     """
-    按 BuildOrder 排序子项目。
+    Sort the child projects by BuildOrder.
 
-    排序逻辑：
-      1. BuildOrder 中的项目按声明顺序排列
-      2. 不在 BuildOrder 中的项目追加到末尾
-      3. 如果 BuildOrder 引用了不存在的子项目，忽略该条目
+    Sorting logic:
+      1. Projects listed in BuildOrder keep their declared order
+      2. Projects not in BuildOrder are appended at the end
+      3. If BuildOrder references a child project that does not exist, that entry is ignored
     """
     if not info.build_order or not info.child_projects:
         return
 
-    # 构建 name → index 映射（BuildOrder 中的顺序）
+    # Build the name -> index map (order in BuildOrder)
     order_map: dict[str, int] = {}
     for i, name in enumerate(info.build_order):
         order_map[name.lower()] = i
 
-    # 按 BuildOrder 排序，不在 BuildOrder 中的项目排在最后
+    # Sort by BuildOrder; projects absent from it go last
     info.child_projects.sort(
         key=lambda p: order_map.get(p.name.lower(), len(info.build_order))
     )
@@ -212,16 +212,16 @@ def _sort_by_build_order(info: GroupProjectInfo) -> None:
 
 def build_dependency_graph(info: GroupProjectInfo) -> dict[str, List[str]]:
     """
-    从 <Dependencies> 构建依赖图。
+    Build the dependency graph from <Dependencies>.
 
-    返回 {子项目文件名: [依赖文件名列表]}。
-    如果没有 <Dependencies> 声明，返回空字典。
+    Returns {child project file name: [dependency file names]}.
+    When no <Dependencies> are declared, an empty dictionary is returned.
 
     Args:
-        info: parse_groupproj 返回的结构化信息
+        info: Structured information returned by parse_groupproj
 
     Returns:
-        依赖图字典
+        Dependency graph dictionary
     """
     return info.dependencies
 
@@ -230,39 +230,39 @@ def topological_sort(
     info: GroupProjectInfo,
 ) -> List[Path]:
     """
-    拓扑排序子项目（基于 <Dependencies> + <BuildOrder>）。
+    Topologically sort the child projects (based on <Dependencies> + <BuildOrder>).
 
-    排序优先级：
-      1. 如果有 BuildOrder，直接使用 BuildOrder 顺序
-      2. 否则基于 <Dependencies> 做拓扑排序
-      3. 都没有则保持原始顺序
+    Sorting priority:
+      1. When BuildOrder exists, use its order directly
+      2. Otherwise topologically sort on <Dependencies>
+      3. When neither exists, keep the original order
 
     Args:
-        info: parse_groupproj 返回的结构化信息
+        info: Structured information returned by parse_groupproj
 
     Returns:
-        排序后的子项目路径列表
+        Sorted list of child project paths
     """
-    # 如果有 BuildOrder，直接使用（已排序）
+    # When BuildOrder exists, use it directly (already sorted)
     if info.build_order:
         return list(info.child_projects)
 
-    # 如果有 Dependencies，做拓扑排序
+    # When Dependencies exist, topologically sort
     if info.dependencies:
         return _topo_sort_with_deps(info)
 
-    # 保持原始顺序
+    # Keep the original order
     return list(info.child_projects)
 
 
 def _topo_sort_with_deps(info: GroupProjectInfo) -> List[Path]:
-    """基于 Dependencies 做拓扑排序"""
-    # 构建 name → Path 映射
+    """Topologically sort on Dependencies"""
+    # Build the name -> Path map
     name_to_path: dict[str, Path] = {}
     for p in info.child_projects:
         name_to_path[p.name.lower()] = p
 
-    # 构建邻接表（依赖 → 被依赖）
+    # Build the adjacency list (dependency -> dependents)
     graph: dict[str, List[str]] = {}
     for name, deps in info.dependencies.items():
         key = name.lower()
@@ -272,7 +272,7 @@ def _topo_sort_with_deps(info: GroupProjectInfo) -> List[Path]:
             graph.setdefault(dep_key, [])
             graph[dep_key].append(key)
 
-    # Kahn's algorithm 拓扑排序
+    # Kahn's algorithm for the topological sort
     in_degree: dict[str, int] = {n: 0 for n in graph}
     for node, neighbors in graph.items():
         for neighbor in neighbors:
@@ -289,13 +289,13 @@ def _topo_sort_with_deps(info: GroupProjectInfo) -> List[Path]:
             if in_degree[neighbor] == 0:
                 queue.append(neighbor)
 
-    # 转换为 Path，未在图中的项目追加到末尾
+    # Convert to Path; append projects outside the graph at the end
     result: List[Path] = []
     for name in sorted_names:
         if name in name_to_path:
             result.append(name_to_path[name])
 
-    # 追加不在依赖图中的项目
+    # Append projects that are not in the dependency graph
     sorted_set = set(sorted_names)
     for p in info.child_projects:
         if p.name.lower() not in sorted_set:
@@ -308,19 +308,19 @@ def get_platform_for_project(
     info: GroupProjectInfo, fallback: str = "win32"
 ) -> str:
     """
-    从 .groupproj 获取默认平台。
+    Get the default platform from a .groupproj.
 
-    优先级：
-      1. <Platform> 节点
-      2. <Platforms> 中的第一个平台
+    Priority:
+      1. The <Platform> node
+      2. The first platform in <Platforms>
       3. fallback
 
     Args:
-        info: parse_groupproj 返回的结构化信息
-        fallback: 默认平台
+        info: Structured information returned by parse_groupproj
+        fallback: Default platform
 
     Returns:
-        平台名称（小写）
+        Platform name (lowercase)
     """
     if info.default_platform:
         return info.default_platform.lower()
@@ -333,18 +333,18 @@ def get_config_for_project(
     info: GroupProjectInfo, fallback: str = "Debug"
 ) -> str:
     """
-    从 .groupproj 获取默认配置。
+    Get the default configuration from a .groupproj.
 
-    优先级：
-      1. <Config> 节点
+    Priority:
+      1. The <Config> node
       2. fallback
 
     Args:
-        info: parse_groupproj 返回的结构化信息
-        fallback: 默认配置
+        info: Structured information returned by parse_groupproj
+        fallback: Default configuration
 
     Returns:
-        配置名称
+        Configuration name
     """
     if info.default_config:
         return info.default_config

@@ -1,5 +1,5 @@
 """
-JSON 格式适配器 — 读写 JSON 文件 ↔ StructuredNode。
+JSON format adapter — reads and writes JSON files ↔ StructuredNode.
 """
 
 from __future__ import annotations
@@ -11,19 +11,19 @@ from .schema import StructuredNode
 
 
 def parse(text: str) -> StructuredNode:
-    """解析 JSON 文本为 StructuredNode。"""
+    """Parse JSON text into a StructuredNode."""
     data = json.loads(text)
     return StructuredNode.from_json_compatible(data, key="")
 
 
 def serialize(node: StructuredNode, indent: int = 2) -> str:
-    """将 StructuredNode 序列化为 JSON 文本。"""
+    """Serialize a StructuredNode into JSON text."""
     data = node.to_json_compatible()
     return json.dumps(data, ensure_ascii=False, indent=indent)
 
 
 def can_parse(text: str) -> bool:
-    """检测是否为合法 JSON。"""
+    """Check whether the text is valid JSON."""
     text = text.strip()
     if not (text.startswith("{") or text.startswith("[")):
         return False

@@ -1,8 +1,10 @@
-<!-- @when: 开始调试任何问题前，需记录调试日志 -->
+<!-- @when: Before starting to debug any problem, the debug log must be recorded -->
 <!-- @chain: before=debug-tool-decision-tree.md, after=binary-search-isolation.md -->
 
-### 8.10 调试状态日志
+### 8.10 Debug Status Log
 
-AI Agent **必须维护结构化调试日志**，显式追踪已尝试方案和结果，防止同质方案重复。
+The AI Agent **must maintain a structured debug log**, explicitly tracking the approaches already tried and their results, to prevent repeating homogeneous approaches.
 
-📋 示例: examples/debugging/debug-log-template.md — 调试日志模板（问题描述/已尝试方案/当前范围/下一步计划）
+📋 Example: examples/debugging/debug-log-template.md — debug log template (problem description / approaches tried / current scope / next-step plan)
+
+

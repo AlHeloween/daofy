@@ -1,32 +1,34 @@
-<!-- @when: 连续尝试失败、遇到无法独立解决的问题时 -->
+<!-- @when: Consecutive attempts fail or a problem cannot be solved independently -->
 <!-- @chain: before=six-step-method.md -->
 
-### 8.1 人工介入触发条件
+### 8.1 Human Intervention Trigger Conditions
 
-满足任一条件时，**必须主动停止尝试并申请人工介入**：
+When any condition is met, you **must proactively stop trying and request human intervention**:
 
-| 优先级 | 条件 | 示例 |
+| Priority | Condition | Example |
 |--------|------|------|
-| 🔴 P0 | 连续 3+ 修复尝试均失败 | 编译报错 3 次未解决 |
-| 🔴 P0 | 报错原因指向 AI 无法访问的封闭代码/环境 | 第三方闭源 DLL 崩溃 |
-| 🔴 P1 | 需人工确认的设计决策 | 架构变更、API 兼容性取舍 |
-| 🟡 P2 | 错误信息不完整，无法确定根因 | AV 无调用栈 |
-| 🟡 P2 | 需访问外部受限资源 | 企业内部 Git、VPN |
-| 🟡 P2 | 2+ 可行方案不确定哪条更优 | 多种等价修复路径 |
-| 🟡 P2 | 连续两次本质相同的方案 | 仅换参数/顺序再试 |
-| 🟡 P2 | 信息不足时强行猜测 | 错误无路径，AI 猜路径去试 |
-| 🟡 P2 | 同一工具连续失败 2 次 | 仍调同一工具不换思路 |
-| 🟢 P3 | 问题简单但环境不匹配 | 用户本机注册表/DLL 差异 |
+| 🔴 P0 | 3+ consecutive fix attempts all fail | Compile error unresolved after 3 attempts |
+| 🔴 P0 | The error cause points to closed-source code/environment the AI cannot access | Third-party closed-source DLL crash |
+| 🔴 P1 | Design decision requiring human confirmation | Architecture change, API compatibility trade-off |
+| 🟡 P2 | Error information incomplete, root cause cannot be determined | AV with no call stack |
+| 🟡 P2 | Need access to external restricted resources | Corporate internal Git, VPN |
+| 🟡 P2 | 2+ feasible solutions, unsure which is better | Multiple equivalent fix paths |
+| 🟡 P2 | Two consecutive essentially identical solutions | Only changing parameters/order and trying again |
+| 🟡 P2 | Forcing guesses when information is insufficient | Error has no path, AI guesses a path to try |
+| 🟡 P2 | Same tool fails twice in a row | Still calling same tool without changing approach |
+| 🟢 P3 | Problem is simple but environment does not match | User's local registry/DLL differences |
 
-> **例外**：AI 编码错误（明显 bug/缺引用）不属介入范畴，应继续修复。
+> **Exception**: AI coding errors (obvious bugs/missing references) are not in scope for intervention; keep fixing.
 
-**补充细则**：
-- **方案选择歧义**：不得默认选一个。1 轮内列出选项及依据，申请人工选择
-- **信息不足不猜测**：先尝试补全信息，仍不足追问用户；连续猜错 2 次 → 介入
-- **同工具连败换方向**：同一工具连续失败 2 次，先检查是否用错工具，换方向
-- **结果异常应核实**：success 但结果明显不合理时交叉验证
+**Supplementary details**:
+- **Ambiguity in solution choice**: Do not default to choosing one. List options and rationale within 1 round and request a human choice
+- **Do not guess when information is insufficient**: First try to complete the information; if still insufficient, ask the user; after 2 consecutive wrong guesses → intervene
+- **Change direction after consecutive same-tool failures**: If the same tool fails twice in a row, first check whether the wrong tool is being used, then change direction
+- **Verify abnormal results**: When success is reported but the result is clearly unreasonable, cross-validate
 
-**优先级交互**：
-- P2(同工具2次)先触发 → 换方向 → 再失败总计 3+ → 进 P0
-- P2(信息不足)猜错 2 次后 → 进 P0
-- P2 换方向后解决 → 不必走到 P0
+**Priority interaction**:
+- P2 (same tool twice) triggers first → change direction → if it still fails for 3+ total → enter P0
+- P2 (insufficient information) after 2 wrong guesses → enter P0
+- P2 resolved after changing direction → no need to reach P0
+
+

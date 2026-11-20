@@ -1,53 +1,55 @@
-<!-- @when: 调试过程中，每次失败后按此检查点升级 -->
+<!-- @when: During debugging, escalate according to these checkpoints after each failure -->
 <!-- @chain: after=runtime-crash-classification.md -->
 
-### 8.14 尝试升级检查点
+### 8.14 Attempt Escalation Checkpoints
 
-每次失败后的检查点，确保 3 次前有合理换档：
+Checkpoints after each failure to ensure a reasonable shift before the 3rd attempt:
 
-#### 8.14.1 第 1 次失败
+#### 8.14.1 First Failure
 ```
-□ 检查点 1
-  ① 确认与上次是否本质不同（同质→立即换方向）
-  ② 检查工具是否用对（§8.11 决策树）
-  ③ 创建调试日志（§8.10）
-  ④ 更新假设
-```
-
-#### 8.14.2 第 2 次失败
-```
-□ 检查点 2
-  ① 查经验库（必须有！）
-  ② 评估二分法隔离
-  ③ 尝试不同工具/方法（同工具2次→换方向）
-  ④ 更新已排除范围+剩余可疑
+□ Checkpoint 1
+  ① Confirm whether this is essentially different from last time (homogeneous → change direction immediately)
+  ② Check whether the right tool is used (§8.11 decision tree)
+  ③ Create a debug log (§8.10)
+  ④ Update hypothesis
 ```
 
-#### 8.14.3 第 3 次失败（介入前）
+#### 8.14.2 Second Failure
 ```
-□ 检查点 3 — 介入前置检查
-  ① 调试日志完整性
-  ② 经验搜索已执行
-  ③ 异常现场信息完整（§8.3）
-  ④ 二分法已被尝试
-  ⑤ 按 §8.4 填写介入申请书
-  ✅ 全部满足 → 提交
-  ❌ 任何不满足 → 补齐后再申请
+□ Checkpoint 2
+  ① Search the experience base (mandatory!)
+  ② Evaluate binary-search isolation
+  ③ Try a different tool/method (same tool twice → change direction)
+  ④ Update the excluded scope + remaining suspects
 ```
 
-#### 8.14.4 升级流程总图
+#### 8.14.3 Third Failure (Before Intervention)
 ```
-尝试#1 → 同质?→立即换方向
-        → 检查点1 → 更新日志 → 更新假设 → #2
-尝试#2 → 查经验库+二分法评估
-        → 换工具? → 检查点2 → 更新日志 → 换方向 → #3
-尝试#3 → 检查点3(介入前置)
-        ├─ 通过 → §8.4 申请介入
-        └─ 不通过 → 补齐后重试
+□ Checkpoint 3 — Pre-intervention checks
+  ① Debug log is complete
+  ② Experience search has been performed
+  ③ Exception scene information is complete (§8.3)
+  ④ Binary-search isolation has been attempted
+  ⑤ Fill out the intervention request per §8.4
+  ✅ All satisfied → submit
+  ❌ Any not satisfied → complete it before applying
 ```
 
-**关键规则**：
-- 第1和第2次之间必须换方向
-- 第2和第3次之间必须查经验库+评估二分法
-- 同质方案立即触发 P2 换方向
-- 严格区分"尝试计数"和"方案计数"
+#### 8.14.4 Overall Escalation Flowchart
+```
+Attempt #1 → Homogeneous? → change direction immediately
+        → Checkpoint 1 → update log → update hypothesis → #2
+Attempt #2 → search experience base + evaluate binary search
+        → change tool? → Checkpoint 2 → update log → change direction → #3
+Attempt #3 → Checkpoint 3 (pre-intervention)
+        ├─ Pass → apply for intervention per §8.4
+        └─ Fail → complete and retry
+```
+
+**Key rules**:
+- Between attempts 1 and 2, you must change direction
+- Between attempts 2 and 3, you must search the experience base + evaluate binary search
+- Homogeneous solutions immediately trigger P2 to change direction
+- Strictly distinguish "attempt count" and "solution count"
+
+

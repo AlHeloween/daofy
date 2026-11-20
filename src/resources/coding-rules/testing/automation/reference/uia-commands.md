@@ -1,180 +1,180 @@
-﻿<!-- @when: 查阅 UIAutomation 命令参考时 -->
+<!-- @when: When consulting the UIAutomation command reference -->
 
-# UIAutomation 命令参考
+# UIAutomation Command Reference
 MCP resource URI: delphi://automation/uia-commands
 
-#### 单击与鼠标交互
+#### Clicking and Mouse Interaction
 
-| 命令 | 用途 | 关键参数 |
+| Command | Purpose | Key Parameters |
 |------|------|---------|
-| `uia.click` | 左键单击控件 | target, [timeout=10] |
-| `uia.rclick` | 右键单击控件 | target, [timeout=10] |
-| `uia.dblclick` | 双击控件 | target, [timeout=10] |
-| `uia.hover` | 悬停控件上方（触发 Tooltip） | target, [timeout=10] |
-| `uia.drag` | 从目标拖拽到偏移坐标 | target, x, y, [timeout=10] |
+| `uia.click` | Left-click a control | target, [timeout=10] |
+| `uia.rclick` | Right-click a control | target, [timeout=10] |
+| `uia.dblclick` | Double-click a control | target, [timeout=10] |
+| `uia.hover` | Hover over a control (triggers Tooltip) | target, [timeout=10] |
+| `uia.drag` | Drag from target to offset coordinates | target, x, y, [timeout=10] |
 
-示例：
+Example:
 ```json
 {"cmd": "uia.click", "target": "打开(&O)"}
 {"cmd": "uia.drag", "target": "ScrollBar1", "x": 0, "y": 50}
 ```
 
-#### 值操作与输入
+#### Value Operations and Input
 
-| 命令 | 用途 | 关键参数 |
+| Command | Purpose | Key Parameters |
 |------|------|---------|
-| `uia.set` | 设置控件值（ValuePattern） | target, text, [timeout=10] |
-| `uia.type` | 模拟键盘打字（SendKeys） | target, text, [timeout=10] |
-| `uia.key` | 发送按键（Enter/Tab/Esc/Ctrl+S 等） | keys, [target] |
-| `uia.toggle` | 切换开关状态（CheckBox/RadioButton） | target, [timeout=10] |
+| `uia.set` | Set control value (ValuePattern) | target, text, [timeout=10] |
+| `uia.type` | Simulate keyboard typing (SendKeys) | target, text, [timeout=10] |
+| `uia.key` | Send keystrokes (Enter/Tab/Esc/Ctrl+S, etc.) | keys, [target] |
+| `uia.toggle` | Toggle switch state (CheckBox/RadioButton) | target, [timeout=10] |
 
-示例：
+Example:
 ```json
 {"cmd": "uia.set", "target": "文件名(N):", "text": "C:\\data\\import.xlsx"}
 {"cmd": "uia.key", "keys": "{Enter}"}
 ```
 
-#### 列表、树与选项
+#### Lists, Trees, and Options
 
-| 命令 | 用途 | 关键参数 |
+| Command | Purpose | Key Parameters |
 |------|------|---------|
-| `uia.select` | 选中项（ComboBox/ListBox/Tab/RadioGroup） | target, [item], [timeout=10] |
-| `uia.expand` | 展开可折叠节点（Tree/ComboBox 下拉） | target, [timeout=10] |
-| `uia.collapse` | 折叠节点 | target, [timeout=10] |
-| `uia.invoke` | 调用控件默认操作（InvokePattern） | target, [timeout=10] |
+| `uia.select` | Select an item (ComboBox/ListBox/Tab/RadioGroup) | target, [item], [timeout=10] |
+| `uia.expand` | Expand a collapsible node (Tree/ComboBox dropdown) | target, [timeout=10] |
+| `uia.collapse` | Collapse a node | target, [timeout=10] |
+| `uia.invoke` | Invoke a control's default action (InvokePattern) | target, [timeout=10] |
 
-示例：
+Example:
 ```json
 {"cmd": "uia.select", "target": "ComboBox1", "item": "选项二"}
 {"cmd": "uia.invoke", "target": "确定"}
 ```
 
-#### 导航与探查
+#### Navigation and Exploration
 
-| 命令 | 用途 | 关键参数 |
+| Command | Purpose | Key Parameters |
 |------|------|---------|
-| `uia.goto` | 查找并激活顶层窗口 | target, [timeout=10] |
-| `uia.find` | 按条件查找控件，返回标识信息 | target, [condition], [scope], [timeout=10] |
-| `uia.scan` | 扫描控件树，返回结构化 JSON | [target], [depth=3], [props], [timeout=10] |
-| `uia.list` | 列出子控件（名称+类型+矩形） | target, [depth=1], [controltype] |
+| `uia.goto` | Find and activate a top-level window | target, [timeout=10] |
+| `uia.find` | Find a control by condition, return identification info | target, [condition], [scope], [timeout=10] |
+| `uia.scan` | Scan the control tree, return structured JSON | [target], [depth=3], [props], [timeout=10] |
+| `uia.list` | List child controls (name + type + rectangle) | target, [depth=1], [controltype] |
 
-示例：
+Example:
 ```json
 {"cmd": "uia.goto", "target": "打开", "timeout": 5000}
 {"cmd": "uia.scan", "target": "TTaskDialog", "depth": 5, "props": "name,class,rect"}
 ```
 
-#### 窗口操作
+#### Window Operations
 
-| 命令 | 用途 | 关键参数 |
+| Command | Purpose | Key Parameters |
 |------|------|---------|
-| `uia.close` | 关闭窗口 | target, [timeout=10] |
-| `uia.minimize` | 最小化窗口 | target, [timeout=10] |
-| `uia.maximize` | 最大化窗口 | target, [timeout=10] |
-| `uia.restore` | 恢复窗口正常大小 | target, [timeout=10] |
-| `uia.move` | 移动窗口到指定坐标 | target, x, y, [timeout=10] |
-| `uia.resize` | 调整窗口尺寸 | target, width, height, [timeout=10] |
-| `uia.state` | 读取窗口状态（normal/minimized/maximized） | target, [timeout=10] |
+| `uia.close` | Close a window | target, [timeout=10] |
+| `uia.minimize` | Minimize a window | target, [timeout=10] |
+| `uia.maximize` | Maximize a window | target, [timeout=10] |
+| `uia.restore` | Restore a window to normal size | target, [timeout=10] |
+| `uia.move` | Move a window to specified coordinates | target, x, y, [timeout=10] |
+| `uia.resize` | Resize a window | target, width, height, [timeout=10] |
+| `uia.state` | Read window state (normal/minimized/maximized) | target, [timeout=10] |
 
-示例：
+Example:
 ```json
 {"cmd": "uia.close", "target": "TMainForm"}
 {"cmd": "uia.move", "target": "TMainForm", "x": 100, "y": 100}
 ```
 
-#### 滚动与视区
+#### Scrolling and Viewport
 
-| 命令 | 用途 | 关键参数 |
+| Command | Purpose | Key Parameters |
 |------|------|---------|
-| `uia.scroll` | 滚动控件（方向+量） | target, direction, [amount], [timeout=10] |
-| `uia.wheel` | 鼠标滚轮滚动 | delta, [target] |
-| `uia.scrollinto` | 将子项滚动到可视区域 | target, item, [timeout=10] |
+| `uia.scroll` | Scroll a control (direction + amount) | target, direction, [amount], [timeout=10] |
+| `uia.wheel` | Scroll with the mouse wheel | delta, [target] |
+| `uia.scrollinto` | Scroll a child item into the visible area | target, item, [timeout=10] |
 
-示例：
+Example:
 ```json
 {"cmd": "uia.scroll", "target": "ListBox1", "direction": "down", "amount": 3}
 {"cmd": "uia.scrollinto", "target": "ListView1", "item": "最后一条"}
 ```
 
-#### 属性与状态读取
+#### Property and State Reading
 
-| 命令 | 用途 | 关键参数 |
+| Command | Purpose | Key Parameters |
 |------|------|---------|
-| `uia.get` | 读取控件常用属性 | target, [prop], [timeout=10] |
-| `uia.exists` | 判断控件是否存在（不抛异常） | target, [timeout=10] |
-| `uia.rect` | 获取控件边界矩形 | target, [timeout=10] |
+| `uia.get` | Read common control properties | target, [prop], [timeout=10] |
+| `uia.exists` | Check whether a control exists (does not throw) | target, [timeout=10] |
+| `uia.rect` | Get the control's bounding rectangle | target, [timeout=10] |
 
-`uia.get` 支持的 `prop` 取值: `name`, `value`, `enabled`, `automationid`, `classname`, `controltype`, `processid`, `runtimeid`, `isoffscreen`, `iskeyboardfocusable`, `haskeyboardfocus`, `acceleratorkey`, `accesskey`, `helptext`, `itemtype`, `itemstatus`, `culture`, `ispassword`, `labeledby`, `localizedcontroltype`, `orientation`, `frameworkid`, `providerdescription`, `issynchronizedinput`, `boundingrectangle`。省略 `prop` 时默认返回 `name` + `value` + `enabled` + `boundingrectangle`。
+Supported `prop` values for `uia.get`: `name`, `value`, `enabled`, `automationid`, `classname`, `controltype`, `processid`, `runtimeid`, `isoffscreen`, `iskeyboardfocusable`, `haskeyboardfocus`, `acceleratorkey`, `accesskey`, `helptext`, `itemtype`, `itemstatus`, `culture`, `ispassword`, `labeledby`, `localizedcontroltype`, `orientation`, `frameworkid`, `providerdescription`, `issynchronizedinput`, `boundingrectangle`. When `prop` is omitted, the default return is `name` + `value` + `enabled` + `boundingrectangle`.
 
-示例：
+Example:
 ```json
 {"cmd": "uia.get", "target": "Edit1", "prop": "value"}
 {"cmd": "uia.exists", "target": "保存(&S)", "timeout": 3}
 ```
 
-#### 可视化
+#### Visualization
 
-| 命令 | 用途 | 关键参数 |
+| Command | Purpose | Key Parameters |
 |------|------|---------|
-| `uia.screenshot` | 截取控件/窗口区域截图 | target, [path], [region], [timeout=10] |
+| `uia.screenshot` | Capture a screenshot of a control/window region | target, [path], [region], [timeout=10] |
 
-`region` 参数格式：`[left, top, width, height]`，相对于 target 控件客户区坐标。省略 `region` 时截取完整控件区域。
+`region` parameter format: `[left, top, width, height]`, relative to the target control's client area coordinates. When `region` is omitted, the full control area is captured.
 
-**截屏兜底策略**：`uia.screenshot` 基于 UIA `CaptureToImage()`，对 DirectX 3D 场景可能输出黑屏。检测到黑屏时，按以下流程回退：
-1. `uia.rect` → 获取 target 的屏幕像素矩形
-2. `mss` 截图 → 按像素坐标截取该区域（DXGI/BitBlt，可捕获 3D 内容）
-3. 若 `mss` 仍黑屏 → 渲染层为 OpenGL / 硬件 Overlay / DRM 保护内容，当前不可自动化
+**Screenshot Fallback Strategy**: `uia.screenshot` is based on UIA `CaptureToImage()` and may output a black screen for DirectX 3D scenes. When a black screen is detected, fall back using the following process:
+1. `uia.rect` → get the target's screen pixel rectangle
+2. `mss` screenshot → capture that region by pixel coordinates (DXGI/BitBlt, can capture 3D content)
+3. If `mss` still shows a black screen → the rendering layer is OpenGL / hardware overlay / DRM-protected content and cannot currently be automated
 
-示例：
+Example:
 ```json
 {"cmd": "uia.screenshot", "target": "TMainForm", "path": "mainform.png"}
 {"cmd": "uia.screenshot", "target": "TMainForm", "region": [0, 0, 200, 50], "path": "titlebar.png"}
 ```
 
-#### 等待与同步
+#### Waiting and Synchronization
 
-| 命令 | 用途 | 关键参数 |
+| Command | Purpose | Key Parameters |
 |------|------|---------|
-| `uia.wait` | 等待控件满足条件 | target, [timeout=30], [condition=exist] |
+| `uia.wait` | Wait for a control to satisfy a condition | target, [timeout=30], [condition=exist] |
 
-`condition` 取值: `exist`（默认，等待出现）, `notexist`（等待消失）, `enabled`（等待可用）, `visible`（等待可见）, `ready`（等待空闲，`WindowPattern.WaitForInputIdle()`）。
+`condition` values: `exist` (default, wait for appearance), `notexist` (wait for disappearance), `enabled` (wait for enabled), `visible` (wait for visible), `ready` (wait for idle, `WindowPattern.WaitForInputIdle()`).
 
-示例：
+Example:
 ```json
 {"cmd": "uia.wait", "target": "保存(&S)", "timeout": 15, "condition": "enabled"}
 {"cmd": "uia.wait", "target": "进度对话框", "timeout": 60, "condition": "notexist"}
 ```
 
-#### 查找策略
+#### Find Strategies
 
-| 方式 | 格式 | 说明 |
+| Method | Format | Description |
 |------|------|------|
-| 控件文本（Name） | `"目标文本"` | 按控件的 Name 属性匹配（最常用） |
-| AutomationId | `#id值` | 按 AutomationId 精确匹配 |
-| 类名 | `.ClassName` | 按 ClassName 匹配，不区分大小写 |
-| 控件类型 | `@ControlType` | 按 UIA ControlType 查找 |
-| 复合条件 | `条件1 && 条件2` | 同时匹配文本和类名，用 `&&` 连接 |
-| 坐标点（由近及远） | `(x,y)` | 从该坐标点向上查找最近的控件 |
+| Control text (Name) | `"target text"` | Match by the control's Name property (most common) |
+| AutomationId | `#idValue` | Exact match by AutomationId |
+| Class name | `.ClassName` | Match by ClassName, case-insensitive |
+| Control type | `@ControlType` | Find by UIA ControlType |
+| Composite condition | `condition1 && condition2` | Match both text and class name, joined with `&&` |
+| Coordinate point (nearest first) | `(x,y)` | Find the nearest control upward from the specified point |
 
-示例：
+Example:
 ```json
 {"cmd": "uia.click", "target": "打开(&O)"}
 {"cmd": "uia.click", "target": "#btnSave"}
 ```
 
-#### 通用参数
+#### Common Parameters
 
-所有 `uia.xxx` 命令共享以下可选参数：
+All `uia.xxx` commands share the following optional parameters:
 
-| 参数 | 类型 | 默认值 | 说明 |
+| Parameter | Type | Default | Description |
 |------|------|--------|------|
-| `timeout` | int | 10 | 控件查找超时（秒），超时未找到抛异常 |
-| `condition` | string | — | 仅 `uia.wait` 使用，其他命令忽略 |
-| `depth` | int | — | 查找深度，不指定则全深度搜索 |
-| `scope` | string | `"children"` | `uia.find` / `uia.scan` 搜索范围：`children` / `descendants` / `all` |
-| `found_index` | int | 1 | 匹配到多个时取第几个（1-indexed） |
+| `timeout` | int | 10 | Control lookup timeout (seconds); throws if not found before timeout |
+| `condition` | string | — | Used only by `uia.wait`; ignored by other commands |
+| `depth` | int | — | Lookup depth; if unspecified, searches all depths |
+| `scope` | string | `"children"` | Search scope for `uia.find` / `uia.scan`: `children` / `descendants` / `all` |
+| `found_index` | int | 1 | Which match to select when multiple are found (1-indexed) |
 
-示例：
+Example:
 ```json
 {"cmd": "uia.click", "target": "打开(&O)", "timeout": 15, "depth": 3}
 {"cmd": "uia.get", "target": ".Edit", "prop": "value", "found_index": 2}

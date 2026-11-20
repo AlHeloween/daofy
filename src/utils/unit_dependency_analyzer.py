@@ -1,11 +1,11 @@
 """
-单元依赖分析器
+Unit dependency analyzer
 
 版权所有 (C) 吉林省左右软件开发有限公司
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
 Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
 
-分析 Delphi 项目的单元依赖关系，智能匹配需要的库路径
+Analyzes unit dependencies of a Delphi project and resolves the library paths it needs.
 """
 
 import os
@@ -24,11 +24,11 @@ logger = get_logger(__name__)
 
 @dataclass
 class UnitInfo:
-    """单元信息"""
-    name: str  # 单元名称（如 'Classes' 或 'System.Classes'）
-    full_name: str  # 完整名称
-    file_path: Optional[str] = None  # 文件路径
-    is_namespace: bool = False  # 是否是命名空间单元（如 System.Classes）
+    """Unit information"""
+    name: str  # Unit name (such as 'Classes' or 'System.Classes')
+    full_name: str  # Full name
+    file_path: Optional[str] = None  # File path
+    is_namespace: bool = False  # Whether this is a namespace unit (such as System.Classes)
     
     def __hash__(self):
         return hash(self.name.lower())
@@ -41,90 +41,90 @@ class UnitInfo:
 
 @dataclass
 class ProjectDependencies:
-    """项目依赖信息"""
+    """Project dependency information"""
     project_path: str
-    units: Set[UnitInfo] = field(default_factory=set)  # 项目直接引用的单元
-    missing_units: Set[str] = field(default_factory=set)  # 找不到的单元
-    resolved_paths: Dict[str, str] = field(default_factory=dict)  # 单元名 -> 文件路径
+    units: Set[UnitInfo] = field(default_factory=set)  # Units referenced directly by the project
+    missing_units: Set[str] = field(default_factory=set)  # Units that could not be found
+    resolved_paths: Dict[str, str] = field(default_factory=dict)  # Unit name -> file path
     
     def get_unit_names(self) -> Set[str]:
-        """获取所有单元名称（小写）"""
+        """Get all unit names (lowercase)"""
         return {u.name.lower() for u in self.units}
 
 
 class UnitDependencyAnalyzer:
-    """单元依赖分析器"""
+    """Unit dependency analyzer"""
     
     def __init__(self):
         self.file_extensions = {'.pas', '.dpr', '.dpk'}
-        # 缓存：路径 -> {单元名 -> 文件路径}
+        # Cache: path -> {unit name -> file path}
         self._path_cache: Dict[str, Dict[str, str]] = {}
         
     def analyze_project(self, project_path: str, 
                        search_paths: Optional[List[str]] = None) -> ProjectDependencies:
         """
-        分析项目依赖
-        
+        Analyze project dependencies.
+
         Args:
-            project_path: 项目文件路径(.dpr 或 .dproj)
-            search_paths: 额外的搜索路径
+            project_path: Project file path (.dpr or .dproj)
+            search_paths: Additional search paths
             
         Returns:
-            项目依赖信息
+            Project dependency information
         """
         project_path_obj = Path(project_path)
         deps = ProjectDependencies(project_path=str(project_path_obj))
         
-        # 获取项目目录
+        # Get the project directory
         project_dir = project_path_obj.parent
         
-        # 1. 收集项目中的所有源码文件
+        # 1. Collect all source files in the project
         source_files = self._collect_source_files(project_dir, project_path_obj)
-        logger.info(f"找到 {len(source_files)} 个源码文件")
+        logger.info(f"Found {len(source_files)} source files")
         
-        # 2. 提取所有引用的单元
+        # 2. Extract every referenced unit
         all_units: Set[UnitInfo] = set()
         for source_file in source_files:
             units = self._extract_uses_from_file(source_file)
             all_units.update(units)
         
         deps.units = all_units
-        logger.info(f"项目引用了 {len(all_units)} 个单元")
+        logger.info(f"Project references {len(all_units)} units")
         
-        # 3. 解析单元位置
+        # 3. Resolve unit locations
         self._resolve_unit_locations(deps, search_paths or [])
         
         return deps
     
     def _collect_source_files(self, project_dir: Path, project_file: Path) -> List[Path]:
-        """收集项目中的源码文件"""
+        """Collect the source files of the project"""
         source_files = []
         
-        # 首先添加项目文件本身
+        # Add the project file itself first
         if project_file.suffix.lower() in self.file_extensions:
             source_files.append(project_file)
         
-        # 递归查找项目目录下的所有源码文件
+        # Recursively find every source file under the project directory
         for ext in self.file_extensions:
             for file_path in project_dir.rglob(f"*{ext}"):
-                # 排除一些常见目录
+                # Exclude a few common directories
                 if self._should_include_file(file_path, project_dir):
                     source_files.append(file_path)
         
         return source_files
     
     def _should_include_file(self, file_path: Path, project_dir: Path) -> bool:
-        """判断是否应该包含该文件"""
-        # 转换为相对路径
+        """Decide whether this file should be included"""
+        # Convert to a relative path
         try:
             rel_path = file_path.relative_to(project_dir)
             rel_str = str(rel_path).lower()
             
-            # 排除的目录
+            # Excluded directories
             exclude = DEPENDENCY_SCAN_EXCLUDED_DIRS
             
             parts = rel_str.split(os.sep)
-            for part in parts[:-1]:  # 不包括文件名
+            for part in parts[:-1]:  # Exclude the file name
                 if part in exclude:
                     return False
             
@@ -133,38 +133,38 @@ class UnitDependencyAnalyzer:
             return True
     
     def _extract_uses_from_file(self, file_path: Path) -> Set[UnitInfo]:
-        """从文件中提取 uses 子句中的单元"""
+        """Extract the units of the uses clause from a file"""
         units = set()
         
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
             
-            # 跳过太大的文件（可能是二进制或异常文件）
+            # Skip files that are too large (possibly binary or abnormal)
             if len(content) > 10 * 1024 * 1024:  # 10MB
-                logger.warning(f"跳过过大文件: {file_path} ({len(content)} bytes)")
+                logger.warning(f"Skipping oversized file: {file_path} ({len(content)} bytes)")
                 return units
             
-            # 匹配 uses 子句（支持多行）
-            # 匹配 uses 后面跟着的单元列表，直到分号
+            # Match the uses clause (multi-line supported)
+            # Match the unit list following uses, up to the semicolon
             uses_pattern = r'\buses\s+([^;]+);'
             matches = re.findall(uses_pattern, content, re.IGNORECASE | re.DOTALL)
             
             for match in matches:
-                # 清理注释
-                match = re.sub(r'\{[^}]*\}', '', match)  # 删除 {注释}
-                match = re.sub(r'\(\*[^\*]*\*\)', '', match)  # 删除 (*注释*)
-                match = re.sub(r'//.*$', '', match, flags=re.MULTILINE)  # 删除 //注释
+                # Strip comments
+                match = re.sub(r'\{[^}]*\}', '', match)  # Remove {comment}
+                match = re.sub(r'\(\*[^\*]*\*\)', '', match)  # Remove (*comment*)
+                match = re.sub(r'//.*$', '', match, flags=re.MULTILINE)  # Remove //comment
                 
-                # 分割单元名
+                # Split the unit names
                 unit_names = [u.strip() for u in match.split(',') if u.strip()]
                 
                 for unit_name in unit_names:
-                    # 验证单元名称是否有效
+                    # Validate the unit name
                     if not self._is_valid_unit_name(unit_name):
                         continue
                     
-                    # 处理命名空间（如 System.Classes）
+                    # Handle namespaces (such as System.Classes)
                     is_namespace = '.' in unit_name
                     simple_name = unit_name.split('.')[-1] if is_namespace else unit_name
                     
@@ -176,37 +176,37 @@ class UnitDependencyAnalyzer:
                     units.add(unit_info)
             
         except Exception as e:
-            logger.warning(f"提取 uses 失败 {file_path}: {e}")
+            logger.warning(f"Failed to extract uses from {file_path}: {e}")
         
         return units
     
     def _is_valid_unit_name(self, name: str) -> bool:
         """
-        验证是否为有效的 Pascal 单元名称
-        
-        有效单元名规则:
-        - 必须以字母或下划线开头
-        - 只能包含字母、数字、下划线
-        - 不能包含空格、特殊字符
-        - 不能是常见英文单词（非 Delphi 关键字）
+        Check that this is a valid Pascal unit name.
+
+        Valid unit name rules:
+        - Must start with a letter or an underscore
+        - May contain only letters, digits and underscores
+        - Must not contain spaces or special characters
+        - Must not be a common English word (non-Delphi keyword)
         """
         if not name:
             return False
         
-        # 去除引号和in关键字（处理 "in 'filename'" 这种）
+        # Strip quotes and the 'in' keyword (handles "in 'filename'")
         name = name.strip().strip("'\"")
         if name.lower().startswith('in '):
             return False
         
-        # 检查是否包含无效字符
+        # Check for invalid characters
         if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$', name):
             return False
         
-        # 检查长度限制
+        # Check the length limit
         if len(name) > 64:
             return False
         
-        # 检查是否为垃圾文本（包含常见英文单词组合）
+        # Check for junk text (common English word combinations)
         name_lower = name.lower()
         garbage_patterns = [
             'the', 'first', 'second', 'third', 'pointer', 'block', 'free',
@@ -215,14 +215,14 @@ class UnitDependencyAnalyzer:
             'error', 'warning', 'debug', 'info', 'exception', 'failed'
         ]
         
-        # 如果名称太短且是常见单词，跳过
+        # Skip a very short name that is a common word
         if len(name_lower) <= 3 and name_lower in (
             'the', 'for', 'var', 'end', 'not', 'and', 'or', 'but', 'out', 'log',
             'sys', 'obj', 'ini', 'cfg', 'app', 'msg', 'err', 'dbg'
         ):
             return False
         
-        # 如果名称中有多个连续的小写单词（垃圾文本特征）
+        # A name made of several long lowercase words is junk text
         parts = name_lower.split('.')
         for part in parts:
             if len(part) > 20:
@@ -232,31 +232,31 @@ class UnitDependencyAnalyzer:
     
     def _resolve_unit_locations(self, deps: ProjectDependencies, 
                                 additional_paths: List[str]):
-        """解析单元位置"""
+        """Resolve unit locations"""
         unit_names = deps.get_unit_names()
         
-        # 1. 首先检查项目目录本身
+        # 1. Check the project directory itself first
         project_dir = Path(deps.project_path).parent
-        self._scan_path_for_units(project_dir, unit_names, deps, "项目目录")
+        self._scan_path_for_units(project_dir, unit_names, deps, "project directory")
         
-        # 2. 检查额外的搜索路径
+        # 2. Check the additional search paths
         for path in additional_paths:
             if Path(path).exists():
-                self._scan_path_for_units(Path(path), unit_names, deps, f"搜索路径: {path}")
+                self._scan_path_for_units(Path(path), unit_names, deps, f"search path: {path}")
         
-        # 3. 记录未找到的单元
+        # 3. Record the units that were not found
         found_units = {u.lower() for u in deps.resolved_paths.keys()}
         deps.missing_units = {u for u in unit_names if u.lower() not in found_units}
         
         if deps.missing_units:
-            logger.warning(f"未找到 {len(deps.missing_units)} 个单元: {list(deps.missing_units)[:10]}")
+            logger.warning(f"{len(deps.missing_units)} units not found: {list(deps.missing_units)[:10]}")
     
     def _scan_path_for_units(self, path: Path, target_units: Set[str], 
                              deps: ProjectDependencies, source: str):
-        """扫描路径查找单元"""
+        """Scan a path for units"""
         path_str = str(path)
         
-        # 使用缓存
+        # Use the cache
         if path_str in self._path_cache:
             cached_units = self._path_cache[path_str]
             for unit_name in target_units:
@@ -264,7 +264,7 @@ class UnitDependencyAnalyzer:
                     deps.resolved_paths[unit_name] = cached_units[unit_name.lower()]
             return
         
-        # 扫描目录
+        # Scan the directory
         unit_map: Dict[str, str] = {}
         
         try:
@@ -273,24 +273,24 @@ class UnitDependencyAnalyzer:
                 if unit_name not in unit_map:
                     unit_map[unit_name] = str(file_path)
                 
-                # 检查是否是目标单元
+                # Check whether this is a target unit
                 if unit_name in target_units and unit_name not in deps.resolved_paths:
                     deps.resolved_paths[unit_name] = str(file_path)
-                    logger.debug(f"在 {source} 找到单元 {unit_name}: {file_path}")
+                    logger.debug(f"Found unit {unit_name} in {source}: {file_path}")
         except Exception as e:
-            logger.warning(f"扫描路径失败 {path}: {e}")
+            logger.warning(f"Failed to scan path {path}: {e}")
         
-        # 缓存结果
+        # Cache the result
         self._path_cache[path_str] = unit_map
 
 
 class SmartLibraryPathResolver:
-    """智能库路径解析器
-    
-    处理优先级（从高到低）：
-    1. 项目目录下的单元（最优先）
-    2. 全局库路径中后引入的单元（覆盖前面的）
-    3. 用户显式传入的路径（直接跳过智能分析）
+    """Smart library path resolver
+
+    Priority order (highest first):
+    1. Units in the project directory (highest priority)
+    2. Units introduced later among the global library paths (override earlier ones)
+    3. Paths the user passes explicitly (smart analysis is skipped entirely)
     """
     
     def __init__(self, thirdparty_kb_service=None):
@@ -302,30 +302,31 @@ class SmartLibraryPathResolver:
                              user_search_paths: Optional[List[str]] = None,
                              version: Optional[str] = None) -> Tuple[List[str], Dict]:
         """
-        智能解析项目需要的库路径
-        
+        Smart resolution of the library paths a project needs.
+
         Args:
-            project_path: 项目文件路径
-            platform: 目标平台
-            user_search_paths: 用户显式传入的搜索路径（如果提供，直接返回）
-            version: Delphi 注册表版本号（如 "23.0"），用于按编译器版本过滤第三方库路径；
-                为 None 时使用最新安装版本（与未指定编译器的默认行为一致）
+            project_path: Project file path
+            platform: Target platform
+            user_search_paths: Search paths the user passes explicitly (returned as-is when provided)
+            version: Delphi registry version number (such as "23.0"), used to filter third-party
+                library paths by compiler version; when None the newest installed version is used
+                (consistent with the default behaviour when no compiler is specified)
             
         Returns:
-            (需要的库路径列表, 详细信息字典)
+            (list of required library paths, detail dictionary)
         """
-        # 如果用户显式传入了路径，直接使用，不再分析
+        # When the user passes paths explicitly, use them and skip the analysis
         if user_search_paths:
-            logger.info(f"用户使用显式传入的 {len(user_search_paths)} 个路径，跳过智能分析")
+            logger.info(f"User supplied {len(user_search_paths)} explicit paths; skipping smart analysis")
             return user_search_paths, {
                 "mode": "user_provided",
                 "total_paths": len(user_search_paths),
                 "paths": user_search_paths
             }
         
-        logger.info(f"开始智能解析项目库路径: {project_path}")
+        logger.info(f"Starting smart resolution of project library paths: {project_path}")
         
-        # 1. 分析项目依赖
+        # 1. Analyze project dependencies
         deps = self.analyzer.analyze_project(project_path)
         
         info = {
@@ -334,57 +335,57 @@ class SmartLibraryPathResolver:
             "missing_unit_names": list(deps.missing_units),
         }
         
-        # 2. 获取所有第三方库路径（按版本过滤，与 RTL 库路径策略一致）
+        # 2. Get every third-party library path (filtered by version, like the RTL path policy)
         if self.thirdparty_kb_service:
             all_thirdparty_paths = self.thirdparty_kb_service.get_library_paths(version)
         else:
-            # 如果没有服务，使用全局函数
+            # Without a service, use the global function
             from ..services.knowledge_base.thirdparty_knowledge_base import ThirdPartyKnowledgeBase
             kb = ThirdPartyKnowledgeBase()
             all_thirdparty_paths = kb.get_library_paths(version)
         
-        logger.info(f"全局第三方库路径数量: {len(all_thirdparty_paths)}")
+        logger.info(f"Global third-party library path count: {len(all_thirdparty_paths)}")
         
-        # 3. 扫描所有路径，建立单元 -> 路径的映射
-        # 优先级：项目目录 > 后引入的全局路径（后面的覆盖前面的）
+        # 3. Scan every path and build the unit -> path map
+        # Priority: project directory > later global paths (later ones override earlier ones)
         project_dir = Path(project_path).parent
-        unit_to_path: Dict[str, Tuple[str, int]] = {}  # 单元名 -> (路径, 优先级)
+        unit_to_path: Dict[str, Tuple[str, int]] = {}  # Unit name -> (path, priority)
         
-        # 首先扫描项目目录（优先级最高 = 0）
+        # Scan the project directory first (highest priority = 0)
         if deps.missing_units:
             project_units = self._scan_path_for_units_with_priority(
                 str(project_dir), deps.missing_units, priority=0
             )
             for unit, path in project_units.items():
                 unit_to_path[unit] = (path, 0)
-            logger.info(f"项目目录提供了 {len(project_units)} 个单元")
+            logger.info(f"The project directory provided {len(project_units)} units")
         
-        # 然后扫描全局库路径（优先级递增，后面的覆盖前面的）
+        # Then scan the global library paths (priority increases; later ones override earlier ones)
         remaining_units = deps.missing_units - set(unit_to_path.keys())
         
         for idx, lib_path in enumerate(all_thirdparty_paths):
             if not remaining_units:
                 break
             
-            # 优先级从1开始递增，后面的优先级更高
+            # Priority starts at 1 and increases; later entries outrank earlier ones
             priority = idx + 1
             found_units = self._scan_path_for_units_with_priority(
                 lib_path, remaining_units, priority=priority
             )
             
             for unit, path in found_units.items():
-                # 如果单元已存在，只有新优先级 >= 旧优先级时才覆盖
+                # Overwrite an existing unit only when the new priority is >= the old one
                 if unit not in unit_to_path or priority >= unit_to_path[unit][1]:
                     unit_to_path[unit] = (path, priority)
                     remaining_units.discard(unit)
         
-        # 4. 收集需要的路径（去重并保持引入顺序）
-        # 按优先级分组路径
+        # 4. Collect the required paths (deduplicated, in introduction order)
+        # Group the paths by priority
         priority_to_paths: Dict[int, Set[str]] = defaultdict(set)
         for unit, (path, priority) in unit_to_path.items():
             priority_to_paths[priority].add(path)
         
-        # 按优先级排序（0最先，然后1,2,3...）
+        # Sort by priority (0 first, then 1, 2, 3 ...)
         needed_paths = []
         seen_paths = set()
         for priority in sorted(priority_to_paths.keys()):
@@ -406,10 +407,10 @@ class SmartLibraryPathResolver:
             "unit_to_path": {u: p[0] for u, p in unit_to_path.items()},
         })
         
-        logger.info(f"智能解析完成: 从 {len(all_thirdparty_paths)} 个路径中"
-                   f"选择了 {len(needed_paths)} 个路径，"
-                   f"解决了 {len(resolved_units)} 个单元依赖，"
-                   f"仍有 {len(remaining_units)} 个未找到")
+        logger.info(f"Smart resolution complete: selected {len(needed_paths)} of "
+                   f"{len(all_thirdparty_paths)} paths, "
+                   f"resolved {len(resolved_units)} unit dependencies, "
+                   f"{len(remaining_units)} still missing")
         
         return needed_paths, info
     
@@ -417,15 +418,15 @@ class SmartLibraryPathResolver:
                                            target_units: Set[str],
                                            priority: int) -> Dict[str, str]:
         """
-        扫描路径查找目标单元，返回单元名 -> 路径的映射
-        
+        Scan a path for target units and return a unit name -> path map.
+
         Args:
-            path: 要扫描的路径
-            target_units: 目标单元集合
-            priority: 优先级（用于日志）
+            path: Path to scan
+            target_units: Set of target units
+            priority: Priority (for logging)
             
         Returns:
-            找到的单元映射 {单元名: 路径}
+            Map of found units {unit name: path}
         """
         found = {}
         path_obj = Path(path)
@@ -438,23 +439,23 @@ class SmartLibraryPathResolver:
                 unit_name = file_path.stem.lower()
                 if unit_name in target_units:
                     found[unit_name] = str(path)
-                    logger.debug(f"[优先级{priority}] 找到单元 {unit_name}: {path}")
+                    logger.debug(f"[priority {priority}] Found unit {unit_name}: {path}")
         except Exception as e:
-            logger.warning(f"扫描路径失败 {path}: {e}")
+            logger.warning(f"Failed to scan path {path}: {e}")
         
         return found
     
     def generate_response_file(self, project_path: str, 
                                unit_paths: List[str]) -> str:
         """
-        生成响应文件（解决命令行过长问题）
-        
+        Generate a response file (works around an over-long command line).
+
         Args:
-            project_path: 项目路径
-            unit_paths: 单元搜索路径列表
+            project_path: Project path
+            unit_paths: List of unit search paths
             
         Returns:
-            响应文件路径
+            Response file path
         """
         project_dir = Path(project_path).parent
         response_file = project_dir / "__compile_response__.txt"
@@ -462,19 +463,19 @@ class SmartLibraryPathResolver:
         with open(response_file, 'w', encoding='utf-8') as f:
             f.write(f"-U{';'.join(unit_paths)}\n")
         
-        logger.info(f"生成响应文件: {response_file}")
+        logger.info(f"Generated response file: {response_file}")
         return str(response_file)
 
 
 def analyze_project_units(project_path: str) -> Dict:
     """
-    分析项目单元的便捷函数
-    
+    Convenience function that analyzes the units of a project.
+
     Args:
-        project_path: 项目文件路径
+        project_path: Project file path
         
     Returns:
-        分析结果字典
+        Analysis result dictionary
     """
     analyzer = UnitDependencyAnalyzer()
     deps = analyzer.analyze_project(project_path)
@@ -493,16 +494,17 @@ def smart_resolve_library_paths(project_path: str,
                                 user_search_paths: Optional[List[str]] = None,
                                 version: Optional[str] = None) -> Tuple[List[str], Dict]:
     """
-    智能解析库路径的便捷函数
-    
+    Convenience function that smart-resolves library paths.
+
     Args:
-        project_path: 项目文件路径
-        platform: 目标平台
-        user_search_paths: 用户显式传入的搜索路径（如果提供，直接返回）
-        version: Delphi 注册表版本号（如 "23.0"），用于按编译器版本过滤第三方库路径
+        project_path: Project file path
+        platform: Target platform
+        user_search_paths: Search paths the user passes explicitly (returned as-is when provided)
+        version: Delphi registry version number (such as "23.0") used to filter third-party
+            library paths by compiler version
         
     Returns:
-        (需要的库路径列表, 详细信息)
+        (list of required library paths, details)
     """
     resolver = SmartLibraryPathResolver()
     return resolver.resolve_library_paths(project_path, platform, user_search_paths, version)

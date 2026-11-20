@@ -1,5 +1,5 @@
 """
-格式检测与分发 — 自动识别文件格式并调用对应适配器。
+Format detection and dispatch — detect a file's format automatically and call the matching adapter.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 from .schema import StructuredNode
 
-# ── 格式枚举 ─────────────────────────────────────────────────────────
+# ── Format enumeration ───────────────────────────────────────────────
 
 SUPPORTED_FORMATS = [
     "dfm",
@@ -24,7 +24,7 @@ SUPPORTED_FORMATS = [
 TEXT_FORMATS = {"dfm", "lfm", "fmx", "xml", "json"}
 BINARY_FORMATS = {"msgpack", "protobuf"}
 
-# ── 扩展名映射 ──────────────────────────────────────────────────────
+# ── Extension mapping ────────────────────────────────────────────────
 
 EXTENSION_MAP: dict[str, str] = {
     ".dfm": "dfm",
@@ -46,15 +46,15 @@ def detect_format(
     content: Optional[bytes] = None,
     hint: Optional[str] = None,
 ) -> Optional[str]:
-    """检测文件格式。
+    """Detect the file format.
 
     Args:
-        file_path: 文件路径。
-        content: 文件内容（可选，传入时可做 content sniffing）。
-        hint: 强制指定格式。
+        file_path: the file path.
+        content: the file content (optional; when given, content sniffing runs).
+        hint: force a specific format.
 
     Returns:
-        格式名（dfm/lfm/fmx/xml/json/msgpack/protobuf）或 None。
+        The format name (dfm/lfm/fmx/xml/json/msgpack/protobuf), or None.
     """
     if hint and hint in SUPPORTED_FORMATS:
         return hint
@@ -64,7 +64,7 @@ def detect_format(
     if fmt:
         return fmt
 
-    # 无扩展名时尝试 content sniffing
+    # With no extension, fall back to content sniffing
     if content:
         return sniff_format(content)
 
@@ -72,7 +72,7 @@ def detect_format(
 
 
 def sniff_format(content: bytes) -> Optional[str]:
-    """根据内容前导字节检测格式。"""
+    """Detect the format from the content's leading bytes."""
     text = content.decode("utf-8", errors="replace").strip()
 
     # JSON
@@ -95,9 +95,9 @@ def sniff_format(content: bytes) -> Optional[str]:
 
     # DFM/LFM
     if text.startswith("object ") or text.startswith("inherited "):
-        return "dfm"  # dfm 和 lfm 格式一致，由扩展名区分
+        return "dfm"  # dfm and lfm share one format; the extension tells them apart
 
-    # MessagePack (binary prefix 0x8_ 或 0x9_ 或 0x_ 等)
+    # MessagePack (binary prefix 0x8_, 0x9_, 0x_ and so on)
     if content[:1] in (b"\x80", b"\x90", b"\xa0", b"\xc0"):
         try:
             import msgpack
@@ -109,25 +109,25 @@ def sniff_format(content: bytes) -> Optional[str]:
     return None
 
 
-# ── 格式读取 ─────────────────────────────────────────────────────────
+# ── Format reading ───────────────────────────────────────────────────
 
 
 def read_file(file_path: str, fmt: Optional[str] = None) -> tuple[StructuredNode, str]:
-    """读取文件并解析为 StructuredNode。
+    """Read a file and parse it into a StructuredNode.
 
     Args:
-        file_path: 文件路径。
-        fmt: 格式（None=自动检测）。
+        file_path: the file path.
+        fmt: the format (None = auto-detect).
 
     Returns:
-        (root_node, detected_format)。
+        (root_node, detected_format).
     """
     with open(file_path, "rb") as f:
         raw = f.read()
 
     fmt = detect_format(file_path, raw, fmt)
     if fmt is None:
-        raise ValueError(f"无法检测文件格式: {file_path}")
+        raise ValueError(f"Unable to detect the file format: {file_path}")
 
     if fmt in ("dfm", "lfm", "fmx"):
         text = raw.decode("utf-8", errors="replace")
@@ -150,12 +150,12 @@ def read_file(file_path: str, fmt: Optional[str] = None) -> tuple[StructuredNode
 
     if fmt == "protobuf":
         raise NotImplementedError(
-            "ProtoBuf 文件需要指定 message_name 和 proto_file 参数。"
-            "使用 structured_content(action='read', format='protobuf', "
+            "A ProtoBuf file needs the message_name and proto_file parameters. "
+            "Use structured_content(action='read', format='protobuf', "
             "proto_file='...', message_name='...')"
         )
 
-    raise ValueError(f"不支持的格式: {fmt}")
+    raise ValueError(f"Unsupported format: {fmt}")
 
 
 def write_file(
@@ -163,16 +163,16 @@ def write_file(
     file_path: str,
     fmt: Optional[str] = None,
 ) -> None:
-    """将 StructuredNode 序列化写入文件。
+    """Serialize a StructuredNode and write it to a file.
 
     Args:
-        node: StructuredNode。
-        file_path: 输出路径。
-        fmt: 格式（None=从扩展名推断）。
+        node: the StructuredNode.
+        file_path: the output path.
+        fmt: the format (None = inferred from the extension).
     """
     fmt = detect_format(file_path, hint=fmt)
     if fmt is None:
-        raise ValueError(f"无法推断格式: {file_path}")
+        raise ValueError(f"Unable to infer the format: {file_path}")
 
     if fmt in ("dfm", "lfm", "fmx"):
         from .dfm_adapter import serialize as dfm_ser
@@ -204,8 +204,8 @@ def write_file(
 
     if fmt == "protobuf":
         raise NotImplementedError(
-            "ProtoBuf 写入需要指定 message_class 参数。"
-            "使用 structured_content(action='write', format='protobuf', ...)"
+            "Writing ProtoBuf needs the message_class parameter. "
+            "Use structured_content(action='write', format='protobuf', ...)"
         )
 
-    raise ValueError(f"不支持的格式: {fmt}")
+    raise ValueError(f"Unsupported format: {fmt}")

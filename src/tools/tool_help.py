@@ -1,8 +1,8 @@
 """
-tool_help MCP 工具 — 按工具名返回完整帮助文档
+tool_help MCP tool — returns full help documentation by tool name
 
-用于替代将详细文档塞入 tool description 的做法。
-AI Agent 不确定某工具用法时，调用此工具按需获取全量帮助。
+Used to replace stuffing detailed docs into tool description.
+When AI Agent is unsure how to use a tool, call this tool to get full help on demand.
 """
 
 from typing import Any
@@ -13,9 +13,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 _PATH_POLICY_TEXT = (
-    "⚠️ 路径参数规则: 本工具的文件系统路径参数必须传绝对路径"
-    "（MCP 服务端无法获取客户端当前工作目录，相对路径会被拒绝）。"
-    "文档示例中的相对路径仅作占位，实际调用请替换为绝对路径，如 C:\\project\\Unit1.pas。"
+    "⚠️ Path parameter rule: Filesystem path parameters for this tool must be absolute paths "
+    "(the MCP server cannot obtain the client's current working directory, so relative paths will be rejected). "
+    "Relative paths in documentation examples are placeholders only; in actual calls, replace them with absolute paths, e.g. C:\\project\\Unit1.pas."
 )
 
 
@@ -27,29 +27,29 @@ def _path_policy_text(tool_name: str) -> str:
     fields = TOOL_PATH_FIELDS.get(tool_name, ())
     if not fields:
         return _PATH_POLICY_TEXT
-    return _PATH_POLICY_TEXT + " 路径参数: " + ", ".join(fields) + "。"
+    return _PATH_POLICY_TEXT + " Path parameters: " + ", ".join(fields) + "."
 
 
 
 def get_tool_help(tool_name: str, action: str = "") -> dict:
-    """获取单个工具的完整帮助文档。
+    """Get full help documentation for a single tool.
 
     Args:
-        tool_name: 工具名，如 compile_project / delphi_file
-        action: 可选，指定 action 名称时只返回该 action 的详细参数说明
+        tool_name: Tool name, e.g. compile_project / delphi_file
+        action: Optional; when an action name is specified, return only that action's detailed parameter description
 
     Returns:
-        dict: {"tool": name, "docs": {...}} 或 {"error": "..."}
+        dict: {"tool": name, "docs": {...}} or {"error": "..."}
     """
     docs = TOOL_HELP_DOCS.get(tool_name)
     if not docs:
         available = ", ".join(sorted(TOOL_HELP_DOCS.keys()))
         return {
             "status": "failed",
-            "message": f"未知工具: {tool_name}。可用工具: {available}",
+            "message": f"Unknown tool: {tool_name}. Available tools: {available}",
         }
 
-    # 如果指定了 action，只输出该 action 的参数部分
+    # If an action is specified, output only the parameter section for that action
     if action:
         action_params = docs.get("action_params", {})
         act_info = action_params.get(action)
@@ -57,7 +57,7 @@ def get_tool_help(tool_name: str, action: str = "") -> dict:
             all_actions = ", ".join(sorted(action_params.keys()))
             return {
                 "status": "failed",
-                "message": f"工具 {tool_name} 中没有 action '{action}'。可用 actions: {all_actions}",
+                "message": f"Tool {tool_name} has no action '{action}'. Available actions: {all_actions}",
             }
 
         desc = act_info.get("description", "")
@@ -68,20 +68,20 @@ def get_tool_help(tool_name: str, action: str = "") -> dict:
         lines.append(f"  ▶ {action}: {desc}")
         req = act_info.get("required", [])
         if req:
-            lines.append(f"    必需参数: {', '.join(req)}")
+            lines.append(f"    Required parameters: {', '.join(req)}")
         opt = act_info.get("optional", {})
         if opt:
-            lines.append("    可选参数:")
+            lines.append("    Optional parameters:")
             for pname, pdesc in opt.items():
                 lines.append(f"      {pname}: {pdesc}")
         ex = act_info.get("examples", [])
         if ex:
-            lines.append("    示例:")
+            lines.append("    Examples:")
             for e in ex:
                 lines.append(f"      {e}")
         return {"status": "ok", "tool": tool_name, "action": action, "help": "\n".join(lines)}
 
-    # 格式化为可读文本
+    # Format as readable text
     lines = [f"📘 {tool_name} — {docs.get('description', '')}", ""]
     if _is_path_tool(tool_name):
         lines.append(_path_policy_text(tool_name))
@@ -89,7 +89,7 @@ def get_tool_help(tool_name: str, action: str = "") -> dict:
 
     if docs.get("triggers"):
         triggers = "; ".join(docs["triggers"])
-        lines.append(f"触发词: {triggers}")
+        lines.append(f"Trigger words: {triggers}")
         lines.append("")
 
     if docs.get("file_triggers"):
@@ -109,28 +109,28 @@ def get_tool_help(tool_name: str, action: str = "") -> dict:
 
     auto_paths = docs.get("auto_unit_paths", [])
     if auto_paths:
-        lines.append("DaofyAutomation 单元选择（根据框架类型选其一）:")
+        lines.append("DaofyAutomation unit selection (choose one based on framework type):")
         for p in auto_paths:
             lines.append(f"  • {p}")
         lines.append("")
 
     if docs.get("features"):
-        lines.append("功能特性:")
+        lines.append("Features:")
         for f in docs["features"]:
             lines.append(f"  ✅ {f}")
         lines.append("")
 
     if docs.get("sync_rules"):
-        lines.append("同步规则:")
+        lines.append("Sync rules:")
         for r in docs["sync_rules"]:
             lines.append(f"  {r}")
         lines.append("")
 
     if docs.get("actions"):
-        lines.append("操作说明 (action):")
+        lines.append("Action descriptions (action):")
         acts = docs["actions"]
         if isinstance(acts, dict):
-            # 优先按分组展示
+            # Display by group first
             for key, val in acts.items():
                 if isinstance(val, dict):
                     lines.append(f"  ▶ {key}:")
@@ -141,79 +141,79 @@ def get_tool_help(tool_name: str, action: str = "") -> dict:
         lines.append("")
 
     if docs.get("action_params"):
-        lines.append("各 action 参数说明（先 tool_help 再调用）：")
+        lines.append("Parameter descriptions for each action (call tool_help first, then invoke):")
         lines.append("")
         for act_name, act_info in docs["action_params"].items():
             desc = act_info.get("description", "")
             lines.append(f"  ▶ {act_name}: {desc}")
             req = act_info.get("required", [])
             if req:
-                lines.append(f"    必需参数: {', '.join(req)}")
+                lines.append(f"    Required parameters: {', '.join(req)}")
             opt = act_info.get("optional", {})
             if opt:
-                lines.append("    可选参数:")
+                lines.append("    Optional parameters:")
                 for pname, pdesc in opt.items():
                     lines.append(f"      {pname}: {pdesc}")
             ex = act_info.get("examples", [])
             if ex:
-                lines.append("    示例:")
+                lines.append("    Examples:")
                 for e in ex:
                     lines.append(f"      {e}")
             lines.append("")
 
     if docs.get("workflow_hints"):
-        lines.append("常用工作流:")
+        lines.append("Common workflows:")
         for name, flow in docs["workflow_hints"].items():
             lines.append(f"  {name}: {flow}")
         lines.append("")
 
     if docs.get("architecture"):
         arch = docs["architecture"]
-        lines.append(f"架构模式: {arch.get('pattern', '')}")
-        lines.append(f"  脑（大模型）: {arch.get('brain', '')}")
-        lines.append(f"  手脚（MCP）: {arch.get('hands', '')}")
+        lines.append(f"Architecture pattern: {arch.get('pattern', '')}")
+        lines.append(f"  Brain (large model): {arch.get('brain', '')}")
+        lines.append(f"  Hands/feet (MCP): {arch.get('hands', '')}")
         see = arch.get('see_also')
         if see:
-            lines.append(f"  参考: {see}")
+            lines.append(f"  See also: {see}")
         sl = arch.get('self_learning')
         if sl:
-            lines.append(f"  自我进化: {sl}")
+            lines.append(f"  Self-evolution: {sl}")
         lines.append("")
 
     if docs.get("planning_guide"):
         pg = docs["planning_guide"]
-        lines.append(f"规划指南:")
-        lines.append(f"  原则: {pg.get('principle', '')}")
+        lines.append(f"Planning guide:")
+        lines.append(f"  Principle: {pg.get('principle', '')}")
         prefer = pg.get('prefer_order')
         if prefer:
-            lines.append("  降级优先级:")
+            lines.append("  Fallback priority:")
             for p in prefer:
                 lines.append(f"    → {p}")
         recovery = pg.get('failure_recovery')
         if recovery:
-            lines.append("  失败恢复:")
+            lines.append("  Failure recovery:")
             for signal, action in recovery.items():
                 lines.append(f"    {signal}: {action}")
         pt = pg.get('prompt_templates')
         if pt:
-            lines.append(f"  提示词模板: {pt}")
+            lines.append(f"  Prompt templates: {pt}")
         eo = pg.get('experience_optimization')
         if eo:
-            lines.append(f"  经验优化: {eo}")
+            lines.append(f"  Experience optimization: {eo}")
         lines.append("")
 
     if docs.get("modes"):
-        lines.append("运行模式:")
+        lines.append("Run modes:")
         for mode_name, mode_desc in docs["modes"].items():
             if isinstance(mode_desc, dict):
                 lines.append(f"  {mode_name}: {mode_desc.get('description', '')}")
                 needs = mode_desc.get('needs_auto_unit')
                 if needs is not None:
-                    lines.append(f"    需要 DaofyAutomation: {'是' if needs else '否'}")
+                    lines.append(f"    Requires DaofyAutomation: {'Yes' if needs else 'No'}")
                 # Phase-based commands
                 cmds_by_phase = mode_desc.get('commands_by_phase')
                 if cmds_by_phase:
-                    lines.append("    命令分类（按感知-执行-验证阶段）:")
+                    lines.append("    Command categories (by perception-execution-verification phase):")
                     for phase_name, phase_info in cmds_by_phase.items():
                         icon = {"perception": "🔍", "execution": "⚡", "verification": "✅"}.get(phase_name, "•")
                         lines.append(f"    {icon} {phase_info.get('description', phase_name)}:")
@@ -227,7 +227,7 @@ def get_tool_help(tool_name: str, action: str = "") -> dict:
                 # Console params
                 params = mode_desc.get('params')
                 if params:
-                    lines.append("    参数:")
+                    lines.append("    Parameters:")
                     for pname, pdesc in params.items():
                         lines.append(f"      {pname}: {pdesc}")
             else:
@@ -235,15 +235,15 @@ def get_tool_help(tool_name: str, action: str = "") -> dict:
         lines.append("")
 
     if docs.get("workflow"):
-        lines.append(f"协作链: {docs['workflow']}")
+        lines.append(f"Collaboration chain: {docs['workflow']}")
         lines.append("")
 
     if docs.get("fallback"):
-        lines.append(f"降级策略: {docs['fallback']}")
+        lines.append(f"Fallback strategy: {docs['fallback']}")
         lines.append("")
 
     if docs.get("section_guide"):
-        lines.append("章节说明 (section):")
+        lines.append("Section descriptions (section):")
         for sec_name, sec_desc in docs["section_guide"].items():
             lines.append(f"  {sec_name} — {sec_desc}")
         lines.append("")
@@ -252,13 +252,13 @@ def get_tool_help(tool_name: str, action: str = "") -> dict:
         lines.append("")
 
     if docs.get("platforms"):
-        lines.append("支持平台:")
+        lines.append("Supported platforms:")
         for plat_name, plat_desc in docs["platforms"].items():
             lines.append(f"  {plat_name}: {plat_desc}")
         lines.append("")
 
     if docs.get("china_access"):
-        lines.append(f"国内访问: {docs['china_access']}")
+        lines.append(f"China access: {docs['china_access']}")
         lines.append("")
 
     if docs.get("details"):
@@ -270,7 +270,7 @@ def get_tool_help(tool_name: str, action: str = "") -> dict:
         lines.append("")
 
     if docs.get("push_notification"):
-        lines.append(f"推送通知: {docs['push_notification']}")
+        lines.append(f"Push notification: {docs['push_notification']}")
         lines.append("")
 
     if docs.get("usage"):
@@ -278,7 +278,7 @@ def get_tool_help(tool_name: str, action: str = "") -> dict:
         lines.append("")
 
     if docs.get("examples"):
-        lines.append("示例:")
+        lines.append("Examples:")
         for ex in docs["examples"]:
             lines.append(f"  {ex}")
         lines.append("")

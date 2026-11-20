@@ -1,7 +1,7 @@
 """
-JSON Schema 生成 — 从 StructuredNode 树递归生成 JSON Schema。
+JSON Schema generation — build a JSON Schema recursively from a StructuredNode tree.
 
-生成的 Schema 可以让 LLM 理解文档结构，从而精确构造路径表达式。
+The generated schema lets an LLM understand the document structure, so that it can build path expressions precisely.
 """
 
 from __future__ import annotations
@@ -16,15 +16,15 @@ def generate_schema(
     title: str = "StructuredDocument",
     description: str = "",
 ) -> dict[str, Any]:
-    """从 StructuredNode 树递归生成 JSON Schema。
+    """Generate a JSON Schema recursively from a StructuredNode tree.
 
     Args:
-        node: 根节点。
-        title: Schema title。
-        description: Schema description。
+        node: the root node.
+        title: the schema title.
+        description: the schema description.
 
     Returns:
-        JSON Schema dict (draft/2020-12)。
+        A JSON Schema dict (draft/2020-12).
     """
     schema: dict[str, Any] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -39,7 +39,7 @@ def generate_schema(
 
 
 def _build_properties(schema: dict[str, Any], node: StructuredNode) -> None:
-    """递归填充 schema 的 properties。"""
+    """Fill in the schema's properties recursively."""
     if node.attributes:
         meta: dict[str, Any] = {}
         for k, v in node.attributes.items():
@@ -79,7 +79,7 @@ def _build_properties(schema: dict[str, Any], node: StructuredNode) -> None:
 
 
 def _child_schema(child: StructuredNode) -> dict[str, Any]:
-    """为单个子节点生成 Schema entry。"""
+    """Produce the schema entry for a single child node."""
     entry: dict[str, Any] = {"type": child.kind}
 
     if child.attributes.get("class_name"):

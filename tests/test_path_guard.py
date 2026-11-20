@@ -1,4 +1,4 @@
-"""path_guard 单元测试 — MCP 路径参数绝对路径校验。"""
+"""path_guard unit tests — MCP path argument absolute-path validation."""
 
 import pytest
 
@@ -10,7 +10,7 @@ class TestRelativePathsRejected:
         err = validate_tool_paths("delphi_file", {"file_path": "Unit1.pas"})
         assert err is not None
         assert "file_path" in err
-        assert "绝对路径" in err
+        assert "absolute path" in err
 
     def test_project_path_relative_rejected(self):
         err = validate_tool_paths(
@@ -37,7 +37,7 @@ class TestRelativePathsRejected:
     def test_error_message_has_example(self):
         err = validate_tool_paths("delphi_file", {"file_path": "Unit1.pas"})
         assert err is not None
-        assert "请使用形如" in err
+        assert "Use an absolute path such as" in err
         assert "Unit1.pas" in err
 
 

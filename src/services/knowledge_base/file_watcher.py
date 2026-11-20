@@ -1,12 +1,12 @@
 """
-文件变更监听器 — 监控 Delphi 源码变化自动触发增量 KB 更新
+File change watcher — monitors Delphi source changes and automatically triggers incremental KB updates
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Left-Right Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
-Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
+Update & Mod By Crystalxp (Dark Night Killer QQ:281309196)
 
-依赖: watchdog (pip install watchdog)
-如果 watchdog 未安装，监听器静默降级，不影响其他功能。
+Dependency: watchdog (pip install watchdog)
+If watchdog is not installed, the watcher silently degrades and does not affect other functionality.
 """
 
 import os
@@ -21,26 +21,26 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# 监听的 Delphi 文件扩展名
+# Delphi file extensions to watch
 DELPHI_EXTENSIONS: Set[str] = {
     '.pas', '.dpr', '.dpk', '.dfm', '.fmx', '.inc', '.dproj', '.groupproj',
 }
 
-# 跳过的不需要监听的目录名
+# Directory names to skip (no need to watch)
 SKIP_DIR_NAMES: Set[str] = set(SOURCE_SCAN_EXCLUDED_DIRS)
 
 
 # ──────────────────────────────────────────────────────────
-# DelphiFileHandler — watchdog 事件处理器（带去抖）
+# DelphiFileHandler — watchdog event handler (with debounce)
 # ──────────────────────────────────────────────────────────
 
 
 class _DelphiFileHandler:
-    """watchdog 文件事件处理器，筛选 Delphi 源码变更并去抖触发。
+    """watchdog file event handler that filters Delphi source changes and triggers after debounce.
 
     Args:
-        on_change: 去抖结束后触发的回调函数（在 watchdog 线程中调用）
-        debounce_seconds: 去抖等待秒数，默认 3 秒
+        on_change: Callback triggered after debounce ends (called in the watchdog thread)
+        debounce_seconds: Debounce wait seconds, default 3 seconds
     """
 
     def __init__(
@@ -55,7 +55,7 @@ class _DelphiFileHandler:
         self._pending_paths: Set[str] = set()
 
     def dispatch(self, event) -> None:
-        """watchdog 事件分发入口——兼容 watchdog 的 FileSystemEventHandler 约定。"""
+        """watchdog event dispatch entry point—compatible with watchdog's FileSystemEventHandler convention."""
         if event.is_directory:
             return
         ext = Path(event.src_path).suffix.lower()
@@ -63,7 +63,7 @@ class _DelphiFileHandler:
             self._debounce(event.src_path)
 
     def _debounce(self, file_path: str) -> None:
-        """重置去抖计时器：连续变更只触发一次回调。"""
+        """Reset the debounce timer: consecutive changes trigger the callback only once."""
         with self._lock:
             self._pending_paths.add(file_path)
             if self._timer is not None:
@@ -80,10 +80,10 @@ class _DelphiFileHandler:
         try:
             self.on_change(pending_paths)
         except Exception as e:
-            logger.error("文件变更回调执行失败: %s", e, exc_info=True)
+            logger.error("File change callback execution failed: %s", e, exc_info=True)
 
     def stop(self) -> None:
-        """取消待处理的去抖计时器。"""
+        """Cancel the pending debounce timer."""
         with self._lock:
             if self._timer is not None:
                 self._timer.cancel()
@@ -97,18 +97,18 @@ class _DelphiFileHandler:
 
 
 class ProjectFileWatcher:
-    """项目文件监听器：监控 Delphi 源码变更，自动触发增量 KB 更新。
+    """Project file watcher: monitors Delphi source changes and automatically triggers incremental KB updates.
 
-    启动时检测 watchdog 是否可用，不可用时静默降级。
-    通过 AsyncTaskManager 提交后台构建任务，自带去重防堆叠。
-    内置看门狗定时检查 Observer 线程健康，崩溃后自动重启。
+    Checks whether watchdog is available at startup, and silently degrades when unavailable.
+    Submits background build tasks via AsyncTaskManager, with built-in deduplication to prevent stacking.
+    Includes a watchdog timer that checks Observer thread health and automatically restarts it after a crash.
 
     Args:
-        project_path: 项目 .dproj 文件路径
-        project_dir: 项目根目录（用于文件监听范围）
+        project_path: Project .dproj file path
+        project_dir: Project root directory (used for file watch scope)
     """
 
-    # 看门狗检查间隔（秒）
+    # Watchdog check interval (seconds)
     _HEALTH_CHECK_INTERVAL: float = 60.0
 
     def __init__(self, project_path: str, project_dir: str):
@@ -120,37 +120,37 @@ class ProjectFileWatcher:
         self._health_timer: Optional[threading.Timer] = None
 
     def start(self) -> bool:
-        """启动文件监听。返回 True 表示成功启动，False 表示降级。
+        """Start file watching. Returns True for successful start, False for degraded mode.
 
-        降级原因：watchdog 未安装、项目目录不存在、Observer 创建失败。
+        Degraded reasons: watchdog not installed, project directory does not exist, Observer creation failed.
         """
-        # ── 检查 watchdog 可用性 ──
+        # ── Check watchdog availability ──
         try:
             from watchdog.observers import Observer  # noqa: F401
             self._watchdog_available = True
         except ImportError:
             logger.info(
-                "watchdog 未安装，文件变更监听已跳过。"
-                "如需自动增量 KB 更新: pip install watchdog"
+                "watchdog is not installed; file change watching skipped. "
+                "For automatic incremental KB updates: pip install watchdog"
             )
             return False
 
         project_dir = Path(self._project_dir)
         if not project_dir.is_dir():
-            logger.warning("项目目录不存在，无法启动文件监听: %s", project_dir)
+            logger.warning("Project directory does not exist; cannot start file watching: %s", project_dir)
             return False
 
-        # ── 创建去抖处理器 ──
+        # ── Create debounce handler ──
         self._handler = _DelphiFileHandler(self._on_change, debounce_seconds=3.0)
 
-        # ── 启动 Observer ──
+        # ── Start Observer ──
         try:
             from watchdog.observers import Observer
             from watchdog.events import FileSystemEvent
 
             self._observer = Observer()
-            # watchdog 要求 handler 实现特定接口，
-            # 用 lambda 包装 dispatch 调用
+            # watchdog requires the handler to implement a specific interface,
+            # use a wrapper to call dispatch
             class _WatchdogHandler:
                 def __init__(self, handler: _DelphiFileHandler):
                     self._handler = handler
@@ -165,29 +165,29 @@ class ProjectFileWatcher:
             self._observer.daemon = True
             self._observer.start()
             self._start_health_check()
-            logger.info("文件变更监听已启动: %s", project_dir)
+            logger.info("File change watching started: %s", project_dir)
             return True
 
         except Exception as e:
-            logger.warning("文件监听启动失败: %s", e)
+            logger.warning("File watching failed to start: %s", e)
             return False
 
     def _start_health_check(self) -> None:
-        """启动看门狗定时器，定期检查 Observer 线程是否存活。"""
+        """Start the watchdog timer to periodically check whether the Observer thread is alive."""
         def _check():
             if self._observer is None:
                 return
             try:
                 alive = getattr(self._observer, 'is_alive', lambda: True)()
                 if not alive:
-                    logger.warning("文件监听 Observer 线程已终止，正在重启...")
+                    logger.warning("File watching Observer thread has terminated; restarting...")
                     project_dir = self._project_dir
                     self._observer = self._rebuild_observer()
                     if self._observer:
                         self._observer.start()
-                        logger.info("文件监听 Observer 已重启: %s", project_dir)
+                        logger.info("File watching Observer restarted: %s", project_dir)
             except Exception as e:
-                logger.debug("文件监听健康检查异常: %s", e)
+                logger.debug("File watching health check exception: %s", e)
 
         def _schedule():
             if self._observer is not None:
@@ -201,7 +201,7 @@ class ProjectFileWatcher:
         _schedule()
 
     def _rebuild_observer(self):
-        """重建 Observer 实例（健康检查检测到崩溃时调用）。"""
+        """Rebuild the Observer instance (called when health check detects a crash)."""
         try:
             from watchdog.observers import Observer
             obs = Observer()
@@ -217,15 +217,15 @@ class ProjectFileWatcher:
                     recursive=True,
                 )
             obs.daemon = True
-            logger.info("Observer 实例已重建")
+            logger.info("Observer instance rebuilt")
             return obs
         except Exception as e:
-            logger.warning("重建 Observer 失败: %s", e)
+            logger.warning("Failed to rebuild Observer: %s", e)
             return None
 
     def stop(self) -> None:
-        """停止文件监听并清理资源。"""
-        # 停止看门狗
+        """Stop file watching and clean up resources."""
+        # Stop watchdog
         if self._health_timer is not None:
             self._health_timer.cancel()
             self._health_timer = None
@@ -239,12 +239,12 @@ class ProjectFileWatcher:
                 self._observer.stop()
                 self._observer.join(timeout=TIMEOUT_PROCESS_TERMINATE)
             except Exception as e:
-                logger.debug("停止文件监听时发生非致命错误: %s", e)
+                logger.debug("Non-fatal error while stopping file watching: %s", e)
             self._observer = None
-            logger.info("文件变更监听已停止")
+            logger.info("File change watching stopped")
 
     def _on_change(self, changed_paths: Optional[Iterable[str]] = None) -> None:
-        """文件变更触发：通过 AsyncTaskManager 提交增量 KB 构建任务（去重）。"""
+        """File change trigger: submit an incremental KB build task via AsyncTaskManager (deduplicated)."""
         for file_path in changed_paths or ():
             record_external_edit(file_path, event_type="modified")
 
@@ -260,18 +260,18 @@ class ProjectFileWatcher:
             dedup_key = f"file_watcher_rebuild_{self._project_path}"
 
             def rebuild_task(**kwargs: str) -> bool:
-                """后台增量构建 KB。"""
+                """Build KB incrementally in the background."""
                 pp = kwargs.get("project_path", self._project_path)
                 pkb = ProjectKnowledgeBase(pp, progress_callback=kwargs.get("_progress_callback"))
                 return pkb.build_project_knowledge_base(rebuild=False)
 
             task_id = task_mgr.submit_task(
-                name=f"文件变更自动增量更新 ({Path(self._project_path).stem})",
+                name=f"Automatic incremental update on file change ({Path(self._project_path).stem})",
                 func=rebuild_task,
                 project_path=self._project_path,
                 dedup_key=dedup_key,
             )
-            logger.debug("文件变更触发增量 KB 更新: task_id=%s", task_id)
+            logger.debug("File change triggered incremental KB update: task_id=%s", task_id)
 
         except Exception as e:
-            logger.error("触发增量 KB 更新失败: %s", e, exc_info=True)
+            logger.error("Failed to trigger incremental KB update: %s", e, exc_info=True)

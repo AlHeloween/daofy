@@ -1,7 +1,7 @@
 """
-Delphi 环境工具函数
+Delphi environment utilities
 
-提供 Delphi 相关的路径和环境变量处理功能
+Provide Delphi-related path and environment variable handling.
 """
 
 import logging
@@ -70,10 +70,10 @@ def get_delphi_bpl_dir(version: Optional[str] = None) -> Optional[Path]:
 
 def get_delphi_version() -> Optional[str]:
     """
-    获取当前系统安装的 Delphi 版本
-     
+    Get the Delphi version installed on the current system
+
     Returns:
-        Delphi 版本号 (如 "23.0")，未安装则返回 None
+        Delphi version number (e.g. "23.0"), or None when Delphi is not installed
     """
     try:
         key = winreg.OpenKey(
@@ -81,13 +81,13 @@ def get_delphi_version() -> Optional[str]:
             REG_KEY_EMBARCADERO_BDS
         )
         
-        # 枚举所有已安装的版本
+        # Enumerate every installed version
         versions = []
         i = 0
         while True:
             try:
                 subkey_name = winreg.EnumKey(key, i)
-                # 尝试解析版本号
+                # Try to parse the version number
                 if subkey_name.replace('.', '').isdigit():
                     versions.append(subkey_name)
                 i += 1
@@ -96,24 +96,24 @@ def get_delphi_version() -> Optional[str]:
         
         winreg.CloseKey(key)
         
-        # 返回最新的版本
+        # Return the newest version
         if versions:
             return sorted(versions, key=lambda x: tuple(int(p) for p in x.split('.')), reverse=True)[0]
     except Exception as e:
-        logger.debug("读取Delphi版本失败: %s", str(e))
+        logger.debug("Failed to read the Delphi version: %s", str(e))
     
     return None
 
 
 def get_delphi_root_dir(version: Optional[str] = None) -> Optional[str]:
     """
-    获取 Delphi 安装根目录
-     
+    Get the Delphi installation root directory
+
     Args:
-        version: Delphi 版本号，默认获取最新版本
-        
+        version: Delphi version number; defaults to the newest version
+
     Returns:
-        Delphi 根目录路径
+        Delphi root directory path
     """
     if not version:
         version = get_delphi_version()
@@ -133,17 +133,18 @@ def get_delphi_root_dir(version: Optional[str] = None) -> Optional[str]:
 
 
 def _matched_version_key(version: str) -> Optional[str]:
-    """在注册表中查找与给定版本标识匹配的版本键。
+    """Find the registry version key matching the given version identifier.
 
-    与第三方库 / RTL 库路径策略一致：`version` 既可以是注册表版本键
-    （如 ``"23.0"``），也可以是产品名（如 ``"Delphi 12 Athens"``，
-    及 ``"delphi 12"`` 这类去掉 codename 的简短写法）。
+    Consistent with the third-party library / RTL library path strategy: `version`
+    may be a registry version key (such as ``"23.0"``) or a product name (such as
+    ``"Delphi 12 Athens"``, or a short form like ``"delphi 12"`` with the codename
+    dropped).
 
     Args:
-        version: 用户传入的版本标识
+        version: version identifier supplied by the caller
 
     Returns:
-        匹配的注册表版本键（如 "23.0"），未匹配则返回 None
+        The matching registry version key (e.g. "23.0"), or None when nothing matches
     """
     from .delphi_versions import get_version_name
 
@@ -163,7 +164,7 @@ def _matched_version_key(version: str) -> Optional[str]:
                 name = get_version_name(vkey)
                 if target == name.lower():
                     return vkey
-                # 简短写法："delphi 12 athens" → "delphi 12"
+                # Short form: "delphi 12 athens" -> "delphi 12"
                 if name.lower().startswith(target) and target.startswith("delphi"):
                     return vkey
             except WindowsError:
@@ -174,18 +175,21 @@ def _matched_version_key(version: str) -> Optional[str]:
 
 
 def resolve_delphi_source_dirs(version: Optional[str] = None) -> List[str]:
-    """解析 Delphi 官方源码（RTL/VCL/FMX，即"系统库"）知识库的源码目录。
+    """Resolve the source directories of the official Delphi source (RTL/VCL/FMX,
+    i.e. the "system libraries") knowledge base.
 
-    与 RTL 库搜索路径 / 第三方库路径共用同一版本过滤策略：当传入 `version`
-    时，只返回该 Delphi 版本的 ``<RootDir>/source``；未传或多版本默认全取，
-    保持既有行为。
+    Shares the same version-filtering strategy as the RTL library search path and
+    the third-party library paths: when `version` is supplied, only that Delphi
+    version's ``<RootDir>/source`` is returned; when it is omitted, or several
+    versions are installed, all of them are taken, keeping the existing behaviour.
 
     Args:
-        version: 版本标识（注册表版本键 "23.0" 或产品名 "Delphi 12 Athens"），
-                 为 None 时逐个返回所有已安装版本的源码目录
+        version: version identifier (registry version key "23.0" or product name
+                 "Delphi 12 Athens"); when None, the source directories of every
+                 installed version are returned one by one
 
     Returns:
-        source 目录路径列表（仅保留实际存在的目录）
+        List of source directory paths (only directories that actually exist)
     """
     if version:
         vkey = _matched_version_key(version)
@@ -194,11 +198,11 @@ def resolve_delphi_source_dirs(version: Optional[str] = None) -> List[str]:
             if src.exists():
                 return [str(src)]
             logger.info(
-                "Delphi 版本 %s 的源码目录不存在: %s", version, src
+                "Source directory for Delphi version %s does not exist: %s", version, src
             )
             return []
 
-    # 无版本 / 版本未匹配：返回所有已安装版本的源码目录（默认行为）
+    # No version / version not matched: return the source directories of every installed version (default behaviour)
     dirs: List[str] = []
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY_EMBARCADERO_BDS)
@@ -221,19 +225,19 @@ def resolve_delphi_source_dirs(version: Optional[str] = None) -> List[str]:
                 break
         winreg.CloseKey(key)
     except Exception as e:
-        logger.debug("读取 Delphi 源码目录失败: %s", e)
+        logger.debug("Failed to read Delphi source directories: %s", e)
     return dirs
 
 
 def get_delphi_env_vars(version: Optional[str] = None) -> Dict[str, str]:
     """
-    获取 Delphi 环境变量
-     
+    Get Delphi environment variables
+
     Args:
-        version: Delphi 版本号，默认获取最新版本
-        
+        version: Delphi version number; defaults to the newest version
+
     Returns:
-        环境变量字典
+        Dictionary of environment variables
     """
     env_vars = {}
     
@@ -259,21 +263,21 @@ def get_delphi_env_vars(version: Optional[str] = None) -> Dict[str, str]:
         
         winreg.CloseKey(key)
     except Exception as e:
-        logger.debug("读取环境变量失败: %s", str(e))
+        logger.debug("Failed to read environment variables: %s", str(e))
     
     return env_vars
 
 
 def get_delphi_library_paths(version: Optional[str] = None, platform: str = "Win32") -> List[str]:
     """
-    获取 Delphi 库搜索路径（合并 BDS + Studio 注册表配置单元）
+    Get the Delphi library search paths (merging the BDS + Studio registry hives)
 
     Args:
-        version: Delphi 版本号，默认获取最新版本
-        platform: 目标平台 (Win32/Win64)
+        version: Delphi version number; defaults to the newest version
+        platform: target platform (Win32/Win64)
 
     Returns:
-        搜索路径列表
+        List of search paths
     """
     paths: list[str] = []
     seen: set[str] = set()
@@ -300,7 +304,7 @@ def get_delphi_library_paths(version: Optional[str] = None, platform: str = "Win
                         paths.append(p)
                         seen.add(p)
         except Exception as e:
-            logger.debug("读取 %s 的 Search Path 失败: %s", reg_path, str(e))
+            logger.debug("Failed to read the Search Path for %s: %s", reg_path, str(e))
 
     return paths
 
@@ -312,38 +316,38 @@ def expand_delphi_path_macros(
     env_vars: Optional[Dict[str, str]] = None
 ) -> str:
     """
-    展开 Delphi 路径中的宏变量
-    
-    支持的宏:
-    - $(BDS) - Delphi 根目录
-    - $(BDSCOMMONDIR) - 公共文档目录
-    - $(BDSUSERDIR) - 用户文档目录
-    - $(BDSBIN) - Delphi bin 目录
-    - $(BDSLIB) - Delphi lib 目录
-    - $(BDSCatalogRepository) - GetIt 组件目录
-    - $(PublicDocuments) - 公共文档目录
-    - $(Platform) - 目标平台
-    
+    Expand the macro variables in a Delphi path
+
+    Supported macros:
+    - $(BDS) - Delphi root directory
+    - $(BDSCOMMONDIR) - Common documents directory
+    - $(BDSUSERDIR) - User documents directory
+    - $(BDSBIN) - Delphi bin directory
+    - $(BDSLIB) - Delphi lib directory
+    - $(BDSCatalogRepository) - GetIt component directory
+    - $(PublicDocuments) - Public documents directory
+    - $(Platform) - Target platform
+
     Args:
-        path: 原始路径，可能包含宏
-        version: Delphi 版本号，默认获取最新版本
-        platform: 目标平台，默认 Win32
-        env_vars: 额外的环境变量
-        
+        path: original path, possibly containing macros
+        version: Delphi version number; defaults to the newest version
+        platform: target platform, default Win32
+        env_vars: additional environment variables
+
     Returns:
-        展开后的路径
+        The expanded path
     """
     if not version:
         version = get_delphi_version()
     if not platform:
         platform = "Win32"
     
-    # 获取 Delphi 根目录
+    # Get the Delphi root directory
     bds_root = get_delphi_root_dir(version)
     user_docs = Path.home() / "Documents"
     public_docs = get_public_documents_dir()
     
-    # 构建默认宏字典
+    # Build the default macro dictionary
     macros: Dict[str, str] = {}
     
     if bds_root:
@@ -363,43 +367,43 @@ def expand_delphi_path_macros(
         if public_docs is not None:
             macros['$(PublicDocuments)'] = str(public_docs)
     
-    # 添加平台宏
+    # Add the platform macro
     macros['$(Platform)'] = platform
     
-    # 合并用户定义的环境变量（键名需要加 $() 前缀才能被 str.replace 正确匹配）
+    # Merge user-defined environment variables (keys need the $() prefix so that str.replace matches them)
     if env_vars:
         for k, v in env_vars.items():
             macros[f'$({k})'] = v
     
-    # 添加注册表中的环境变量（同上，注册表键名如 SKIADIR 需转为 $(SKIADIR)）
+    # Add environment variables from the registry (same as above; a registry key such as SKIADIR becomes $(SKIADIR))
     reg_env_vars = get_delphi_env_vars(version)
     for k, v in reg_env_vars.items():
         macros[f'$({k})'] = v
     
-    # 展开路径
+    # Expand the path
     result = path
     
-    # 多次替换，确保嵌套宏也能展开
+    # Replace repeatedly so that nested macros expand as well
     max_iterations = 5
     for _ in range(max_iterations):
         new_result = result
         for macro, value in macros.items():
             new_result = new_result.replace(macro, value)
         
-        # 如果没有变化，停止迭代
+        # Stop iterating when nothing changed
         if new_result == result:
             break
         result = new_result
     
-    # 检测并警告未解析的宏
+    # Detect and warn about unresolved macros
     unresolved = re.findall(r'\$\([^)]+\)', result)
     if unresolved:
         import logging
         logging.getLogger(__name__).warning(
-            "路径中存在未解析的宏变量 %s: %s", list(set(unresolved)), path
+            "Unresolved macro variables in path %s: %s", list(set(unresolved)), path
         )
     
-    # 清理未解析的宏（避免返回含 $(...) 的无效路径）
+    # Strip unresolved macros (avoid returning an invalid path containing $(...))
     result = re.sub(r'\$\([^)]+\)', '', result)
     
     return result
@@ -407,13 +411,13 @@ def expand_delphi_path_macros(
 
 def get_catalog_repository_paths(version: Optional[str] = None) -> List[str]:
     """
-    获取 GetIt CatalogRepository 中所有组件的源码路径
-    
+    Get the source paths of every component in the GetIt CatalogRepository
+
     Args:
-        version: Delphi 版本号，默认获取最新版本
-        
+        version: Delphi version number; defaults to the newest version
+
     Returns:
-        组件源码路径列表
+        List of component source paths
     """
     paths = []
     
@@ -422,14 +426,14 @@ def get_catalog_repository_paths(version: Optional[str] = None) -> List[str]:
         if not version:
             return paths
     
-    # 获取 CatalogRepository 路径
+    # Get the CatalogRepository path
     user_docs = os.path.expanduser("~\\Documents")
     catalog_base = user_docs + '\\Embarcadero\\Studio\\' + version + '\\CatalogRepository'
     
     if not os.path.exists(catalog_base):
         return paths
     
-    # 遍历所有组件
+    # Walk every component
     for item in os.listdir(catalog_base):
         source_path = os.path.join(catalog_base, item, 'Source')
         if os.path.isdir(source_path):
@@ -443,19 +447,19 @@ def resolve_delphi_search_paths(
     platform: str = "Win32"
 ) -> List[str]:
     """
-    解析 Delphi 所有搜索路径（项目 + 注册表 + GetIt）
-    
+    Resolve every Delphi search path (project + registry + GetIt)
+
     Args:
-        version: Delphi 版本号，默认获取最新版本
-        platform: 目标平台
-        
+        version: Delphi version number; defaults to the newest version
+        platform: target platform
+
     Returns:
-        所有搜索路径列表
+        List of all search paths
     """
     all_paths = []
     seen = set()
     
-    # 1. 从注册表获取库搜索路径
+    # 1. Get the library search paths from the registry
     library_paths = get_delphi_library_paths(version, platform)
     for path in library_paths:
         expanded = expand_delphi_path_macros(path, version, platform)
@@ -463,7 +467,7 @@ def resolve_delphi_search_paths(
             all_paths.append(expanded)
             seen.add(expanded)
     
-    # 2. 从 GetIt CatalogRepository 获取组件源码路径
+    # 2. Get component source paths from the GetIt CatalogRepository
     catalog_paths = get_catalog_repository_paths(version)
     for path in catalog_paths:
         if os.path.exists(path) and path not in seen:
@@ -524,7 +528,7 @@ def _read_env_options_library_paths(
     try:
         root = ET.parse(env_options_path).getroot()
     except (ET.ParseError, OSError) as exc:
-        logger.warning("无法解析 EnvOptions 文件 %s: %s", env_options_path, exc)
+        logger.warning("Cannot parse the EnvOptions file %s: %s", env_options_path, exc)
         return None, False
 
     library_path: Optional[str] = None

@@ -1,32 +1,33 @@
-# 修复后复盘示例 — 从调试到防御
+# Post-Fix Retrospective Example — From Debugging to Defense
 
-修复验证通过后，必须执行复盘沉淀为长期资产。
+After fix verification passes, a retrospective must be performed to consolidate into long-term assets.
 
 ```
-① 根因归类
-   ├─ 编码错误（逻辑/语法）
-   ├─ API 误用（参数/生命周期/约定）
-   ├─ 环境差异（版本/OS/三方库）
-   ├─ 并发/时序（竞态/死锁/事件顺序）
-   └─ 外部依赖变更
+① Root cause classification
+   ├─ Coding error (logic/syntax)
+   ├─ API misuse (parameters/lifecycle/contract)
+   ├─ Environment difference (version/OS/third-party library)
+   ├─ Concurrency/timing (race/deadlock/event order)
+   └─ External dependency change
 
-② 评估防御措施
-   ├─ 加 Assert → 前置条件不满足时
-   ├─ 加日志 → 信息不足导致定位困难时
-   ├─ 加自动化测试 → 业务逻辑错误时
-   └─ 更新规则 → 常见模式时
+② Evaluate defensive measures
+   ├─ Add Assert → When preconditions are not met
+   ├─ Add logging → When information is insufficient for difficult diagnosis
+   ├─ Add automated tests → When business logic errors
+   └─ Update rules → When common patterns
 
-③ 经验保存（必须执行）
+③ Experience saving (must execute)
    experience(action="save", problem="{泛化后描述}", solution="{步骤+关键代码}", tags=["调试", ...])
 
-④ 规则联动检查
-   ├─ hit_count ≥ 3 → 升级为正式规则
-   └─ 发现规则盲区 → 新增/更新规则
+④ Rule linkage check
+   ├─ hit_count ≥ 3 → Upgrade to formal rule
+   └─ Discover rule blind spot → Add/update rule
 ```
 
-## 原则
+## Principles
 
-- 每个修复都伴随复盘
-- 经验半衰期 30 天（不记录则会衰减）
-- 规则是经验的固化，hit_count ≥ 3 升级
-- 复盘不可跳过
+- Every fix is accompanied by a retrospective
+- Experience half-life is 30 days (it decays if not recorded)
+- Rules are the solidification of experience; upgrade when hit_count ≥ 3
+- Retrospectives cannot be skipped
+

@@ -1,11 +1,11 @@
 """
-ProtoBuf 格式适配器 — 读写 .proto / .pb 文件 ↔ StructuredNode。
+ProtoBuf format adapter — reads and writes .proto / .pb files ↔ StructuredNode.
 
-支持两种模式:
-  1. 动态编译 .proto 文件 → 用生成的 XXX_pb2 模块序列化/反序列化
-  2. 直接解析已有的 .proto 描述文件为 Schema
+Supports two modes:
+  1. Compile a .proto file on the fly → serialize/deserialize with the generated XXX_pb2 module
+  2. Parse an existing .proto descriptor file directly into a Schema
 
-依赖: pip install protobuf
+Requires: pip install protobuf
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from .schema import StructuredNode
 
 
 # ═════════════════════════════════════════════════════════════════════
-#  第1部分: .proto 文件解析为描述性 JSON
+#  Part 1: parse a .proto file into descriptive JSON
 # ═════════════════════════════════════════════════════════════════════
 
 PROTO_MESSAGE_RE = re.compile(
@@ -33,7 +33,7 @@ PROTO_FIELD_RE = re.compile(
 
 
 def parse_proto_descriptor(proto_text: str) -> list[dict[str, Any]]:
-    """解析 .proto 文件中的消息定义，返回描述列表。"""
+    """Parse the message definitions of a .proto file and return a list of descriptors."""
     messages: list[dict[str, Any]] = []
     pos = 0
     while True:
@@ -41,7 +41,7 @@ def parse_proto_descriptor(proto_text: str) -> list[dict[str, Any]]:
         if not m:
             break
         msg_name = m.group(1)
-        # 找匹配的闭合括号（简单处理，不支持嵌套消息）
+        # Find the matching closing brace (simple handling; nested messages unsupported)
         brace_start = m.end()
         depth = 1
         p = brace_start
@@ -69,15 +69,15 @@ def parse_proto_descriptor(proto_text: str) -> list[dict[str, Any]]:
 
 
 # ═════════════════════════════════════════════════════════════════════
-#  第2部分: 已知 protobuf 消息序列化 ↔ dict
+#  Part 2: a known protobuf message ↔ dict
 # ═════════════════════════════════════════════════════════════════════
 
 
 def message_to_dict(msg_obj) -> dict[str, Any]:
-    """将 protobuf 消息对象转为 JSON 兼容 dict。
+    """Convert a protobuf message object into a JSON-compatible dict.
 
     Args:
-        msg_obj: protobuf 消息实例（如 my_pb2.MyMessage()）。
+        msg_obj: a protobuf message instance (e.g. my_pb2.MyMessage()).
     """
     try:
         from google.protobuf.json_format import MessageToDict
@@ -87,20 +87,20 @@ def message_to_dict(msg_obj) -> dict[str, Any]:
             including_default_value_fields=False,
         )
     except ImportError:
-        raise ImportError("需要 protobuf 库: pip install protobuf")
+        raise ImportError("the protobuf library is required: pip install protobuf")
 
 
 def dict_to_message(data: dict[str, Any], msg_class) -> Any:
-    """从 JSON 兼容 dict 反构造 protobuf 消息。"""
+    """Rebuild a protobuf message from a JSON-compatible dict."""
     try:
         from google.protobuf.json_format import ParseDict
         return ParseDict(data, msg_class())
     except ImportError:
-        raise ImportError("需要 protobuf 库: pip install protobuf")
+        raise ImportError("the protobuf library is required: pip install protobuf")
 
 
 # ═════════════════════════════════════════════════════════════════════
-#  第3部分: parse() / serialize() — 通过动态编译 .proto
+#  Part 3: parse() / serialize() — through on-the-fly .proto compilation
 # ═════════════════════════════════════════════════════════════════════
 
 
@@ -109,22 +109,22 @@ def compile_and_parse(
     message_name: str,
     binary_data: bytes,
 ) -> StructuredNode:
-    """编译 .proto 文件并用其反序列化二进制数据。
+    """Compile a .proto file and use it to deserialize binary data.
 
     Args:
-        proto_file: .proto 文件路径。
-        message_name: 顶层消息名（如 "MyMessage"）。
-        binary_data: Protobuf 序列化字节。
+        proto_file: path to the .proto file.
+        message_name: top-level message name (e.g. "MyMessage").
+        binary_data: Protobuf-serialized bytes.
 
     Returns:
-        StructuredNode。
+        A StructuredNode.
     """
     import importlib
     import sys
 
     from google.protobuf import descriptor_pb2, compiler
 
-    # 编译 .proto 到临时目录
+    # Compile the .proto into a temporary directory
     tmp_dir = tempfile.mkdtemp(prefix="proto_")
     try:
         # protoc --python_out=tmp_dir proto_file
@@ -157,14 +157,14 @@ def compile_and_parse(
 
 
 def serialize_message(msg_class, data: dict[str, Any]) -> bytes:
-    """从 dict 构造 protobuf 消息并序列化。
+    """Build a protobuf message from a dict and serialize it.
 
     Args:
-        msg_class: protobuf 消息类（如 MyMessage）。
-        data: JSON 兼容 dict。
+        msg_class: the protobuf message class (e.g. MyMessage).
+        data: a JSON-compatible dict.
 
     Returns:
-        序列化字节。
+        The serialized bytes.
     """
     msg = dict_to_message(data, msg_class)
     return msg.SerializeToString()

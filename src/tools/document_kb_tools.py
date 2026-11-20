@@ -1,6 +1,6 @@
 """
-文档知识库辅助函数
-用于 delphi_kb 工具的文档操作
+Document knowledge base helpers.
+Backs the document actions of the delphi_kb tool.
 """
 
 from typing import Any
@@ -17,7 +17,7 @@ _doc_scanner = None
 
 
 def _get_scanner() -> GenericDocumentScanner:
-    """获取文档扫描器实例"""
+    """Return the document scanner instance."""
     global _doc_scanner
     
     if _doc_scanner is None:
@@ -33,21 +33,21 @@ def _get_scanner() -> GenericDocumentScanner:
 
 
 async def scan_documents(arguments: Any) -> CallToolResult:
-    """扫描目录中的文档"""
+    """Scan the documents in a directory."""
     directory = arguments.get("directory")
     extensions = arguments.get("extensions")
     max_workers = arguments.get("max_workers")
     
     if not directory:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供 directory 参数"}],
+            content=[{"type": "text", "text": "The directory parameter is required"}],
             isError=True
         )
     
     dir_path = Path(directory)
     if not dir_path.exists():
         return CallToolResult(
-            content=[{"type": "text", "text": f"目录不存在: {directory}"}],
+            content=[{"type": "text", "text": f"Directory does not exist: {directory}"}],
             isError=True
         )
     
@@ -60,18 +60,18 @@ async def scan_documents(arguments: Any) -> CallToolResult:
     
     if 'error' in result:
         return CallToolResult(
-            content=[{"type": "text", "text": f"扫描失败: {result['error']}"}],
+            content=[{"type": "text", "text": f"Scan failed: {result['error']}"}],
             isError=True
         )
     
-    output = f"文档扫描完成:\n"
-    output += f"  总文件数: {result['total_files']}\n"
-    output += f"  处理成功: {result['processed']}\n"
-    output += f"  处理失败: {result['failed']}\n"
+    output = f"Document scan complete:\n"
+    output += f"  Total files: {result['total_files']}\n"
+    output += f"  Processed: {result['processed']}\n"
+    output += f"  Failed: {result['failed']}\n"
     
     stats = scanner.get_statistics()
     if stats.get('by_type'):
-        output += f"\n按类型统计:\n"
+        output += f"\nCounts by type:\n"
         for content_type, count in stats['by_type'].items():
             output += f"  {content_type}: {count}\n"
     
@@ -79,18 +79,18 @@ async def scan_documents(arguments: Any) -> CallToolResult:
 
 
 async def add_web_document(arguments: Any) -> CallToolResult:
-    """添加网页文档"""
+    """Add a web document."""
     url = arguments.get("url")
     
     if not url:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供 url 参数"}],
+            content=[{"type": "text", "text": "The url parameter is required"}],
             isError=True
         )
     
     if not url.startswith(('http://', 'https://')):
         return CallToolResult(
-            content=[{"type": "text", "text": "URL 必须以 http:// 或 https:// 开头"}],
+            content=[{"type": "text", "text": "URL must start with http:// or https://"}],
             isError=True
         )
     
@@ -99,36 +99,36 @@ async def add_web_document(arguments: Any) -> CallToolResult:
     
     if result is None:
         return CallToolResult(
-            content=[{"type": "text", "text": f"添加网页失败: {url}"}],
+            content=[{"type": "text", "text": f"Failed to add web document: {url}"}],
             isError=True
         )
     
     if isinstance(result, dict) and 'error' in result:
         return CallToolResult(
-            content=[{"type": "text", "text": f"添加网页失败: {result['error']}"}],
+            content=[{"type": "text", "text": f"Failed to add web document: {result['error']}"}],
             isError=True
         )
     
-    output = f"网页添加成功:\n"
-    output += f"  标题: {result.get('title', 'N/A')}\n"
+    output = f"Web document added:\n"
+    output += f"  Title: {result.get('title', 'N/A')}\n"
     output += f"  URL: {url}\n"
-    output += f"  大小: {result.get('size', 0)} 字节\n"
-    output += f"  行数: {result.get('line_count', 0)}\n"
-    output += f"  章节数: {len(result.get('sections', []))}\n"
-    output += f"  代码块数: {len(result.get('code_examples', []))}\n"
+    output += f"  Size: {result.get('size', 0)} bytes\n"
+    output += f"  Lines: {result.get('line_count', 0)}\n"
+    output += f"  Sections: {len(result.get('sections', []))}\n"
+    output += f"  Code blocks: {len(result.get('code_examples', []))}\n"
     
     return CallToolResult(content=[{"type": "text", "text": output}])
 
 
 async def search_documents(arguments: Any) -> CallToolResult:
-    """搜索文档"""
+    """Search the documents."""
     query = arguments.get("query")
     content_type = arguments.get("content_type")
     top_k = min(arguments.get("top_k", 200), 500)
     
     if not query:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供 query 参数"}],
+            content=[{"type": "text", "text": "The query parameter is required"}],
             isError=True
         )
     
@@ -136,82 +136,82 @@ async def search_documents(arguments: Any) -> CallToolResult:
     results = scanner.search(query, content_type=content_type, top_k=top_k)
     
     if not results:
-        msg = f"未找到匹配 '{query}' 的文档"
+        msg = f"No document matched '{query}'"
         
         import re
         if re.search(r'[\u4e00-\u9fff]', query):
-            # 中文查询，检查文档库语言
+            # Chinese query — inspect the document library's languages
             stats = scanner.get_statistics()
             languages = stats.get('by_language', {})
             total = stats.get('total_documents', 0)
             
-            # 构建语言提示
+            # Build the language hint
             lang_hints = []
             if languages.get('en', 0) > 0:
                 pct = languages['en'] / total * 100
-                lang_hints.append(f"英文({pct:.0f}%)")
+                lang_hints.append(f"English ({pct:.0f}%)")
             if languages.get('ja', 0) > 0:
                 pct = languages['ja'] / total * 100
-                lang_hints.append(f"日文({pct:.0f}%)")
+                lang_hints.append(f"Japanese ({pct:.0f}%)")
             if languages.get('ko', 0) > 0:
                 pct = languages['ko'] / total * 100
-                lang_hints.append(f"韩文({pct:.0f}%)")
+                lang_hints.append(f"Korean ({pct:.0f}%)")
             
             if lang_hints:
-                msg += f"\n\n💡 文档库包含: {', '.join(lang_hints)}"
-                msg += "\n   AI可自动翻译关键词后重试，例如："
+                msg += f"\n\n💡 Document library contains: {', '.join(lang_hints)}"
+                msg += "\n   The AI can translate the keyword and retry, for example:"
                 msg += "\n   - '创建表' → 'CREATE TABLE'"
                 msg += "\n   - '索引语法' → 'CREATE INDEX'"
         
         return CallToolResult(content=[{"type": "text", "text": msg}])
     
-    output = f"搜索 '{query}'"
+    output = f"Search '{query}'"
     if content_type:
-        output += f" (类型: {content_type})"
-    output += f" - 找到 {len(results)} 个结果:\n\n"
+        output += f" (type: {content_type})"
+    output += f" — {len(results)} result(s):\n\n"
     
     for i, doc in enumerate(results, 1):
         doc_id = doc.get('id')
         output += f"{i}. [ID:{doc_id}] {doc.get('title', 'N/A')}\n"
-        output += f"   类型: {doc.get('content_type', 'N/A')}\n"
+        output += f"   Type: {doc.get('content_type', 'N/A')}\n"
         
         if doc.get('url'):
             output += f"   URL: {doc.get('url')}\n"
         else:
-            output += f"   路径: {doc.get('path', 'N/A')}\n"
+            output += f"   Path: {doc.get('path', 'N/A')}\n"
         
-        output += f"   大小: {doc.get('size', 0)} 字节\n"
+        output += f"   Size: {doc.get('size', 0)} bytes\n"
         
         content = doc.get('content', '')
         if content:
             preview = content[:200].replace('\n', ' ')
-            output += f"   预览: {preview}...\n"
+            output += f"   Preview: {preview}...\n"
         
         output += "\n"
     
-    output += f"提示: 使用 delphi_kb(action=read, doc_id={results[0].get('id')}) 读取完整内容\n"
+    output += f"Hint: use delphi_kb(action=read, doc_id={results[0].get('id')}) to read the full content\n"
     
     return CallToolResult(content=[{"type": "text", "text": output}])
 
 
 async def get_document_statistics(arguments: Any) -> CallToolResult:
-    """获取文档统计信息"""
+    """Return the document statistics."""
     scanner = _get_scanner()
     stats = scanner.get_statistics()
     
-    output = "文档知识库统计:\n"
-    output += f"  总文档数: {stats.get('total_documents', 0)}\n\n"
+    output = "Document KB statistics:\n"
+    output += f"  Total documents: {stats.get('total_documents', 0)}\n\n"
     
     by_type = stats.get('by_type', {})
     if by_type:
-        output += "按类型统计:\n"
+        output += "Counts by type:\n"
         for content_type, count in by_type.items():
             output += f"  {content_type}: {count}\n"
         output += "\n"
     
     by_extension = stats.get('by_extension', {})
     if by_extension:
-        output += "按扩展名统计:\n"
+        output += "Counts by extension:\n"
         for ext, count in sorted(by_extension.items(), key=lambda x: x[1], reverse=True):
             output += f"  {ext}: {count}\n"
     
@@ -219,7 +219,7 @@ async def get_document_statistics(arguments: Any) -> CallToolResult:
 
 
 async def read_document(arguments: Any) -> CallToolResult:
-    """读取文档内容（基于 ZVec）"""
+    """Read document content (ZVec-backed)."""
     import zvec
 
     url = arguments.get("url")
@@ -229,7 +229,7 @@ async def read_document(arguments: Any) -> CallToolResult:
 
     if not url and not doc_id:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供 url 或 doc_id 参数"}],
+            content=[{"type": "text", "text": "The url or doc_id parameter is required"}],
             isError=True
         )
 
@@ -243,17 +243,17 @@ async def read_document(arguments: Any) -> CallToolResult:
         results = col.search(search_field, search_term, zvec.FtsParams(top_k=100))
 
         if not results:
-            # 再尝试按 url 字段搜索
+            # Retry the search on the url field
             results = col.search("path", url or "", zvec.FtsParams(top_k=100))
 
         if not results:
             col.close()
             return CallToolResult(
-                content=[{"type": "text", "text": f"未找到文档: {url or doc_id}"}],
+                content=[{"type": "text", "text": f"Document not found: {url or doc_id}"}],
                 isError=True
             )
 
-        # 合并同一 path 的所有块
+        # Merge all chunks of the same path
         title = results[0].get('chunk_text', '')[:80]
         content_parts = []
         for r in results:
@@ -275,21 +275,21 @@ async def read_document(arguments: Any) -> CallToolResult:
 
         content_slice = full_content[offset:offset + limit]
 
-        output = f"文档: {title}\n"
-        output += f"路径: {url or doc_id}\n"
-        output += f"内容长度: {content_len} 字符\n"
-        output += f"显示范围: {offset} - {offset + len(content_slice)}\n"
+        output = f"Document: {title}\n"
+        output += f"Path: {url or doc_id}\n"
+        output += f"Content length: {content_len} characters\n"
+        output += f"Showing: {offset} - {offset + len(content_slice)}\n"
         output += "=" * 60 + "\n\n"
         output += content_slice
 
         if offset + limit < content_len:
             remaining = content_len - (offset + limit)
-            output += f"\n... (还有 {remaining} 字符未显示) ...\n"
-            output += f"提示: 使用 offset={offset + limit} 继续读取\n"
+            output += f"\n... ({remaining} characters not shown) ...\n"
+            output += f"Hint: use offset={offset + limit} to continue reading\n"
 
         return CallToolResult(content=[{"type": "text", "text": output}])
     except Exception as e:
         return CallToolResult(
-            content=[{"type": "text", "text": f"读取文档失败: {str(e)}"}],
+            content=[{"type": "text", "text": f"Failed to read document: {str(e)}"}],
             isError=True
         )

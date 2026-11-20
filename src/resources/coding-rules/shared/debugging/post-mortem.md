@@ -1,8 +1,10 @@
-<!-- @when: 修复验证通过后，需复盘并沉淀经验 -->
+<!-- @when: The fix passed verification and a retrospective with captured experience is due -->
 <!-- @chain: before=runtime-crash-classification.md, after=debug-tool-decision-tree.md -->
 
-### 8.12 修复后复盘 — 从调试到防御
+### 8.12 Post-Fix Retrospective — From Debugging to Defense
 
-修复验证通过后，必须执行复盘沉淀为长期资产。
+Once the fix passes verification, a retrospective must be performed and captured as a long-term asset.
 
-📋 示例: examples/debugging/post-mortem.md — 复盘示例（根因归类→防御措施→经验保存→规则联动）
+📋 Example: examples/debugging/post-mortem.md — retrospective example (root-cause classification→defensive measures→experience saving→rule linkage)
+
+

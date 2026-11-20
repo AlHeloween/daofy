@@ -1,7 +1,7 @@
 """
-命令行参数模型
+Command-line argument model
 
-定义命令行参数相关的数据模型
+Defines the data models related to command-line arguments.
 """
 
 from dataclasses import dataclass, field, asdict
@@ -10,7 +10,7 @@ from typing import List, Dict, Any
 
 @dataclass
 class CommandArgs:
-    """命令行参数"""
+    """Command-line arguments"""
     compiler_executable: str
     project_file: str
     arguments: List[str]
@@ -18,13 +18,13 @@ class CommandArgs:
     warnings: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
+        """Convert to a dictionary"""
         return asdict(self)
 
     def has_warnings(self) -> bool:
-        """是否有警告"""
+        """Whether there are warnings"""
         return len(self.warnings) > 0
 
     def get_argument_string(self) -> str:
-        """获取参数字符串(不包含编译器路径)"""
+        """Get the argument string (excluding the compiler path)"""
         return " ".join(self.arguments)

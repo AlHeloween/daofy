@@ -1,7 +1,7 @@
 """
-ZVec 知识库适配器 — 兼容现有 DelphiKnowledgeBaseService 接口
+ZVec knowledge base adapter — compatible with the existing DelphiKnowledgeBaseService interface
 
-让 ZVecKnowledgeBase 可以被 server.py / knowledge_base.py 直接使用。
+Lets ZVecKnowledgeBase be used directly by server.py / knowledge_base.py.
 """
 import json
 import os
@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 class ZVecKnowledgeBaseAdapter:
     """
-    适配器：让 ZVecKnowledgeBase 兼容 DelphiKnowledgeBaseService 的接口。
+    Adapter: makes ZVecKnowledgeBase compatible with the DelphiKnowledgeBaseService interface.
 
-    代理方法:
+    Proxy methods:
       search_by_name(query)         → ZVec search
       semantic_search_classes()     → ZVec search + filter class
       semantic_search_functions()   → ZVec search + filter function
@@ -34,7 +34,7 @@ class ZVecKnowledgeBaseAdapter:
         self.kb_dir.mkdir(parents=True, exist_ok=True)
         self.source_dirs = source_dirs or []
 
-        # 迁移：旧版数据在 kb_dir/delphi_kb/ 子目录，向上提升一级
+        # Migration: legacy data lives in the kb_dir/delphi_kb/ subdirectory; promote it one level up
         old_dir = self.kb_dir / "delphi_kb"
         if old_dir.exists():
             _migrate_old_zvec_data(old_dir, self.kb_dir)
@@ -42,19 +42,20 @@ class ZVecKnowledgeBaseAdapter:
         self._zvec = ZVecKnowledgeBase(str(self.kb_dir))
         self.progress_callback: Optional[Callable] = None
 
-    # ── 构建 ──
+    # ── Build ──
 
     def build_knowledge_base(self, version: str = None, rebuild: bool = False) -> bool:
         """
-        构建知识库（兼容旧接口）。
+        Build the knowledge base (legacy interface compatible).
 
-        从 source_dirs 收集 .pas 文件，chunk 后导入 ZVec。
-        传入 version 时，与 RTL/第三方库路径共用同一版本过滤策略：
-        只索引该 Delphi 版本的官方源码；否则回退到构造时注入的 source_dirs。
+        Collects .pas files from source_dirs and imports them into ZVec after chunking.
+        When version is passed, the same version-filtering policy as the RTL/third-party
+        library paths applies: index only that Delphi version's official sources; otherwise
+        fall back to the source_dirs injected at construction time.
         """
         from .zvec_knowledge_base import ZVecKnowledgeBase
 
-        # 版本过滤：仅当显式传 version 时按版本解析源码目录
+        # Version filter: resolve source directories by version only when version is passed explicitly
         if version:
             try:
                 from ...utils.delphi_env import resolve_delphi_source_dirs
@@ -63,21 +64,21 @@ class ZVecKnowledgeBaseAdapter:
                     source_dirs = scoped
                 else:
                     logger.warning(
-                        "未找到 Delphi 版本 %s 的官方源码，回退到默认全部版本目录",
+                        "No official sources found for Delphi version %s; falling back to the default all-versions directory",
                         version,
                     )
                     source_dirs = self.source_dirs
             except Exception:
-                logger.debug("按版本解析源码目录失败，回退默认目录", exc_info=True)
+                logger.debug("Failed to resolve source directories by version; falling back to the default directories", exc_info=True)
                 source_dirs = self.source_dirs
         else:
             source_dirs = self.source_dirs
 
         if not source_dirs:
-            logger.error("没有配置源码目录，无法构建")
+            logger.error("No source directories configured; cannot build")
             return False
 
-        # 收集文件
+        # Collect files
         all_files: List[str] = []
         for sd in source_dirs:
             src = Path(sd)
@@ -87,15 +88,15 @@ class ZVecKnowledgeBaseAdapter:
                 )
 
         if not all_files:
-            logger.warning(f"未在 {source_dirs} 中找到 .pas 文件")
+            logger.warning(f"No .pas files found under {source_dirs}")
             return False
 
-        logger.info(f"构建 ZVec 知识库: {len(all_files)} 文件")
+        logger.info(f"Building ZVec knowledge base: {len(all_files)} files")
 
-        # 去旧库（rebuild）
+        # Remove the old store (rebuild)
         if rebuild:
-            # 重建：先关闭已打开的集合释放 Windows 句柄，再删整目录
-            # （不 mkdir，让 create_and_open 自行创建）。
+            # Rebuild: close any open collection first to release Windows handles, then delete the whole directory
+            # (no mkdir here — let create_and_open create it).
             import shutil as _shutil
             if self.kb_dir.exists():
                 try:
@@ -106,10 +107,10 @@ class ZVecKnowledgeBaseAdapter:
             from .zvec_knowledge_base import ZVecKnowledgeBase
             self._zvec = ZVecKnowledgeBase(str(self.kb_dir))
 
-        # 构建
+        # Build
         stats = self._zvec.build(all_files, progress_callback=self.progress_callback)
 
-        # 保存构建元数据到 metadata.json
+        # Save build metadata to metadata.json
         if stats and stats.get("status") == "ok":
             metadata = {
                 "files": stats.get("files", 0),
@@ -123,21 +124,21 @@ class ZVecKnowledgeBaseAdapter:
                     encoding="utf-8"
                 )
             except Exception as e:
-                logger.warning(f"保存 KB metadata 失败: {e}")
+                logger.warning(f"Failed to save KB metadata: {e}")
 
         return stats.get("status") == "ok"
 
-    # ── 搜索 ──
+    # ── Search ──
 
     def search_by_name(self, query: str) -> List[Dict]:
         """
-        按名称搜索符号（兼容旧接口返回格式）。
-        在新 schema 中 chunk_text 已含 entity_name 前缀，直接搜 chunk_text。
+        Search symbols by name (returns the legacy interface format).
+        In the new schema chunk_text already carries the entity_name prefix, so search chunk_text directly.
         """
         try:
             result = self._zvec.search(query, top_k=50)
         except Exception as e:
-            logger.debug(f"ZVec 搜索失败: {e}")
+            logger.debug(f"ZVec search failed: {e}")
             return []
 
         symbols = []
@@ -149,7 +150,7 @@ class ZVecKnowledgeBaseAdapter:
             start_line = fields.get("start_line", 0)
             base_class = fields.get("base_class", "")
 
-            # 从 chunk_text 首行提取 entity_name
+            # Extract entity_name from the first line of chunk_text
             first_line = chunk_text.split('\n')[0].strip() if chunk_text else ""
 
             kind_map = {
@@ -174,11 +175,11 @@ class ZVecKnowledgeBaseAdapter:
         return symbols
 
     def semantic_search_classes(self, query: str, top_k: int = 10) -> List[Tuple[str, float]]:
-        """语义搜索类 — 用 ZVec FTS + filter"""
+        """Semantic class search — ZVec FTS + filter"""
         try:
             result = self._zvec.search(query, chunk_type="class", top_k=top_k)
         except Exception as e:
-            logger.debug(f"ZVec 语义搜索失败: {e}")
+            logger.debug(f"ZVec semantic search failed: {e}")
             return []
         return [
             (r["fields"].get("chunk_text", "").split("\n")[0].strip(), r.get("score", 0.0))
@@ -186,11 +187,11 @@ class ZVecKnowledgeBaseAdapter:
         ]
 
     def semantic_search_functions(self, query: str, top_k: int = 10) -> List[Tuple[str, float]]:
-        """语义搜索函数"""
+        """Semantic function search"""
         try:
             result = self._zvec.search(query, top_k=top_k)
         except Exception as e:
-            logger.debug(f"ZVec 函数搜索失败: {e}")
+            logger.debug(f"ZVec function search failed: {e}")
             return []
         return [
             (r["fields"].get("chunk_text", "").split("\n")[0].strip(), r.get("score", 0.0))
@@ -198,15 +199,15 @@ class ZVecKnowledgeBaseAdapter:
         ]
 
     def search_by_keyword(self, keyword: str) -> List[Dict]:
-        """关键词搜索"""
+        """Keyword search"""
         return self.search_by_name(keyword)
 
     def search_by_unit_name(self, unit_name: str) -> List[Dict]:
-        """按单元名搜索"""
+        """Search by unit name"""
         try:
             result = self._zvec.search(unit_name, chunk_type="unit", top_k=10)
         except Exception as e:
-            logger.debug(f"ZVec 单元搜索失败: {e}")
+            logger.debug(f"ZVec unit search failed: {e}")
             return []
         return [
             {"name": r["fields"].get("chunk_text", "").split("\n")[0].strip(),
@@ -215,11 +216,11 @@ class ZVecKnowledgeBaseAdapter:
             for r in result.get("results", [])
         ]
 
-    # ── 统计 ──
+    # ── Statistics ──
 
     def get_statistics(self) -> Dict:
-        """获取统计信息（兼容旧接口）"""
-        # 优先从 metadata.json 读取实际统计
+        """Return statistics (legacy interface compatible)"""
+        # Prefer reading the actual statistics from metadata.json
         metadata_file = self.kb_dir / "metadata.json"
         meta = {"files": 0, "classes": 0, "chunks": 0}
         if metadata_file.exists():
@@ -228,7 +229,7 @@ class ZVecKnowledgeBaseAdapter:
             except Exception:
                 pass
 
-        # 获取实时的 ZVec doc_count（chunk 级）
+        # Read the live ZVec doc_count (chunk level)
         doc_count = 0
         try:
             stats = self._zvec.get_statistics()
@@ -247,28 +248,28 @@ class ZVecKnowledgeBaseAdapter:
         }
 
     def close(self):
-        """关闭知识库"""
+        """Close the knowledge base"""
         self._zvec.close()
 
     def load_knowledge_base(self) -> bool:
-        """兼容接口：检查 ZVec 集合是否存在"""
+        """Compatibility interface: check whether the ZVec collection exists"""
         return _has_zvec_data(self.kb_dir)
 
     @property
     def kb_instance(self):
-        """兼容接口：返回自身（有些代码用 .kb_instance.search_by_name）"""
+        """Compatibility interface: return self (some code calls .kb_instance.search_by_name)"""
         return self
 
 
 # ══════════════════════════════════════════════════════════════════
-# 模块级辅助函数（独立于实例，可被外部代码复用）
+# Module-level helper functions (independent of any instance, reusable by external code)
 # ══════════════════════════════════════════════════════════════════
 
 
 def _has_zvec_data(dir_path: Path) -> bool:
     """
-    检查目录中是否有 ZVec 集合数据。
-    ZVec 创建 collection 时至少会生成 manifest.* 文件。
+    Check whether the directory holds ZVec collection data.
+    ZVec always generates at least a manifest.* file when creating a collection.
     """
     if not dir_path.exists():
         return False
@@ -282,22 +283,22 @@ def _has_zvec_data(dir_path: Path) -> bool:
 
 
 def _clean_zvec_collection(dir_path: Path):
-    """清理目录中 ZVec 生成的数据文件和子目录"""
+    """Clean up the data files and subdirectories ZVec generated in the directory"""
     for item in dir_path.iterdir():
         name = item.name
-        # ZVec 内部文件：manifest, scalar.*.ipc, *.sst, *.rocksdb, etc.
+        # ZVec internal files: manifest, scalar.*.ipc, *.sst, *.rocksdb, etc.
         if name.startswith("manifest") or name.startswith("scalar.") or \
            name.startswith("fts.") or name.startswith("scalar.index.") or \
            name.startswith("idmap") or name.startswith("del.") or \
            name == "LOCK":
             _safe_remove(item)
-        # RocksDB 子目录
+        # RocksDB subdirectories
         if item.is_dir() and (name.endswith(".rocksdb") or name.startswith("scalar.")):
             shutil.rmtree(item, ignore_errors=True)
 
 
 def _safe_remove(path: Path):
-    """安全删除文件或目录"""
+    """Safely remove a file or directory"""
     try:
         if path.is_dir():
             shutil.rmtree(path, ignore_errors=True)
@@ -308,7 +309,7 @@ def _safe_remove(path: Path):
 
 
 def _calc_zvec_dir_size(dir_path: Path) -> int:
-    """计算 ZVec 数据目录大小（字节）"""
+    """Compute the size of the ZVec data directory (bytes)"""
     total = 0
     try:
         for dp, _, fs in os.walk(dir_path):
@@ -325,15 +326,15 @@ def _calc_zvec_dir_size(dir_path: Path) -> int:
 
 def _migrate_old_zvec_data(old_dir: Path, new_dir: Path):
     """
-    将旧版 delphi_kb/ 子目录中的数据迁移到根目录。
+    Migrate the data in the legacy delphi_kb/ subdirectory up to the root directory.
 
-    旧结构: kb_dir/delphi_kb/{zvec_data}
-    新结构: kb_dir/{zvec_data}
+    Old layout: kb_dir/delphi_kb/{zvec_data}
+    New layout: kb_dir/{zvec_data}
     """
     if not old_dir.exists() or old_dir == new_dir:
         return
 
-    logger.info("迁移 ZVec 数据: %s → %s", old_dir, new_dir)
+    logger.info("Migrating ZVec data: %s → %s", old_dir, new_dir)
     for item in old_dir.iterdir():
         target = new_dir / item.name
         try:
@@ -344,7 +345,7 @@ def _migrate_old_zvec_data(old_dir: Path, new_dir: Path):
             else:
                 shutil.copy2(item, target)
         except Exception as e:
-            logger.warning("迁移文件失败 %s: %s", item.name, e)
+            logger.warning("Failed to migrate file %s: %s", item.name, e)
 
     shutil.rmtree(old_dir, ignore_errors=True)
-    logger.info("ZVec 数据迁移完成，已删除旧目录 %s", old_dir)
+    logger.info("ZVec data migration complete; old directory %s removed", old_dir)

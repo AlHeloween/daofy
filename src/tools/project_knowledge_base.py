@@ -1,11 +1,11 @@
 """
-项目知识库 MCP 工具
+Project knowledge base MCP tools
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Province Zuoyou Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
-Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
+Update & Mod By Crystalxp (Dark Night Killer QQ:281309196)
 
-提供项目知识库查询和管理的 MCP 工具
+Provides MCP tools for querying and managing the project knowledge base
 """
 
 from typing import Any, Dict, Optional, Callable
@@ -18,34 +18,34 @@ from ..utils.progress_tracker import ProgressInfo
 
 logger = get_logger(__name__)
 
-# 项目知识库实例缓存（LRU 淘汰，防止内存无限增长）
+# Project knowledge base instance cache (LRU eviction to prevent unbounded memory growth)
 _project_kb_cache: Dict[str, ProjectKnowledgeBase] = {}
-_project_kb_cache_order: list[str] = []  # 访问顺序，最近访问的在末尾
-_MAX_PROJECT_KB_CACHE = 5  # 最多缓存 5 个项目知识库
+_project_kb_cache_order: list[str] = []  # Access order; most recently accessed at the end
+_MAX_PROJECT_KB_CACHE = 5  # Cache at most 5 project knowledge bases
 
 
 def _evict_oldest_project_kb() -> None:
-    """淘汰最久未访问的项目知识库实例"""
+    """Evict the least recently accessed project knowledge base instance"""
     while len(_project_kb_cache) >= _MAX_PROJECT_KB_CACHE and _project_kb_cache_order:
         oldest_key = _project_kb_cache_order.pop(0)
         if oldest_key in _project_kb_cache:
             try:
                 _project_kb_cache[oldest_key].close()
             except Exception as e:
-                logger.debug("关闭被淘汰的项目知识库失败: %s", e)
+                logger.debug("Failed to close evicted project knowledge base: %s", e)
             del _project_kb_cache[oldest_key]
-            logger.debug("淘汰项目知识库缓存: %s", oldest_key)
+            logger.debug("Evicted project knowledge base cache: %s", oldest_key)
 
 
 def _touch_project_kb_cache(project_path: str) -> None:
-    """更新缓存访问顺序"""
+    """Update cache access order"""
     if project_path in _project_kb_cache_order:
         _project_kb_cache_order.remove(project_path)
     _project_kb_cache_order.append(project_path)
 
 
 def _cleanup_project_kb_cache() -> None:
-    """清理所有项目知识库缓存（服务关闭时调用）"""
+    """Clean up all project knowledge base caches (called when the service shuts down)"""
     for path, pkb in list(_project_kb_cache.items()):
         try:
             pkb.close()
@@ -57,14 +57,14 @@ def _cleanup_project_kb_cache() -> None:
 
 def get_project_kb(project_path: str, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> ProjectKnowledgeBase:
     """
-    获取或创建项目知识库实例
+    Get or create a project knowledge base instance
 
     Args:
-        project_path: 项目文件路径
-        progress_callback: 进度回调函数
+        project_path: Project file path
+        progress_callback: Progress callback function
 
     Returns:
-        项目知识库实例
+        Project knowledge base instance
     """
     project_path = str(Path(project_path).resolve())
 
@@ -79,30 +79,30 @@ def get_project_kb(project_path: str, progress_callback: Optional[Callable[[Prog
 
 async def init_project_knowledge_base(arguments: Any) -> CallToolResult:
     """
-    初始化项目知识库
+    Initialize the project knowledge base
 
     Args:
-        arguments: 包含以下参数:
-            - project_path: 项目文件路径 (.dproj 或 .dpr) (必需)
-            - build_thirdparty: 是否构建三方库知识库 (可选,默认 true)
-            - build_project: 是否构建项目源码知识库 (可选,默认 true)
-            - rebuild: 是否强制重建 (可选,默认 false)
-            - show_progress: 是否显示进度 (可选,默认 true)
+        arguments: Contains the following parameters:
+            - project_path: Project file path (.dproj or .dpr) (required)
+            - build_thirdparty: Whether to build the third-party library knowledge base (optional, default true)
+            - build_project: Whether to build the project source knowledge base (optional, default true)
+            - rebuild: Whether to force rebuild (optional, default false)
+            - show_progress: Whether to show progress (optional, default true)
 
     Returns:
-        初始化结果
+        Initialization result
     """
     project_path = arguments.get("project_path")
     if not project_path:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供项目文件路径"}],
+            content=[{"type": "text", "text": "Please provide a project file path"}],
             isError=True
         )
 
-    # 检查项目文件是否存在
+    # Check whether the project file exists
     if not Path(project_path).exists():
         return CallToolResult(
-            content=[{"type": "text", "text": f"项目文件不存在: {project_path}"}],
+            content=[{"type": "text", "text": f"Project file does not exist: {project_path}"}],
             isError=True
         )
 
@@ -111,14 +111,14 @@ async def init_project_knowledge_base(arguments: Any) -> CallToolResult:
     rebuild = arguments.get("rebuild", False)
     show_progress = arguments.get("show_progress", True)
 
-    # 创建进度回调
+    # Create progress callback
     progress_messages = []
     def progress_callback(progress: ProgressInfo):
         if show_progress:
-            msg = f"进度: {progress.current}/{progress.total} ({progress.percentage:.1f}%) | "
-            msg += f"速度: {progress.speed:.1f}项/秒 | "
-            msg += f"已用: {progress.elapsed_time:.1f}秒 | "
-            msg += f"剩余: {progress.estimated_remaining:.1f}秒 | "
+            msg = f"Progress: {progress.current}/{progress.total} ({progress.percentage:.1f}%) | "
+            msg += f"Speed: {progress.speed:.1f} items/sec | "
+            msg += f"Elapsed: {progress.elapsed_time:.1f} sec | "
+            msg += f"Remaining: {progress.estimated_remaining:.1f} sec | "
             msg += f"{progress.message}"
             progress_messages.append(msg)
             logger.info(msg)
@@ -126,73 +126,73 @@ async def init_project_knowledge_base(arguments: Any) -> CallToolResult:
     try:
         project_kb = get_project_kb(project_path, progress_callback if show_progress else None)
 
-        output = f"项目知识库初始化: {project_kb.project_name}\n\n"
+        output = f"Project knowledge base initialization: {project_kb.project_name}\n\n"
 
-        # 构建项目知识库（含三方库）
+        # Build the project knowledge base (including third-party libraries)
         if not (build_project or build_thirdparty):
-            output += "请指定 build_thirdparty 或 build_project 参数\n"
+            output += "Please specify build_thirdparty or build_project parameter\n"
         else:
-            logger.info("构建项目知识库...")
+            logger.info("Building project knowledge base...")
             if project_kb.build_project_knowledge_base(rebuild=rebuild):
-                output += "✓ 项目知识库构建成功\n"
+                output += "✓ Project knowledge base built successfully\n"
             else:
-                output += "✗ 项目知识库构建失败\n"
+                output += "✗ Failed to build project knowledge base\n"
 
-        # 获取统计信息
+        # Get statistics
         stats = project_kb.get_statistics()
-        output += "\n知识库统计:\n"
+        output += "\nKnowledge base statistics:\n"
 
         if stats["project"]:
-            output += f"  项目源码: {stats['project']['files']} 文件, "
-            output += f"{stats['project']['classes']} 类\n"
+            output += f"  Project source: {stats['project']['files']} files, "
+            output += f"{stats['project']['classes']} classes\n"
 
         if stats["thirdparty"]:
-            output += f"  三方库: {stats['thirdparty']['files']} 文件, "
-            output += f"{stats['thirdparty']['classes']} 类\n"
+            output += f"  Third-party libraries: {stats['thirdparty']['files']} files, "
+            output += f"{stats['thirdparty']['classes']} classes\n"
 
-        output += f"\n知识库位置: {project_kb.kb_dir}"
+        output += f"\nKnowledge base location: {project_kb.kb_dir}"
 
-        # 添加进度信息
+        # Add progress information
         if show_progress and progress_messages:
-            output += f"\n\n构建进度 (最近10条):\n"
+            output += f"\n\nBuild progress (last 10 entries):\n"
             for msg in progress_messages[-10:]:
                 output += f"  {msg}\n"
 
         return CallToolResult(content=[{"type": "text", "text": output}])
 
     except Exception as e:
-        logger.error(f"初始化项目知识库失败: {e}", exc_info=True)
+        logger.error(f"Failed to initialize project knowledge base: {e}", exc_info=True)
         return CallToolResult(
-            content=[{"type": "text", "text": f"初始化项目知识库失败: {str(e)}"}],
+            content=[{"type": "text", "text": f"Failed to initialize project knowledge base: {str(e)}"}],
             isError=True
         )
 
 
 async def search_project_class(arguments: Any) -> CallToolResult:
     """
-    在项目中搜索类
+    Search for a class in the project
 
     Args:
-        arguments: 包含以下参数:
-            - project_path: 项目文件路径 (必需)
-            - class_name: 类名 (必需)
-            - search_in: 搜索范围 "project", "thirdparty", "all" (可选,默认 "all")
+        arguments: Contains the following parameters:
+            - project_path: Project file path (required)
+            - class_name: Class name (required)
+            - search_in: Search scope "project", "thirdparty", "all" (optional, default "all")
 
     Returns:
-        搜索结果
+        Search results
     """
     project_path = arguments.get("project_path")
     class_name = arguments.get("class_name")
 
     if not project_path:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供项目文件路径"}],
+            content=[{"type": "text", "text": "Please provide a project file path"}],
             isError=True
         )
 
     if not class_name:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供类名"}],
+            content=[{"type": "text", "text": "Please provide a class name"}],
             isError=True
         )
 
@@ -204,54 +204,54 @@ async def search_project_class(arguments: Any) -> CallToolResult:
 
         if not results:
             return CallToolResult(
-                content=[{"type": "text", "text": f"未找到类 '{class_name}'"}]
+                content=[{"type": "text", "text": f"Class '{class_name}' not found"}]
             )
 
-        # 格式化结果
-        output = f"找到 {len(results)} 个类 '{class_name}':\n\n"
+        # Format results
+        output = f"Found {len(results)} classes '{class_name}':\n\n"
         for i, result in enumerate(results, 1):
             source = result.get('_source', 'unknown')
             output += f"{i}. [{source}] {result['file']['path']}\n"
-            output += f"   类名: {result['class']['name']}\n"
-            output += f"   基类: {result['class']['base_class']}\n"
-            output += f"   行号: {result['class']['line']}\n"
-            output += f"   完整路径: {result['file']['full_path']}\n\n"
+            output += f"   Class name: {result['class']['name']}\n"
+            output += f"   Base class: {result['class']['base_class']}\n"
+            output += f"   Line: {result['class']['line']}\n"
+            output += f"   Full path: {result['file']['full_path']}\n\n"
 
         return CallToolResult(content=[{"type": "text", "text": output}])
 
     except Exception as e:
-        logger.error(f"搜索类失败: {e}", exc_info=True)
+        logger.error(f"Failed to search for class: {e}", exc_info=True)
         return CallToolResult(
-            content=[{"type": "text", "text": f"搜索类时出错: {str(e)}"}],
+            content=[{"type": "text", "text": f"Error searching for class: {str(e)}"}],
             isError=True
         )
 
 
 async def search_project_function(arguments: Any) -> CallToolResult:
     """
-    在项目中搜索函数
+    Search for a function in the project
 
     Args:
-        arguments: 包含以下参数:
-            - project_path: 项目文件路径 (必需)
-            - function_name: 函数名 (必需)
-            - search_in: 搜索范围 "project", "thirdparty", "all" (可选,默认 "all")
+        arguments: Contains the following parameters:
+            - project_path: Project file path (required)
+            - function_name: Function name (required)
+            - search_in: Search scope "project", "thirdparty", "all" (optional, default "all")
 
     Returns:
-        搜索结果
+        Search results
     """
     project_path = arguments.get("project_path")
     function_name = arguments.get("function_name")
 
     if not project_path:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供项目文件路径"}],
+            content=[{"type": "text", "text": "Please provide a project file path"}],
             isError=True
         )
 
     if not function_name:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供函数名"}],
+            content=[{"type": "text", "text": "Please provide a function name"}],
             isError=True
         )
 
@@ -263,55 +263,55 @@ async def search_project_function(arguments: Any) -> CallToolResult:
 
         if not results:
             return CallToolResult(
-                content=[{"type": "text", "text": f"未找到函数 '{function_name}'"}]
+                content=[{"type": "text", "text": f"Function '{function_name}' not found"}]
             )
 
-        # 格式化结果
-        output = f"找到 {len(results)} 个函数 '{function_name}':\n\n"
+        # Format results
+        output = f"Found {len(results)} functions '{function_name}':\n\n"
         for i, result in enumerate(results, 1):
             source = result.get('_source', 'unknown')
             output += f"{i}. [{source}] {result['file']['path']}\n"
-            output += f"   函数名: {result['function']['name']}\n"
-            output += f"   类型: {result['function']['type']}\n"
-            output += f"   行号: {result['function']['line']}\n"
-            output += f"   完整路径: {result['file']['full_path']}\n\n"
+            output += f"   Function name: {result['function']['name']}\n"
+            output += f"   Type: {result['function']['type']}\n"
+            output += f"   Line: {result['function']['line']}\n"
+            output += f"   Full path: {result['file']['full_path']}\n\n"
 
         return CallToolResult(content=[{"type": "text", "text": output}])
 
     except Exception as e:
-        logger.error(f"搜索函数失败: {e}", exc_info=True)
+        logger.error(f"Failed to search for function: {e}", exc_info=True)
         return CallToolResult(
-            content=[{"type": "text", "text": f"搜索函数时出错: {str(e)}"}],
+            content=[{"type": "text", "text": f"Error searching for function: {str(e)}"}],
             isError=True
         )
 
 
 async def semantic_search_project(arguments: Any) -> CallToolResult:
     """
-    在项目中进行语义搜索
+    Perform semantic search in the project
 
     Args:
-        arguments: 包含以下参数:
-            - project_path: 项目文件路径 (必需)
-            - query: 搜索查询 (必需)
-            - top_k: 返回结果数量 (可选,默认 200, 最大500)
-            - search_in: 搜索范围 "project", "thirdparty", "all" (可选,默认 "all")
+        arguments: Contains the following parameters:
+            - project_path: Project file path (required)
+            - query: Search query (required)
+            - top_k: Number of results to return (optional, default 200, max 500)
+            - search_in: Search scope "project", "thirdparty", "all" (optional, default "all")
 
     Returns:
-        搜索结果
+        Search results
     """
     project_path = arguments.get("project_path")
     query = arguments.get("query")
 
     if not project_path:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供项目文件路径"}],
+            content=[{"type": "text", "text": "Please provide a project file path"}],
             isError=True
         )
 
     if not query:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供搜索查询"}],
+            content=[{"type": "text", "text": "Please provide a search query"}],
             isError=True
         )
 
@@ -324,56 +324,56 @@ async def semantic_search_project(arguments: Any) -> CallToolResult:
 
         if not results["classes"] and not results["functions"]:
             return CallToolResult(
-                content=[{"type": "text", "text": f"未找到与 '{query}' 相关的内容"}]
+                content=[{"type": "text", "text": f"No content related to '{query}' found"}]
             )
 
-        # 格式化结果
-        output = f"语义搜索 '{query}' 的结果:\n\n"
+        # Format results
+        output = f"Semantic search results for '{query}':\n\n"
 
         if results["classes"]:
-            output += f"相关的类 (Top {len(results['classes'])}):\n"
+            output += f"Related classes (Top {len(results['classes'])}):\n"
             for item in results["classes"][:5]:
                 result = item["data"]
-                output += f"  - [{item['source']}] {result['class']['name']} (相似度: {item['score']:.3f})\n"
-                output += f"    位置: {result['file']['path']}\n"
-                output += f"    基类: {result['class']['base_class']}\n"
-                output += f"    行号: {result['class']['line']}\n\n"
+                output += f"  - [{item['source']}] {result['class']['name']} (similarity: {item['score']:.3f})\n"
+                output += f"    Location: {result['file']['path']}\n"
+                output += f"    Base class: {result['class']['base_class']}\n"
+                output += f"    Line: {result['class']['line']}\n\n"
 
         if results["functions"]:
-            output += f"相关的函数 (Top {len(results['functions'])}):\n"
+            output += f"Related functions (Top {len(results['functions'])}):\n"
             for item in results["functions"][:5]:
                 result = item["data"]
-                output += f"  - [{item['source']}] {result['function']['name']} (相似度: {item['score']:.3f})\n"
-                output += f"    位置: {result['file']['path']}\n"
-                output += f"    类型: {result['function']['type']}\n"
-                output += f"    行号: {result['function']['line']}\n\n"
+                output += f"  - [{item['source']}] {result['function']['name']} (similarity: {item['score']:.3f})\n"
+                output += f"    Location: {result['file']['path']}\n"
+                output += f"    Type: {result['function']['type']}\n"
+                output += f"    Line: {result['function']['line']}\n\n"
 
         return CallToolResult(content=[{"type": "text", "text": output}])
 
     except Exception as e:
-        logger.error(f"语义搜索失败: {e}", exc_info=True)
+        logger.error(f"Semantic search failed: {e}", exc_info=True)
         return CallToolResult(
-            content=[{"type": "text", "text": f"语义搜索时出错: {str(e)}"}],
+            content=[{"type": "text", "text": f"Error during semantic search: {str(e)}"}],
             isError=True
         )
 
 
 async def get_project_kb_stats(arguments: Any) -> CallToolResult:
     """
-    获取项目知识库统计信息
+    Get project knowledge base statistics
 
     Args:
-        arguments: 包含以下参数:
-            - project_path: 项目文件路径 (必需)
+        arguments: Contains the following parameters:
+            - project_path: Project file path (required)
 
     Returns:
-        统计信息
+        Statistics
     """
     project_path = arguments.get("project_path")
 
     if not project_path:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供项目文件路径"}],
+            content=[{"type": "text", "text": "Please provide a project file path"}],
             isError=True
         )
 
@@ -381,58 +381,58 @@ async def get_project_kb_stats(arguments: Any) -> CallToolResult:
         project_kb = get_project_kb(project_path)
         stats = project_kb.get_statistics()
 
-        output = f"项目知识库统计信息: {project_kb.project_name}\n\n"
+        output = f"Project knowledge base statistics: {project_kb.project_name}\n\n"
 
         if stats["project"]:
-            output += "项目源码:\n"
-            output += f"  - 文件数: {stats['project']['files']}\n"
-            output += f"  - 类数量: {stats['project']['classes']}\n"
-            output += f"  - 数据库大小: {stats['project']['database_size_mb']:.2f} MB\n\n"
+            output += "Project source:\n"
+            output += f"  - Files: {stats['project']['files']}\n"
+            output += f"  - Classes: {stats['project']['classes']}\n"
+            output += f"  - Database size: {stats['project']['database_size_mb']:.2f} MB\n\n"
         else:
-            output += "项目源码: 未构建\n\n"
+            output += "Project source: not built\n\n"
 
         if stats["thirdparty"]:
-            output += "三方库:\n"
-            output += f"  - 文件数: {stats['thirdparty']['files']}\n"
-            output += f"  - 类数量: {stats['thirdparty']['classes']}\n"
-            output += f"  - 数据库大小: {stats['thirdparty']['database_size_mb']:.2f} MB\n\n"
+            output += "Third-party libraries:\n"
+            output += f"  - Files: {stats['thirdparty']['files']}\n"
+            output += f"  - Classes: {stats['thirdparty']['classes']}\n"
+            output += f"  - Database size: {stats['thirdparty']['database_size_mb']:.2f} MB\n\n"
         else:
-            output += "三方库: 未构建\n\n"
+            output += "Third-party libraries: not built\n\n"
 
-        # 显示三方库路径
+        # Display third-party library paths
         if project_kb.metadata.get("thirdparty_paths"):
-            output += "三方库路径:\n"
+            output += "Third-party library paths:\n"
             for path in project_kb.metadata["thirdparty_paths"]:
                 output += f"  - {path}\n"
 
-        output += f"\n知识库位置: {project_kb.kb_dir}"
+        output += f"\nKnowledge base location: {project_kb.kb_dir}"
 
         return CallToolResult(content=[{"type": "text", "text": output}])
 
     except Exception as e:
-        logger.error(f"获取统计信息失败: {e}", exc_info=True)
+        logger.error(f"Failed to get statistics: {e}", exc_info=True)
         return CallToolResult(
-            content=[{"type": "text", "text": f"获取统计信息时出错: {str(e)}"}],
+            content=[{"type": "text", "text": f"Error getting statistics: {str(e)}"}],
             isError=True
         )
 
 
 async def get_thirdparty_paths(arguments: Any) -> CallToolResult:
     """
-    获取项目的三方库路径
+    Get the project's third-party library paths
 
     Args:
-        arguments: 包含以下参数:
-            - project_path: 项目文件路径 (必需)
+        arguments: Contains the following parameters:
+            - project_path: Project file path (required)
 
     Returns:
-        三方库路径列表
+        List of third-party library paths
     """
     project_path = arguments.get("project_path")
 
     if not project_path:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供项目文件路径"}],
+            content=[{"type": "text", "text": "Please provide a project file path"}],
             isError=True
         )
 
@@ -442,18 +442,18 @@ async def get_thirdparty_paths(arguments: Any) -> CallToolResult:
 
         if not paths:
             return CallToolResult(
-                content=[{"type": "text", "text": "未找到三方库路径"}]
+                content=[{"type": "text", "text": "No third-party library paths found"}]
             )
 
-        output = f"项目的三方库路径 ({len(paths)} 个):\n\n"
+        output = f"Project third-party library paths ({len(paths)}):\n\n"
         for i, path in enumerate(paths, 1):
             output += f"{i}. {path}\n"
 
         return CallToolResult(content=[{"type": "text", "text": output}])
 
     except Exception as e:
-        logger.error(f"获取三方库路径失败: {e}", exc_info=True)
+        logger.error(f"Failed to get third-party library paths: {e}", exc_info=True)
         return CallToolResult(
-            content=[{"type": "text", "text": f"获取三方库路径时出错: {str(e)}"}],
+            content=[{"type": "text", "text": f"Error getting third-party library paths: {str(e)}"}],
             isError=True
         )

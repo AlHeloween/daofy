@@ -32,9 +32,9 @@ def test_packaged_daofy_skill_mentions_trae_run_mcp_wrapper() -> None:
         "server_name",
         "tool_name",
         "args",
-        "服务别名",
-        "不是 Daofy 固定值",
-        "不要把 `server_name/tool_name` 混进",
+        "service alias",
+        "not a fixed Daofy value",
+        "do not mix `server_name/tool_name`",
     ]
     for term in required_terms:
         assert term in text, f"Packaged Daofy skill missing {term!r}"

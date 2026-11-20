@@ -1,7 +1,7 @@
 """
-输出解析器
+Output parser
 
-解析 Delphi / FPC 编译器输出,提取错误和警告信息
+Parses Delphi / FPC compiler output and extracts errors and warnings.
 """
 
 import re
@@ -13,20 +13,20 @@ logger = get_logger(__name__)
 
 
 class OutputParser:
-    """Delphi / FPC 编译器输出解析器"""
+    """Delphi / FPC compiler output parser"""
 
-    # 标准格式: Error: File.pas(10,5): Error message
-    # 格式: Warning: File.pas(20,10): Warning message
-    # 格式: Fatal: File.pas(1,1): Fatal error
+    # Standard format: Error: File.pas(10,5): Error message
+    # Format: Warning: File.pas(20,10): Warning message
+    # Format: Fatal: File.pas(1,1): Fatal error
     MESSAGE_PATTERN = re.compile(
         r'(?P<type>Error|Warning|Fatal):\s+'
         r'(?P<file>[^(]+)\((?P<line>\d+),(?P<column>\d+)\):\s+'
         r'(?P<message>.+)'
     )
 
-    # FPC 格式: File.pas(13,3) Fatal: (2003) Syntax error message
-    # FPC 格式: File.pas(13,8) Error: (4001) Incompatible types...
-    # FPC 格式: File.pas(13,10) Error: (5000) Identifier not found...
+    # FPC format: File.pas(13,3) Fatal: (2003) Syntax error message
+    # FPC format: File.pas(13,8) Error: (4001) Incompatible types...
+    # FPC format: File.pas(13,10) Error: (5000) Identifier not found...
     FPC_MESSAGE_PATTERN = re.compile(
         r'(?P<file>[^(]+)\((?P<line>\d+),(?P<column>\d+)\)\s+'
         r'(?P<type>Error|Fatal|Warning):\s+'
@@ -34,25 +34,25 @@ class OutputParser:
         r'(?P<message>.+)'
     )
 
-    # 致命错误模式(无行号)
+    # Fatal error pattern (no line number)
     FATAL_PATTERN = re.compile(
         r'Fatal:\s+(?P<message>.+)'
     )
 
-    # FPC 致命错误: Fatal: (1018) Compilation aborted
+    # FPC fatal error: Fatal: (1018) Compilation aborted
     FPC_FATAL_PATTERN = re.compile(
         r'Fatal:\s+\(\d+\)\s+(?P<message>.+)'
     )
 
     def parse(self, output: str) -> List[CompileMessage]:
         """
-        解析编译器输出（支持 Delphi 和 FPC 格式）
+        Parse compiler output (Delphi and FPC formats supported).
 
         Args:
-            output: 编译器输出字符串
+            output: Compiler output string
 
         Returns:
-            编译消息列表
+            List of compile messages
         """
         messages = []
 
@@ -99,89 +99,89 @@ class OutputParser:
                     message_type='error',
                 ))
 
-        logger.debug(f"解析到 {len(messages)} 条消息")
+        logger.debug(f"Parsed {len(messages)} messages")
         return messages
 
-        logger.debug(f"解析到 {len(messages)} 条消息")
+        logger.debug(f"Parsed {len(messages)} messages")
         return messages
 
     def parse_errors(self, output: str) -> List[CompileMessage]:
         """
-        仅解析错误消息
+        Parse error messages only.
 
         Args:
-            output: 编译器输出字符串
+            output: Compiler output string
 
         Returns:
-            错误消息列表
+            List of error messages
         """
         messages = self.parse(output)
         errors = [m for m in messages if m.message_type == 'error']
-        logger.debug(f"解析到 {len(errors)} 条错误")
+        logger.debug(f"Parsed {len(errors)} errors")
         return errors
 
     def parse_warnings(self, output: str) -> List[CompileMessage]:
         """
-        仅解析警告消息
+        Parse warning messages only.
 
         Args:
-            output: 编译器输出字符串
+            output: Compiler output string
 
         Returns:
-            警告消息列表
+            List of warning messages
         """
         messages = self.parse(output)
         warnings = [m for m in messages if m.message_type == 'warning']
-        logger.debug(f"解析到 {len(warnings)} 条警告")
+        logger.debug(f"Parsed {len(warnings)} warnings")
         return warnings
 
     def has_errors(self, output: str) -> bool:
         """
-        检查输出中是否有错误
+        Check whether the output contains errors.
 
         Args:
-            output: 编译器输出字符串
+            output: Compiler output string
 
         Returns:
-            是否有错误
+            Whether there are errors
         """
-        # 检查是否包含 Error 或 Fatal
+        # Check for Error or Fatal
         return bool(re.search(r'\b(Error|Fatal)\b:', output))
 
     def has_warnings(self, output: str) -> bool:
         """
-        检查输出中是否有警告
+        Check whether the output contains warnings.
 
         Args:
-            output: 编译器输出字符串
+            output: Compiler output string
 
         Returns:
-            是否有警告
+            Whether there are warnings
         """
         return bool(re.search(r'\bWarning\b:', output))
 
     def extract_error_summary(self, output: str) -> str:
         """
-        提取错误摘要
+        Extract an error summary.
 
         Args:
-            output: 编译器输出字符串
+            output: Compiler output string
 
         Returns:
-            错误摘要字符串
+            Error summary string
         """
         errors = self.parse_errors(output)
         if not errors:
-            return "无错误"
+            return "No errors"
 
         summary_lines = []
-        for error in errors[:5]:  # 最多显示前 5 个错误
+        for error in errors[:5]:  # Show at most the first 5 errors
             if error.file_path:
                 summary_lines.append(f"{error.file_path}({error.line},{error.column}): {error.message}")
             else:
                 summary_lines.append(error.message)
 
         if len(errors) > 5:
-            summary_lines.append(f"... 还有 {len(errors) - 5} 个错误")
+            summary_lines.append(f"... and {len(errors) - 5} more errors")
 
         return '\n'.join(summary_lines)

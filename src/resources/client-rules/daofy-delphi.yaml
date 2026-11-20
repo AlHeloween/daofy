@@ -1,13 +1,13 @@
-# Daofy for Delphi — 客户端规则安装描述符
-# 由 client_rules_installer 读取，将 daofy-delphi.md 安装到对应 MCP 客户端的规则目录。
+# Daofy for Delphi — client rule installation descriptor
+# Read by client_rules_installer; installs daofy-delphi.md into the corresponding MCP client's rules directory.
 rule:
   id: daofy-delphi
   version: "2026.07.14.3"
   source: "Daofy for Delphi MCP Server"
-  file: daofy-delphi.md              # 要安装的规则文件（与本文件同目录）
-  managed_filename: daofy-delphi.md  # 安装后在客户端规则目录中的文件名
+  file: daofy-delphi.md              # the rule file to install (in the same directory as this file)
+  managed_filename: daofy-delphi.md  # file name in the client's rules directory after installation
 
-  # 视为 Delphi 文件、必须用 delphi_file 读写的扩展名
+  # Extensions considered Delphi files, which must be read/written with delphi_file
   extensions:
     - .pas
     - .dpr
@@ -18,14 +18,14 @@ rule:
     - .dproj
     - .groupproj
 
-  # 客户端匹配 → 规则目录（相对用户主目录）
-  # match 为 clientInfo.name 的子串（大小写不敏感）。
+  # Client match → rules directory (relative to the user's home directory)
+  # match is a substring of clientInfo.name (case-insensitive).
   #
-  # 注意：通义灵码 / Comate / MarsCode 等多为 IDE 插件，经 MCP 连接时
-  # clientInfo.name 是宿主 IDE（如 "Visual Studio Code" / "IntelliJ IDEA"），
-  # 而非工具名，故无法靠 name 命中。此类场景请用 DAOFY_CLIENT_RULES_DIR
-  # 手动指定目录，或依赖 CodeBuddy 用户级 rules。
-  # 文心快码 Comate 规则为 JSON 格式（非 markdown 目录机制），不在此列。
+  # Note: Tongyi Lingma / Comate / MarsCode etc. are mostly IDE plugins; when connecting via MCP,
+  # clientInfo.name is the host IDE (e.g. "Visual Studio Code" / "IntelliJ IDEA"),
+  # not the tool name, so they cannot be matched by name. For such cases, use DAOFY_CLIENT_RULES_DIR
+  # to specify the directory manually, or rely on CodeBuddy user-level rules.
+  # Wenxin Kuaima (Comate) rules are in JSON format (not a markdown directory mechanism) and are not listed here.
   clients:
     - match: ["codebuddy"]
       rules_dir: ".codebuddy/rules"
@@ -35,7 +35,7 @@ rule:
       format: markdown
       frontmatter:
         alwaysApply: true
-        description: "Daofy Delphi 文件读写路由规则"
+        description: "Daofy Delphi file read/write routing rule"
         globs:
           - "*.pas"
           - "*.dpr"
@@ -53,7 +53,7 @@ rule:
       format: markdown
       frontmatter:
         alwaysApply: true
-        description: "Daofy Delphi 文件读写路由规则"
+        description: "Daofy Delphi file read/write routing rule"
         globs:
           - "*.pas"
           - "*.dpr"
@@ -67,9 +67,10 @@ rule:
       rules_dir: ".lingma/rules"
       format: markdown
     - match: ["codearts"]
-      # 华为云码道(CodeArts Doer/Snap)明确兼容 AGENTS.md：
-      # 个人级规则放 %USERPROFILE%/.codeartsdoer/AGENTS.md 即被自动识别。
-      # 普通 .codeartsdoer/rule/ 目录内部格式不透明，故用 AGENTS.md 路径最稳。
+      # Huawei Cloud CodeArts (CodeArts Doer/Snap) explicitly supports AGENTS.md:
+      # personal-level rules placed in %USERPROFILE%/.codeartsdoer/AGENTS.md are recognized automatically.
+      # The internal format of the ordinary .codeartsdoer/rule/ directory is opaque, so the AGENTS.md path is the most reliable.
       rules_dir: ".codeartsdoer"
       managed_filename: "AGENTS.md"
       format: markdown
+

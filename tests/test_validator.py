@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-验证器 (Validator class) 测试
+Validator class tests
 """
 
 import sys
@@ -26,7 +26,7 @@ def test_validate_compiler_path_valid():
 def test_validate_compiler_path_nonexistent():
     ok, msg = Validator.validate_compiler_path(r"C:\nonexistent\dcc32.exe")
     assert not ok
-    assert "不存在" in msg
+    assert "does not exist" in msg
 
 
 def test_validate_compiler_path_empty():
@@ -71,7 +71,7 @@ def test_validate_output_path():
 def test_validate_output_path_nonexistent():
     ok, msg = Validator.validate_output_path(r"C:\nonexistent_output_dir")
     assert not ok
-    assert "不存在" in msg
+    assert "does not exist" in msg
 
 
 def test_validate_search_paths_empty():

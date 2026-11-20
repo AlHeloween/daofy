@@ -1,179 +1,179 @@
-<!-- @when: 有多个修改需要同时处理时，确定修改顺序和优先级 -->
+<!-- @when: Several changes must be handled at the same time — decide their order and priority -->
 <!-- @chain: before=workflow.md, after=agent-rules.md -->
 
-## 多修改优先级排序
+## Multi-Change Priority Ordering
 
-> 本规则仅约束**多个改动的调度策略**（先改什么、后改什么），不修改各独立流程本身（工作流、调试、测试等各自流程不变）。
+> This rule constrains only the **scheduling strategy across multiple changes** (what to change first, what next); it does not modify the individual processes themselves (workflow, debugging and testing each keep their own flow unchanged).
 
-### 入口条件
+### Entry Conditions
 
-进入本规则前，先判断是否命中 `planning.md` 的 P0 触发条件：
+Before entering this rule, decide whether the P0 trigger conditions of `planning.md` are hit:
 
-- **命中**（新功能/接口变更/跨模块修复等非平凡修改）→ 先走 `planning.md` P0 计划流程，产出可执行的子任务列表后，再进入本规则的排序流程
-- **未命中**（平凡改动）→ 直接进入本规则的排序流程
+- **Hit** (non-trivial changes such as new features / interface changes / cross-module fixes) → go through the `planning.md` P0 planning flow first, and enter this rule's ordering flow only once an executable sub-task list exists
+- **Not hit** (trivial changes) → enter this rule's ordering flow directly
 
-### 优先级定义
+### Priority Definitions
 
-| 优先级 | 类型 | 说明 |
+| Priority | Type | Description |
 |--------|------|------|
-| **S0** | 编译阻断 | 不改就无法编译（缺单元、语法错误） |
-| **S1** | 基础设施/接口 | 其他改动依赖它，顺序错误全部返工 |
-| **S2** | 核心逻辑 | 编译依赖、数据流上游 |
-| **S3** | 辅助功能/工具 | 不影响主流程，可独立验证 |
-| **S4** | 样式/文案/微调 | 最低依赖，最后处理 |
+| **S0** | Compile blocker | Cannot compile without it (missing unit, syntax error) |
+| **S1** | Infrastructure/interface | Other changes depend on it; a wrong order reworks everything |
+| **S2** | Core logic | Compile dependencies, upstream of the data flow |
+| **S3** | Auxiliary feature/tool | Does not affect the main flow, can be verified independently |
+| **S4** | Style/wording/tweaking | Lowest dependencies, handled last |
 
-### 执行顺序规则
+### Execution Order Rules
 
-#### 1. 依赖链优先
-
-```
-S0(编译阻断) → S1(接口/基础设施) → S2(核心逻辑) → S3(辅助功能) → S4(样式/微调)
-```
-
-- **先改接口，后改实现** — 接口签名变了，所有调用方都要跟着改
-- **先改底层，后改上层** — 数据模型/Schema 变了，业务逻辑要适配
-- **改完即验证** — 每个改动完成后立即编译验证，确认通过后再处理下一个
-
-#### 2. 稳定性优先
+#### 1. Dependency chain first
 
 ```
-修复 bug → 新增功能 → 重构代码
+S0(compile blocker) → S1(interface/infrastructure) → S2(core logic) → S3(auxiliary feature) → S4(style/tweaking)
 ```
 
-- **先修复，后重构** — 修 bug 时不要顺便重构，否则无法确认是哪步导致的回归
-- **修复 + 重构需分开时**：修复编译通过后再重构，每步重构后编译验证
+- **Change the interface first, the implementation after** — once an interface signature changes, every caller must change with it
+- **Change the bottom layer first, the upper layer after** — once the data model/Schema changes, the business logic must adapt
+- **Verify as soon as it is changed** — compile and verify immediately after each change is complete, and only then move to the next one
 
-#### 3. 可验证性优先
+#### 2. Stability first
 
 ```
-能独立编译的改动 → 需要整体编译的改动
+fix a bug → add a feature → refactor code
 ```
 
-- **单文件改动优先** — 中间态能编译 = 随时可以暂停和回退
-- **小步提交** — 每个独立改动配合编译验证，不要攒一批一起测
+- **Fix first, refactor after** — do not refactor while fixing a bug, otherwise you cannot tell which step caused a regression
+- **When fix + refactor must be separated**: fix until it compiles, then refactor, compile-verifying after every refactor step
 
-#### 4. 同优先级排序
+#### 3. Verifiability first
 
-当多个改动同属一个优先级时：
+```
+changes that compile on their own → changes that need a whole-project compile
+```
 
-| 原则 | 说明 |
+- **Single-file changes first** — an intermediate state that compiles = it can be paused and rolled back at any time
+- **Commit in small steps** — pair each independent change with a compile verification; do not pile up a batch and test it all at once
+
+#### 4. Ordering within one priority
+
+When several changes share one priority:
+
+| Principle | Description |
 |------|------|
-| 影响范围大的先做 | 改动涉及文件多、影响面大的优先 |
-| 风险高的先做 | 可能引发回归的优先，尽早暴露问题 |
-| 依赖链短的先做 | 后续改动依赖少的优先，减少阻塞 |
-| 难度低的先做 | 快速完成能减少待办清单，降低认知负担 |
+| Larger impact first | Changes that touch more files and a wider surface go first |
+| Higher risk first | Those that may cause a regression go first, exposing problems early |
+| Shorter dependency chain first | Those that fewer later changes depend on go first, reducing blocking |
+| Lower difficulty first | Quick completion shrinks the to-do list and lowers the cognitive load |
 
-### 决策流程
+### Decision Flow
 
 ```
-收到多个修改请求
+Multiple change requests received
     │
-    ├─ <入口条件> 是否命中 planning.md P0?
-    │   ├─ 是 → 先走 P0 计划，产出子任务列表后再进入排序
-    │   └─ 否 → 直接进入排序
+    ├─ <Entry condition> Does planning.md P0 hit?
+    │   ├─ Yes → go through the P0 plan first; enter ordering once the sub-task list exists
+    │   └─ No  → enter ordering directly
     │
-    ├─ ① 列出所有改动并分类
+    ├─ ① List all changes and classify them
     │
-    ├─ ② 分析依赖关系
-    │   ├─ A 依赖 B → B 先执行
-    │   └─ A 与 B 无关 → 按优先级排
+    ├─ ② Analyze the dependency relations
+    │   ├─ A depends on B → run B first
+    │   └─ A and B are unrelated → order by priority
     │
-    ├─ ③ 按 S0~S4 排序
+    ├─ ③ Order by S0~S4
     │
-    ├─ ④ 逐个执行 + 编译验证
-    │   ├─ 通过 → 继续下一个
-    │   ├─ 失败 → 从三个备份来源中取**最新可用**的恢复：
-    │   │          · delphi_file __history（每次 write 自动备份，最可靠）
-    │   │          · Git commit/stash（如有最近提交或暂存）
-    │   │          · AI 工具自身备份
-    │   │          恢复后修复问题，重新执行
-    │   └─ 原因不明确 → 按调试流程排查（compile.md / debugging rules）
+    ├─ ④ Execute one by one + compile-verify
+    │   ├─ Pass → continue with the next
+    │   ├─ Fail → restore the **newest usable** copy from the three backup sources:
+    │   │          · delphi_file __history (auto-backed up on every write; most reliable)
+    │   │          · Git commit/stash (if there is a recent commit or stash)
+    │   │          · The AI tool's own backup
+    │   │          After restoring, fix the problem and re-run
+    │   └─ Cause unclear → troubleshoot per the debugging flow (compile.md / debugging rules)
     │
-    ├─ ⑤ 全量编译确认
+    ├─ ⑤ Full compile confirmation
     │
-    └─ ⑥ 最终验证（测试通过）
+    └─ ⑥ Final verification (tests pass)
 ```
 
-### 测试策略
+### Testing Strategy
 
-- **测试跟改动走** — 每个独立改动完成后立即验证，不要攒一批
-- **增量编译验证** — 改 A → 编译 → 改 B → 编译 → 确认 A 和 B 都通过
-- **全量回归测试** — 所有改动完成后，跑一次全量测试确认无回归
-- **回归优先测改动区域** — 全量测试资源有限时，优先覆盖改动的模块
+- **Tests follow the changes** — verify immediately after each independent change is complete; do not pile up a batch
+- **Incremental compile verification** — change A → compile → change B → compile → confirm both A and B pass
+- **Full regression run** — once all changes are done, run the full test suite once to confirm there is no regression
+- **Regression covers the changed area first** — when full-test resources are limited, cover the changed modules first
 
-### 改动合并与拆分
+### Merging and Splitting Changes
 
-| 场景 | 策略 |
+| Scenario | Strategy |
 |------|------|
-| 两个改动改同一文件相邻行 | 合并为一次修改，减少冲突风险 |
-| 一个改动涉及多个不相关模块 | 拆分为独立子任务，逐个验证 |
-| 两个改动互相独立且风险低 | 可合并执行，减少编译总次数 |
-| 两个改动互相独立但风险高 | 分开执行，每次只验证一项 |
+| Two changes touch adjacent lines of the same file | Merge them into one edit, reducing conflict risk |
+| One change touches several unrelated modules | Split into independent sub-tasks, verified one by one |
+| Two changes are independent and low-risk | May be executed merged, reducing total compiles |
+| Two changes are independent but high-risk | Execute separately, verifying only one at a time |
 
-### 改动状态跟踪
+### Change Status Tracking
 
-逐个执行期间必须维护改动清单的状态：
+During one-by-one execution the status of the change list must be maintained:
 
 ```
-| # | 改动描述 | S级 | 状态 | 备份方式 | 备注 |
+| # | Change description | S-level | Status | Backup method | Notes |
 |---|---------|-----|------|---------|------|
-| 1 | 修复 TForm1 崩溃 | S0 | ✅ 完成 | git stash | — |
-| 2 | 重构数据模块 | S2 | 🔄 执行中 | delphi_file __history | — |
-| 3 | 调整按钮布局 | S4 | ⏳ 待处理 | — | — |
+| 1 | Fix TForm1 crash | S0 | ✅ Done | git stash | — |
+| 2 | Refactor data module | S2 | 🔄 In progress | delphi_file __history | — |
+| 3 | Adjust button layout | S4 | ⏳ Pending | — | — |
 ```
 
-**状态**：⏳ 待处理 / 🔄 执行中 / ✅ 完成 / ❌ 失败已回退
+**Status**: ⏳ Pending / 🔄 In progress / ✅ Done / ❌ Failed, rolled back
 
-### 典型场景
+### Typical Scenarios
 
-#### 场景 A：修复 bug + 新增功能
+#### Scenario A: Fix a bug + add a feature
 ```
-1. 修复 bug（S1/S2）→ 编译通过
-2. 新增功能（S2/S3）→ 编译通过
-3. 全量验证
-```
-
-#### 场景 B：修改接口 + 适配调用方
-```
-1. 修改接口定义（S1）→ 编译失败（预期）
-2. 逐个适配调用方 → 每个适配后编译
-3. 全量编译确认
+1. Fix the bug (S1/S2) → compile passes
+2. Add the feature (S2/S3) → compile passes
+3. Full verification
 ```
 
-#### 场景 C：重构 + 修 bug
+#### Scenario B: Change an interface + adapt the callers
 ```
-1. 修复 bug（不重构）→ 编译通过 → 确认 bug 已修复
-2. 开始重构 → 每步编译验证
-3. 全量验证
-```
-
-#### 场景 D：多个独立 bug 修复
-```
-1. 按影响范围排序（影响大的先修）
-2. 逐个修复 + 编译验证
-3. 全量编译确认
+1. Change the interface definition (S1) → compile fails (expected)
+2. Adapt the callers one by one → compile after each adaptation
+3. Full compile confirmation
 ```
 
-#### 场景 E：跨模块改动
+#### Scenario C: Refactor + fix a bug
 ```
-1. 确认模块间依赖关系
-2. 从底层模块开始改（被依赖的模块优先）
-3. 逐个模块编译验证
-4. 集成编译确认
+1. Fix the bug (no refactoring) → compile passes → confirm the bug is fixed
+2. Start refactoring → compile-verify after every step
+3. Full verification
 ```
 
-### 禁止行为
+#### Scenario D: Several independent bug fixes
+```
+1. Order by impact (fix the largest impact first)
+2. Fix them one by one + compile-verify
+3. Full compile confirmation
+```
 
-| ❌ 禁止 | 原因 |
+#### Scenario E: Cross-module changes
+```
+1. Confirm the inter-module dependencies
+2. Start from the bottom modules (dependencies first)
+3. Compile-verify module by module
+4. Integration compile confirmation
+```
+
+### Forbidden Behaviors
+
+| ❌ Forbidden | Reason |
 |---------|------|
-| 修 bug 时顺便重构 | 无法确认是哪步导致的回归 |
-| 攒一批改动一起测 | 出错时无法定位是哪个改动引起的 |
-| 改完接口不验证就改下一个 | 接口改错会导致后续全部返工 |
-| 无序修改（随机挑一个改） | 增加返工概率，不可复现 |
+| Refactoring while fixing a bug | Cannot tell which step caused the regression |
+| Piling up a batch of changes and testing them together | When something breaks, you cannot locate which change caused it |
+| Moving to the next change without verifying the interface change | A wrong interface change reworks everything that follows |
+| Unordered changes (picking one at random to change) | Raises the rework probability and is not reproducible |
 
-### 相关规则联动
+### Related Rule Linkage
 
-- **`planning.md`** — 非平凡修改先走 P0 计划，产出子任务后再进入本规则排序
-- **工作流总览** — 本规则不修改工作流各步骤，仅决定多个改动间的调度顺序；每个改动自身仍遵循工作流
-- **`compile.md` / 调试规则** — 编译失败且原因不明确时按编译失败处理流程排查
-- **`delphi_file` 备份** — 回退时从三个备份来源取最新可用版本：`delphi_file __history`（最可靠） > Git commit/stash > AI 工具自身备份
+- **`planning.md`** — non-trivial changes go through the P0 plan first; enter this rule's ordering once sub-tasks exist
+- **Workflow overview** — this rule does not modify any workflow step; it decides only the scheduling order among multiple changes; each change still follows the workflow itself
+- **`compile.md` / debugging rules** — when a compile fails and the cause is unclear, troubleshoot per the compile-failure handling flow
+- **`delphi_file` backup** — on rollback, take the newest usable version from the three backup sources: `delphi_file __history` (most reliable) > Git commit/stash > the AI tool's own backup

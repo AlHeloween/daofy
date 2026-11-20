@@ -1,16 +1,16 @@
 r"""
-Delphi RTTI 桥接服务 — 管理 Delphi 应用的 RTTI 能力发现和调用。
+Delphi RTTI bridge service — manages RTTI capability discovery and invocation for Delphi applications.
 
-使用已有的 automation_service 命名管道通信，
-将 Delphi 端的 RTTI 发现结果转换为 MCP 可用格式。
+Uses the existing automation_service named pipe communication,
+converts RTTI discovery results from the Delphi side into an MCP-usable format.
 
-通信协议：
-  请求: {"reqId":"...", "cmd":"rtti_discover", "target":"TMainForm"}
-  响应: {"reqId":"...", "status":"ok", "data":{...JSON...}}
+Communication protocol:
+  Request: {"reqId":"...", "cmd":"rtti_discover", "target":"TMainForm"}
+  Response: {"reqId":"...", "status":"ok", "data":{...JSON...}}
 
-进程注册发现：
-  Delphi 应用启动时写入 %TEMP%\daofy-rtti-{PID}.json，
-  MCP 扫描这些文件自动发现运行中的应用。
+Process registry discovery:
+  When a Delphi application starts it writes %TEMP%\daofy-rtti-{PID}.json,
+  MCP scans these files to automatically discover running applications.
 """
 
 import glob
@@ -43,7 +43,7 @@ def _send_rtti_command(app_path: str, command: str) -> str:
         return _send_command(command)
     return _send_command_to_pipe(pipe_name, command)
 
-# ── 注册文件发现（%TEMP%\daofy-rtti-*.json）──
+# ── Registry file discovery (%TEMP%\daofy-rtti-*.json) ──
 
 REGISTRY_PATTERN = "daofy-rtti-*.json"
 
@@ -60,7 +60,7 @@ SYNCHRONIZE = 0x00100000
 
 
 def _is_pid_alive(pid: int) -> bool:
-    """检查 PID 是否存活（通过 OpenProcess）。"""
+    """Check whether the PID is alive (via OpenProcess)."""
     h = _OpenProcess(PROCESS_QUERY_INFORMATION | SYNCHRONIZE, False, pid)
     if h:
         _CloseHandle(h)
@@ -69,7 +69,7 @@ def _is_pid_alive(pid: int) -> bool:
 
 
 def scan_running_apps() -> list[dict]:
-    """扫描注册文件，返回运行中的 Delphi 应用列表。
+    """Scan registry files and return a list of running Delphi applications.
 
     Returns:
         list[dict]: [{pipe, pid, name, timestamp}, ...]
@@ -94,11 +94,11 @@ def scan_running_apps() -> list[dict]:
         if not pid or not pipe:
             continue
 
-        # 检查 PID 是否存活
+        # Check whether the PID is alive
         if not _is_pid_alive(pid):
             continue
 
-        # 验证管道可连接
+        # Verify the pipe is connectable
         try:
             if not _WaitNP(pipe, 1000):
                 continue
@@ -116,20 +116,20 @@ def scan_running_apps() -> list[dict]:
 
 
 class RttiBridge:
-    """管理一个或多个 Delphi 应用的 RTTI 桥接。
+    """Manage RTTI bridging for one or more Delphi applications.
 
-    每个 app_path 对应一个独立的 Delphi 进程和命名管道。
-    使用 keep_alive 保持长连接，避免重复启动。
+    Each app_path corresponds to an independent Delphi process and named pipe.
+    Use keep_alive to maintain a long-lived connection and avoid repeated starts.
 
-    Pipe-based discover：
-      通过注册文件发现已运行的应用，无需手动指定 app_path。
-      使用 scan_running_apps() → list_running_apps() 获取可用应用列表。
+    Pipe-based discover:
+      Discover already-running applications via registry files without manually specifying app_path.
+      Use scan_running_apps() → list_running_apps() to get the available application list.
     """
 
     def __init__(self):
         self._cache: dict[str, dict] = {}  # app_path → discovery result
         self._cache_time: dict[str, float] = {}
-        self._cache_ttl: float = 300  # 缓存 5 分钟
+        self._cache_ttl: float = 300  # Cache for 5 minutes
         self._pipe_cache: dict[str, dict] = {}  # pipe_name → discovery result
         self._pipe_cache_time: dict[str, float] = {}
         self._app_pipe_map: dict[str, str] = {}  # app_name → pipe_name
@@ -140,9 +140,9 @@ class RttiBridge:
         return (time.time() - self._cache_time.get(app_path, 0)) < self._cache_ttl
 
     def list_running_apps(self) -> dict:
-        """列出所有通过注册文件发现且管道可达的应用。
+        """List all applications discovered via registry files whose pipes are reachable.
 
-        返回:
+        Returns:
             dict: {status, apps: [{pipe, pid, name, timestamp}, ...]}
         """
         apps = scan_running_apps()
@@ -150,19 +150,19 @@ class RttiBridge:
 
     def discover_from_pipe(self, pipe_name: str, class_name: str = "",
                            force: bool = False) -> dict:
-        r"""通过管道名直接发现 RTTI 能力（不依赖 app_path，仅依赖注册文件）。
+        r"""Discover RTTI capabilities directly by pipe name (does not depend on app_path, only on registry files).
 
         Args:
-            pipe_name: 命名管道路径，如 \\.\pipe\daofy_auto
-            class_name: 限定的类名，空串则扫描所有
-            force: 强制刷新缓存
+            pipe_name: Named pipe path, e.g. \\.\pipe\daofy_auto
+            class_name: Qualified class name; empty string scans all
+            force: Force cache refresh
 
         Returns:
             dict: {status, classes: [...], ...}
         """
         cache_key = pipe_name
 
-        # 缓存命中
+        # Cache hit
         if not force and cache_key in self._pipe_cache:
             cached = self._pipe_cache[cache_key]
             age = time.time() - self._pipe_cache_time.get(cache_key, 0)
@@ -174,7 +174,7 @@ class RttiBridge:
                     return {"status": "ok", "classes": cached.get("classes", [])}
                 return {"status": "ok", **cached}
 
-        # 发送 rtti_discover 命令到指定的管道
+        # Send the rtti_discover command to the specified pipe
         req = {
             "reqId": f"disc_{int(time.time() * 1000)}",
             "cmd": "rtti_discover",
@@ -187,12 +187,12 @@ class RttiBridge:
         try:
             resp = json.loads(resp_raw)
         except (json.JSONDecodeError, TypeError) as e:
-            return {"status": "error", "message": f"无效响应: {resp_raw} ({e})"}
+            return {"status": "error", "message": f"Invalid response: {resp_raw} ({e})"}
 
         if resp.get("status") != "ok":
-            return {"status": "error", "message": resp.get("data", "未知错误")}
+            return {"status": "error", "message": resp.get("data", "Unknown error")}
 
-        # 解析 data 字段
+        # Parse the data field
         data_raw = resp.get("data", "{}")
         if isinstance(data_raw, str):
             try:
@@ -204,7 +204,7 @@ class RttiBridge:
         else:
             data = {"raw": str(data_raw)}
 
-        # 更新缓存
+        # Update cache
         if not class_name:
             self._pipe_cache[cache_key] = data
             self._pipe_cache_time[cache_key] = time.time()
@@ -212,10 +212,10 @@ class RttiBridge:
         return {"status": "ok", **data}
 
     def auto_discover_all(self, force: bool = False) -> list[dict]:
-        """自动发现所有运行中的 Delphi 应用的能力。
+        """Automatically discover the capabilities of all running Delphi applications.
 
         Args:
-            force: 强制刷新缓存
+            force: Force cache refresh
 
         Returns:
             list[dict]: [{pipe, name, status, result}, ...]
@@ -236,11 +236,11 @@ class RttiBridge:
         return results
 
     def connect(self, app_path: str, wait_for_pipe: float = 10.0) -> dict:
-        """连接 Delphi 应用（启动进程或复用已有）。
+        """Connect to a Delphi application (start the process or reuse an existing one).
 
         Args:
-            app_path: Delphi exe 路径
-            wait_for_pipe: 等待管道就绪的超时秒数
+            app_path: Delphi exe path
+            wait_for_pipe: Timeout in seconds to wait for the pipe to become ready
 
         Returns:
             dict: {status, reused, message}
@@ -252,17 +252,17 @@ class RttiBridge:
 
     def discover(self, app_path: str, class_name: str = "",
                  force: bool = False) -> dict:
-        """发现 Delphi 应用的 RTTI 能力。
+        """Discover the RTTI capabilities of a Delphi application.
 
         Args:
-            app_path: Delphi exe 路径
-            class_name: 限定的类名，空串则扫描所有
-            force: 强制刷新缓存
+            app_path: Delphi exe path
+            class_name: Qualified class name; empty string scans all
+            force: Force cache refresh
 
         Returns:
             dict: {status, classes: [...], ...}
         """
-        # 缓存命中
+        # Cache hit
         if not force and self._is_cache_valid(app_path):
             cached = self._cache[app_path]
             if class_name:
@@ -272,13 +272,13 @@ class RttiBridge:
                 return {"status": "ok", "classes": cached.get("classes", [])}
             return {"status": "ok", **cached}
 
-        # 确保进程运行
+        # Ensure the process is running
         _, err = _ensure_process(app_path, 10.0)
         if err:
             return {"status": "error", "message": err}
-        time.sleep(POLL_INTERVAL_AUTOMATION)  # 给管道一点时间就绪
+        time.sleep(POLL_INTERVAL_AUTOMATION)  # Give the pipe a moment to become ready
 
-        # 发送 rtti_discover 命令
+        # Send the rtti_discover command
         req = {
             "reqId": f"disc_{int(time.time() * 1000)}",
             "cmd": "rtti_discover",
@@ -294,12 +294,12 @@ class RttiBridge:
         try:
             resp = json.loads(resp_raw)
         except (json.JSONDecodeError, TypeError) as e:
-            return {"status": "error", "message": f"无效响应: {resp_raw} ({e})"}
+            return {"status": "error", "message": f"Invalid response: {resp_raw} ({e})"}
 
         if resp.get("status") != "ok":
-            return {"status": "error", "message": resp.get("data", "未知错误")}
+            return {"status": "error", "message": resp.get("data", "Unknown error")}
 
-        # 解析 data 字段中的 JSON（Delphi 端 WriteResp 会序列化 data）
+        # Parse the JSON in the data field (WriteResp on the Delphi side serializes data)
         data_raw = resp.get("data", "{}")
         if isinstance(data_raw, str):
             try:
@@ -311,7 +311,7 @@ class RttiBridge:
         else:
             data = {"raw": str(data_raw)}
 
-        # 更新缓存
+        # Update cache
         if not class_name:
             self._cache[app_path] = data
             self._cache_time[app_path] = time.time()
@@ -320,18 +320,18 @@ class RttiBridge:
 
     def call(self, app_path: str, class_name: str,
              method: str, params: Optional[dict] = None) -> dict:
-        """调用 Delphi 应用的 RTTI 暴露方法。
+        """Call an RTTI-exposed method of a Delphi application.
 
         Args:
-            app_path: Delphi exe 路径
-            class_name: 类名
-            method: 方法名
-            params: 参数字典
+            app_path: Delphi exe path
+            class_name: Class name
+            method: Method name
+            params: Parameter dictionary
 
         Returns:
             dict: {status, data, response}
         """
-        # 确保进程运行
+        # Ensure the process is running
         _, err = _ensure_process(app_path, 10.0)
         if err:
             return {"status": "error", "message": err}
@@ -355,7 +355,7 @@ class RttiBridge:
         try:
             resp = json.loads(resp_raw)
         except (json.JSONDecodeError, TypeError) as e:
-            return {"status": "error", "message": f"无效响应: {resp_raw} ({e})"}
+            return {"status": "error", "message": f"Invalid response: {resp_raw} ({e})"}
 
         return {
             "status": resp.get("status", "error"),
@@ -364,7 +364,7 @@ class RttiBridge:
         }
 
     def clear_cache(self, app_path: Optional[str] = None):
-        """清除缓存。"""
+        """Clear the cache."""
         if app_path:
             self._cache.pop(app_path, None)
             self._cache_time.pop(app_path, None)
@@ -373,9 +373,10 @@ class RttiBridge:
             self._cache_time.clear()
 
 
-# 全局单例
+# Global singleton
 _rtti_bridge = RttiBridge()
 
 
 def get_rtti_bridge() -> RttiBridge:
     return _rtti_bridge
+

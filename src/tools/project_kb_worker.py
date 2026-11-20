@@ -1,6 +1,6 @@
 """
-项目知识库构建 Worker（独立子进程）
-通过 sys.argv 接收参数，输出 JSON 结果到 stdout
+Project KB build worker (standalone subprocess).
+Receives its arguments through sys.argv and prints a JSON result to stdout.
 """
 
 import sys
@@ -13,7 +13,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 def main():
-    # 解析参数
+    # Parse arguments
     project_path = None
     rebuild = False
     progress_file = None
@@ -30,17 +30,17 @@ def main():
         print(json.dumps({"error": "project_path is required"}), flush=True)
         sys.exit(1)
     
-    # 添加项目根目录到 Python 路径
+    # Add the project root to the Python path
     script_dir = Path(__file__).resolve().parent.parent.parent
     if str(script_dir) not in sys.path:
         sys.path.insert(0, str(script_dir))
     
-    # 自定义进度回调
+    # Custom progress callback
     def progress_callback(info):
         if progress_file:
             try:
                 with open(progress_file, 'w', encoding='utf-8') as f:
-                    # info 可能是 dict 或 ProgressInfo 对象
+                    # info may be a dict or a ProgressInfo object
                     if hasattr(info, 'percent'):
                         percent = info.percent
                         msg = getattr(info, 'message', '')
@@ -55,7 +55,7 @@ def main():
                         'message': str(msg),
                     }))
             except Exception as e:
-                logger.debug("进度写入失败: %s", str(e))
+                logger.debug("Failed to write progress: %s", str(e))
     
     from src.services.knowledge_base.project_knowledge_base import ProjectKnowledgeBase
     
@@ -74,17 +74,17 @@ def main():
         }
         print(json.dumps(result), flush=True)
         
-        # 写入 final 信号到进度文件
+        # Write the final signal to the progress file
         if progress_file:
             try:
                 with open(progress_file, 'w', encoding='utf-8') as f:
                     f.write(json.dumps({
                         'percent': 100,
-                        'message': '完成',
+                        'message': 'complete',
                         'done': True
                     }))
             except Exception as e:
-                logger.debug("进度写入失败: %s", str(e))
+                logger.debug("Failed to write progress: %s", str(e))
     except Exception as e:
         import traceback
         result = {

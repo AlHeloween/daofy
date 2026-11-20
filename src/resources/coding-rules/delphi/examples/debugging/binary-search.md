@@ -1,42 +1,42 @@
-# 二分法与隔离调试示例
+# Binary Search and Isolation Debugging Example
 
-用二分法快速缩小可疑范围，O(log N) 复杂度。
+Use binary search to quickly narrow the suspect scope, O(log N) complexity.
 
-## 编译错误二分法（文件级）
-
-```
-① 文件分为上下两半
-② {$IFDEF DEBUG_SKIP}...{$ENDIF} 注释上半 → 编译
-③ 错误消失→上；仍在→下
-④ 递归直到定位到具体行
-```
-
-## 运行时崩溃二分法（代码路径级）
+## Compile Error Binary Search (File Level)
 
 ```
-① 确定最简触发路径
-② 调用链中点插入 Exit/提前返回
-③ 崩溃消失→后半段；仍在→前半段
-④ 递归直到定位到具体函数
+① Split file into upper and lower halves
+② Comment out upper half with {$IFDEF DEBUG_SKIP}...{$ENDIF} → Compile
+③ Error disappears → Upper; still present → Lower
+④ Recurse until the specific line is located
 ```
 
-## 多模块隔离（项目级）
+## Runtime Crash Binary Search (Code Path Level)
 
 ```
-① 临时关闭编译事件
-② 逐个移除 DCCReference 定位缺少单元
-③ 分批注释 uses 定位循环引用
+① Determine the simplest triggering path
+② Insert Exit/early return at the midpoint of the call chain
+③ Crash disappears → Second half; still present → First half
+④ Recurse until the specific function is located
 ```
 
-## 回归定位（变更级）
+## Multi-Module Isolation (Project Level)
+
+```
+① Temporarily disable compilation events
+② Remove DCCReference one by one to locate missing units
+③ Comment out uses in batches to locate circular references
+```
+
+## Regression Localization (Change Level)
 
 ```
 git bisect start → bad → good → run <script>
-自动二分编译验证，定位引入问题的 commit
+Automatically bisect compile verification to locate the commit that introduced the problem
 ```
 
-## 隔离原则
+## Isolation Principles
 
-- 每次只改变一个变量
-- 确认结果后再进行下一步
-- 用 `{$IFDEF}` 而非删代码（方便恢复）
+- Change only one variable at a time
+- Proceed to the next step after confirming the result
+- Use `{$IFDEF}` instead of deleting code (for easy restoration)

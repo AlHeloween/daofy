@@ -1,7 +1,7 @@
 """
-获取命令行参数工具
+Command-line argument retrieval tool
 
-提供命令行参数生成功能
+Provides command-line argument generation functionality
 """
 
 import json
@@ -14,12 +14,12 @@ from ..utils.dproj_parser import resolve_target_platform_from_dproj
 
 logger = get_logger(__name__)
 
-# 全局编译服务实例
+# Global compiler service instance
 _compiler_service: Optional[CompilerService] = None
 
 
 def set_compiler_service(service: CompilerService):
-    """设置编译服务实例"""
+    """Set compiler service instance"""
     global _compiler_service
     _compiler_service = service
 
@@ -42,47 +42,47 @@ async def get_compiler_args(
     extra_args: Optional[List[str]] = None
 ) -> CallToolResult:
     """
-    获取编译器命令行参数(不执行编译)
+    Get compiler command-line arguments (without executing compilation)
 
     Args:
-        project_path: 项目文件路径(.dproj 或 .dpr)
-        target_platform: 目标平台(win32/win64/osx64/osxarm64/iosdevice64/android/linux64等)
-        output_path: 输出路径
-        compiler_version: 编译器版本名称
-        conditional_defines: 条件编译符号列表
-        unit_search_paths: 单元搜索路径列表
-        resource_search_paths: 资源搜索路径列表
-        optimize: 是否启用优化
-        debug: 是否生成调试信息
-        warning_level: 警告级别(0-4)
-        disabled_warnings: 禁用的警告列表
-        output_type: 输出类型(console/gui/dll)
-        runtime_library: 运行时库链接方式(static/dynamic)
-        build_configuration: 编译配置名称
-        extra_args: 附加编译器参数列表
+        project_path: project file path (.dproj or .dpr)
+        target_platform: target platform (win32/win64/osx64/osxarm64/iosdevice64/android/linux64, etc.)
+        output_path: output path
+        compiler_version: compiler version name
+        conditional_defines: conditional compilation symbol list
+        unit_search_paths: unit search path list
+        resource_search_paths: resource search path list
+        optimize: whether to enable optimization
+        debug: whether to generate debug information
+        warning_level: warning level (0-4)
+        disabled_warnings: disabled warning list
+        output_type: output type (console/gui/dll)
+        runtime_library: runtime library linking method (static/dynamic)
+        build_configuration: build configuration name
+        extra_args: additional compiler argument list
 
     Returns:
-        命令行参数
+        Command-line arguments
     """
-    logger.info(f"收到获取命令行参数请求: {project_path}")
+    logger.info(f"Received get command-line arguments request: {project_path}")
 
     if _compiler_service is None:
-        logger.error("编译服务未初始化")
+        logger.error("Compiler service not initialized")
         return CallToolResult(
-            content=[{"type": "text", "text": "编译服务未初始化，请先启动服务"}],
+            content=[{"type": "text", "text": "Compiler service not initialized, please start the service first"}],
             isError=True
         )
 
     try:
-        # 仅当用户未指定目标平台时才从 .dproj 读取
-        # （显式传入 win32/win64 等均不得被 .dproj 的 Active Platform 覆盖）
+        # Only read from .dproj when the user has not specified a target platform
+        # (explicitly passed win32/win64 etc. must not be overridden by Active Platform in .dproj)
         if not target_platform:
             target_platform = resolve_target_platform_from_dproj(project_path)
-            logger.info(f"从 .dproj 读取到目标平台: {target_platform}")
+            logger.info(f"Read target platform from .dproj: {target_platform}")
         else:
             target_platform = target_platform.lower()
         
-        # 构建编译选项
+        # Build compilation options
         options = CompileOptions(
             target_platform=TargetPlatform(target_platform),
             output_path=output_path,
@@ -100,25 +100,26 @@ async def get_compiler_args(
             extra_args=extra_args or [],
         )
 
-        # 构建编译请求
+        # Build compilation request
         request = ProjectCompileRequest(
             project_path=project_path,
             options=options
         )
 
-        # 生成参数
+        # Generate arguments
         result = _compiler_service.get_args(request)
 
-        # 返回结果
+        # Return result
         return CallToolResult(
             content=[{"type": "text", "text": json.dumps(result.to_dict(), ensure_ascii=False, default=str)}],
             isError=False
         )
 
     except Exception as e:
-        error_msg = f"生成参数过程发生异常: {str(e)}"
+        error_msg = f"Exception occurred while generating arguments: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return CallToolResult(
             content=[{"type": "text", "text": error_msg}],
             isError=True
         )
+

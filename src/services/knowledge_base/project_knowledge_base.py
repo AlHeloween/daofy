@@ -1,14 +1,14 @@
 """
-项目知识库服务
+Project knowledge base service
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Zuoyou Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
-Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
+Update & Mod By Crystalxp (Dark Night Killer QQ:281309196)
 
-为用户项目提供知识库功能:
-1. 从 .dproj 文件读取三方库目录并构建知识库
-2. 为项目源码构建知识库,支持增量更新
-3. 支持 .dproj/.dpr/.dpk 项目文件类型（仅 .dproj 可提取三方库路径）
+Provides knowledge base functionality for user projects:
+1. Read third-party library directories from .dproj files and build knowledge base
+2. Build knowledge base for project source code, supporting incremental updates
+3. Support .dproj/.dpr/.dpk project file types (only .dproj can extract third-party library paths)
 """
 
 import os
@@ -27,59 +27,59 @@ logger = get_logger(__name__)
 
 
 class ProjectKnowledgeBase:
-    """项目知识库管理器（ZVec 版）"""
+    """Project knowledge base manager (ZVec version)"""
 
     def __init__(self, project_path: str, progress_callback: Optional[Callable] = None):
         """
-        初始化项目知识库
+        Initialize project knowledge base
 
         Args:
-            project_path: 项目文件路径 (.dproj / .dpr / .dpk)
-            progress_callback: 进度回调函数
+            project_path: Project file path (.dproj / .dpr / .dpk)
+            progress_callback: Progress callback function
         """
         self.project_path = Path(project_path)
         self.project_dir = self.project_path.parent
         self.project_name = self.project_path.stem
         self.progress_callback = progress_callback
 
-        # 项目知识库目录
+        # Project knowledge base directory
         self.kb_dir = self.project_dir / DIR_DELPHI_KB
         self.kb_dir.mkdir(parents=True, exist_ok=True)
 
-        # ZVec 知识库适配器
+        # ZVec knowledge base adapter
         self.project_kb: Optional[ZVecKnowledgeBaseAdapter] = None
         self.thirdparty_kb: Optional[ZVecKnowledgeBaseAdapter] = None
 
-        logger.info(f"项目知识库初始化: {self.project_name}")
+        logger.info(f"Project knowledge base initialized: {self.project_name}")
 
     def _get_delphi_install_paths(self) -> Set[str]:
         """
-        获取 Delphi 安装路径列表
+        Get Delphi installation path list
 
         Returns:
-            Delphi 安装路径集合
+            Set of Delphi installation paths
         """
         delphi_paths = set()
 
         try:
             import winreg
 
-            # 打开 Delphi 注册表键
+            # Open Delphi registry key
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY_EMBARCADERO_BDS)
 
-            # 遍历所有版本
+            # Iterate over all versions
             i = 0
             while True:
                 try:
                     version_key = winreg.EnumKey(key, i)
                     i += 1
 
-                    # 获取版本信息
+                    # Get version info
                     version_path = winreg.OpenKey(key, version_key)
                     try:
                         root_dir = winreg.QueryValueEx(version_path, "RootDir")[0]
                         if root_dir:
-                            # 添加 Delphi 安装路径及其子目录
+                            # Add Delphi installation path and its subdirectories
                             delphi_paths.add(Path(root_dir).resolve())
                     except OSError:
                         pass
@@ -92,45 +92,45 @@ class ProjectKnowledgeBase:
             winreg.CloseKey(key)
 
         except Exception as e:
-            logger.warning(f"获取 Delphi 安装路径失败: {e}")
+            logger.warning(f"Failed to get Delphi installation paths: {e}")
 
         return delphi_paths
 
     def get_thirdparty_paths_from_dproj(self) -> List[str]:
         """
-        从 .dproj 文件中提取三方库路径
+        Extract third-party library paths from .dproj file
 
         Returns:
-            三方库路径列表
+            List of third-party library paths
         """
         if self.project_path.suffix.lower() != '.dproj':
-            logger.debug("项目文件不是 .dproj 格式（%s），跳过三方库路径提取", self.project_path.suffix)
+            logger.debug("Project file is not in .dproj format (%s), skipping third-party library path extraction", self.project_path.suffix)
             return []
 
         parser = DprojParser(str(self.project_path))
         if not parser.parse():
-            logger.error("解析 .dproj 文件失败")
+            logger.error("Failed to parse .dproj file")
             return []
 
-        # 获取单元搜索路径
+        # Get unit search paths
         unit_paths = parser.get_unit_search_paths()
 
-        # 获取 Delphi 安装路径（用于排除）
+        # Get Delphi installation paths (for exclusion)
         delphi_install_paths = self._get_delphi_install_paths()
 
-        # 过滤出三方库路径 (排除项目自身目录和 Delphi 安装目录)
+        # Filter out third-party library paths (exclude project's own directory and Delphi installation directory)
         thirdparty_paths = []
         for path in unit_paths:
             path_obj = Path(path)
 
-            # 检查路径是否存在
+            # Check if path exists
             if not path_obj.exists():
                 continue
 
-            # 解析为绝对路径
+            # Resolve to absolute path
             path_obj = path_obj.resolve()
 
-            # 检查是否在 Delphi 安装目录下
+            # Check if under Delphi installation directory
             is_delphi_path = False
             for delphi_path in delphi_install_paths:
                 try:
@@ -141,58 +141,58 @@ class ProjectKnowledgeBase:
                     pass
 
             if is_delphi_path:
-                # 跳过 Delphi 安装目录下的路径
+                # Skip paths under Delphi installation directory
                 continue
 
-            # 检查是否在项目目录外
+            # Check if outside project directory
             try:
-                # 相对路径检查
+                # Relative path check
                 path_obj.relative_to(self.project_dir)
             except ValueError:
-                # 在项目目录外,是三方库
+                # Outside project directory, it is a third-party library
                 thirdparty_paths.append(str(path_obj))
             else:
-                # 在项目目录内,检查是否是常见的三方库目录名
+                # Inside project directory, check if it is a common third-party library directory name
                 path_lower = str(path_obj).lower()
                 thirdparty_keywords = ['thirdpart', 'thirdparty', 'vendor', 'lib', 'libs', 'packages', 'components']
                 if any(kw in path_lower for kw in thirdparty_keywords):
                     thirdparty_paths.append(str(path_obj))
 
-        logger.info(f"从 .dproj 提取到 {len(thirdparty_paths)} 个三方库路径")
+        logger.info(f"Extracted {len(thirdparty_paths)} third-party library paths from .dproj")
         return thirdparty_paths
 
     def _calculate_paths_hash(self, paths: List[str]) -> str:
-        """计算路径列表的签名（排序后用分号连接，无需 MD5）"""
+        """Calculate signature of path list (sort and join with semicolons, no MD5 needed)"""
         return ";".join(sorted(paths))
 
     def _calculate_source_hash(self, source_dir: Path, extensions: Set[str] = None) -> str:
         """
-        计算源码目录的变更签名（基于文件数量+总大小+最新修改时间）
+        Calculate change signature of source directory (based on file count + total size + latest modification time)
 
-        跳过第三方库路径和 .delphi-kb 目录，避免将 KB 自身或第三方库的变更
-        误判为项目源码变更，同时大幅加快计算速度。
+        Skip third-party library paths and .delphi-kb directory to avoid treating changes in KB itself or third-party libraries
+        as project source changes, while greatly speeding up calculation.
 
-        使用 `文件数|总字节数|最新mtime` 三元组而非 MD5 哈希，因为：
-        - 不需要逐文件计算 MD5（IO + CPU 开销大）
-        - 文件数/总大小/最新时间的变化能覆盖所有增删改场景
-        - config.json 中指定 hash_mode=md5 时才需逐文件 MD5
+        Use `file count|total bytes|latest mtime` triple instead of MD5 hash because:
+        - No need to calculate MD5 per file (high IO + CPU overhead)
+        - Changes in file count/total size/latest time cover all add/delete/modify scenarios
+        - Only when hash_mode=md5 is specified in config.json is per-file MD5 needed
 
         Args:
-            source_dir: 源码目录
-            extensions: 文件扩展名集合
+            source_dir: Source directory
+            extensions: Set of file extensions
 
         Returns:
-            签名值 (文件数|总大小|最新修改时间)
+            Signature value (file count|total size|latest modification time)
         """
         if extensions is None:
             extensions = {'.pas', '.dpr', '.dpk', '.dfm', '.fmx', '.inc'}
 
-        # 需要跳过的目录名（第三方库、知识库、系统目录等）
+        # Directory names to skip (third-party libraries, knowledge base, system directories, etc.)
         skip_dir_names = SOURCE_SCAN_EXCLUDED_DIRS
 
-        # 读取经过 .dproj 交叉验证的三方库路径前缀，精确跳过
-        # （仅跳过那些同时出现在共享KB和.dproj三方库路径中的目录，
-        #  避免项目源码目录因意外出现在 IDE 全局库路径中被误跳）
+        # Read third-party library path prefixes verified by .dproj, skip precisely
+        # (Only skip directories that appear in both shared KB and .dproj third-party library paths,
+        #  to avoid project source directories being mistakenly skipped because they accidentally appear in IDE global library paths)
         skip_paths_normalized = self._get_verified_thirdparty_prefixes()
 
         total_files = 0
@@ -200,7 +200,7 @@ class ProjectKnowledgeBase:
         latest_mtime = 0.0
 
         for root, dirs, files in os.walk(source_dir):
-            # 跳过不需要的目录（不进入遍历）
+            # Skip unneeded directories (do not traverse into them)
             dirs[:] = [d for d in dirs if d.lower() not in skip_dir_names]
 
             root_normalized = str(Path(root).resolve())
@@ -217,66 +217,66 @@ class ProjectKnowledgeBase:
                         if stat.st_mtime > latest_mtime:
                             latest_mtime = stat.st_mtime
                     except Exception as e:
-                        logger.debug("忽略非致命异常: %s", str(e))
+                        logger.debug("Ignoring non-fatal exception: %s", str(e))
 
         return f"{total_files}|{total_size}|{latest_mtime}"
 
     def _get_shared_thirdparty_paths(self) -> Set[str]:
         """
-        读取 MCP 服务器共享第三方知识库中已扫描的路径列表。
+        Read the list of scanned paths from the MCP server shared third-party knowledge base.
 
-        共享知识库路径:
-          <项目根>/data/thirdparty-knowledge-base/thirdparty_paths.json
+        Shared knowledge base path:
+          <project root>/data/thirdparty-knowledge-base/thirdparty_paths.json
 
         Returns:
-            已扫描的路径集合 (绝对路径,已规范化)
+            Set of scanned paths (absolute paths, normalized)
         """
-        # 从当前文件位置推导项目根目录: src/services/know_base/ → 上3层 = 项目根
+        # Derive project root from current file location: src/services/know_base/ → up 3 levels = project root
         _project_root = Path(__file__).parent.parent.parent.parent
         shared_paths_file = (
             _project_root / "data" / "thirdparty-knowledge-base" / "thirdparty_paths.json"
         )
         if not shared_paths_file.exists():
-            logger.info("共享第三方知识库路径文件不存在,跳过检查")
+            logger.info("Shared third-party knowledge base path file does not exist, skipping check")
             return set()
 
         try:
             with open(shared_paths_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             raw_paths = data.get("paths", [])
-            # 规范化所有路径 (解析真实大小写)
+            # Normalize all paths (resolve real case)
             normalized = set()
             for p in raw_paths:
                 try:
                     normalized.add(str(Path(p).resolve()))
                 except Exception:
                     normalized.add(p)
-            logger.info(f"从共享知识库读取到 {len(normalized)} 个已扫描路径")
+            logger.info(f"Read {len(normalized)} scanned paths from shared knowledge base")
             return normalized
         except Exception as e:
-            logger.warning(f"读取共享第三方知识库路径失败: {e}")
+            logger.warning(f"Failed to read shared third-party knowledge base paths: {e}")
             return set()
 
     def _get_verified_thirdparty_prefixes(self) -> Set[str]:
         """
-        获取经过验证的三方库路径前缀集合。
+        Get the set of verified third-party library path prefixes.
 
-        只返回**同时满足**以下条件的路径：
-        1. 出现在共享知识库 thirdparty_paths.json 中
-        2. 在项目目录内 (self.project_dir 下)
-        3. 也被 .dproj 文件认定为三方库路径
+        Only return paths that **simultaneously satisfy** the following conditions:
+        1. Appear in shared knowledge base thirdparty_paths.json
+        2. Are inside project directory (under self.project_dir)
+        3. Are also recognized as third-party library paths by .dproj file
 
-        三重校验确保项目源码目录不会因意外出现在 IDE 全局库路径中
-        而被误判为三方库跳过的 bug。
+        Triple validation ensures project source directories will not be mistakenly skipped as third-party libraries
+        because they accidentally appear in IDE global library paths.
 
         Returns:
-            需要跳过的绝对路径集合 (已规范化)
+            Set of absolute paths to skip (normalized)
         """
         shared = self._get_shared_thirdparty_paths()
         if not shared:
             return set()
 
-        # 收集 .dproj 中在项目目录内的三方库路径
+        # Collect third-party library paths inside project directory from .dproj
         dproj_inside = set()
         for p in self.get_thirdparty_paths_from_dproj():
             try:
@@ -284,12 +284,12 @@ class ProjectKnowledgeBase:
                 pp.relative_to(self.project_dir.resolve())
                 dproj_inside.add(str(pp))
             except ValueError:
-                pass  # 不在项目目录内，不参与排除判断
+                pass  # Not inside project directory, do not participate in exclusion judgment
 
         if not dproj_inside:
             return set()
 
-        # 交集：同时出现在共享 KB 和 .dproj 三方库路径中
+        # Intersection: appear in both shared KB and .dproj third-party library paths
         verified = set()
         for p in shared:
             pp_str = str(Path(p).resolve())
@@ -297,12 +297,12 @@ class ProjectKnowledgeBase:
                 verified.add(pp_str)
 
         if verified:
-            logger.info(f"项目源码扫描将跳过 {len(verified)} 个经验证的三方库目录")
+            logger.info(f"Project source scan will skip {len(verified)} verified third-party library directories")
         return verified
 
 
     def _should_skip_shared_path(self, file_path: Path, exclude_prefixes: Set[str]) -> bool:
-        """检查文件是否在需要跳过的共享知识库路径下"""
+        """Check if file is under a shared knowledge base path that should be skipped"""
         if not exclude_prefixes:
             return False
         file_str = str(file_path.resolve())
@@ -313,17 +313,17 @@ class ProjectKnowledgeBase:
 
     def build_project_knowledge_base(self, rebuild: bool = False) -> bool:
         """
-        构建项目源码知识库（ZVec 版）
+        Build project source knowledge base (ZVec version)
 
         Args:
-            rebuild: 是否强制重建
+            rebuild: Whether to force rebuild
 
         Returns:
-            是否构建成功
+            Whether build succeeded
         """
         _build_start = time.time()
 
-        # 迁移旧版 zvec_project/ 子目录到根目录
+        # Migrate old zvec_project/ subdirectory to root directory
         from .zvec_adapter import _migrate_old_zvec_data
         old_zvec = self.kb_dir / "zvec_project"
         if old_zvec.exists() and old_zvec != self.kb_dir:
@@ -336,14 +336,14 @@ class ProjectKnowledgeBase:
             if hash_file.exists():
                 cached_hash = hash_file.read_text(encoding='utf-8').strip()
             if cached_hash == current_hash and any(f.name.startswith("manifest") for f in self.kb_dir.iterdir()):
-                logger.info("项目源码知识库已是最新,跳过构建")
+                logger.info("Project source knowledge base is up to date, skipping build")
                 return True
 
-        logger.info("开始构建项目源码知识库 (ZVec)")
-        self._report_progress(5, "扫描项目源码文件...")
+        logger.info("Starting to build project source knowledge base (ZVec)")
+        self._report_progress(5, "Scanning project source files...")
         self.kb_dir.mkdir(parents=True, exist_ok=True)
 
-        # 收集项目源码文件
+        # Collect project source files
         exclude_prefixes = self._get_verified_thirdparty_prefixes()
         skip_dir_names = SOURCE_SCAN_EXCLUDED_DIRS
         delphi_extensions = {'.pas', '.dpr', '.dpk', '.dfm', '.fmx', '.inc'}
@@ -359,22 +359,22 @@ class ProjectKnowledgeBase:
                 if Path(file).suffix.lower() in delphi_extensions:
                     project_files.append(str(root_path / file))
 
-        self._report_progress(30, f"收集到 {len(project_files)} 个文件，开始 chunk...")
+        self._report_progress(30, f"Collected {len(project_files)} files, starting chunking...")
 
-        # Chunk 所有文件
+        # Chunk all files
         chunks = chunk_file_list(project_files)
         if not chunks:
-            logger.warning("项目源码未产生任何 chunk")
+            logger.warning("Project source produced no chunks")
             return False
-        logger.info(f"Chunk 完成: {len(chunks)} chunks 来自 {len(project_files)} 文件")
-        self._report_progress(50, f"{len(chunks)} chunks，导入 ZVec...")
+        logger.info(f"Chunking complete: {len(chunks)} chunks from {len(project_files)} files")
+        self._report_progress(50, f"{len(chunks)} chunks, importing into ZVec...")
 
-        # 构建 ZVec 知识库（展平到 kb_dir 根目录）
+        # Build ZVec knowledge base (flattened to kb_dir root)
         kv_dir = str(self.kb_dir)
         import zvec
         from zvec import CollectionSchema, FieldSchema, DataType, FtsIndexParam, InvertIndexParam, Doc
 
-        # 打开或创建集合：存在有效集合则 open，否则删除目录后 create_and_open
+        # Open or create collection: open if valid collection exists, otherwise remove directory and create_and_open
         kv_path = Path(kv_dir)
         has_valid = kv_path.exists() and any(
             f.name.startswith("manifest") for f in kv_path.iterdir()
@@ -382,8 +382,8 @@ class ProjectKnowledgeBase:
         if has_valid:
             col = zvec.open(kv_dir)
             if rebuild:
-                # 重建：先关闭集合释放 Windows 句柄，再删目录。
-                # 若不关闭，打开的句柄会让 rmtree 静默失败。
+                # Rebuild: close collection first to release Windows handles, then delete directory.
+                # If not closed, open handles will make rmtree fail silently.
                 try:
                     col.close()
                 except Exception:
@@ -395,7 +395,7 @@ class ProjectKnowledgeBase:
             if kv_path.exists():
                 import shutil as _shutil
                 _shutil.rmtree(kv_dir, ignore_errors=True)
-            # 简化 schema：entity_name 合并到 chunk_text 中
+            # Simplified schema: entity_name merged into chunk_text
             schema = CollectionSchema("project_kb", fields=[
                 FieldSchema("chunk_text", DataType.STRING),
                 FieldSchema("chunk_type", DataType.STRING),
@@ -406,7 +406,7 @@ class ProjectKnowledgeBase:
             ])
             col = zvec.create_and_open(path=kv_dir, schema=schema)
 
-        # 先插入数据
+        # Insert data first
         BATCH = 500
         for offset in range(0, len(chunks), BATCH):
             batch = chunks[offset:offset + BATCH]
@@ -426,22 +426,22 @@ class ProjectKnowledgeBase:
             col.insert(docs)
             if (offset // BATCH) % 10 == 0:
                 pct = 50 + int(offset / len(chunks) * 40)
-                self._report_progress(pct, f"导入 {offset + BATCH}/{len(chunks)}")
+                self._report_progress(pct, f"Importing {offset + BATCH}/{len(chunks)}")
 
         col.flush()
 
-        # 再建索引
+        # Then create indexes
         col.create_index("chunk_text", FtsIndexParam(tokenizer_name="jieba"))
         col.create_index("chunk_type", InvertIndexParam())
         col.create_index("base_class", InvertIndexParam())
         col.optimize()
         col.flush()
 
-        # 保存 source_hash
+        # Save source_hash
         hash_file = self.kb_dir / "source_hash.txt"
         hash_file.write_text(current_hash, encoding='utf-8')
 
-        # 保存构建元数据
+        # Save build metadata
         class_count = sum(1 for c in chunks if c.get('chunk_type') in ('class', 'record', 'interface'))
         try:
             metadata = {
@@ -454,22 +454,22 @@ class ProjectKnowledgeBase:
                 encoding="utf-8"
             )
         except Exception as e:
-            logger.warning(f"保存项目 KB metadata 失败: {e}")
+            logger.warning(f"Failed to save project KB metadata: {e}")
 
-        # 设置 project_kb 为 ZVec 适配器
+        # Set project_kb as ZVec adapter
         self.project_kb = ZVecKnowledgeBaseAdapter(str(self.kb_dir), source_dirs=[str(self.project_dir)])
 
         _duration = int(time.time() - _build_start)
-        logger.info(f"项目知识库构建完成! {len(chunks)} chunks, 耗时 {_duration}s")
-        self._report_progress(100, f"项目 KB: {len(chunks)} chunks, {_duration}s")
+        logger.info(f"Project knowledge base build complete! {len(chunks)} chunks, took {_duration}s")
+        self._report_progress(100, f"Project KB: {len(chunks)} chunks, {_duration}s")
         return True
 
     def check_and_update_project_kb(self) -> bool:
         """
-        检查项目源码是否有变更（ZVec 版用 source_hash.txt）
+        Check if project source has changes (ZVec version uses source_hash.txt)
 
         Returns:
-            True 表示知识库最新，False 表示已检测到变更
+            True means knowledge base is up to date, False means changes detected
         """
         current_hash = self._calculate_source_hash(self.project_dir)
         cached_hash = None
@@ -478,48 +478,48 @@ class ProjectKnowledgeBase:
             cached_hash = hash_file.read_text(encoding='utf-8').strip()
 
         if current_hash != cached_hash:
-            logger.info("检测到项目源码变动（搜索将使用旧知识库，请手动触发重建）")
+            logger.info("Project source changes detected (search will use old knowledge base, please manually trigger rebuild)")
             return False
         return True
 
     def load_knowledge_bases(self) -> bool:
         """
-        加载 ZVec 知识库
+        Load ZVec knowledge base
 
         Returns:
-            是否加载成功
+            Whether loading succeeded
         """
         try:
-            # 迁移旧版 zvec_project/ 子目录到根目录
+            # Migrate old zvec_project/ subdirectory to root directory
             from .zvec_adapter import _migrate_old_zvec_data
             old_zvec = self.kb_dir / "zvec_project"
             if old_zvec.exists() and old_zvec != self.kb_dir:
                 _migrate_old_zvec_data(old_zvec, self.kb_dir)
-            # 检查展平后的 ZVec 数据
+            # Check flattened ZVec data
             if any(f.name.startswith("manifest") for f in self.kb_dir.iterdir()):
                 self.project_kb = ZVecKnowledgeBaseAdapter(str(self.kb_dir), source_dirs=[str(self.project_dir)])
                 self.thirdparty_kb = self.project_kb
-                logger.info(f"ZVec 知识库加载成功: {self.kb_dir}")
+                logger.info(f"ZVec knowledge base loaded successfully: {self.kb_dir}")
                 return True
             return False
         except Exception as e:
-            logger.error(f"加载 ZVec 知识库失败: {e}")
+            logger.error(f"Failed to load ZVec knowledge base: {e}")
             return False
 
     def search_class(self, class_name: str, search_in: str = "all") -> List[Dict]:
         """
-        搜索类
+        Search class
 
         Args:
-            class_name: 类名
-            search_in: 搜索范围 ("project", "thirdparty", "all")
+            class_name: Class name
+            search_in: Search scope ("project", "thirdparty", "all")
 
         Returns:
-            搜索结果
+            Search results
         """
         results = []
 
-        # 检查并更新项目知识库
+        # Check and update project knowledge base
         self.check_and_update_project_kb()
 
         if search_in in ("project", "all") and self.project_kb:
@@ -532,18 +532,18 @@ class ProjectKnowledgeBase:
 
     def search_function(self, function_name: str, search_in: str = "all") -> List[Dict]:
         """
-        搜索函数
+        Search function
 
         Args:
-            function_name: 函数名
-            search_in: 搜索范围 ("project", "thirdparty", "all")
+            function_name: Function name
+            search_in: Search scope ("project", "thirdparty", "all")
 
         Returns:
-            搜索结果
+            Search results
         """
         results = []
 
-        # 检查并更新项目知识库
+        # Check and update project knowledge base
         self.check_and_update_project_kb()
 
         if search_in in ("project", "all") and self.project_kb:
@@ -556,17 +556,17 @@ class ProjectKnowledgeBase:
 
     def semantic_search(self, query: str, top_k: int = 10, search_in: str = "all") -> Dict:
         """
-        语义搜索
+        Semantic search
 
         Args:
-            query: 搜索查询
-            top_k: 返回结果数量
-            search_in: 搜索范围 ("project", "thirdparty", "all")
+            query: Search query
+            top_k: Number of results to return
+            search_in: Search scope ("project", "thirdparty", "all")
 
         Returns:
-            搜索结果 {"classes": [...], "functions": [...]}
+            Search results {"classes": [...], "functions": [...]}
         """
-        # 检查并更新项目知识库
+        # Check and update project knowledge base
         self.check_and_update_project_kb()
 
         result = {
@@ -618,7 +618,7 @@ class ProjectKnowledgeBase:
                         "data": exact[0]
                     })
 
-        # 按相似度排序
+        # Sort by similarity
         result["classes"].sort(key=lambda x: x["score"], reverse=True)
         result["functions"].sort(key=lambda x: x["score"], reverse=True)
 
@@ -626,14 +626,14 @@ class ProjectKnowledgeBase:
 
     def get_statistics(self) -> Dict:
         """
-        获取知识库统计信息（ZVec 版）
+        Get knowledge base statistics (ZVec version)
 
         Returns:
-            统计信息
+            Statistics
         """
         stats = {"project": None, "thirdparty": None}
 
-        # 优先从 metadata.json 读取实际统计
+        # Prefer reading actual statistics from metadata.json
         metadata_file = self.kb_dir / "metadata.json"
         if metadata_file.exists():
             try:
@@ -652,7 +652,7 @@ class ProjectKnowledgeBase:
             except Exception:
                 pass
 
-        # fallback: zvec 内部文件计数（旧/无 metadata 数据）
+        # fallback: zvec internal file count (old/no metadata data)
         zvec_dir = self.kb_dir
         if not any(f.name.startswith("manifest") for f in zvec_dir.iterdir() if zvec_dir.exists()):
             return stats
@@ -674,23 +674,23 @@ class ProjectKnowledgeBase:
                 "database_size_mb": round(total_size / (1024 * 1024), 1),
             }
         except Exception as e:
-            logger.debug(f"ZVec 统计失败: {e}")
+            logger.debug(f"ZVec statistics failed: {e}")
         return stats
 
     def _report_progress(self, percent: float, message: str) -> None:
-        """报告进度（安全调用 progress_callback）"""
+        """Report progress (safely call progress_callback)"""
         if self.progress_callback:
             try:
                 self.progress_callback(percent, message)
             except Exception as e:
-                logger.warning("progress_callback 执行失败: %s", e)
+                logger.warning("progress_callback execution failed: %s", e)
 
     def build_vectors(self, progress_callback=None) -> dict:
-        """ZVec 版：索引已在插入时创建，此处无需操作"""
+        """ZVec version: indexes are created during insertion, no operation needed here"""
         return {"project": 0, "thirdparty": 0}
 
     def close(self):
-        """关闭知识库连接"""
+        """Close knowledge base connection"""
         if self.project_kb:
             try:
                 self.project_kb.close()
@@ -698,3 +698,4 @@ class ProjectKnowledgeBase:
                 pass
             self.project_kb = None
         self.thirdparty_kb = None
+

@@ -1,148 +1,148 @@
-# Delphi Knowledge Base — 知识库搜索与管理
+# Delphi Knowledge Base — Knowledge Base Search and Management
 
-> 版本：v1.1 | 最后更新：2026-07-05
-
----
-
-## 目录
-
-1. [概述](#1-概述)
-2. [知识库类型](#2-知识库类型)
-3. [操作指南](#3-操作指南)
-4. [搜索策略](#4-搜索策略)
-5. [知识库构建](#5-知识库构建)
-6. [向量索引（Embedding）](#6-向量索引embedding)
-7. [文档知识库](#7-文档知识库)
-8. [技术架构](#8-技术架构)
-9. [故障排除](#9-故障排除)
+> Version: v1.1 | Last Updated: 2026-07-05
 
 ---
 
-## 1. 概述
+## Table of Contents
 
-`delphi_kb` 是 Daofy 的知识库搜索与管理工具。它整合了 Delphi 官方源码、项目代码、第三方库和通用文档四大知识库，支持类/函数/语义等多种搜索方式。
+1. [Overview](#1-overview)
+2. [Knowledge Base Types](#2-knowledge-base-types)
+3. [Operation Guide](#3-operation-guide)
+4. [Search Strategy](#4-search-strategy)
+5. [Knowledge Base Construction](#5-knowledge-base-construction)
+6. [Vector Index (Embedding)](#6-vector-index-embedding)
+7. [Document Knowledge Base](#7-document-knowledge-base)
+8. [Technical Architecture](#8-technical-architecture)
+9. [Troubleshooting](#9-troubleshooting)
 
-**核心用途**：AI 编写 Delphi 代码前，先查知识库确认 API 定义，避免凭空编造。
+---
 
-### 四大知识库一览
+## 1. Overview
 
-| 知识库 | 数据量 | 用途 |
+`delphi_kb` is Daofy's knowledge base search and management tool. It integrates four major knowledge bases—Delphi official source code, project code, third-party libraries, and general documentation—and supports class/function/semantic and other search methods.
+
+**Core use**: Before AI writes Delphi code, query the knowledge base to confirm API definitions and avoid fabricating them.
+
+### Four Major Knowledge Bases at a Glance
+
+| Knowledge Base | Data Volume | Purpose |
 |--------|--------|------|
-| Delphi 源码 | 163,737 类 / 300,228 函数 | 查 VCL/FMX/RTL 官方 API |
-| 项目知识库 | 项目自定 | 查当前项目自有代码 |
-| 第三方库 | 5,724 类 / 28,801 函数 | 查三方组件 API |
-| 通用文档 | 160,328 篇 | 查 Delphi 帮助文档/CHM |
+| Delphi Source | 163,737 classes / 300,228 functions | Look up VCL/FMX/RTL official APIs |
+| Project Knowledge Base | Project-defined | Look up the current project's own code |
+| Third-party Libraries | 5,724 classes / 28,801 functions | Look up third-party component APIs |
+| General Documentation | 160,328 documents | Look up Delphi help documentation/CHM |
 
-### 统计信息
+### Statistics
 
 ```
-Delphi 源码: 2,798 文件, 163,737 类, 300,228 函数, 260 MB
-第三方库:   1,800 文件, 5,724 类, 28,801 函数, 27 MB
-通用文档:   160,328 文件, 1,306 MB
+Delphi Source: 2,798 files, 163,737 classes, 300,228 functions, 260 MB
+Third-party Libraries:   1,800 files, 5,724 classes, 28,801 functions, 27 MB
+General Documentation:   160,328 files, 1,306 MB
 ```
 
 ---
 
-## 2. 知识库类型
+## 2. Knowledge Base Types
 
-### 2.1 类型对照表
+### 2.1 Type Reference Table
 
-| kb_type | 名称 | 存储路径 | 是否需要 project_path |
+| kb_type | Name | Storage Path | Requires project_path |
 |---------|------|---------|---------------------|
-| `delphi` | Delphi 官方源码 | `data/delphi-knowledge-base/` | ❌ |
-| `project` | 项目自有代码 | `<项目目录>/.delphi-kb/` | ✅（或自动检测） |
-| `thirdparty` | 第三方组件 | `data/thirdparty-knowledge-base/` | ❌ |
-| `document` | 通用文档 | `data/document-knowledge-base/` | ❌ |
-| `example` | 示例代码 | `data/example-knowledge-base/` | ❌ |
-| `all`（默认） | 全部 | — | — |
+| `delphi` | Delphi official source | `data/delphi-knowledge-base/` | ❌ |
+| `project` | Project's own code | `<project directory>/.delphi-kb/` | ✅ (or auto-detect) |
+| `thirdparty` | Third-party components | `data/thirdparty-knowledge-base/` | ❌ |
+| `document` | General documentation | `data/document-knowledge-base/` | ❌ |
+| `example` | Example code | `data/example-knowledge-base/` | ❌ |
+| `all` (default) | All | — | — |
 
-### 2.2 项目路径自动检测
+### 2.2 Project Path Auto-Detection
 
-不传 `project_path` 时自动扫描当前工作目录及父目录下的 `.dproj`：
+When `project_path` is not passed, automatically scans the current working directory and parent directories for `.dproj`:
 
-- 找到唯一 `.dproj` 时自动使用
-- 多个同名时匹配目录名
+- If exactly one `.dproj` is found, use it automatically
+- If multiple have the same name, match by directory name
 
 ```python
-# 依赖自动检测
+# Rely on auto-detection
 delphi_kb(query="TfrmMain", kb_type="project")
 
-# 显式指定
+# Explicitly specify
 delphi_kb(query="TfrmMain", kb_type="project", project_path="C:/MyProject/Project.dproj")
 ```
 
-### 2.3 存储结构
+### 2.3 Storage Structure
 
-> ⚠️ v2026.06.22 起所有知识库已从 SQLite FTS5 迁移到 **ZVec 向量引擎**。仅经验知识库 (`experience`) 保留 SQLite。
+> ⚠️ Starting from v2026.06.22, all knowledge bases have been migrated from SQLite FTS5 to the **ZVec vector engine**. Only the experience knowledge base (`experience`) retains SQLite.
 
-每个知识库目录包含：
-- `*.zvec/` — ZVec 向量数据库目录（文档/示例/项目/三方库知识库）
-- `config.json` — 配置文件（首次构建自动生成）
-- 知识库配置支持自定义数据库、源码路径、构建参数
+Each knowledge base directory contains:
+- `*.zvec/` — ZVec vector database directory (document/example/project/third-party knowledge bases)
+- `config.json` — configuration file (auto-generated on first build)
+- Knowledge base configuration supports custom databases, source paths, and build parameters
 
-经验知识库 (`data/experience-knowledge-base/`) 仍使用 `experiences.sqlite`，不包含 ZVec 目录。
+The experience knowledge base (`data/experience-knowledge-base/`) still uses `experiences.sqlite` and does not contain a ZVec directory.
 
 ---
 
-## 3. 操作指南
+## 3. Operation Guide
 
-### 3.1 `action="search"` — 搜索
+### 3.1 `action="search"` — Search
 
 ```python
-# 搜索类
+# Search for class
 delphi_kb(query="TStringList")
 
-# 搜索函数
+# Search for function
 delphi_kb(query="Create", search_type="function")
 
-# 语义搜索（需要先构建向量索引）
+# Semantic search (requires vector index to be built first)
 delphi_kb(query="如何创建数据库连接", search_type="semantic")
 
-# 搜索项目代码
+# Search project code
 delphi_kb(query="TfrmMain", kb_type="project", project_path="Project.dproj")
 
-# 搜索 Delphi 官方 API
+# Search Delphi official API
 delphi_kb(query="TCustomADODataSet", kb_type="delphi")
 
-# 搜索引用（评估修改影响）
+# Search references (evaluate modification impact)
 delphi_kb(query="TStringList", search_type="reference")
 ```
 
-**参数说明**：
+**Parameter Description**:
 
-| 参数 | 必需 | 默认值 | 说明 |
+| Parameter | Required | Default | Description |
 |------|------|--------|------|
-| `query` | ✅ | — | 搜索关键词 |
+| `query` | ✅ | — | Search keyword |
 | `kb_type` | ❌ | all | all/delphi/project/thirdparty/document |
-| `search_type` | ❌ | — | function/procedure/class/record/semantic/reference/all 等 |
-| `top_k` | ❌ | 200 | 最大返回结果数（最大500） |
-| `project_path` | ❌ | 自动检测 | 项目路径（project/thirdparty 时需要） |
-| `content_type` | ❌ | — | 文档类型过滤（document 时使用） |
+| `search_type` | ❌ | — | function/procedure/class/record/semantic/reference/all etc. |
+| `top_k` | ❌ | 200 | Maximum number of results to return (max 500) |
+| `project_path` | ❌ | Auto-detect | Project path (required for project/thirdparty) |
+| `content_type` | ❌ | — | Document type filter (used for document) |
 
-### 3.2 `action="stats"` — 查看统计
+### 3.2 `action="stats"` — View Statistics
 
-查看各知识库的文件数、类数、函数数、末次构建时间。
+View the file count, class count, function count, and last build time of each knowledge base.
 
 ```python
 delphi_kb(action="stats")
 ```
 
-### 3.3 `action="read"` — 读取内容
+### 3.3 `action="read"` — Read Content
 
-读取文档内容或源码文件。
+Read document content or source files.
 
 ```python
-# 按文档 URL/doc_id 读取
+# Read by document URL/doc_id
 delphi_kb(action="read", url="...")
 delphi_kb(action="read", doc_id="...")
 
-# 按文件路径读取
+# Read by file path
 delphi_kb(action="read", file_path="System.SysUtils.pas", offset=0, limit=1000)
 ```
 
-### 3.4 `action="scan"` — 扫描文档
+### 3.4 `action="scan"` — Scan Documents
 
-扫描指定目录添加文档到知识库。
+Scan a specified directory to add documents to the knowledge base.
 
 ```python
 delphi_kb(action="scan",
@@ -152,7 +152,7 @@ delphi_kb(action="scan",
     max_workers=4)
 ```
 
-### 3.5 `action="web"` — 添加网页
+### 3.5 `action="web"` — Add Web Pages
 
 ```python
 delphi_kb(action="web",
@@ -161,174 +161,174 @@ delphi_kb(action="web",
     max_depth=2)
 ```
 
-### 3.6 `action="build_embedding"` — 构建向量索引
+### 3.6 `action="build_embedding"` — Build Vector Index
 
-详见第 6 章。
+See Chapter 6 for details.
 
 ---
 
-## 4. 搜索策略
+## 4. Search Strategy
 
-### 4.1 优先级（写代码前的标准搜索流程）
+### 4.1 Priority (Standard Search Flow Before Writing Code)
 
 ```
-⭐1  delphi_kb(query="TStringList")           精确类名搜索
-     └─ 无结果？→ 换名再试
-⭐2  delphi_kb(query="TMainForm")             换名（TMainForm→TfrmMain）
-     └─ 仍无结果？→ 搜函数
+⭐1  delphi_kb(query="TStringList")           Exact class name search
+     └─ No results? → Try another name
+⭐2  delphi_kb(query="TMainForm")             Try another name (TMainForm→TfrmMain)
+     └─ Still no results? → Search functions
 ⭐3  delphi_kb(query="Create",
-          search_type="function")             搜索函数（同时匹配 FF+FP）
-     └─ 仍无结果？→ 查引用
+          search_type="function")             Search functions (matches both FF and FP)
+     └─ Still no results? → Search references
 ⭐4  delphi_kb(query="TForm1",
-          search_type="reference")            查引用（评估修改影响）
-     └─ 仍无结果？→ 语义搜索兜底
+          search_type="reference")            Search references (evaluate modification impact)
+     └─ Still no results? → Semantic search fallback
 ⭐5  delphi_kb(query="创建主窗口",
-          search_type="semantic")             中文语义搜索兜底
+          search_type="semantic")             Chinese semantic search fallback
 ```
 
-> `search_type="function"` 同时匹配函数（FF）和过程（FP）。`search_type="procedure"` 只查过程。
+> `search_type="function"` matches both functions (FF) and procedures (FP). `search_type="procedure"` only searches procedures.
 
-### 4.2 KB 搜不到的排查
+### 4.2 Troubleshooting When the KB Cannot Find It
 
 ```
-搜不到类/函数 → 检查 kb_type 是否正确（项目代码用 project）
-             → 尝试部分匹配（仅类名不含命名空间）
-             → 检查三方库是否已安装/构建
-             → 直接按文件路径搜索 System.SysUtils → 搜文件名
-             → 直接读源码：delphi_file(action="read", ...)
+Cannot find class/function → Check whether kb_type is correct (use project for project code)
+             → Try partial match (class name only, without namespace)
+             → Check whether the third-party library is installed/built
+             → Search directly by file path System.SysUtils → search file name
+             → Read source directly: delphi_file(action="read", ...)
 ```
 
-### 4.3 与 delphi_file 配合
+### 4.3 Working with delphi_file
 
 ```python
-# 先搜 KB 确认 API
+# First search the KB to confirm the API
 delphi_kb(query="TButton", kb_type="delphi")
 
-# 再读官方源码看具体实现
+# Then read the official source code for the specific implementation
 delphi_file(action="read", search_type="class", type_name="TButton")
 
-# 项目代码
+# Project code
 delphi_file(action="read", search_type="class",
     type_name="TfrmMain", search_in="project", project_path="...")
 ```
 
 ---
 
-## 5. 知识库构建
+## 5. Knowledge Base Construction
 
-### 5.1 构建命令
+### 5.1 Build Commands
 
 ```python
-# Delphi 源码 KB（~1分钟，163737类/300228函数）
+# Delphi source KB (~1 minute, 163737 classes/300228 functions)
 delphi_kb(action="build", kb_type="delphi", rebuild=True, async_mode=True)
 
-# 三方库 KB（~6秒，5606类/51265函数）
+# Third-party library KB (~6 seconds, 5606 classes/51265 functions)
 delphi_kb(action="build", kb_type="thirdparty", rebuild=True, async_mode=True)
 
-# 文档 KB（~6分钟，160328文档）
+# Document KB (~6 minutes, 160328 documents)
 delphi_kb(action="build", kb_type="document", rebuild=True, async_mode=True)
 
-# 项目 KB
+# Project KB
 delphi_kb(action="build", kb_type="project",
     project_path="Project.dproj", rebuild=True)
 ```
 
-### 5.2 参数说明
+### 5.2 Parameter Description
 
-| 参数 | 说明 |
+| Parameter | Description |
 |------|------|
-| `async_mode` | 默认 true，异步执行不阻塞 MCP 通道 |
-| `rebuild` | 强制完全重建（默认 false） |
-| `incremental` | 增量更新，只处理变更的文件（默认 false） |
-| `build_thirdparty` | 构建项目 KB 时同时构建三方库 KB（默认 true） |
-| `build_project` | 是否构建项目 KB（默认 true） |
-| `version` | 指定 Delphi 版本 |
-| `directory` | 扫描目录（build document 时可指定，默认自动检测 Delphi 帮助目录） |
-| `extensions` | 文件扩展名过滤（如 `[".chm"]`） |
+| `async_mode` | Default true; asynchronous execution does not block the MCP channel |
+| `rebuild` | Force a full rebuild (default false) |
+| `incremental` | Incremental update, only process changed files (default false) |
+| `build_thirdparty` | When building the project KB, also build the third-party library KB (default true) |
+| `build_project` | Whether to build the project KB (default true) |
+| `version` | Specify Delphi version |
+| `directory` | Scan directory (can be specified when building document; defaults to auto-detecting the Delphi help directory) |
+| `extensions` | File extension filter (e.g. `[".chm"]`) |
 
-### 5.3 启动时自动构建
+### 5.3 Auto-Build on Startup
 
-MCP Server 启动时自动检测 CWD 下的 `.dproj`，提交后台增量 KB 构建（不阻塞 MCP 就绪）。
+When the MCP Server starts, it automatically detects `.dproj` under the CWD and submits a background incremental KB build (without blocking MCP readiness).
 
-### 5.4 热切换重建
+### 5.4 Hot-Swap Rebuild
 
-构建到临时目录 `.delphi-kb-tmp-{ts}/`，旧 KB 在构建期间保持可查，构建完成原子 swap。
+Build to a temporary directory `.delphi-kb-tmp-{ts}/`; the old KB remains searchable during the build, and an atomic swap occurs after the build completes.
 
 ---
 
-## 6. 向量索引（Embedding）
+## 6. Vector Index (Embedding)
 
-### 6.1 概述
+### 6.1 Overview
 
-向量索引基于 sentence-transformers 模型，将文本编码为向量，实现**语义搜索**——你搜"怎么创建数据库连接"也能匹配到 `TADOConnection.Create`。
+The vector index is based on the sentence-transformers model, encoding text into vectors to enable **semantic search**—searching for "how to create a database connection" can also match `TADOConnection.Create`.
 
-### 6.2 加载模型
+### 6.2 Load Model
 
 ```python
 delphi_kb(action="build_embedding", async_mode=True)
 ```
 
-首次加载会下载模型（耗时数分钟），用 `async_mode=True` 异步执行。
+The first load downloads the model (takes several minutes); use `async_mode=True` for asynchronous execution.
 
-### 6.3 加载后的效果
+### 6.3 Effects After Loading
 
-| 功能 | 模型未加载 | 模型已加载 |
+| Feature | Model Not Loaded | Model Loaded |
 |------|-----------|-----------|
-| 知识库 `search_type="semantic"` | 降级为倒排索引 | 真语义搜索，余弦相似度排序 |
-| 经验库 save | 不去重 | 自动 >0.85 去重合并 |
-| 经验库 search | LIKE 关键词降级 | 语义向量搜索 |
+| Knowledge base `search_type="semantic"` | Falls back to inverted index | True semantic search, ranked by cosine similarity |
+| Experience KB save | No deduplication | Automatic >0.85 deduplication merge |
+| Experience KB search | LIKE keyword fallback | Semantic vector search |
 
-### 6.4 注意事项
+### 6.4 Notes
 
-- **只需加载一次**，知识库和经验库共享同一 embedding 模型
-- 模型未加载时所有功能**完全可用**，只是搜索精度降低
-- 加载过程是异步的，通过 `async_task` 查询进度
-- 旧记录（模型加载前保存的）缺少向量，下次搜索时会自动补全
+- **Load only once**; the knowledge base and experience KB share the same embedding model
+- When the model is not loaded, all features are **fully available**, but search precision is lower
+- The loading process is asynchronous; check progress via `async_task`
+- Old records (saved before the model was loaded) lack vectors and are automatically backfilled on the next search
 
 ---
 
-## 7. 文档知识库
+## 7. Document Knowledge Base
 
-### 7.1 支持格式
+### 7.1 Supported Formats
 
-| 格式 | 必需依赖 |
+| Format | Required Dependency |
 |------|---------|
-| TXT / MD / HTML | 内置支持 |
-| DOCX | `python-docx`（可选） |
-| DOC | `antiword`/`catdoc`（可选） |
-| CHM | 需要 7-Zip（可用 `tools/7z/` 免安装版） |
-| PDF | `PyMuPDF`（推荐）或 `pdfplumber`（备选） |
-| EPUB / HLP | 内置支持 |
-| 网页 | `beautifulsoup4`, `html2text`, `lxml`, `requests` |
+| TXT / MD / HTML | Built-in support |
+| DOCX | `python-docx` (optional) |
+| DOC | `antiword`/`catdoc` (optional) |
+| CHM | Requires 7-Zip (portable version available in `tools/7z/`) |
+| PDF | `PyMuPDF` (recommended) or `pdfplumber` (alternative) |
+| EPUB / HLP | Built-in support |
+| Web pages | `beautifulsoup4`, `html2text`, `lxml`, `requests` |
 
-### 7.2 构建 Delphi 帮助文档知识库
+### 7.2 Build Delphi Help Documentation Knowledge Base
 
 ```python
-# 自动检测最新安装的 Delphi 帮助目录
+# Auto-detect the latest installed Delphi help directory
 delphi_kb(action="build", kb_type="document",
     extensions=[".chm"], async_mode=True)
 
-# 手动指定目录
+# Manually specify the directory
 delphi_kb(action="build", kb_type="document",
     directory="C:\Program Files (x86)\Embarcadero\Studio\23.0\Help\Doc",
     extensions=[".chm"], async_mode=True)
 ```
 
-**版本对照**：37.0=Delphi 13, 23.0=Delphi 12, 22.0=Delphi 11, 21.0=Delphi 10.4, 20.0=Delphi 10.3
+**Version Reference**: 37.0=Delphi 13, 23.0=Delphi 12, 22.0=Delphi 11, 21.0=Delphi 10.4, 20.0=Delphi 10.3
 
-### 7.3 网页抓取参数
+### 7.3 Web Crawling Parameters
 
-| 参数 | 默认值 | 说明 |
+| Parameter | Default | Description |
 |------|--------|------|
-| `max_pages` | 100 | 最大抓取页数 |
-| `max_depth` | 3 | 最大抓取深度 |
-| `domain_filter` | — | 域名过滤 |
-| `url_pattern` | — | URL 模式过滤 |
-| `exclude` | — | 排除目录列表 |
+| `max_pages` | 100 | Maximum pages to crawl |
+| `max_depth` | 3 | Maximum crawl depth |
+| `domain_filter` | — | Domain filter |
+| `url_pattern` | — | URL pattern filter |
+| `exclude` | — | List of excluded directories |
 
 ---
 
-## 8. 技术架构
+## 8. Technical Architecture
 
 ```
 AI Agent
@@ -339,7 +339,7 @@ delphi_kb(action="search"|"build"|"stats"|...)
     ▼
 ┌───────────────────────────────────────┐
 │       src/tools/knowledge_base.py       │
-│  action 分派 + 多 KB 查询路由            │
+│  action dispatch + multi-KB query routing │
 └──────┬──────────┬──────────┬───────────┘
        │          │          │
        ▼          ▼          ▼
@@ -347,30 +347,31 @@ delphi_kb(action="search"|"build"|"stats"|...)
 │ Delphi   │ │ Project  │ │ Document │
 │ KB       │ │ KB       │ │ KB       │
 ├──────────┤ ├──────────┤ ├──────────┤
-│· RTL/VCL │ │· 项目源码│ │· CHM/PDF │
-│· FMX/api │ │· 三方库  │ │· TXT/MD  │
-│· 官方源码│ │· 增量更新│ │· 网页    │
+│· RTL/VCL │ │· Project source │ │· CHM/PDF │
+│· FMX/api │ │· Third-party libraries │ │· TXT/MD  │
+│· Official source │ │· Incremental updates │ │· Web pages │
 └──────────┘ └──────────┘ └──────────┘
        │
        ▼
 ┌───────────────────────────────────────┐
-│    embedding_service (向量引擎)         │
+│    embedding_service (vector engine)   │
 │  · sentence-transformers               │
 │  · encode_single / cosine_similarity   │
-│  · 经验库复用同一模型                   │
+│  · Experience KB reuses the same model │
 └───────────────────────────────────────┘
 ```
 
 ---
 
-## 9. 故障排除
+## 9. Troubleshooting
 
-| 现象 | 原因 | 解决 |
+| Symptom | Cause | Solution |
 |------|------|------|
-| 搜索无结果 | KB 未构建 | `delphi_kb(action="build", ...)` |
-| 搜不到类/函数 | kb_type 不对 | 项目代码用 `kb_type="project"` |
-| 语义搜索不准确 | 向量索引未构建 | `delphi_kb(action="build_embedding")` |
-| 构建 KB 超时 | 数据量大 | 用 `async_mode=True` 异步执行 |
-| 构建 KB 失败 | 三方库路径不对 | 检查 `DCC_UnitSearchPath` 配置 |
-| CHM 无法解析 | 未安装 7-Zip | 将 7z.exe 放到 `tools/7z/` 目录 |
-| 文档 KB 搜索无结果 | 知识库未构建 | 先执行 `delphi_kb(action="build", kb_type="document")` |
+| Search returns no results | KB not built | `delphi_kb(action="build", ...)` |
+| Cannot find class/function | kb_type is wrong | Use `kb_type="project"` for project code |
+| Semantic search inaccurate | Vector index not built | `delphi_kb(action="build_embedding")` |
+| KB build timeout | Large data volume | Use `async_mode=True` for asynchronous execution |
+| KB build failed | Third-party library path is wrong | Check the `DCC_UnitSearchPath` configuration |
+| CHM cannot be parsed | 7-Zip not installed | Place `7z.exe` in the `tools/7z/` directory |
+| Document KB search returns no results | Knowledge base not built | First run `delphi_kb(action="build", kb_type="document")` |
+

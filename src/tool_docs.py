@@ -1,64 +1,64 @@
 """
-Tool 完整文档字典 — 供 tool_help 工具按需查询
+Tool complete documentation dictionary — queried on demand by the tool_help tool
 
-每个工具包含：简介、触发词、协作链、全部 action 说明、示例、降级策略等。
-description 字段是精简版本的 1-2 句简介，其他字段都是 AI 按需获取的详细说明。
+Each tool contains：summary、triggers、collaboration chain、all action descriptions、examples、fallback strategies etc。
+The description field is a condensed 1-2 sentence summary，other fields are detailed descriptions retrieved by AI on demand。
 """
 
 TOOL_HELP_DOCS: dict = {
     "delphi_project": {
-        "summary": "Delphi 项目全生命周期管理：编译/配置查看/代码与 UI 布局审计/设备部署。支持 .dproj/.dpr/.dpk。",
-        "description": "Delphi 项目全生命周期管理 — 编译/配置/审计/部署",
+        "summary": "Delphi project full lifecycle management：compile/config view/code and UI layout audit/device deployment。Supports .dproj/.dpr/.dpk。",
+        "description": "Delphi project full lifecycle management — compile/config/audit/deploy",
         "triggers": [
-            "【仅限 Delphi】编译、构建、生成exe、语法检查、编译报错、build、compile、msbuild、dcc32",
-            "【仅限 Delphi】项目文件、dproj、工程配置、创建项目、添加配置、删除配置",
-            "语法解析、AST解析、审计代码、审查代码、review code、audit",
-            "【仅限 Delphi】部署、deploy、设备列表、iOS设备、Android设备、PAServer",
+            "【Delphi only】compile、build、generate exe、syntax check、compile errors、build、compile、msbuild、dcc32",
+            "【Delphi only】project files、dproj、project configuration、create project、add configuration、delete configuration",
+            "syntax parsing、AST parsing、audit code、review code、review code、audit",
+            "【Delphi only】deploy、deploy、device list、iOS devices、Android devices、PAServer",
         ],
         "constraints": [
-            "❌ 不得用 bash/cmd 运行 dcc32/msbuild（绕过 MSBuild/事件/依赖）",
+            "❌ Do not use bash/cmd to run dcc32/msbuild（bypasses MSBuild/events/dependencies）",
         ],
-        "workflow": "tool_help(tool_name=\"delphi_project\", action=\"<action>\") → delphi_project(action=...) 查看当前 action 参数 → 调用",
+        "workflow": "tool_help(tool_name=\"delphi_project\", action=\"<action>\") → delphi_project(action=...) view current action parameters → call",
         "actions": {
-            "compile": "编译 .dproj/.dpr/.dpk 项目",
-            "compile_file": "检查 .pas 文件语法（快捷方式，等价于 compile + .pas）",
-            "dry_run": "预览编译参数，不实际执行",
-            "info": "读取 .dproj 文件完整信息（配置/源文件/资源/编译事件）",
-            "create": "创建新的 .dproj 文件",
-            "set": "设置 .dproj 属性值（PropertyGroup），可指定 config/platform",
-            "add_config": "添加新的编译配置（如 Staging）",
-            "remove_config": "删除指定编译配置",
-            "add_source": "向 ItemGroup 添加源文件引用",
-            "remove_source": "从 ItemGroup 删除源文件引用",
-            "audit": "运行 50+ 条静态分析规则",
-            "ast": "⭐ 代码骨架提取（daudit --mode skeleton --compact），最省 token",
-            "runtime": "运行时注册检查，检测 uses 中是否遗漏必需单元",
-            "layout": "静态 DFM UI 布局审计，检测重叠、越界、对齐、间距、字段配对、TabOrder 和可调整窗口的绝对坐标溢出风险",
-            "devices": "枚举连接的设备列表（iOS/Android/Windows）",
-            "deploy": "部署编译后的应用到设备（iOS/Android/Windows）",
+            "compile": "Compile .dproj/.dpr/.dpk projects",
+            "compile_file": "Check .pas file syntax（shortcut，equivalent to compile + .pas）",
+            "dry_run": "Preview compilation parameters，do not actually execute",
+            "info": "Read complete .dproj file information（config/source files/resources/compile events）",
+            "create": "Create a new .dproj file",
+            "set": "Set .dproj property value（PropertyGroup），can specify config/platform",
+            "add_config": "Add a new build configuration（e.g. Staging）",
+            "remove_config": "Delete specified build configuration",
+            "add_source": "Add source file reference to ItemGroup",
+            "remove_source": "Delete source file reference from ItemGroup",
+            "audit": "Run 50+ static analysis rules",
+            "ast": "⭐ Code skeleton extraction（daudit --mode skeleton --compact），most token-efficient",
+            "runtime": "Runtime registration check，detect whether required units are missing from uses",
+            "layout": "Static DFM UI layout audit，detect overlap、out-of-bounds、alignment、spacing、field pairing、TabOrder and absolute coordinate overflow risks in resizable windows",
+            "devices": "Enumerate connected device list（iOS/Android/Windows）",
+            "deploy": "Deploy the compiled application to a device",
         },
         "action_params": {
             "compile": {
-                "description": "编译 Delphi 项目",
+                "description": "Compile Delphi project",
                 "required": ["project_path"],
                 "optional": {
-                    "target_platform": "目标平台(win32/win64/osx64/...)，默认 win32",
-                    "build_configuration": "Debug/Release，默认 Debug",
-                    "compiler_version": "编译器版本，不传则自动检测最新",
-                    "conditional_defines": "条件编译符号数组，如 ['DEBUG','TEST']",
-                    "unit_search_paths": "额外单元搜索路径数组",
-                    "resource_search_paths": "资源搜索路径数组",
-                    "optimize": "是否优化，默认 true",
-                    "debug": "是否生成调试信息，默认 true",
-                    "warning_level": "警告级别 0-4，默认 2",
-                    "disabled_warnings": "禁用的警告编号，如 ['W1000']",
-                    "output_type": "gui/console/dll，默认 gui",
-                    "runtime_library": "static/dynamic，默认 static",
-                    "timeout": "超时秒数，默认 600",
-                    "auto_install": "仅 .dpk 有效，是否自动安装到 IDE，默认 true",
-                    "run_verify": "编译后启动 3 秒验证是否崩溃，默认 false",
-                    "output_path": "编译输出目录",
-                    "extra_args": "附加到实际编译后端的完整参数数组；.dproj/MSBuild 使用 /p:...，无对应 .dproj 的直接 DCC 编译使用 -VT/-VR 等开关",
+                    "target_platform": "Target platform(win32/win64/osx64/...)，default win32",
+                    "build_configuration": "Debug/Release，default Debug",
+                    "compiler_version": "Compiler version，if not passed automatically detect latest",
+                    "conditional_defines": "Conditional compilation symbol array，e.g. ['DEBUG','TEST']",
+                    "unit_search_paths": "Additional unit search path array",
+                    "resource_search_paths": "Resource search path array",
+                    "optimize": "Whether to optimize，default true",
+                    "debug": "Whether to generate debug information，default true",
+                    "warning_level": "Warning level 0-4，default 2",
+                    "disabled_warnings": "Disabled warning numbers，e.g. ['W1000']",
+                    "output_type": "gui/console/dll，default gui",
+                    "runtime_library": "static/dynamic，default static",
+                    "timeout": "Timeout seconds，default 600",
+                    "auto_install": "Only valid for .dpk，whether to automatically install to IDE，default true",
+                    "run_verify": "After compilation start for 3 seconds to verify whether it crashes，default false",
+                    "output_path": "Compilation output directory",
+                    "extra_args": "Complete parameter array appended to the actual compilation backend；.dproj/MSBuild uses /p:...，direct DCC compilation without a corresponding .dproj uses switches such as -VT/-VR",
                 },
                 "examples": [
                     'delphi_project(action="compile", project_path="App.dproj", build_configuration="Release")',
@@ -67,57 +67,57 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "dry_run": {
-                "description": "预览编译参数，不实际执行",
+                "description": "Preview compilation parameters，do not actually execute",
                 "optional": {
-                    "project_path": "项目文件绝对路径",
-                    "target_platform": "目标平台",
-                    "build_configuration": "构建配置",
-                    "compiler_version": "编译器版本",
-                    "conditional_defines": "条件编译符号",
-                    "unit_search_paths": "单元搜索路径",
-                    "optimize": "是否优化",
-                    "debug": "是否调试",
-                    "output_type": "输出类型",
-                    "runtime_library": "运行时库",
-                    "extra_args": "附加编译器参数",
+                    "project_path": "Absolute path of project file",
+                    "target_platform": "Target platform",
+                    "build_configuration": "Build configuration",
+                    "compiler_version": "Compiler version",
+                    "conditional_defines": "Conditional compilation symbols",
+                    "unit_search_paths": "Unit search paths",
+                    "optimize": "Whether to optimize",
+                    "debug": "Whether to debug",
+                    "output_type": "Output type",
+                    "runtime_library": "Runtime library",
+                    "extra_args": "Additional compiler parameters",
                 },
                 "examples": [
                     'delphi_project(action="dry_run", project_path="App.dproj")',
                 ],
             },
             "compile_file": {
-                "description": "检查 .pas 文件语法",
+                "description": "Check .pas file syntax",
                 "required": ["project_path"],
                 "optional": {
-                    "unit_search_paths": "单元搜索路径",
-                    "conditional_defines": "条件编译符号",
-                    "compiler_version": "编译器版本",
-                    "extra_args": "附加 DCC 参数",
+                    "unit_search_paths": "Unit search paths",
+                    "conditional_defines": "Conditional compilation symbols",
+                    "compiler_version": "Compiler version",
+                    "extra_args": "Additional DCC parameters",
                 },
                 "examples": [
                     'delphi_project(action="compile_file", project_path="unit.pas")',
                 ],
             },
             "info": {
-                "description": "读取 .dproj 文件完整信息",
+                "description": "Read complete .dproj file information",
                 "required": ["project_path"],
                 "examples": [
                     'delphi_project(action="info", project_path="App.dproj")',
                 ],
             },
             "create": {
-                "description": "创建新的 .dproj 项目文件",
+                "description": "Create a new .dproj project file",
                 "required": ["project_path", "main_source"],
                 "optional": {
-                    "project_guid": "项目 GUID，自动生成",
-                    "framework_type": "VCL/FMX，默认 VCL",
-                    "unit_search_paths": "初始单元搜索路径",
-                    "namespace": "命名空间",
-                    "configs": "编译配置列表，默认 ['Debug','Release']",
-                    "target_platform": "目标平台快捷参数，如 win32/win64；create 时等价于 platforms 单项",
-                    "platforms": "目标平台列表，如 ['Win32','Win64']；默认 ['Win32']",
-                    "sources": "初始源文件列表",
-                    "form_units": "同时生成 Form 桩代码，如 ['Unit1','Main']",
+                    "project_guid": "Project GUID，auto-generated",
+                    "framework_type": "VCL/FMX，default VCL",
+                    "unit_search_paths": "Initial unit search paths",
+                    "namespace": "Namespace",
+                    "configs": "Build configuration list，default ['Debug','Release']",
+                    "target_platform": "Target platform shortcut parameter，e.g. win32/win64；during create equivalent to a single platforms item",
+                    "platforms": "Target platform list，e.g. ['Win32','Win64']；default ['Win32']",
+                    "sources": "Initial source file list",
+                    "form_units": "Also generate Form stub code，e.g. ['Unit1','Main']",
                 },
                 "examples": [
                     'delphi_project(action="create", project_path="App.dproj", main_source="App.dpr")',
@@ -126,61 +126,61 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "set": {
-                "description": "设置 .dproj 属性值",
+                "description": "Set .dproj property value",
                 "required": ["project_path", "property_name", "value"],
                 "optional": {
-                    "config": "编译配置，如 Debug/Release",
-                    "platform": "目标平台，如 Win32/Win64",
+                    "config": "Build configuration，e.g. Debug/Release",
+                    "platform": "Target platform，e.g. Win32/Win64",
                 },
                 "examples": [
                     'delphi_project(action="set", project_path="App.dproj", property_name="DCC_Define", value="DEBUG;TEST", config="Debug")',
                 ],
             },
             "add_config": {
-                "description": "添加新的编译配置",
+                "description": "Add a new build configuration",
                 "required": ["project_path", "config_name"],
                 "optional": {
-                    "base_config": "从哪个现有配置复制属性",
-                    "defines": "条件编译符号",
-                    "optimize": "是否启用优化",
-                    "debug_info": "是否生成调试信息",
+                    "base_config": "Which existing configuration to copy properties from",
+                    "defines": "Conditional compilation symbols",
+                    "optimize": "Whether to enable optimization",
+                    "debug_info": "Whether to generate debug information",
                 },
                 "examples": [
                     'delphi_project(action="add_config", project_path="App.dproj", config_name="Staging", base_config="Debug")',
                 ],
             },
             "remove_config": {
-                "description": "删除编译配置",
+                "description": "Delete build configuration",
                 "required": ["project_path", "config_name"],
                 "examples": [
                     'delphi_project(action="remove_config", project_path="App.dproj", config_name="Staging")',
                 ],
             },
             "add_source": {
-                "description": "向项目添加源文件",
+                "description": "Add source file to project",
                 "required": ["project_path", "source_file"],
                 "optional": {
-                    "main_source_flag": "true=添加为主源文件，false=添加到 DCCReference",
+                    "main_source_flag": "true=add as main source file，false=add to DCCReference",
                 },
                 "examples": [
                     'delphi_project(action="add_source", project_path="App.dproj", source_file="Unit1.pas")',
                 ],
             },
             "remove_source": {
-                "description": "从项目删除源文件引用",
+                "description": "Delete source file reference from project",
                 "required": ["project_path", "source_file"],
                 "examples": [
                     'delphi_project(action="remove_source", project_path="App.dproj", source_file="Unit1.pas")',
                 ],
             },
             "audit": {
-                "description": "运行 50+ 条静态分析规则",
+                "description": "Run 50+ static analysis rules",
                 "optional": {
-                    "base_dir": "审计基准目录",
-                    "file_path": "单文件绝对路径",
-                    "rules": "规则集 P0/P1，默认 P0",
-                    "severity": "最低严重级别 suggestion/warning/critical",
-                    "output_format": "report/json，默认 report",
+                    "base_dir": "Audit base directory",
+                    "file_path": "Absolute path of single file",
+                    "rules": "Rule set P0/P1，default P0",
+                    "severity": "Minimum severity level suggestion/warning/critical",
+                    "output_format": "report/json，default report",
                 },
                 "examples": [
                     'delphi_project(action="audit", base_dir="src")',
@@ -188,10 +188,10 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "ast": {
-                "description": "⭐ 代码骨架提取，最省 token",
+                "description": "⭐ Code skeleton extraction，most token-efficient",
                 "required": ["base_dir"],
                 "optional": {
-                    "file_path": "单文件绝对路径",
+                    "file_path": "Absolute path of single file",
                 },
                 "examples": [
                     'delphi_project(action="ast", base_dir="src")',
@@ -199,20 +199,20 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "runtime": {
-                "description": "运行时注册检查，检测遗漏的 uses 单元",
+                "description": "Runtime registration check，detect missing uses units",
                 "optional": {
-                    "base_dir": "项目基准目录",
+                    "base_dir": "Project base directory",
                 },
                 "examples": [
                     'delphi_project(action="runtime", base_dir="src")',
                 ],
             },
             "layout": {
-                "description": "静态审计 .dfm 布局质量，包括可调整窗口应优先使用 Align 或设置父容器最小尺寸。",
+                "description": "Statically audit .dfm layout quality，including that resizable windows should preferably use Align or set the parent container minimum size。",
                 "optional": {
-                    "base_dir": "递归扫描目录下的 .dfm 文件",
-                    "file_path": "单个 .dfm 文件绝对路径",
-                    "output_format": "report/json，默认 report",
+                    "base_dir": "Recursively scan .dfm files under the directory",
+                    "file_path": "Absolute path of a single .dfm file",
+                    "output_format": "report/json，default report",
                 },
                 "examples": [
                     'delphi_project(action="layout", base_dir="src")',
@@ -220,10 +220,10 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "devices": {
-                "description": "枚举连接的设备列表（iOS/Android/Windows）",
+                "description": "Enumerate connected device list（iOS/Android/Windows）",
                 "optional": {
-                    "target_platform": "目标平台 (iosdevice64/iossimulator/android64/androidarm64/win32/win64)，不传则推断",
-                    "project_path": "项目文件绝对路径（可选，用于推断目标平台）",
+                    "target_platform": "Target platform (iosdevice64/iossimulator/android64/androidarm64/win32/win64)，if not passed then infer",
+                    "project_path": "Absolute path of project file（optional，used to infer target platform）",
                 },
                 "examples": [
                     'delphi_project(action="devices")',
@@ -232,13 +232,13 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "deploy": {
-                "description": "部署编译后的应用到设备",
+                "description": "Deploy the compiled application to a device",
                 "required": ["project_path", "target_platform"],
                 "optional": {
-                    "device_id": "目标设备 ID（iOS UDID 或 Android serial），不传则部署到默认设备",
-                    "build_configuration": "编译配置 (Debug/Release)，默认 Debug",
-                    "extra_args": "附加到 MSBuild 的参数数组",
-                    "timeout": "超时秒数，默认 600",
+                    "device_id": "Target device ID（iOS UDID or Android serial），if not passed deploy to default device",
+                    "build_configuration": "Build configuration (Debug/Release)，default Debug",
+                    "extra_args": "Parameter array appended to MSBuild",
+                    "timeout": "Timeout seconds，default 600",
                 },
                 "examples": [
                     'delphi_project(action="deploy", project_path="App.dproj", target_platform="iosdevice64")',
@@ -249,197 +249,196 @@ TOOL_HELP_DOCS: dict = {
         },
         "workflow_hints": {
             "创建项目": "delphi_project(create) → delphi_project(info) → delphi_project(compile)",
-            "日常编译": "delphi_project(compile, project_path=...) 自动识别 .pas/.dproj",
-            "审计代码": "delphi_project(ast) → 分析 → delphi_file → delphi_project(compile)",
-            "改配置": "delphi_project(set, property_name=...) → delphi_project(compile) 验证",
+            "日常编译": "delphi_project(compile, project_path=...) automatically detect .pas/.dproj",
+            "审计代码": "delphi_project(ast) → analyze → delphi_file → delphi_project(compile)",
+            "改配置": "delphi_project(set, property_name=...) → delphi_project(compile) verify",
             "设备部署": "delphi_project(devices, target_platform=...) → delphi_project(deploy, project_path=..., target_platform=..., device_id=...)",
         },
-    },
-    "delphi_kb": {
-        "summary": "搜索 Delphi API/项目代码/三方库/文档(类/函数/语义搜索)，构建知识库。",
-        "description": "知识库搜索/管理 — 查 Delphi API、项目代码、文档",
+    },    "delphi_kb": {
+        "summary": "Search Delphi API/project code/third-party libraries/docs (class/function/semantic search), build knowledge base.",
+        "description": "Knowledge base search/management — query Delphi API, project code, docs",
         "triggers": [
-            "搜索类、搜索函数、查API、查定义、知识库、构建知识库、KB、语义搜索",
+            "Search classes, search functions, look up API, look up definitions, knowledge base, build knowledge base, KB, semantic search",
         ],
-        "file_triggers": "写 .pas 代码前应先搜索 KB 查 API 定义",
-        "workflow": "写代码前→delphi_kb查API→delphi_file(read)看定义→写代码→compile",
+        "file_triggers": "Before writing .pas code, first search KB for API definitions",
+        "workflow": "Before writing code→delphi_kb query API→delphi_file(read) view definition→write code→compile",
         "actions": {
-            "search": "搜索类/函数/文档(query必需)，kb_type限定范围，search_type限定类型",
-            "stats": "查看知识库统计(文件数、类数、函数数、末次构建时间)",
-            "build": "构建/更新知识库（支持异步 async_mode=true）",
-            "scan": "扫描目录添加文档(kb_type=document)",
-            "web": "添加网页文档(kb_type=document)",
-            "read": "读取文档内容(url/doc_id)或源码文件(file_path)",
-            "build_embedding": "构建向量索引",
+            "search": "Search classes/functions/docs (query required), kb_type limits scope, search_type limits type",
+            "stats": "View knowledge base statistics (file count, class count, function count, last build time)",
+            "build": "Build/update knowledge base (supports async async_mode=true)",
+            "scan": "Scan directory to add documents (kb_type=document)",
+            "web": "Add web documents (kb_type=document)",
+            "read": "Read document content (url/doc_id) or source file (file_path)",
+            "build_embedding": "Build vector index",
         },
         "examples": [
-            'delphi_kb(query="TStringList")                                    搜索类',
-            'delphi_kb(query="Create", search_type="function")                  搜索函数',
-            'delphi_kb(query="TfrxReport", kb_type="thirdparty")                搜索三方库(如 FastReport)',
-            'delphi_kb(action="stats")                                          查看统计',
-            'delphi_kb(action="build", kb_type="project")                       构建项目知识库',
+            'delphi_kb(query="TStringList")                                    Search classes',
+            'delphi_kb(query="Create", search_type="function")                  Search functions',
+            'delphi_kb(query="TfrxReport", kb_type="thirdparty")                Search third-party libraries (e.g. FastReport)',
+            'delphi_kb(action="stats")                                          View statistics',
+            'delphi_kb(action="build", kb_type="project")                       Build project knowledge base',
         ],
         "action_params": {
             "search": {
-                "description": "搜索类/函数/文档",
+                "description": "Search classes/functions/docs",
                 "required": [],
                 "optional": {
-                    "query": "搜索关键词",
-                    "kb_type": "知识库类型: all/delphi/project/thirdparty/document/example",
-                    "search_type": "搜索类型: class/function/unit/semantic/reference/all 等",
-                    "top_k": "最大返回结果数（默认200，最大500）",
-                    "project_path": "项目绝对路径（搜索 project/thirdparty 时需要）",
+                    "query": "Search keyword",
+                    "kb_type": "Knowledge base type: all/delphi/project/thirdparty/document/example",
+                    "search_type": "Search type: class/function/unit/semantic/reference/all etc.",
+                    "top_k": "Maximum number of results (default 200, max 500)",
+                    "project_path": "Absolute project path (required when searching project/thirdparty)",
                 },
             },
             "stats": {
-                "description": "查看知识库统计",
+                "description": "View knowledge base statistics",
                 "required": [],
                 "optional": {},
             },
             "build": {
-                "description": "构建/更新知识库",
+                "description": "Build/update knowledge base",
                 "required": [],
                 "optional": {
-                    "kb_type": "知识库类型: all/delphi/project/thirdparty/document/example",
-                    "project_path": "项目绝对路径",
-                    "version": "Delphi版本",
-                    "rebuild": "是否强制重建",
-                    "incremental": "是否增量更新",
-                    "async_mode": "是否异步执行（默认 true）",
-                    "directory": "扫描目录绝对路径（document KB 时使用）",
-                    "extensions": "文件扩展名过滤",
-                    "max_pages": "最大抓取页数",
-                    "max_depth": "最大抓取深度",
-                    "domain_filter": "域名过滤",
-                    "url_pattern": "URL模式过滤",
-                    "exclude": "排除目录列表",
-                    "max_workers": "最大工作进程数",
-                    "show_progress": "是否显示进度",
-                    "build_thirdparty": "是否同时构建第三方库KB",
-                    "build_project": "是否构建项目KB",
+                    "kb_type": "Knowledge base type: all/delphi/project/thirdparty/document/example",
+                    "project_path": "Absolute project path",
+                    "version": "Delphi version",
+                    "rebuild": "Whether to force rebuild",
+                    "incremental": "Whether to update incrementally",
+                    "async_mode": "Whether to run asynchronously (default true)",
+                    "directory": "Absolute directory path to scan (used for document KB)",
+                    "extensions": "File extension filter",
+                    "max_pages": "Maximum pages to crawl",
+                    "max_depth": "Maximum crawl depth",
+                    "domain_filter": "Domain filter",
+                    "url_pattern": "URL pattern filter",
+                    "exclude": "List of excluded directories",
+                    "max_workers": "Maximum number of workers",
+                    "show_progress": "Whether to show progress",
+                    "build_thirdparty": "Whether to also build third-party library KB",
+                    "build_project": "Whether to build project KB",
                 },
             },
             "scan": {
-                "description": "扫描目录添加文档",
+                "description": "Scan directory to add documents",
                 "required": [],
                 "optional": {
-                    "directory": "扫描目录绝对路径",
-                    "extensions": "文件扩展名过滤",
-                    "max_workers": "最大工作进程数",
-                    "show_progress": "是否显示进度",
+                    "directory": "Absolute directory path to scan",
+                    "extensions": "File extension filter",
+                    "max_workers": "Maximum number of workers",
+                    "show_progress": "Whether to show progress",
                 },
             },
             "web": {
-                "description": "添加网页文档",
+                "description": "Add web documents",
                 "required": [],
                 "optional": {
-                    "url": "网页 URL",
-                    "max_depth": "最大抓取深度（默认3）",
-                    "max_pages": "最大抓取页数（默认100）",
-                    "domain_filter": "域名过滤",
+                    "url": "Webpage URL",
+                    "max_depth": "Maximum crawl depth (default 3)",
+                    "max_pages": "Maximum pages to crawl (default 100)",
+                    "domain_filter": "Domain filter",
                 },
             },
             "read": {
-                "description": "读取文档内容或源码文件",
+                "description": "Read document content or source file",
                 "required": [],
                 "optional": {
-                    "url": "文档 URL",
-                    "doc_id": "文档 ID",
-                    "file_path": "文件绝对路径",
-                    "offset": "读取偏移量",
-                    "limit": "读取字节数限制",
+                    "url": "Document URL",
+                    "doc_id": "Document ID",
+                    "file_path": "Absolute file path",
+                    "offset": "Read offset",
+                    "limit": "Read byte limit",
                 },
             },
             "build_embedding": {
-                "description": "构建向量索引",
+                "description": "Build vector index",
                 "required": [],
                 "optional": {},
             },
         },
     },
     "delphi_file": {
-        "summary": "Delphi 文件(.pas/.dfm/.dproj/.dpr/.dpk/.fmx/.inc/.groupproj)专用读写/搜索/替换入口。Delphi 文件必须用 delphi_file，不要用内置 Read/Edit/Write/grep。",
-        "description": "Delphi 文件专用操作：读/写(edits)/replace/insert/delete/格式化/备份管理/encoding转换/uses子句增删（编码检测+自动备份+DFM转换）。AI 工具路由规则：读取或修改 Delphi 文件都必须选 delphi_file。",
+        "summary": "Delphi file (.pas/.dfm/.dproj/.dpr/.dpk/.fmx/.inc/.groupproj) dedicated read/write/search/replace entry point. Delphi files must use delphi_file, do not use built-in Read/Edit/Write/grep.",
+        "description": "Dedicated operations for Delphi files: read/write (edits)/replace/insert/delete/format/backup management/encoding conversion/uses clause add/remove (encoding detection + automatic backup + DFM conversion). AI tool routing rule: reading or modifying Delphi files must choose delphi_file.",
         "triggers": [
-            "读文件、查看源码、打开文件、cat、Agent内置Read、built-in Read、写代码、编辑文件、改代码、修改代码、Agent内置Edit/Write",
-            "新建文件、格式化、整理代码、恢复备份、回退修改、diff、差异对比",
-            "查看备份、还原文件、增删uses、添加单元、删除单元",
-            "批量写入、批量修改、多处修改、多 edit、write edits",
+            "read file, view source, open file, cat, Agent built-in Read, built-in Read, write code, edit file, modify code, change code, Agent built-in Edit/Write",
+            "create file, format, tidy code, restore backup, roll back changes, diff, compare differences",
+            "view backups, restore file, add/remove uses, add unit, remove unit",
+            "batch write, batch modify, multiple changes, multiple edits, write edits",
         ],
-        "file_triggers": "看到 .pas/.dfm/.dproj/.dpk/.dpr/.fmx/.inc/.groupproj 文件路径时必须用此；读取也算",
+        "file_triggers": "When seeing .pas/.dfm/.dproj/.dpk/.dpr/.fmx/.inc/.groupproj file paths you must use this; reading also counts",
         "constraints": [
-            "❌ Delphi 文件必须用 delphi_file 读写/搜索/正则匹配+替换，不要用内置 Read/Edit/Write/grep",
-            "🚫 禁止对同一个文件并行写入，多处修改合并到一次 write(edits=[...])",
-            "🚫 format/uses/write 标记脏，需 read 后才能再 write",
+            "❌ Delphi files must use delphi_file to read/write/search/regex match+replace, do not use built-in Read/Edit/Write/grep",
+            "🚫 Parallel writes to the same file are prohibited; merge multiple changes into one write(edits=[...])",
+            "🚫 format/uses/write mark dirty; must read before writing again",
         ],
         "features": [
-            "自动编码检测(UTF-8/GBK/UTF-16)，自动备份(__history)",
-            "DFM二进制↔文本透明转换",
-            "1-indexed 行号（参数和输出一致），脏标记机制",
+            "Automatic encoding detection (UTF-8/GBK/UTF-16), automatic backup (__history)",
+            "Transparent DFM binary↔text conversion",
+            "1-indexed line numbers (parameters and output consistent), dirty mark mechanism",
         ],
-        "workflow": "get_coding_rules → delphi_file(read)规划修改→ replace/insert/delete/write(edits=[...])一次性写出 → format → compile。write/replace/insert/delete/format/uses 标记脏，需 read 或 old_content 校验后才能继续写。不同文件可并行。",
+        "workflow": "get_coding_rules → delphi_file(read) plan changes→ replace/insert/delete/write(edits=[...]) write out in one go → format → compile. write/replace/insert/delete/format/uses mark dirty; must read or verify with old_content before continuing to write. Different files can be processed in parallel.",
         "client_wrappers": [
-            "直接暴露 MCP 工具的客户端：调用 delphi_file 时只传 Daofy 参数，例如 action/file_path/start_line/end_line。",
-            "Trae 等只暴露 run_mcp 的客户端：外层传 server_name 和 tool_name，内层 args 才放 Daofy 参数；server_name 是该客户端 MCP 配置里的 Daofy 服务别名，按实际配置填写，不是 Daofy 固定值。",
-            "不要把 server_name/tool_name 混进 delphi_file 的参数对象，也不要把 action/file_path/start_line/end_line 平铺到 run_mcp 外层。",
-            'Trae 示例：run_mcp({"server_name":"<client-configured-daofy-server-name>","tool_name":"delphi_file","args":{"action":"read","file_path":"C:\\\\path\\\\Unit1.pas","start_line":1,"end_line":100}})',
+            "Clients that expose MCP tools directly: when calling delphi_file pass only Daofy parameters, e.g. action/file_path/start_line/end_line.",
+            "Clients such as Trae that only expose run_mcp: pass server_name and tool_name at the outer layer, and put Daofy parameters in the inner args; server_name is the Daofy service alias in that client's MCP configuration, fill in according to actual configuration, not a fixed Daofy value.",
+            "Do not mix server_name/tool_name into the parameter object of delphi_file, and do not flatten action/file_path/start_line/end_line into the outer layer of run_mcp.",
+            'Trae example: run_mcp({"server_name":"<client-configured-daofy-server-name>","tool_name":"delphi_file","args":{"action":"read","file_path":"C:\\\\path\\\\Unit1.pas","start_line":1,"end_line":100}})',
         ],
         "actions": {
-            "read": "读文件，支持分段读取(start_line/end_line)或按类名/函数名定位。所有行号为 1-indexed inclusive。项目源码搜索用 search_in='project' + project_path。读取时自动清除脏标记。",
-            "write": "兼容写入接口（旧语义）。接收 edits 数组，内部自动排序+累积偏移，一次性写出。edits=[{start_line:1, content:'...'}] 全量替换；edits=[{start_line:5, end_line:10, content:'...'}] 部分替换。支持 dry_run 预览 diff。写入后标记脏。",
-            "replace": "按行范围替换。现有文件中每个 edit 必须提供非空 old_content，工具用行号+旧内容校验命中范围。",
-            "insert": "按 start_line 锚点插入。现有文件中每个 edit 必须提供非空 old_content（单行锚点，无需带换行符），position=before/after。",
-            "delete": "按行范围删除。现有文件中每个 edit 必须提供非空 old_content，content 可省略。",
-            "format": "使用 pasfmt 格式化代码。格式化后标记脏。",
-            "backup": "备份管理（创建/列表/恢复）",
-            "encode": "文件编码转换。自动检测源编码，写入目标编码。支持 utf-8/utf-8-sig/gbk/utf-16/utf-16-le/utf-16-be/ansi。自动备份。转换后标记脏。",
-            "uses": "增删 uses 子句中的单元。成功后标记脏。",
-            "grep": "正则搜索/替换。file_path 支持字符串（自动检测文件/目录）或路径数组（逐项解析）。支持多 pattern OR 搜索(patterns)、二级 AND 过滤(filter_pattern)、NOT 排除(exclude_pattern)。replace 切换替换模式（dry_run 默认 True，预览不写盘）。",
-            "fix_garbled": "修复中文乱码：自动检测 U+FFFD 替换字符、缺失 UTF-8 BOM、编码误检测并修复。支持 backup 备份。",
+            "read": "Read file, supports segmented read (start_line/end_line) or locating by class name/function name. All line numbers are 1-indexed inclusive. For project source search use search_in='project' + project_path. Reading automatically clears dirty mark.",
+            "write": "Compatibility write interface (old semantics). Accepts edits array, internally auto-sorts + accumulates offsets, writes out at once. edits=[{start_line:1, content:'...'}] full replacement; edits=[{start_line:5, end_line:10, content:'...'}] partial replacement. Supports dry_run preview diff. Marks dirty after writing.",
+            "replace": "Replace by line range. In existing files each edit must provide non-empty old_content; the tool uses line number + old content to verify the hit range.",
+            "insert": "Insert by start_line anchor. In existing files each edit must provide non-empty old_content (single-line anchor, no newline needed), position=before/after.",
+            "delete": "Delete by line range. In existing files each edit must provide non-empty old_content, content can be omitted.",
+            "format": "Format code using pasfmt. Marks dirty after formatting.",
+            "backup": "Backup management (create/list/restore)",
+            "encode": "File encoding conversion. Automatically detects source encoding, writes target encoding. Supports utf-8/utf-8-sig/gbk/utf-16/utf-16-le/utf-16-be/ansi. Automatic backup. Marks dirty after conversion.",
+            "uses": "Add/remove units in uses clause. Marks dirty after success.",
+            "grep": "Regex search/replace. file_path supports string (auto-detect file/directory) or path array (resolve each item). Supports multi-pattern OR search (patterns), secondary AND filter (filter_pattern), NOT exclude (exclude_pattern). replace switches to replacement mode (dry_run default True, preview does not write to disk).",
+            "fix_garbled": "Fix Chinese garbled text: automatically detect U+FFFD replacement characters, missing UTF-8 BOM, encoding misdetection and fix. Supports backup.",
         },
         "examples": [
-            'delphi_file(action="read", file_path="Unit1.pas")                                         读文件',
-            'delphi_file(action="read", search_type="class", type_name="TForm1")                       搜索类定义',
-            'delphi_file(action="read", file_path="Unit1.pas", start_line=5, end_line=15)              读取第5~15行',
-            'delphi_file(action="write", file_path="src/Unit1.pas", edits=[{start_line:1,content:"unit ..."}])             全量替换',
-            'delphi_file(action="write", file_path="src/Unit1.pas", edits=[{start_line:10,end_line:12,content:"替换内容"}])  部分替换第10~12行',
-            'delphi_file(action="write", file_path="src/Unit1.pas", edits=[{start_line:5,content:"新内容"}], dry_run=true)   预览 diff（从第5行到末尾）',
-            'delphi_file(action="write", file_path="Unit1.pas", edits=[{start_line:5,end_line:7,content:"..."},{start_line:18,end_line:21,content:"..."}])  批量替换两处',
-            'delphi_file(action="replace", file_path="Unit1.pas", edits=[{start_line:5,end_line:7,old_content:"旧代码",content:"新代码"}])  按原文替换',
-            'delphi_file(action="insert", file_path="Unit1.pas", edits=[{start_line:10,position:"before",old_content:"  OldCall;",content:"  NewCall;\\n"}])  锚点插入',
-            'delphi_file(action="delete", file_path="Unit1.pas", edits=[{start_line:10,end_line:12,old_content:"  OldCall;\\n  OtherCall;\\n"}])  按原文删除',
-            'delphi_file(action="format", file_path="src/Unit1.pas")                                   格式化',
-            'delphi_file(action="backup", file_path="Unit1.pas")                                       创建备份',
-            'delphi_file(action="backup", backup_action="list", file_path="Unit1.pas")                 列出备份',
-            'delphi_file(action="backup", backup_action="restore", file_path="Unit1.pas", version=3)   恢复',
-            'delphi_file(action="uses", uses_action="add", unit_name="System.SysUtils", file_path="Unit1.pas")  增uses',
-            'delphi_file(action="grep", file_path="Unit1.pas", pattern="/TMyClass/i")                                                     单文件正则搜索(不区分大小写)',
-            'delphi_file(action="grep", file_path="Unit1.pas", pattern="/^procedure/m", context=2)                                        多行模式+上下文的搜索',
-            'delphi_file(action="grep", file_path="Unit1.pas", pattern="/TMyClass/i", replace="TNewClass", dry_run=True)                 替换预览',
-            'delphi_file(action="grep", file_path="src/", include="**/*.pas", pattern="/TMyClass/i", context=1)                            目录递归搜索（file_path自动检测为目录）',
-            'delphi_file(action="grep", file_path="Unit1.pas", patterns=["/TMyClass/i", "/TSomeClass/"])                                   多 pattern OR 搜索',
-            'delphi_file(action="grep", file_path=["Unit1.pas", "src/"], pattern="/TMyClass/i")                                         路径数组搜索',
-            'delphi_file(action="encode", file_path="Unit1.pas", to_encoding="utf-8-sig")                       添加 UTF-8 BOM',
-            'delphi_file(action="encode", file_path="Unit1.pas", to_encoding="gbk")                             转为 GBK',
-            'delphi_file(action="encode", file_path="Unit1.pas", to_encoding="utf-8", from_encoding="gbk")      指定 GBK→UTF-8',
+            'delphi_file(action="read", file_path="Unit1.pas")                                         Read file',
+            'delphi_file(action="read", search_type="class", type_name="TForm1")                       Search class definition',
+            'delphi_file(action="read", file_path="Unit1.pas", start_line=5, end_line=15)              Read lines 5~15',
+            'delphi_file(action="write", file_path="src/Unit1.pas", edits=[{start_line:1,content:"unit ..."}])             Full replacement',
+            'delphi_file(action="write", file_path="src/Unit1.pas", edits=[{start_line:10,end_line:12,content:"替换内容"}])  Partial replacement of lines 10~12',
+            'delphi_file(action="write", file_path="src/Unit1.pas", edits=[{start_line:5,content:"新内容"}], dry_run=true)   Preview diff (from line 5 to end)',
+            'delphi_file(action="write", file_path="Unit1.pas", edits=[{start_line:5,end_line:7,content:"..."},{start_line:18,end_line:21,content:"..."}])  Batch replace two places',
+            'delphi_file(action="replace", file_path="Unit1.pas", edits=[{start_line:5,end_line:7,old_content:"旧代码",content:"新代码"}])  Replace by original text',
+            'delphi_file(action="insert", file_path="Unit1.pas", edits=[{start_line:10,position:"before",old_content:"  OldCall;",content:"  NewCall;\\n"}])  Anchor insert',
+            'delphi_file(action="delete", file_path="Unit1.pas", edits=[{start_line:10,end_line:12,old_content:"  OldCall;\\n  OtherCall;\\n"}])  Delete by original text',
+            'delphi_file(action="format", file_path="src/Unit1.pas")                                   Format',
+            'delphi_file(action="backup", file_path="Unit1.pas")                                       Create backup',
+            'delphi_file(action="backup", backup_action="list", file_path="Unit1.pas")                 List backups',
+            'delphi_file(action="backup", backup_action="restore", file_path="Unit1.pas", version=3)   Restore',
+            'delphi_file(action="uses", uses_action="add", unit_name="System.SysUtils", file_path="Unit1.pas")  Add uses',
+            'delphi_file(action="grep", file_path="Unit1.pas", pattern="/TMyClass/i")                                                     Single-file regex search (case-insensitive)',
+            'delphi_file(action="grep", file_path="Unit1.pas", pattern="/^procedure/m", context=2)                                        Multiline mode + context search',
+            'delphi_file(action="grep", file_path="Unit1.pas", pattern="/TMyClass/i", replace="TNewClass", dry_run=True)                 Replace preview',
+            'delphi_file(action="grep", file_path="src/", include="**/*.pas", pattern="/TMyClass/i", context=1)                            Directory recursive search (file_path auto-detected as directory)',
+            'delphi_file(action="grep", file_path="Unit1.pas", patterns=["/TMyClass/i", "/TSomeClass/"])                                   Multi-pattern OR search',
+            'delphi_file(action="grep", file_path=["Unit1.pas", "src/"], pattern="/TMyClass/i")                                         Path array search',
+            'delphi_file(action="encode", file_path="Unit1.pas", to_encoding="utf-8-sig")                       Add UTF-8 BOM',
+            'delphi_file(action="encode", file_path="Unit1.pas", to_encoding="gbk")                             Convert to GBK',
+            'delphi_file(action="encode", file_path="Unit1.pas", to_encoding="utf-8", from_encoding="gbk")      Specify GBK→UTF-8',
         ],
         "action_params": {
             "read": {
-                "description": "读取文件，支持分段读取或按类名/函数名定位。所有行号为 1-indexed inclusive。",
+                "description": "Read file, supports segmented read or locating by class name/function name. All line numbers are 1-indexed inclusive.",
                 "required": ["file_path"],
                 "optional": {
-                    "start_line": "起始行号（1-indexed inclusive, 默认1）",
-                    "end_line": "结束行号（1-indexed inclusive），不传则 start_line+limit-1",
-                    "limit": "最大返回行数（默认500，上限1000）",
-                    "show_line_numbers": "是否显示 1-indexed 行号前缀（默认 false）",
-                    "search_type": "读取模式: path/class/function/record",
-                    "search_in": "搜索范围 all/delphi/project/thirdparty；project 需要 project_path",
-                    "project_path": "项目文件绝对路径，用于 search_in=project 或限制写入路径",
-                    "type_name": "类名/接口名",
-                    "function_name": "函数/过程名",
-                    "class_name": "类名（search_type=class 时使用，与 type_name 等效）",
-                    "record_name": "Record 类型名（search_type=record 时使用）",
-                    "encoding": "读取编码 auto/utf-8/gbk/utf-16（默认 auto）",
+                    "start_line": "Start line number (1-indexed inclusive, default 1)",
+                    "end_line": "End line number (1-indexed inclusive), if not provided then start_line+limit-1",
+                    "limit": "Maximum number of lines returned (default 500, upper limit 1000)",
+                    "show_line_numbers": "Whether to show 1-indexed line number prefix (default false)",
+                    "search_type": "Read mode: path/class/function/record",
+                    "search_in": "Search scope all/delphi/project/thirdparty; project requires project_path",
+                    "project_path": "Absolute project file path, used for search_in=project or to restrict write path",
+                    "type_name": "Class/interface name",
+                    "function_name": "Function/procedure name",
+                    "class_name": "Class name (used when search_type=class, equivalent to type_name)",
+                    "record_name": "Record type name (used when search_type=record)",
+                    "encoding": "Read encoding auto/utf-8/gbk/utf-16 (default auto)",
                 },
                 "examples": [
                     'delphi_file(action="read", file_path="Unit1.pas")',
@@ -448,17 +447,17 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "write": {
-                "description": "兼容写入接口。新调用优先使用 replace/insert/delete。edits 内行号为 1-indexed inclusive，写入后标记脏。",
+                "description": "Compatibility write interface. New calls should prefer replace/insert/delete. Line numbers in edits are 1-indexed inclusive; marks dirty after writing.",
                 "required": ["file_path", "edits"],
                 "optional": {
-                    "backup": "写入前自动备份，默认 true",
-                    "encoding": "写入编码 auto/utf-8/gbk/utf-16，默认 auto",
-                    "auto_format": "写入后自动调用 pasfmt 格式化，默认 false。返回的偏移量已包含格式化造成的行数变化",
-                    "force": "跳过重复检测和脏标记检查（默认 false 时检测到重复仅警告不阻断写入）",
-                    "dry_run": "设为 true 时只预览 diff 不写盘（不备份、不写入、不格式化），默认 false。dry_run 不清除脏标记，后续 write 仍需 read 或 old_content。",
-                    "old_content": "写在每个 edit 内；将被替换区间的非空旧内容。写入前忽略字符串外空白后比较，避免行号错位。注意：不要带尾部 \\r\\n 换行符，工具会自动忽略",
-                    "allow_dirty": "跳过脏标记检查（默认 false）。优先使用每个 edit 的非空 old_content；裸 allow_dirty 风险自负",
-                    "project_path": "可选；提供时限制 file_path 必须位于项目目录内",
+                    "backup": "Automatically back up before writing, default true",
+                    "encoding": "Write encoding auto/utf-8/gbk/utf-16, default auto",
+                    "auto_format": "Automatically call pasfmt formatting after writing, default false. Returned offsets already include line count changes caused by formatting",
+                    "force": "Skip duplicate detection and dirty mark check (default false: duplicates only warn, not block writing)",
+                    "dry_run": "When set to true only preview diff without writing to disk (no backup, no write, no formatting), default false. dry_run does not clear dirty mark; subsequent write still requires read or old_content.",
+                    "old_content": "Written inside each edit; non-empty old content of the range to be replaced. Before writing, whitespace outside strings is ignored for comparison to avoid line number misalignment. Note: do not include trailing \\r\\n newline; the tool ignores it automatically",
+                    "allow_dirty": "Skip dirty mark check (default false). Prefer non-empty old_content in each edit; bare allow_dirty at your own risk",
+                    "project_path": "Optional; when provided, restricts file_path to be within project directory",
                 },
                 "examples": [
                     'delphi_file(action="write", file_path="Unit1.pas", edits=[{start_line:5,end_line:7,content:"新行"},{start_line:18,end_line:21,content:"新行"}])',
@@ -467,56 +466,56 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "replace": {
-                "description": "替换一个或多个行范围。现有文件中每个 edit 必须提供非空 old_content，工具用行号+旧内容校验命中范围。",
+                "description": "Replace one or more line ranges. In existing files each edit must provide non-empty old_content; the tool uses line number + old content to verify the hit range.",
                 "required": ["file_path", "edits"],
                 "optional": {
-                    "dry_run": "设为 true 时只预览 diff 不写盘，默认 false。推荐使用",
+                    "dry_run": "When set to true only preview diff without writing to disk, default false. Recommended",
                 },
                 "examples": [
                     'delphi_file(action="replace", file_path="Unit1.pas", edits=[{start_line:5,end_line:7,old_content:"旧代码",content:"新代码"}])',
                 ],
             },
             "insert": {
-                "description": "以 start_line 指向的锚点行为基准插入内容。old_content 必填，用来校验锚点行（单行内容，无需带换行符）；position=before/after。",
+                "description": "Insert content based on the anchor line pointed to by start_line. old_content is required to verify the anchor line (single-line content, no newline needed); position=before/after.",
                 "required": ["file_path", "edits"],
                 "optional": {
-                    "dry_run": "设为 true 时只预览 diff 不写盘，默认 false。推荐使用",
+                    "dry_run": "When set to true only preview diff without writing to disk, default false. Recommended",
                 },
                 "examples": [
                     'delphi_file(action="insert", file_path="Unit1.pas", edits=[{start_line:10,position:"before",old_content:"  OldCall;",content:"  NewCall;\\n"}])',
                 ],
             },
             "delete": {
-                "description": "删除一个或多个行范围。每个 edit 必须提供非空 old_content；content 可省略。",
+                "description": "Delete one or more line ranges. Each edit must provide non-empty old_content; content can be omitted.",
                 "required": ["file_path", "edits"],
                 "optional": {
-                    "dry_run": "设为 true 时只预览 diff 不写盘，默认 false。推荐使用",
+                    "dry_run": "When set to true only preview diff without writing to disk, default false. Recommended",
                 },
                 "examples": [
                     'delphi_file(action="delete", file_path="Unit1.pas", edits=[{start_line:10,end_line:12,old_content:"旧代码"}])',
                 ],
             },
             "format": {
-                "description": "使用 pasfmt 格式化代码。格式化成功后标记文件脏。",
+                "description": "Format code using pasfmt. Marks file dirty after successful formatting.",
                 "required": ["file_path"],
                 "optional": {
-                    "mode": "格式化模式: file/code/check，默认 file",
-                    "code": "mode=code 时待格式化的代码文本",
-                    "config_path": "pasfmt 配置文件绝对路径",
-                    "uses_style": "uses子句风格: compact/pasfmt_default",
-                    "dry_run": "true=仅检查格式不修改文件",
-                    "backup": "是否创建备份，默认 true",
-                    "project_path": "项目绝对路径（可选）",
+                    "mode": "Format mode: file/code/check, default file",
+                    "code": "Code text to format when mode=code",
+                    "config_path": "Absolute path to pasfmt config file",
+                    "uses_style": "uses clause style: compact/pasfmt_default",
+                    "dry_run": "true=only check format without modifying file",
+                    "backup": "Whether to create backup, default true",
+                    "project_path": "Absolute project path (optional)",
                 },
             },
             "encode": {
-                "description": "文件编码转换。支持自动检测源编码（from_encoding='auto'）。转换前自动备份，转换后标记脏。",
+                "description": "File encoding conversion. Supports automatic source encoding detection (from_encoding='auto'). Automatically backs up before conversion, marks dirty after conversion.",
                 "required": ["file_path", "to_encoding"],
                 "optional": {
-                    "from_encoding": "源编码（auto=自动检测，推荐始终用 auto；如需显式指定，请确保编码名称准确无误，否则会导致解码失败或乱码）",
-                    "backup": "转换前是否备份到 __history（默认 true）",
-                    "dry_run": "预览模式: 只输出转换信息不写盘（默认 false）",
-                    "project_path": "项目绝对路径（可选）",
+                    "from_encoding": "Source encoding (auto=automatic detection, recommended to always use auto; if explicitly specified, ensure the encoding name is accurate, otherwise decoding may fail or produce garbled text)",
+                    "backup": "Whether to back up to __history before conversion (default true)",
+                    "dry_run": "Preview mode: only output conversion info without writing to disk (default false)",
+                    "project_path": "Absolute project path (optional)",
                 },
                 "examples": [
                     'delphi_file(action="encode", file_path="Unit1.pas", to_encoding="utf-8-sig")',
@@ -525,14 +524,14 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "uses": {
-                "description": "增删 uses 子句中的单元。成功后标记脏。",
+                "description": "Add/remove units in uses clause. Marks dirty after success.",
                 "required": ["file_path", "uses_action", "unit_name"],
                 "optional": {
-                    "uses_section": "所在区域: interface/implementation，默认 interface",
-                    "auto_format": "添加后自动 pasfmt 格式化（默认 false）",
-                    "backup": "是否创建备份（默认 true）",
-                    "encoding": "写入编码 auto/utf-8/gbk/utf-16（默认 auto）",
-                    "project_path": "项目绝对路径（可选）",
+                    "uses_section": "Section: interface/implementation, default interface",
+                    "auto_format": "Automatically format with pasfmt after adding (default false)",
+                    "backup": "Whether to create backup (default true)",
+                    "encoding": "Write encoding auto/utf-8/gbk/utf-16 (default auto)",
+                    "project_path": "Absolute project path (optional)",
                 },
                 "examples": [
                     'delphi_file(action="uses", uses_action="add", unit_name="System.SysUtils", file_path="Unit1.pas")',
@@ -540,12 +539,12 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "backup": {
-                "description": "备份管理：创建备份、列出备份版本、恢复指定版本。",
+                "description": "Backup management: create backup, list backup versions, restore specified version.",
                 "required": ["file_path"],
                 "optional": {
-                    "backup_action": "子操作: create（默认）/ list / restore",
-                    "version": "备份版本号（restore 时需要，不传则恢复最新）",
-                    "project_path": "项目绝对路径（可选）",
+                    "backup_action": "Sub-action: create (default) / list / restore",
+                    "version": "Backup version number (required for restore; if omitted restores latest)",
+                    "project_path": "Absolute project path (optional)",
                 },
                 "examples": [
                     'delphi_file(action="backup", file_path="Unit1.pas")',
@@ -554,21 +553,21 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "grep": {
-                "description": "正则搜索 + 多级过滤 + 替换。file_path 自动检测：文件路径→单文件搜索，目录路径→递归搜索。也支持多 pattern OR 搜索（patterns）。",
+                "description": "Regex search + multi-level filtering + replacement. file_path auto-detects: file path→single-file search, directory path→recursive search. Also supports multi-pattern OR search (patterns).",
                 "required": [],
                 "optional": {
-                    "file_path": "文件绝对路径、目录绝对路径或路径数组。字符串自动检测文件/目录；数组逐项解析",
-                    "include": "glob 包含模式（仅 file_path 为目录时有效），如 **/*.pas",
-                    "exclude": "glob 排除模式（仅 file_path 为目录时有效）",
-                    "pattern": "单模式正则，支持行内 /expr/flags 语法",
-                    "patterns": "多模式正则数组，各模式 OR 搜索",
-                    "filter_pattern": "二级 AND 过滤（可选），也支持行内 /expr/flags",
-                    "exclude_pattern": "NOT 排除模式（可选），也支持行内 /expr/flags",
-                    "replace": "替换文本，提供后切换为替换模式（dry_run 默认 True）",
-                    "dry_run": "替换模式预览开关，默认 True（仅预览不写盘）",
-                    "context": "上下文行数，默认 0",
-                    "count": "最大返回结果数，默认 200",
-                    "project_path": "项目绝对路径（可选）",
+                    "file_path": "Absolute file path, absolute directory path, or path array. String auto-detects file/directory; array resolves each item",
+                    "include": "glob include pattern (only valid when file_path is a directory), e.g. **/*.pas",
+                    "exclude": "glob exclude pattern (only valid when file_path is a directory)",
+                    "pattern": "Single-pattern regex, supports inline /expr/flags syntax",
+                    "patterns": "Multi-pattern regex array, each pattern OR-searched",
+                    "filter_pattern": "Secondary AND filter (optional), also supports inline /expr/flags",
+                    "exclude_pattern": "NOT exclude pattern (optional), also supports inline /expr/flags",
+                    "replace": "Replacement text; when provided switches to replacement mode (dry_run default True)",
+                    "dry_run": "Replacement mode preview switch, default True (only preview, do not write to disk)",
+                    "context": "Number of context lines, default 0",
+                    "count": "Maximum number of returned results, default 200",
+                    "project_path": "Absolute project path (optional)",
                 },
                 "examples": [
                     'delphi_file(action="grep", file_path="Unit1.pas", pattern="/TMyClass/i")',
@@ -579,12 +578,12 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "fix_garbled": {
-                "description": "修复 Delphi 文件中文乱码：检测无 BOM 的 UTF-8、U+FFFD 替换字符、双重编码等问题并修复。",
+                "description": "Fix Chinese garbled text in Delphi files: detect UTF-8 without BOM, U+FFFD replacement characters, double encoding and other issues and fix them.",
                 "required": ["file_path"],
                 "optional": {
-                    "backup": "是否创建备份，默认 True",
-                    "target_encoding": "目标编码，默认 utf-8-sig（带 BOM 的 UTF-8）",
-                    "project_path": "项目绝对路径（可选）",
+                    "backup": "Whether to create backup, default True",
+                    "target_encoding": "Target encoding, default utf-8-sig (UTF-8 with BOM)",
+                    "project_path": "Absolute project path (optional)",
                 },
                 "examples": [
                     'delphi_file(action="fix_garbled", file_path="Unit1.pas")',
@@ -592,743 +591,740 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
         },
-    },
-    "manage_component": {
-        "summary": "DFM 组件增/删/改/生成 + PAS 自动同步。",
-        "description": "DFM 组件增/删/改/生成 + PAS 自动同步",
-        "triggers": ["添加组件、删除组件、修改组件、生成DFM、组件同步、manage component"],
+    },    "manage_component": {
+        "summary": "DFM component add/remove/modify/generate + PAS auto-sync.",
+        "description": "DFM component add/remove/modify/generate + PAS auto-sync",
+        "triggers": ["Add component, delete component, modify component, generate DFM, component sync, manage component"],
         "sync_rules": [
-            "add:    新字段声明 + 事件方法桩 + uses 单元",
-            "remove: 字段声明 + 事件方法(声明+实现) + 空引用的 uses",
-            "modify: 事件属性变更 → 增/删/改事件方法声明",
+            "add:    new field declaration + event method stubs + uses unit",
+            "remove: field declaration + event methods (declaration+implementation) + unused uses",
+            "modify: event property change → add/remove/modify event method declarations",
         ],
         "actions": {
-            "create": "生成组件 DFM（编译+运行序列化，原 generate_component_dfm 功能）",
-            "add": "向现有 DFM 添加子组件，自动同步 PAS 字段+事件+uses",
-            "remove": "从 DFM 删除组件（含子树），自动同步删除 PAS 字段+事件方法",
-            "modify": "修改 DFM 中组件属性，事件变更时自动同步 PAS 声明",
+            "create": "Generate component DFM (compile+runtime serialization, original generate_component_dfm functionality)",
+            "add": "Add child component to existing DFM, automatically sync PAS fields+events+uses",
+            "remove": "Remove component from DFM (including subtree), automatically sync deletion of PAS fields+event methods",
+            "modify": "Modify component properties in DFM, automatically sync PAS declarations when events change",
         },
         "examples": [
             'create: code="function CreateComponent(AOwner: TComponent): TComponent; ...", uses=["Vcl.Forms","Vcl.StdCtrls"]',
             'add: action="add", target_dfm="Unit1.dfm", new_component_class="TButton", properties={"Caption": "OK"}',
             'remove: action="remove", target_dfm="Unit1.dfm", component_name="BtnCancel"',
-            'modify: action="modify", target_dfm="Unit1.dfm", component_name="BtnOK", properties={"Caption": "确认"}',
+            'modify: action="modify", target_dfm="Unit1.dfm", component_name="BtnOK", properties={"Caption": "Confirm"}',
         ],
         "action_params": {
             "create": {
-                "description": "生成组件 DFM（编译+运行序列化）",
+                "description": "Generate component DFM (compile+runtime serialization)",
                 "required": ["code"],
                 "optional": {
-                    "uses": "需引用的单元列表，如 [\"Vcl.Forms\", \"Vcl.StdCtrls\"]",
-                    "type_decl": "类型声明段（可选）",
-                    "init_code": "初始化代码（可选）",
-                    "compile_timeout": "编译超时秒数（默认60）",
-                    "exec_timeout": "执行超时秒数（默认15）",
+                    "uses": "List of units to reference, e.g. [\"Vcl.Forms\", \"Vcl.StdCtrls\"]",
+                    "type_decl": "Type declaration section (optional)",
+                    "init_code": "Initialization code (optional)",
+                    "compile_timeout": "Compile timeout in seconds (default 60)",
+                    "exec_timeout": "Execution timeout in seconds (default 15)",
                 },
             },
             "add": {
-                "description": "向现有 DFM 添加子组件",
+                "description": "Add child component to existing DFM",
                 "required": ["target_dfm"],
                 "optional": {
-                    "target_pas": "PAS 文件绝对路径（可选，自动同步声明）",
-                    "parent_name": "父组件名称（可选，默认添加到根）",
-                    "new_component_class": "新组件类名，如 TButton",
-                    "new_component_name": "新组件实例名（可选，自动生成）",
-                    "properties": "组件属性字典",
-                    "dfm_text": "待添加的 DFM 文本片段",
+                    "target_pas": "Absolute path to PAS file (optional, automatically sync declarations)",
+                    "parent_name": "Parent component name (optional, default adds to root)",
+                    "new_component_class": "New component class name, e.g. TButton",
+                    "new_component_name": "New component instance name (optional, auto-generated)",
+                    "properties": "Component properties dictionary",
+                    "dfm_text": "DFM text snippet to add",
                 },
             },
             "remove": {
-                "description": "从 DFM 删除组件（含子树）",
+                "description": "Remove component from DFM (including subtree)",
                 "required": ["target_dfm", "component_name"],
                 "optional": {
-                    "target_pas": "PAS 文件绝对路径（可选，自动同步删除）",
+                    "target_pas": "Absolute path to PAS file (optional, automatically sync deletion)",
                 },
             },
             "modify": {
-                "description": "修改 DFM 中组件属性",
+                "description": "Modify component properties in DFM",
                 "required": ["target_dfm", "component_name"],
                 "optional": {
-                    "target_pas": "PAS 文件绝对路径（可选，自动同步事件）",
-                    "properties": "组件属性字典",
+                    "target_pas": "Absolute path to PAS file (optional, automatically sync events)",
+                    "properties": "Component properties dictionary",
                 },
             },
         },
     },
     "check_environment": {
-        "summary": "诊断 Delphi 编译环境、检测编译器、安装 pasfmt。首次使用先 check。",
-        "description": "环境检查 — 诊断 Delphi 编译环境、检测编译器、安装 pasfmt",
-        "triggers": ["检查环境、检测编译器、诊断、环境状态、环境就绪、编译器找不到"],
-        "workflow": "首次使用→check_environment(action=check)→compile→失败→check_environment(action=detect)",
+        "summary": "Diagnose Delphi compilation environment, detect compiler, install pasfmt. Run check first on first use.",
+        "description": "Environment check — diagnose Delphi compilation environment, detect compiler, install pasfmt",
+        "triggers": ["Check environment, detect compiler, diagnose, environment status, environment ready, compiler not found"],
+        "workflow": "First use→check_environment(action=check)→compile→failure→check_environment(action=detect)",
         "actions": {
-            "check": "默认 — 检查当前编译环境状态（有多少编译器可用）",
-            "detect": "重新从注册表/指定路径检测 Delphi 编译器",
-            "install": "下载并安装 pasfmt 格式化工具",
-            "format_install": "安装 pasfmt RAD Studio 插件",
+            "check": "Default — check current compilation environment status (how many compilers are available)",
+            "detect": "Redetect Delphi compilers from registry/specified path",
+            "install": "Download and install pasfmt formatting tool",
+            "format_install": "Install pasfmt RAD Studio plugin",
         },
         "examples": [
-            'check_environment(action="check")                                  检查环境',
-            'check_environment(action="detect", search_path="D:\\Delphi")       指定路径检测',
+            'check_environment(action="check")                                  check environment',
+            'check_environment(action="detect", search_path="D:\\Delphi")       detect specified path',
         ],
         "action_params": {
             "check": {
-                "description": "检查当前编译环境状态",
+                "description": "Check current compilation environment status",
                 "required": [],
                 "optional": {},
             },
             "detect": {
-                "description": "重新检测 Delphi 编译器",
+                "description": "Redetect Delphi compilers",
                 "required": [],
                 "optional": {
-                    "search_path": "额外搜索路径",
+                    "search_path": "Additional search path",
                 },
             },
             "install": {
-                "description": "下载并安装 pasfmt 格式化工具",
+                "description": "Download and install pasfmt formatting tool",
                 "required": [],
                 "optional": {
-                    "install_dir": "安装目录绝对路径",
+                    "install_dir": "Absolute installation directory path",
                 },
             },
             "format_install": {
-                "description": "安装 pasfmt RAD Studio 插件",
+                "description": "Install pasfmt RAD Studio plugin",
                 "required": [],
                 "optional": {
-                    "install_dir": "安装目录绝对路径",
-                    "delphi_version": "Delphi 版本号，如 11、12",
+                    "install_dir": "Absolute installation directory path",
+                    "delphi_version": "Delphi version number, e.g. 11, 12",
                 },
             },
         },
     },
     "async_task": {
-        "summary": "管理后台构建知识库等耗时任务。通常 delphi_kb(action=build) 已自动触发。",
-        "description": "异步任务管理 — 管理后台构建知识库等耗时任务",
-        "triggers": ["任务状态、查看进度、后台任务、构建进度、取消任务"],
+        "summary": "Manage background time-consuming tasks such as knowledge base building. Usually automatically triggered by delphi_kb(action=build).",
+        "description": "Async task management — manage background time-consuming tasks such as knowledge base building",
+        "triggers": ["Task status, view progress, background task, build progress, cancel task"],
         "push_notification": (
-            "异步任务完成/失败时自动推送通知到 MCP 客户端，无需轮询。"
+            "Automatically push notification to MCP client when async task completes/fails; no polling needed."
         ),
         "actions": {
-            "start": "启动异步任务（通常 delphi_kb(action=build) 已自动启动，无需手动调用）",
-            "status": "查询任务状态（返回进度百分比和状态）",
-            "result": "获取任务结果（大结果自动写入临时文件，返回摘要+文件路径）",
-            "list": "列出所有任务",
-            "cancel": "取消运行中的任务",
+            "start": "Start async task (usually automatically started by delphi_kb(action=build); no manual call needed)",
+            "status": "Query task status (returns progress percentage and status)",
+            "result": "Get task result (large results automatically written to temporary file, returns summary+file path)",
+            "list": "List all tasks",
+            "cancel": "Cancel running task",
         },
         "examples": [
-            'async_task(action="status", task_id="...")   查看任务进度',
-            'async_task(action="list")                    列出所有任务',
+            'async_task(action="status", task_id="...")   view task progress',
+            'async_task(action="list")                    list all tasks',
         ],
         "action_params": {
             "start": {
-                "description": "启动异步任务",
+                "description": "Start async task",
                 "required": [],
                 "optional": {
-                    "task_type": "任务类型，如 build_knowledge_base",
-                    "task_params": "任务参数 dict",
+                    "task_type": "Task type, e.g. build_knowledge_base",
+                    "task_params": "Task parameters dict",
                 },
             },
             "status": {
-                "description": "查询任务状态",
+                "description": "Query task status",
                 "required": [],
                 "optional": {
-                    "task_id": "任务 ID",
-                    "long_poll_seconds": "长轮询秒数，默认 0（立即返回），最大 30",
-                    "show_progress": "是否显示进度，默认 true",
+                    "task_id": "Task ID",
+                    "long_poll_seconds": "Long polling seconds, default 0 (return immediately), maximum 30",
+                    "show_progress": "Whether to show progress, default true",
                 },
-                "note": "⚠️ 对于慢任务（如自动化测试），不要使用 long_poll_seconds，改用 action=result 轮询，避免 MCP 通道超时",
+                "note": "⚠️ For slow tasks (such as automated tests), do not use long_poll_seconds; instead use action=result polling to avoid MCP channel timeout",
             },
             "result": {
-                "description": "获取任务结果（立即返回，零等待）",
+                "description": "Get task result (return immediately, zero wait)",
                 "required": [],
                 "optional": {
-                    "task_id": "任务 ID",
+                    "task_id": "Task ID",
                 },
-                "note": "✅ 推荐用于轮询慢任务状态：立即返回当前结果，不阻塞。任务未完成时返回「任务尚未完成」+ 当前进度。结果超过 10KB 时自动写入临时文件，返回摘要+文件路径，读取后调用 cleanup 清理",
+                "note": "✅ Recommended for polling slow task status: return current result immediately without blocking. When task is not complete, returns \"Task not completed\" + current progress. When result exceeds 10KB, automatically writes to temporary file, returns summary+file path; after reading, call cleanup to clean up",
             },
             "list": {
-                "description": "列出所有任务",
+                "description": "List all tasks",
                 "required": [],
                 "optional": {},
             },
             "cancel": {
-                "description": "取消运行中的任务",
+                "description": "Cancel running task",
                 "required": [],
                 "optional": {
-                    "task_id": "任务 ID",
+                    "task_id": "Task ID",
                 },
             },
         },
     },
     "package": {
-        "summary": "编译/安装/管理 Delphi 组件包。支持 .dproj/.dpk/.groupproj。",
-        "description": "组件包管理 — 编译安装/列出已安装",
-        "triggers": ["安装组件、安装包、编译包、dpk安装、注册组件、列出已安装、install package"],
-        "details": "自动将设计期包注册到 IDE，运行期包仅编译",
-        "workflow": "package(action=install) → package(action=list) 验证安装",
+        "summary": "Compile/install/manage Delphi component packages. Supports .dproj/.dpk/.groupproj.",
+        "description": "Component package management — compile/install/list installed",
+        "triggers": ["Install component, install package, compile package, install dpk, register component, list installed, install package"],
+        "details": "Automatically register design-time packages to IDE; runtime packages are only compiled",
+        "workflow": "package(action=install) → package(action=list) verify installation",
         "actions": {
-            "install": "编译并安装组件包。package_path 必需。",
-            "list": "列出已安装到 IDE 的组件包。无参数。",
+            "install": "Compile and install component package. package_path is required.",
+            "list": "List component packages installed in IDE. No parameters.",
         },
         "examples": [
-            'package(action="install", package_path="MyPackage.dpk")  安装组件包',
-            'package(action="list")                                    验证安装',
+            'package(action="install", package_path="MyPackage.dpk")  install component package',
+            'package(action="list")                                    verify installation',
         ],
         "action_params": {
             "install": {
-                "description": "编译并安装组件包",
+                "description": "Compile and install component package",
                 "required": ["package_path"],
                 "optional": {
-                    "target_platform": "目标平台 win32/win64，默认 win32",
-                    "build_configuration": "构建配置 Debug/Release，默认 Debug",
-                    "timeout": "超时秒数，默认 300",
-                    "install": "是否自动安装到 IDE，默认 true",
+                    "target_platform": "Target platform win32/win64, default win32",
+                    "build_configuration": "Build configuration Debug/Release, default Debug",
+                    "timeout": "Timeout in seconds, default 300",
+                    "install": "Whether to automatically install to IDE, default true",
                 },
             },
             "list": {
-                "description": "列出已安装的组件包",
+                "description": "List installed component packages",
                 "required": [],
                 "optional": {},
             },
         },
     },
     "get_coding_rules": {
-        "summary": "加载编码规则（支持 Delphi / Lazarus/FPC）。按场景加载，不要一次全读。",
+        "summary": "Load coding rules (supports Delphi / Lazarus/FPC). Load by scenario; do not read all at once.",
         "description": (
-            "按场景加载编码规则。支持多种编程语言的编码规范。\n\n"
-            "**语言选择**:\n"
-            "  `language=\"delphi\"`（默认）— Delphi 编码规范\n"
-            "  `language=\"lazarus\"` — Lazarus/Free Pascal 编码规范\n\n"
-            "⚠️ 必须调用的场景（违反会导致编译失败/运行崩溃）:\n"
-            "  编辑代码 → section=\"writing\"      （命名/格式/行号规则）\n"
-            "  编译项目 → section=\"compile\"       （编译参数/错误处理）\n"
-            "  审查代码 → section=\"review\"        （审核清单）\n\n"
-            "📋 按需加载的场景:\n"
-            "  首次编码 → section=\"workflow\"      （整体流程总览）\n"
-            "  调试问题 → section=\"debugging\"     （调试决策树/异常分类）\n"
-            "  自动化测试 → section=\"automation\"  （测试架构/脚本/场景模板）\n"
-            "  UI 布局 → section=\"ui_layout\"      （布局审计规范）\n"
-            "  保存经验 → section=\"experience\"    （经验库操作）\n"
-            "  人机协同 → section=\"human_collab\"  （异常诊断/人工介入）\n"
-            "  重建 KB → section=\"kb_build\"       （知识库重建）\n\n"
-            "💡 按需加载示例:\n"
-            "  examples=\"naming\"           — 命名规范示例\n"
-            "  examples=\"formatting\"       — 格式化示例\n"
-            "  examples=\"documentation\"    — 文档注释示例\n"
-            "  examples=\"error-handling\"   — 错误处理示例\n"
-            "  examples=\"dirty-flag\"       — 脏标记保护示例\n"
-            "  examples=\"debug-log-template\" — 调试日志模板示例\n"
-            "  examples=\"write-edits\"      — write(edits=[...]) 批量写入示例\n"
-            "  规则文件中有 📋 示例: examples/xxx 行，标明可用示例名称\n\n"
-            "💡 不传 section= 返回工作流总览+章节索引（首次使用时推荐）"
+            "Load coding rules by scenario. Supports coding standards for multiple programming languages.\n\n"
+            "**Language selection**:\n"
+            "  `language=\"delphi\"` (default) — Delphi coding standards\n"
+            "  `language=\"lazarus\"` — Lazarus/Free Pascal coding standards\n\n"
+            "⚠️ Scenarios that must be called (violation may cause compilation failure/runtime crash):\n"
+            "  Edit code → section=\"writing\"      (naming/formatting/line number rules)\n"
+            "  Compile project → section=\"compile\"       (compile parameters/error handling)\n"
+            "  Review code → section=\"review\"        (review checklist)\n\n"
+            "📋 Scenarios to load on demand:\n"
+            "  First-time coding → section=\"workflow\"      (overall process overview)\n"
+            "  Debugging issues → section=\"debugging\"     (debug decision tree/exception classification)\n"
+            "  Automated testing → section=\"automation\"  (test architecture/scripts/scenario templates)\n"
+            "  UI layout → section=\"ui_layout\"      (layout audit standards)\n"
+            "  Save experience → section=\"experience\"    (experience library operations)\n"
+            "  Human collaboration → section=\"human_collab\"  (exception diagnosis/manual intervention)\n"
+            "  Rebuild KB → section=\"kb_build\"       (knowledge base rebuild)\n\n"
+            "💡 On-demand loading examples:\n"
+            "  examples=\"naming\"           — naming standards example\n"
+            "  examples=\"formatting\"       — formatting example\n"
+            "  examples=\"documentation\"    — documentation comment example\n"
+            "  examples=\"error-handling\"   — error handling example\n"
+            "  examples=\"dirty-flag\"       — dirty flag protection example\n"
+            "  examples=\"debug-log-template\" — debug log template example\n"
+            "  examples=\"write-edits\"      — write(edits=[...]) batch write example\n"
+            "  Rule files contain 📋 example: examples/xxx line, indicating available example names\n\n"
+            "💡 Omit section= to return workflow overview+section index (recommended on first use)"
         ),
-        "triggers": ["编码规则、编码规范、代码风格、命名规范、规则、coding rules"],
+        "triggers": ["Coding rules, coding standards, code style, naming conventions, rules, coding rules"],
         "file_triggers": [
-            "⚠️ 看到 .pas/.dfm/.dproj/.dpk/.dpr/.inc/.res/.groupproj 等 Delphi 文件时，必须先调用此工具",
-            "⚠️ 在写/修改任何 Delphi 代码前，必须先 get_coding_rules 了解编码规范",
+            "⚠️ When seeing .pas/.dfm/.dproj/.dpk/.dpr/.inc/.res/.groupproj and other Delphi files, you must call this tool first",
+            "⚠️ Before writing/modifying any Delphi code, you must first call get_coding_rules to learn the coding standards",
         ],
-        "workflow": "任何 .pas/.dproj 操作前→get_coding_rules(section='workflow') 了解流程",
+        "workflow": "Before any .pas/.dproj operation→get_coding_rules(section='workflow') learn the process",
         "section_guide": {
-            "workflow": "工作流总览（首次编码时加载）",
-            "writing": "写 Delphi 代码时的命名/格式/泛型规则（编辑代码前必须加载）",
-            "compile": "编译参数/错误处理（编译项目前必须加载）",
-            "review": "编译后审查代码（审查前必须加载）",
-            "debugging": "调试决策树/异常分类（调试问题时加载）",
-            "automation": "自动化测试架构/脚本/场景模板（自动化测试时加载）",
-            "ui_layout": "UI 布局规范与审计（修改窗体后加载）",
-            "experience": "经验库操作（保存/搜索经验时加载）",
-            "human_collab": "人机协同（异常诊断/人工介入时加载）",
-            "kb_build": "知识库重建（KB 数据缺失时加载）",
-            "agent_rules": "Agent 操作硬规则（执行脚本/格式化时加载）",
+            "workflow": "Workflow overview (load on first coding)",
+            "writing": "Naming/formatting/generics rules when writing Delphi code (must load before editing code)",
+            "compile": "Compile parameters/error handling (must load before compiling project)",
+            "review": "Review code after compilation (must load before review)",
+            "debugging": "Debug decision tree/exception classification (load when debugging issues)",
+            "automation": "Automated test architecture/scripts/scenario templates (load during automated testing)",
+            "ui_layout": "UI layout standards and auditing (load after modifying forms)",
+            "experience": "Experience library operations (load when saving/searching experience)",
+            "human_collab": "Human collaboration (load during exception diagnosis/manual intervention)",
+            "kb_build": "Knowledge base rebuild (load when KB data is missing)",
+            "agent_rules": "Agent operation hard rules (load when executing scripts/formatting)",
         },
         "examples_guide": {
-            "naming": "命名规范代码示例（T/I/E/P/F/A 前缀、PascalCase、UPPER_SNAKE 常量）",
-            "formatting": "格式化代码示例（2 空格缩进、begin 独占行、uses 分组字母序）",
-            "documentation": "文档注释示例（单元头注释、XML Doc 风格方法注释）",
-            "error-handling": "错误处理示例（try/finally 资源释放、具体异常捕获、禁止空 except）",
-            "dirty-flag": "脏标记保护示例（写入前后 read/preview 流程）",
-            "debug-log-template": "调试日志模板示例（问题描述/已尝试方案/当前范围/下一步）",
-            "write-edits": "write(edits=[...]) 批量写入示例（行号偏移计算）",
+            "naming": "Naming standards code example (T/I/E/P/F/A prefixes, PascalCase, UPPER_SNAKE constants)",
+            "formatting": "Formatting code example (2-space indentation, begin on its own line, uses grouped alphabetically)",
+            "documentation": "Documentation comment example (unit header comment, XML Doc style method comments)",
+            "error-handling": "Error handling example (try/finally resource release, specific exception catching, no empty except)",
+            "dirty-flag": "Dirty flag protection example (read/preview process before and after writing)",
+            "debug-log-template": "Debug log template example (problem description/attempted solutions/current scope/next step)",
+            "write-edits": "write(edits=[...]) batch write example (line number offset calculation)",
         },
-        "default_section": "不传 section=返回工作流总览+章节索引（推荐首次调用）。language=delphi(默认)或lazarus。",
-    },
-    "code_hosting": {
-        "summary": "Git 本地操作 + 代码托管平台。必须使用此工具进行所有 Git 操作，禁止用 bash 直接执行 git。",
-        "description": "所有 Git 操作(status/diff/show/log/add/commit/fetch/pull/branch/switch/merge/restore/stash/tag/push/clone) + 代码托管平台 API。禁止用 bash 执行 git（code_hosting 更省 token 且自动处理异步推送）。",
-        "triggers": ["git", "status", "diff", "show", "log", "add", "commit", "push", "clone", "pull", "branch", "stash", "提交", "推送", "暂存", "仓库"],
+        "default_section": "Omit section= to return workflow overview+section index (recommended on first call). language=delphi(default) or lazarus.",
+    },    "code_hosting": {
+        "summary": "Git local operations + code hosting platform. This tool must be used for all Git operations; do not execute git directly via bash.",
+        "description": "All Git operations(status/diff/show/log/add/commit/fetch/pull/branch/switch/merge/restore/stash/tag/push/clone) + code hosting platform API. Do not execute git via bash (code_hosting saves tokens and automatically handles asynchronous pushes).",
+        "triggers": ["git", "status", "diff", "show", "log", "add", "commit", "push", "clone", "pull", "branch", "stash", "commit", "push", "stage", "repository"],
         "platforms": {
-            "gitea": "自托管 Gitea",
+            "gitea": "Self-hosted Gitea",
             "github": "GitHub (github.com)",
             "gitlab": "GitLab CE/EE (gitlab.com)",
-            "gitee": "Gitee 码云 (gitee.com)",
+            "gitee": "Gitee Code Cloud (gitee.com)",
             "gitcode": "GitCode (gitcode.net)",
         },
         "actions": {
             "api": {
-                "create_token": "创建令牌(仅Gitea)", "init_labels": "初始化标签",
-                "create_issue": "创建工单", "get_issue": "查看工单",
-                "edit_issue": "修改工单", "set_labels": "设置工单标签",
-                "close_issue": "关闭工单", "add_comment": "评论工单",
-                "list_issues": "查询工单",
-                "create_pull": "创建 PR/MR", "get_pull": "查看 PR/MR",
-                "list_pulls": "查询 PR/MR", "edit_pull": "修改 PR/MR",
-                "merge_pull": "合并 PR/MR", "close_pull": "关闭 PR/MR",
-                "reopen_pull": "重开 PR/MR",
-                "create_release": "创建 Release", "get_release": "查看 Release",
-                "list_releases": "查询 Release", "edit_release": "修改 Release",
-                "delete_release": "删除 Release",
+                "create_token": "Create token (Gitea only)", "init_labels": "Initialize labels",
+                "create_issue": "Create issue", "get_issue": "View issue",
+                "edit_issue": "Edit issue", "set_labels": "Set issue labels",
+                "close_issue": "Close issue", "add_comment": "Comment on issue",
+                "list_issues": "List issues",
+                "create_pull": "Create PR/MR", "get_pull": "View PR/MR",
+                "list_pulls": "List PR/MR", "edit_pull": "Edit PR/MR",
+                "merge_pull": "Merge PR/MR", "close_pull": "Close PR/MR",
+                "reopen_pull": "Reopen PR/MR",
+                "create_release": "Create Release", "get_release": "View Release",
+                "list_releases": "List Releases", "edit_release": "Edit Release",
+                "delete_release": "Delete Release",
             },
             "git_sync": {
-                "git_status": "仓库状态", "git_diff": "查看差异", "git_show": "查看提交/对象",
-                "git_log": "提交历史", "git_add": "暂存文件", "git_commit": "提交",
-                "git_fetch": "拉取远程引用(支持 async_mode)", "git_pull": "拉取并合并(支持 async_mode)",
-                "git_branch": "分支列表/创建/删除", "git_switch": "切换/创建分支",
-                "git_merge": "合并分支(支持 async_mode)", "git_restore": "恢复显式文件",
-                "git_unstage": "取消暂存", "git_stash": "stash 管理", "git_tag": "标签列表/创建/删除",
+                "git_status": "Repository status", "git_diff": "View diff", "git_show": "View commit/object",
+                "git_log": "Commit history", "git_add": "Stage files", "git_commit": "Commit",
+                "git_fetch": "Fetch remote refs (supports async_mode)", "git_pull": "Pull and merge (supports async_mode)",
+                "git_branch": "List/create/delete branches", "git_switch": "Switch/create branch",
+                "git_merge": "Merge branch (supports async_mode)", "git_restore": "Restore explicit files",
+                "git_unstage": "Unstage", "git_stash": "stash management", "git_tag": "List/create/delete tags",
             },
             "git_async": {
-                "git_clone": "克隆(支持 GitHub 镜像)", "git_push": "推送",
-                "git_push_retry": "推送(后台自动重试)",
+                "git_clone": "Clone (supports GitHub mirror)", "git_push": "Push",
+                "git_push_retry": "Push (automatic background retry)",
             },
         },
-        "china_access": "git_clone 支持 mirror 参数指定镜像源。推送依赖用户自身的 SSH/HTTPS 代理配置。",
+        "china_access": "git_clone supports the mirror parameter to specify a mirror source. Pushing depends on the user's own SSH/HTTPS proxy configuration.",
         "action_params": {
             "git_status": {
-                "description": "查看仓库状态",
+                "description": "View repository status",
                 "required": ["dir"],
                 "optional": {},
             },
             "git_diff": {
-                "description": "查看差异",
+                "description": "View diff",
                 "required": ["dir"],
-                "optional": {"staged": "显示已暂存的差异", "name_only": "只输出文件名", "stat": "输出统计信息", "limit": "输出截断行数", "files": "文件路径列表"},
+                "optional": {"staged": "Show staged diff", "name_only": "Only output file names", "stat": "Output statistics", "limit": "Number of lines to truncate output to", "files": "List of file paths"},
             },
             "git_log": {
-                "description": "查看提交历史",
+                "description": "View commit history",
                 "required": ["dir"],
-                "optional": {"limit": "返回条数", "files": "文件路径列表", "stat": "显示统计信息"},
+                "optional": {"limit": "Number of results", "files": "List of file paths", "stat": "Show statistics"},
             },
             "git_add": {
-                "description": "暂存文件",
+                "description": "Stage files",
                 "required": ["dir"],
-                "optional": {"files": "文件路径列表"},
+                "optional": {"files": "List of file paths"},
             },
             "git_commit": {
-                "description": "提交",
+                "description": "Commit",
                 "required": ["dir", "message"],
                 "optional": {},
             },
             "git_push": {
-                "description": "推送到远程",
+                "description": "Push to remote",
                 "required": ["dir"],
-                "optional": {"remote": "远程名称，默认 origin", "branch": "分支名"},
+                "optional": {"remote": "Remote name, defaults to origin", "branch": "Branch name"},
             },
             "git_push_retry": {
-                "description": "推送（后台自动重试）",
+                "description": "Push (automatic background retry)",
                 "required": ["dir"],
-                "optional": {"remote": "远程名称，默认 origin", "branch": "分支名", "retry_interval": "重试间隔秒数，默认 300", "max_retries": "最大重试次数，默认 12"},
+                "optional": {"remote": "Remote name, defaults to origin", "branch": "Branch name", "retry_interval": "Retry interval in seconds, defaults to 300", "max_retries": "Maximum retry count, defaults to 12"},
             },
             "git_clone": {
-                "description": "克隆仓库",
+                "description": "Clone repository",
                 "required": ["repo_url", "dir"],
-                "optional": {"branch": "分支名", "mirror": "GitHub 镜像源地址"},
+                "optional": {"branch": "Branch name", "mirror": "GitHub mirror source address"},
             },
             "git_branch": {
-                "description": "分支管理",
+                "description": "Branch management",
                 "required": ["dir"],
-                "optional": {"branch": "分支名", "delete": "删除分支", "remote_branches": "列出远程分支"},
+                "optional": {"branch": "Branch name", "delete": "Delete branch", "remote_branches": "List remote branches"},
             },
             "git_switch": {
-                "description": "切换/创建分支",
+                "description": "Switch/create branch",
                 "required": ["dir", "branch"],
-                "optional": {"create": "创建并切换分支", "start_point": "新分支起点"},
+                "optional": {"create": "Create and switch branch", "start_point": "New branch start point"},
             },
             "git_fetch": {
-                "description": "拉取远程引用",
+                "description": "Fetch remote refs",
                 "required": ["dir"],
-                "optional": {"branch": "分支名", "prune": "使用 --prune", "async_mode": "后台异步执行"},
+                "optional": {"branch": "Branch name", "prune": "Use --prune", "async_mode": "Execute asynchronously in background"},
             },
             "git_pull": {
-                "description": "拉取并合并",
+                "description": "Pull and merge",
                 "required": ["dir"],
-                "optional": {"branch": "分支名", "rebase": "使用 rebase 模式", "async_mode": "后台异步执行"},
+                "optional": {"branch": "Branch name", "rebase": "Use rebase mode", "async_mode": "Execute asynchronously in background"},
             },
             "git_merge": {
-                "description": "合并分支",
+                "description": "Merge branch",
                 "required": ["dir", "branch"],
-                "optional": {"ff_only": "使用 ff-only", "no_commit": "使用 no-commit", "async_mode": "后台异步执行"},
+                "optional": {"ff_only": "Use ff-only", "no_commit": "Use no-commit", "async_mode": "Execute asynchronously in background"},
             },
             "git_restore": {
-                "description": "恢复文件",
+                "description": "Restore files",
                 "required": ["dir", "files"],
-                "optional": {"staged": "恢复已暂存的文件", "source": "--source 引用"},
+                "optional": {"staged": "Restore staged files", "source": "--source reference"},
             },
             "git_stash": {
-                "description": "stash 管理",
+                "description": "stash management",
                 "required": ["dir"],
-                "optional": {"op": "push/list/pop/apply/drop/show", "include_untracked": "包含未跟踪文件", "message": "stash 消息", "files": "文件列表"},
+                "optional": {"op": "push/list/pop/apply/drop/show", "include_untracked": "Include untracked files", "message": "stash message", "files": "File list"},
             },
             "git_tag": {
-                "description": "标签管理",
+                "description": "Tag management",
                 "required": ["dir"],
-                "optional": {"tag": "标签名", "start_point": "标签起点", "delete": "删除标签"},
+                "optional": {"tag": "Tag name", "start_point": "Tag start point", "delete": "Delete tag"},
             },
             "git_unstage": {
-                "description": "取消暂存",
+                "description": "Unstage",
                 "required": ["dir"],
-                "optional": {"files": "文件列表"},
+                "optional": {"files": "File list"},
             },
             "git_show": {
-                "description": "查看提交/对象",
+                "description": "View commit/object",
                 "required": ["dir", "ref"],
-                "optional": {"stat": "统计信息", "name_only": "只输出文件名"},
+                "optional": {"stat": "Statistics", "name_only": "Only output file names"},
             },
             "create_issue": {
-                "description": "创建工单",
+                "description": "Create issue",
                 "required": ["repo", "title"],
-                "optional": {"body": "正文内容", "labels": "标签名列表"},
+                "optional": {"body": "Body content", "labels": "List of label names"},
             },
             "create_pull": {
-                "description": "创建 PR/MR",
+                "description": "Create PR/MR",
                 "required": ["repo", "title", "source_branch", "target_branch"],
-                "optional": {"body": "正文内容"},
+                "optional": {"body": "Body content"},
             },
             "create_release": {
-                "description": "创建 Release",
+                "description": "Create Release",
                 "required": ["repo", "tag_name"],
-                "optional": {"name": "Release 名称", "body": "正文内容", "target_commitish": "目标提交", "draft": "草稿标记", "prerelease": "预发布标记"},
+                "optional": {"name": "Release name", "body": "Body content", "target_commitish": "Target commit", "draft": "Draft flag", "prerelease": "Prerelease flag"},
             },
         },
     },
 
     "tool_help": {
-        "summary": "获取任意工具的完整帮助文档，包含参数说明、示例、触发词、协作链。",
-        "description": "获取工具的完整帮助文档",
-        "triggers": ["帮助、帮助文档、用法、如何使用、详细说明、全量帮助"],
-        "usage": "当不确定某个工具的详细用法时调用此工具。输入 tool_name 即可返回触发词、action 说明、示例、协作链等所有详细信息。",
+        "summary": "Get the full help documentation for any tool, including parameter descriptions, examples, trigger words, and collaboration chains.",
+        "description": "Get the full help documentation for a tool",
+        "triggers": ["help, help documentation, usage, how to use, detailed description, full help"],
+        "usage": "Call this tool when unsure about the detailed usage of a tool. Enter tool_name to return all detailed information such as trigger words, action descriptions, examples, and collaboration chains.",
         "examples": [
             'tool_help(tool_name="delphi_file")',
             'tool_help(tool_name="delphi_project")',
         ],
     },
     "delphi_rtti": {
-        "summary": "Delphi RTTI 桥接 — 通过 RTTI 发现和调用 Delphi 应用程序的运行时能力。三步法: discover→发现能力, call→调用方法, guide→使用指南。",
-        "description": "Delphi RTTI 桥接 — 通过 Enhanced RTTI 发现/调用 Delphi 应用能力",
+        "summary": "Delphi RTTI bridge — discover and call the runtime capabilities of a Delphi application via RTTI. Three-step method: discover→discover capabilities, call→call methods, guide→usage guide.",
+        "description": "Delphi RTTI bridge — discover/call Delphi application capabilities via Enhanced RTTI",
         "triggers": [
-            "RTTI、运行时发现、调用Delphi方法、发现Delphi能力、发布published+public方法",
-            "delphi rtti、rtti bridge、运行时类型信息",
+            "RTTI, runtime discovery, call Delphi methods, discover Delphi capabilities, published+public methods",
+            "delphi rtti, rtti bridge, runtime type information",
         ],
         "constraints": [
-            "❌ 需要 Delphi 应用已链接 DaofyAutomation 单元（VCL: uses Vcl.DaofyAutomation; FMX: uses Fmx.DaofyAutomation）",
-            "❌ 需要 Delphi 2010+ (Enhanced RTTI)",
-            "⚠️ 不能发现 protected 和 private 区段的方法/属性",
+            "❌ Requires the Delphi application to have linked the DaofyAutomation unit (VCL: uses Vcl.DaofyAutomation; FMX: uses Fmx.DaofyAutomation)",
+            "❌ Requires Delphi 2010+ (Enhanced RTTI)",
+            "⚠️ Cannot discover methods/properties in protected and private sections",
         ],
         "auto_unit_paths": [
-            "VCL 项目 → Vcl.DaofyAutomation.pas（自动引用 DaofyAutomation.Base / RttiAttributes / RttiDiscovery）",
-            "FMX 项目 → Fmx.DaofyAutomation.pas（自动引用 DaofyAutomation.Base / RttiAttributes / RttiDiscovery）",
-            "以上文件均在 $(DaofyRoot)\\tools\\auto\\，将此路径加入项目 Search path 即可编译",
+            "VCL project → Vcl.DaofyAutomation.pas (automatically references DaofyAutomation.Base / RttiAttributes / RttiDiscovery)",
+            "FMX project → Fmx.DaofyAutomation.pas (automatically references DaofyAutomation.Base / RttiAttributes / RttiDiscovery)",
+            "The above files are all in $(DaofyRoot)\\tools\\auto\\; add this path to the project Search path to compile",
         ],
         "workflow": "delphi_rtti(action='guide') → discover → call",
         "features": [
-            "三步法：guide(使用指南) → discover(能力扫描) → call(方法调用)",
-            "自动 JSON Schema 类型映射（15 类 Delphi 类型）",
-            "5 分钟缓存，同一应用生命周期内不重复扫描",
-            "进程池复用，keep_alive 支持多次调用",
-            "AI 注解支持：AIDescription / AIResultDescription / AIExample / AIParamDescription",
+            "Three-step method: guide(usage guide) → discover(capability scan) → call(method invocation)",
+            "Automatic JSON Schema type mapping (15 Delphi types)",
+            "5-minute cache; no repeated scan within the same application lifecycle",
+            "Process pool reuse; keep_alive supports multiple calls",
+            "AI annotation support: AIDescription / AIResultDescription / AIExample / AIParamDescription",
         ],
         "actions": {
-            "guide": "返回完整使用指南（含类型映射表、最佳实践、故障排除）",
-            "discover": "扫描并返回 Delphi 应用所有类的 published+public 方法/属性，含 JSON Schema 参数定义及 AI 注解描述",
-            "call": "调用指定类的指定方法，params 为可选参数 dict",
+            "guide": "Return the complete usage guide (including type mapping table, best practices, troubleshooting)",
+            "discover": "Scan and return the published+public methods/properties of all classes in the Delphi application, including JSON Schema parameter definitions and AI annotation descriptions",
+            "call": "Call the specified method of the specified class; params is an optional parameter dict",
         },
         "action_params": {
             "guide": {
-                "description": "获取 delphi_rtti 工具的使用指南",
+                "description": "Get the usage guide for the delphi_rtti tool",
                 "optional": {},
             },
             "discover": {
-                "description": "扫描 Delphi 应用的 RTTI 能力",
+                "description": "Scan the RTTI capabilities of a Delphi application",
                 "required": ["app_path"],
                 "optional": {
-                    "class_name": "限定的类名，空串扫描所有",
-                    "force": "true 强制刷新缓存（默认 false）",
-                    "keep_alive": "true 保持进程运行供后续复用（默认 false）",
-                    "pipe": "内部命名管道名称（自动生成，不传则自动）",
+                    "class_name": "Limited class name; an empty string scans all",
+                    "force": "true forces cache refresh (default false)",
+                    "keep_alive": "true keeps the process running for subsequent reuse (default false)",
+                    "pipe": "Internal named pipe name (auto-generated; automatically set if not passed)",
                 },
             },
             "call": {
-                "description": "调用 Delphi 应用的 RTTI 暴露方法",
+                "description": "Call a method exposed by the Delphi application via RTTI",
                 "required": ["app_path", "class_name", "method"],
                 "optional": {
-                    "params": "参数 dict，键名需与 discover 返回的 Schema 一致",
-                    "keep_alive": "true 保持进程运行供后续复用（默认 false）",
-                    "pipe": "内部命名管道名称（自动生成，不传则自动）",
+                    "params": "Parameter dict; key names must match the Schema returned by discover",
+                    "keep_alive": "true keeps the process running for subsequent reuse (default false)",
+                    "pipe": "Internal named pipe name (auto-generated; automatically set if not passed)",
                 },
             },
         },
         "examples": [
-            'delphi_rtti(action="guide")                                                        获取使用指南',
-            'delphi_rtti(action="discover", app_path="C:\\App\\MyApp.exe")                      扫描所有类',
-            'delphi_rtti(action="discover", app_path="C:\\App\\MyApp.exe", class_name="TMainForm")  扫描指定类',
-            'delphi_rtti(action="discover", app_path="C:\\App\\MyApp.exe", keep_alive=True)      扫描并保持进程',
-            'delphi_rtti(action="call", app_path="C:\\App\\MyApp.exe", class_name="TMainForm", method="CreateOrder", params={"customerName":"张三"})  调用方法',
+            'delphi_rtti(action="guide")                                                        Get usage guide',
+            'delphi_rtti(action="discover", app_path="C:\\App\\MyApp.exe")                      Scan all classes',
+            'delphi_rtti(action="discover", app_path="C:\\App\\MyApp.exe", class_name="TMainForm")  Scan specified class',
+            'delphi_rtti(action="discover", app_path="C:\\App\\MyApp.exe", keep_alive=True)      Scan and keep process alive',
+            'delphi_rtti(action="call", app_path="C:\\App\\MyApp.exe", class_name="TMainForm", method="CreateOrder", params={"customerName":"Zhang San"})  Call method',
         ],
         "workflow_hints": {
-            "首次使用": "delphi_rtti(action='guide') 查看完整使用说明",
-            "连接应用": "delphi_rtti(action='discover', app_path='...') → 自动连接 → 发现能力",
+            "首次使用": "delphi_rtti(action='guide') View complete usage instructions",
+            "连接应用": "delphi_rtti(action='discover', app_path='...') → Auto-connect → Discover capabilities",
             "调用方法": "delphi_rtti(action='call', app_path='...', class_name='...', method='...')",
-            "批量调用": "首次使用 keep_alive=True → 多次 call → 自动复用进程",
+            "批量调用": "First use keep_alive=True → Multiple calls → Automatically reuse process",
         },
         "type_mapping": {
             "string": "String/UnicodeString/AnsiString → string",
-            "integer": "Integer/Int64/Cardinal/Byte/Word → integer(无符号加minimum:0)",
+            "integer": "Integer/Int64/Cardinal/Byte/Word → integer (unsigned adds minimum:0)",
             "number": "Single/Double/Currency → number",
             "boolean": "Boolean/ByteBool/WordBool/LongBool → boolean",
             "datetime": "TDateTime → string with format:date-time",
-            "enum": "枚举类型 → string with enum约束",
-            "array": "动态数组/TArray → array, 元素类型递归映射",
-            "object": "TObject子类 → object",
+            "enum": "Enum type → string with enum constraint",
+            "array": "Dynamic array/TArray → array, element types recursively mapped",
+            "object": "TObject subclass → object",
             "variant": "Variant → [string,number,boolean,null]",
         },
-    },
-    "experience": {
-        "summary": "经验记忆管理：保存/搜索 AI 成功解决问题的做法，下次遇到类似问题自动复用。save 自动去重。",
-        "description": "经验记忆管理 — 保存/搜索/管理 AI 成功解决问题的经验，save 时自动去重合并",
-        "triggers": ["经验、记忆、保存经验、搜索经验、之前怎么解决的、我记得"],
-        "workflow": "任务成功 → experience(action=save, ...) → 自动去重(>0.85 合并非新增) → 定期 experience(action=prune) 清理低价值条目",
+    },    "experience": {
+        "summary": "Experience memory management: save/search approaches that AI successfully used to solve problems, automatically reuse next time a similar problem is encountered. save automatically deduplicates.",
+        "description": "Experience memory management — save/search/manage AI experiences that successfully solved problems, automatically deduplicate and merge on save",
+        "triggers": ["experience, memory, save experience, search experience, how was it solved before, I remember"],
+        "workflow": "Task succeeds → experience(action=save, ...) → auto deduplicate (>0.85 merged not added) → periodically experience(action=prune) clean low-value entries",
         "actions": {
-            "save": "保存经验(自动去重：相似度>0.85时合并)。必要: problem+solution",
-            "search": "语义搜索经验。query+top_k",
-            "get": "查看经验详情。id=经验ID",
-            "list": "浏览列表。tags+sort_by+limit",
-            "update": "更新经验。id+要改的字段",
-            "merge": "合并多条经验。ids=[id1,id2,...] 至少2个",
-            "prune": "列出低价值经验供检查删除",
-            "delete": "删除经验。id=经验ID",
-            "rebuild_embedding": "重建缺失向量。需先 delphi_kb(build_embedding) 加载模型",
+            "save": "Save experience (auto deduplicate: merge when similarity >0.85). Required: problem+solution",
+            "search": "Semantic search experiences. query+top_k",
+            "get": "View experience details. id=experience ID",
+            "list": "Browse list. tags+sort_by+limit",
+            "update": "Update experience. id+fields to change",
+            "merge": "Merge multiple experiences. ids=[id1,id2,...] at least 2",
+            "prune": "List low-value experiences for review and deletion",
+            "delete": "Delete experience. id=experience ID",
+            "rebuild_embedding": "Rebuild missing vectors. Need delphi_kb(build_embedding) to load model first",
         },
         "action_params": {
             "save": {
-                "description": "保存经验（自动去重）",
+                "description": "Save experience (auto deduplicate)",
                 "required": ["problem", "solution"],
                 "optional": {
-                    "tools_used": "用到的工具列表",
-                    "tags": "标签列表",
-                    "context": "上下文信息 dict",
-                    "force": "强制新保存（跳过 >0.7 去重提醒层）",
+                    "tools_used": "List of tools used",
+                    "tags": "Tag list",
+                    "context": "Context info dict",
+                    "force": "Force new save (skip >0.7 deduplication reminder layer)",
                 },
             },
             "search": {
-                "description": "语义搜索经验",
+                "description": "Semantic search experiences",
                 "required": [],
                 "optional": {
-                    "query": "搜索关键词",
-                    "top_k": "返回条数，默认 5",
-                    "tags": "标签过滤",
+                    "query": "Search keywords",
+                    "top_k": "Number of results, default 5",
+                    "tags": "Tag filter",
                 },
             },
             "get": {
-                "description": "查看经验详情",
+                "description": "View experience details",
                 "required": ["id"],
                 "optional": {},
             },
             "list": {
-                "description": "浏览列表",
+                "description": "Browse list",
                 "required": [],
                 "optional": {
-                    "tags": "标签过滤",
-                    "sort_by": "排序字段: updated_at/created_at/hit_count/score，默认 updated_at",
-                    "limit": "返回条数，默认 20",
+                    "tags": "Tag filter",
+                    "sort_by": "Sort field: updated_at/created_at/hit_count/score, default updated_at",
+                    "limit": "Number of results, default 20",
                 },
             },
             "update": {
-                "description": "更新经验",
+                "description": "Update experience",
                 "required": ["id"],
                 "optional": {
-                    "problem": "新问题描述",
-                    "solution": "新解决步骤",
-                    "tags": "新标签列表",
-                    "tools_used": "新工具列表",
-                    "context": "新上下文信息",
+                    "problem": "New problem description",
+                    "solution": "New solution steps",
+                    "tags": "New tag list",
+                    "tools_used": "New tool list",
+                    "context": "New context info",
                 },
             },
             "merge": {
-                "description": "合并多条经验",
+                "description": "Merge multiple experiences",
                 "required": ["ids"],
                 "optional": {
-                    "keep": "保留的目标 ID（可选，不传则创建新记录）",
+                    "keep": "Target ID to keep (optional, creates new record if not passed)",
                 },
             },
             "prune": {
-                "description": "列出低价值经验",
+                "description": "List low-value experiences",
                 "required": [],
                 "optional": {
-                    "limit": "返回条数，默认 20",
+                    "limit": "Number of results, default 20",
                 },
             },
             "delete": {
-                "description": "删除经验",
+                "description": "Delete experience",
                 "required": ["id"],
                 "optional": {},
             },
             "rebuild_embedding": {
-                "description": "重建缺失向量",
+                "description": "Rebuild missing vectors",
                 "required": [],
                 "optional": {},
             },
         },
     },
     "daofy_update": {
-        "summary": "检查 Daofy 版本更新、执行 git pull 更新（类似 code_hosting 异步模式）。",
-        "description": "Daofy 自身更新管理 — 版本检查 / git pull 更新（后台异步+自动重试）",
-        "triggers": ["更新、升级、新版本、检查更新、daofy 版本、update、upgrade"],
-        "workflow": "启动时后台自动检查 → 智能提示通知 AI → AI 询问用户 → daofy_update(action='update') → async_task 查进度 → 通知重启",
+        "summary": "Check Daofy version updates, execute git pull update (similar to code_hosting async mode).",
+        "description": "Daofy self-update management — version check / git pull update (background async + automatic retry)",
+        "triggers": ["update, upgrade, new version, check for updates, daofy version, update, upgrade"],
+        "workflow": "Automatically check in the background on startup → intelligently prompt/notify AI → AI asks user → daofy_update(action='update') → async_task check progress → notify restart",
         "actions": {
-            "check": "先快速检查（缓存/同步），失败后自动提交后台重试任务（返回 task_id）",
-            "check_retry": "强制提交后台自动重试版本检查任务，返回 task_id",
-            "update": "提交后台 git pull 任务（单次），返回 task_id",
-            "update_retry": "提交后台自动重试 git pull 任务（类似 git_push_retry），返回 task_id",
-            "version": "显示当前版本号和安装方式（git/pip）",
+            "check": "Quickly check first (cache/sync), on failure automatically submit background retry task (returns task_id)",
+            "check_retry": "Force submit background automatic retry version check task, returns task_id",
+            "update": "Submit background git pull task (single run), returns task_id",
+            "update_retry": "Submit background automatic retry git pull task (similar to git_push_retry), returns task_id",
+            "version": "Show current version number and installation method (git/pip)",
         },
         "notes": (
-            "启动时服务器会自动在后台检查更新，有新版本时会通过工具响应智能提示通知 AI。\n"
-            "check/update 返回 task_id 时，使用 async_task(action=status, task_id=...) 查看进度。\n"
-            "任务完成时会自动推送通知到 MCP 客户端。\n"
-            "更新完成后需要重启 Daofy 或 AI Agent 使新版本生效。\n"
-            "pip 安装用户使用: pip install --upgrade daofy-for-delphi"
+            "On startup the server automatically checks for updates in the background; when a new version is available, it intelligently prompts/notifies the AI through the tool response.\n"
+            "When check/update returns task_id, use async_task(action=status, task_id=...) to view progress.\n"
+            "When the task completes, a notification is automatically pushed to the MCP client.\n"
+            "After the update completes, restart Daofy or the AI Agent for the new version to take effect.\n"
+            "pip installation users use: pip install --upgrade daofy-for-delphi"
         ),
         "examples": [
-            'daofy_update(action="check")           检查版本（快速/后台重试）',
-            'daofy_update(action="check_retry")     强制后台重试检查',
-            'daofy_update(action="update")          后台 git pull 更新',
-            'daofy_update(action="update_retry")    后台自动重试 git pull',
-            'async_task(action=status, task_id=...) 查询异步任务进度',
-            'daofy_update(action="version")         显示当前版本',
+            'daofy_update(action="check")           Check version (quick/background retry)',
+            'daofy_update(action="check_retry")     Force background retry check',
+            'daofy_update(action="update")          Background git pull update',
+            'daofy_update(action="update_retry")    Background automatic retry git pull',
+            'async_task(action=status, task_id=...) Query async task progress',
+            'daofy_update(action="version")         Show current version',
         ],
         "action_params": {
             "check": {
-                "description": "快速检查版本更新",
+                "description": "Quickly check version updates",
                 "required": [],
                 "optional": {},
             },
             "check_retry": {
-                "description": "强制后台重试版本检查",
+                "description": "Force background retry version check",
                 "required": [],
                 "optional": {},
             },
             "update": {
-                "description": "后台 git pull 更新",
+                "description": "Background git pull update",
                 "required": [],
                 "optional": {},
             },
             "update_retry": {
-                "description": "后台自动重试 git pull",
+                "description": "Background automatic retry git pull",
                 "required": [],
                 "optional": {
-                    "retry_interval": "重试间隔秒数，默认 60",
-                    "max_retries": "最大重试次数，默认 10",
+                    "retry_interval": "Retry interval in seconds, default 60",
+                    "max_retries": "Maximum retries, default 10",
                 },
             },
             "version": {
-                "description": "显示当前版本号",
+                "description": "Show current version number",
                 "required": [],
                 "optional": {},
             },
         },
     },
     "generate_copyright": {
-        "summary": "生成软著文档（源代码+说明书+汇总表）。",
-        "description": "软著文档生成 — 源代码/说明书/汇总表",
-        "triggers": ["软著、版权、著作权登记、copyright"],
-        "constraints": ["需要 Edge/Chrome 浏览器 headless"],
+        "summary": "Generate software copyright documents (source code + manual + summary table).",
+        "description": "Software copyright document generation — source code/manual/summary table",
+        "triggers": ["software copyright, copyright, copyright registration, copyright"],
+        "constraints": ["Requires Edge/Chrome browser headless"],
         "actions": {
-            "generate": "生成文档", "validate": "检查配置",
-            "update_config": "更新配置(config字典)", "status": "检查浏览器",
-            "list": "列出已生成文件", "generate_content": "生成草稿",
-            "audit": "审计草稿驳回风险",
+            "generate": "Generate documents", "validate": "Check configuration",
+            "update_config": "Update configuration (config dict)", "status": "Check browser",
+            "list": "List generated files", "generate_content": "Generate draft",
+            "audit": "Audit draft rejection risks",
         },
         "examples": [
             'generate_copyright(action="validate")',
-            'generate_copyright(action="update_config", config={"contact_person":"张三"})',
+            'generate_copyright(action="update_config", config={"contact_person":"John Doe"})',
             'generate_copyright(action="generate")',
             'generate_copyright(action="audit")',
         ],
         "action_params": {
             "generate": {
-                "description": "生成软著文档（源代码+说明书+汇总表）",
+                "description": "Generate software copyright documents (source code + manual + summary table)",
                 "required": [],
                 "optional": {
-                    "doc_type": "文档类型: all/source/manual/summary，默认 all",
-                    "output_dir": "输出目录绝对路径（可选，默认 docs/copyright）",
-                    "project_path": "项目绝对路径（可选，默认当前工作目录）",
+                    "doc_type": "Document type: all/source/manual/summary, default all",
+                    "output_dir": "Absolute path of output directory (optional, default docs/copyright)",
+                    "project_path": "Absolute path of project (optional, default current working directory)",
                 },
             },
             "validate": {
-                "description": "检查配置",
+                "description": "Check configuration",
                 "required": [],
                 "optional": {},
             },
             "update_config": {
-                "description": "更新配置",
+                "description": "Update configuration",
                 "required": [],
                 "optional": {
-                    "config": "配置更新 dict",
+                    "config": "Configuration update dict",
                 },
             },
             "status": {
-                "description": "检查浏览器/环境状态",
+                "description": "Check browser/environment status",
                 "required": [],
                 "optional": {},
             },
             "list": {
-                "description": "列出已生成的文件",
+                "description": "List generated files",
                 "required": [],
                 "optional": {},
             },
             "generate_content": {
-                "description": "生成草稿",
+                "description": "Generate draft",
                 "required": [],
                 "optional": {},
             },
             "audit": {
-                "description": "审计草稿，检查驳回风险",
+                "description": "Audit draft, check rejection risks",
                 "required": [],
                 "optional": {},
             },
         },
     },
     "ocr": {
-        "summary": "图像分析：PP-OCRv6 文字识别 + 截图差异对比 + 颜色分析 + 图标匹配。",
-        "description": "图像分析 — 文字识别/截图对比/颜色分析/模板匹配",
+        "summary": "Image analysis: PP-OCRv6 text recognition + screenshot diff comparison + color analysis + icon matching.",
+        "description": "Image analysis — text recognition/screenshot comparison/color analysis/template matching",
         "triggers": [
-            "OCR、文字识别、图片文字、识别图片、提取文字、图像文字",
-            "图片转文字、截图识别、ocr识别、optical character recognition",
-            "截图对比、图像差异、diff、颜色分析、图标匹配、模板匹配",
+            "OCR, text recognition, image text, recognize image, extract text, image text",
+            "image to text, screenshot recognition, ocr recognition, optical character recognition",
+            "screenshot comparison, image diff, diff, color analysis, icon matching, template matching",
         ],
         "constraints": [
-            "❌ image_path 必须为本地存在的文件路径",
-            "❌ 不支持 base64 编码图片（需先保存为文件）",
-            "⚠️ 首次调用时会自动下载模型（~65MB），可能需要等待",
-            "⚠️ 模型缓存到 data/ocr-models/，后续调用无需下载",
-            "⚠️ diff/color/match 使用 OpenCV/Pillow，不需要 OCR 模型",
+            "❌ image_path must be a path to an existing local file",
+            "❌ base64-encoded images are not supported (save to a file first)",
+            "⚠️ On first call the model (~65MB) is downloaded automatically; this may take time",
+            "⚠️ Models are cached to data/ocr-models/; subsequent calls need no download",
+            "⚠️ diff/color/match use OpenCV/Pillow and do not require the OCR model",
         ],
-        "workflow": "ocr(action=status) → 确认模型就绪 → ocr(action=recognize, image_path=...)",
+        "workflow": "ocr(action=status) → confirm model ready → ocr(action=recognize, image_path=...)",
         "auto_backend": (
-            "自动选择推理后端:\n"
-            "  Intel CPU + openvino → OpenVINO（利用 VNNI/AMX 加速）\n"
-            "  AMD / 其他 CPU       → ONNX Runtime\n"
-            "  Python ≥ 3.14        → ONNX Runtime（PaddlePaddle 不兼容）"
+            "Automatically select inference backend:\n"
+            "  Intel CPU + openvino → OpenVINO (uses VNNI/AMX acceleration)\n"
+            "  AMD / other CPU       → ONNX Runtime\n"
+            "  Python ≥ 3.14        → ONNX Runtime (PaddlePaddle incompatible)"
         ),
         "actions": {
-            "recognize": "完整 OCR 管线：检测 → 方向分类 → 文字识别 → 返回结构化结果",
-            "detect": "仅文本框检测，不识别文字（返回 box + score）",
-            "status": "查询模型加载状态和后端信息",
-            "diff": "截图差异对比：两张图片的像素级对比，返回变化区域",
-            "color": "区域颜色分析：指定区域的 RGB 平均色/主色/亮度/灰度判断",
-            "match": "图标模板匹配：在截图中查找指定图标/图案的位置",
+            "recognize": "Full OCR pipeline: detection → orientation classification → text recognition → return structured results",
+            "detect": "Text box detection only, no text recognition (returns box + score)",
+            "status": "Query model loading status and backend info",
+            "diff": "Screenshot diff comparison: pixel-level comparison of two images, returns changed regions",
+            "color": "Region color analysis: RGB average color/dominant color/brightness/grayscale check for specified region",
+            "match": "Icon template matching: find the position of specified icon/pattern in screenshot",
         },
         "action_params": {
             "recognize": {
-                "description": "检测并识别图片中所有文字",
+                "description": "Detect and recognize all text in the image",
                 "required": ["image_path"],
                 "optional": {},
                 "examples": [
@@ -1337,53 +1333,53 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "detect": {
-                "description": "仅检测文本框位置",
+                "description": "Detect text box positions only",
                 "required": ["image_path"],
                 "examples": [
                     'ocr(action="detect", image_path="screenshot.png")',
                 ],
             },
             "status": {
-                "description": "查询服务状态（后端类型、模型是否已加载）",
+                "description": "Query service status (backend type, whether model is loaded)",
                 "examples": [
                     'ocr(action="status")',
                 ],
             },
             "diff": {
-                "description": "比较两张截图，找出视觉差异区域",
+                "description": "Compare two screenshots and find visually different regions",
                 "required": ["baseline", "current"],
-                "optional": {"threshold": "像素差异阈值 0-255（默认 10）",
-                             "output_dir": "差异图输出目录绝对路径（可选）"},
+                "optional": {"threshold": "Pixel difference threshold 0-255 (default 10)",
+                             "output_dir": "Absolute path of diff image output directory (optional)"},
                 "examples": [
                     'ocr(action="diff", baseline="before.png", current="after.png")',
                     'ocr(action="diff", baseline="100%.png", current="150%.png", threshold=5)',
                 ],
             },
             "color": {
-                "description": "分析图片指定区域的颜色特征",
+                "description": "Analyze color features of specified region in image",
                 "required": ["image_path"],
-                "optional": {"region": "分析区域 [x,y,w,h]，不传则全图"},
+                "optional": {"region": "Analysis region [x,y,w,h]; if not passed, entire image"},
                 "examples": [
                     'ocr(action="color", image_path="screenshot.png", region=[10,20,100,25])',
                     'ocr(action="color", image_path="button.png")',
                 ],
             },
             "match": {
-                "description": "在截图中查找指定图标/图案",
+                "description": "Find specified icon/pattern in screenshot",
                 "required": ["image_path", "template_path"],
-                "optional": {"threshold": "匹配阈值 0-1（默认 0.8）"},
+                "optional": {"threshold": "Matching threshold 0-1 (default 0.8)"},
                 "examples": [
                     'ocr(action="match", image_path="screenshot.png", template_path="save_icon.png")',
                 ],
             },
         },
         "examples": [
-            'ocr(action="status")                                                   查询模型状态',
-            'ocr(action="recognize", image_path="screenshot.png")                   完整OCR识别',
-            'ocr(action="detect", image_path="screenshot.png")                      仅文本框检测',
-            'ocr(action="diff", baseline="base.png", current="new.png")             截图差异对比',
-            'ocr(action="color", image_path="btn.png", region=[0,0,50,20])          区域颜色分析',
-            'ocr(action="match", image_path="shot.png", template_path="icon.png")   图标匹配',
+            'ocr(action="status")                                                   Query model status',
+            'ocr(action="recognize", image_path="screenshot.png")                   Full OCR recognition',
+            'ocr(action="detect", image_path="screenshot.png")                      Text box detection only',
+            'ocr(action="diff", baseline="base.png", current="new.png")             Screenshot diff comparison',
+            'ocr(action="color", image_path="btn.png", region=[0,0,50,20])          Region color analysis',
+            'ocr(action="match", image_path="shot.png", template_path="icon.png")   Icon matching',
         ],
         "response_format": {
             "recognize": (
@@ -1393,7 +1389,7 @@ TOOL_HELP_DOCS: dict = {
                 '  "count": 3,\n'
                 '  "results": [\n'
                 "    {\n"
-                '      "text": "确定",\n'
+                '      "text": "OK",\n'
                 '      "confidence": 0.97,\n'
                 '      "box": [[10,20],[100,20],[100,50],[10,50]],\n'
                 '      "det_score": 0.85\n'
@@ -1434,51 +1430,50 @@ TOOL_HELP_DOCS: dict = {
             ),
         },
         "workflow_hints": {
-            "首次使用": "ocr(action='status') 检查模型是否已下载好",
-            "日常识别": "ocr(action='recognize', image_path='...') 直接识别",
-            "快速检测": "ocr(action='detect', image_path='...') 先看文本框位置",
-            "截图对比": "ocr(action='diff', baseline='...', current='...') 检查 UI 是否变化",
-            "颜色验证": "ocr(action='color', image_path='...', region=[...]) 检查按钮颜色",
-            "图标查找": "ocr(action='match', image_path='...', template_path='icon.png') 确认图标出现",
+            "首次使用": "ocr(action='status') Check whether the model has been downloaded",
+            "日常识别": "ocr(action='recognize', image_path='...') Directly recognize",
+            "快速检测": "ocr(action='detect', image_path='...') First check text box positions",
+            "截图对比": "ocr(action='diff', baseline='...', current='...') Check whether UI changed",
+            "颜色验证": "ocr(action='color', image_path='...', region=[...]) Check button color",
+            "图标查找": "ocr(action='match', image_path='...', template_path='icon.png') Confirm the icon appears",
         },
-    },
-    "automate_delphi": {
-        "summary": "驱动 Delphi 程序自动化测试（GUI 截图 + 控制台交互）。支持感知-规划-执行-反馈循环。",
-        "description": "Delphi 自动化测试 — 感知·规划·执行·反馈",
-        "triggers": ["自动化测试、截图、Delphi自动化、控制台测试、automate"],
-        "constraints": ["gui 模式需要 Delphi 程序已链接 DaofyAutomation 单元（VCL: uses Vcl.DaofyAutomation; FMX: uses Fmx.DaofyAutomation）；console 模式无需 Delphi 端改造"],
+    },    "automate_delphi": {
+        "summary": "Drive Delphi program automation testing (GUI screenshots + console interaction). Supports a perceive-plan-execute-feedback loop.",
+        "description": "Delphi automation testing — perceive·plan·execute·feedback",
+        "triggers": ["automation testing", "screenshots", "Delphi automation", "console testing", "automate"],
+        "constraints": ["gui mode requires the Delphi program to have linked the DaofyAutomation unit (VCL: uses Vcl.DaofyAutomation; FMX: uses Fmx.DaofyAutomation); console mode requires no Delphi-side changes"],
         "auto_unit_paths": [
-            "VCL 项目 → Vcl.DaofyAutomation.pas（自动引用 DaofyAutomation.Base / RttiAttributes / RttiDiscovery）",
-            "FMX 项目 → Fmx.DaofyAutomation.pas（自动引用 DaofyAutomation.Base / RttiAttributes / RttiDiscovery）",
-            "callgraph 可选诊断 → 额外 uses DaofyAutomation.CallGraph，并确保 tools\\stacktrace 在 Search path 中",
-            "核心自动化文件在 $(DaofyRoot)\\tools\\auto\\，callgraph 实现在 $(DaofyRoot)\\tools\\stacktrace\\；使用 action=prepare 自动注册所需全局搜索路径",
+            "VCL project → Vcl.DaofyAutomation.pas (automatically references DaofyAutomation.Base / RttiAttributes / RttiDiscovery)",
+            "FMX project → Fmx.DaofyAutomation.pas (automatically references DaofyAutomation.Base / RttiAttributes / RttiDiscovery)",
+            "callgraph optional diagnostics → additionally uses DaofyAutomation.CallGraph, and ensure tools\\stacktrace is in the Search path",
+            "Core automation files are in $(DaofyRoot)\\tools\\auto\\, callgraph implementation is in $(DaofyRoot)\\tools\\stacktrace\\; use action=prepare to automatically register the required global search paths",
         ],
         "architecture": {
-            "pattern": "感知 → 规划 → 执行 → 反馈（循环）",
-            "brain": "大模型负责决策和规划",
-            "hands": "MCP 工具负责感知和执行",
-            "see_also": "脚本生成流程: MCP Resource delphi://automation/script-generation-workflow；资源索引: delphi://resources；详细方法论 + 提示词模板 + 经验优化闭环 + 脚本缓存: get_coding_rules(section=\"automation\")",
+            "pattern": "Perceive → Plan → Execute → Feedback (loop)",
+            "brain": "The large model is responsible for decision-making and planning",
+            "hands": "MCP tools are responsible for perception and execution",
+            "see_also": "Script generation workflow: MCP Resource delphi://automation/script-generation-workflow; resource index: delphi://resources; detailed methodology + prompt templates + experience optimization loop + script cache: get_coding_rules(section=\"automation\")",
             "self_learning": (
-                "通过 experience 工具 + delphi://coding-rules / get_coding_rules(section=\"automation\") 实现："
-                "测试前检索经验 → 测试中记录失败/恢复 → 测试后保存经验 → "
-                "定期合并抽象为通用模式。让大模型从每次测试中学习进化。"
+                "Implemented through the experience tool + delphi://coding-rules / get_coding_rules(section=\"automation\"): "
+                "retrieve experience before testing → record failures/recovery during testing → save experience after testing → "
+                "periodically merge and abstract into general patterns. Let the large model learn and evolve from each test."
             ),
         },
         "modes": {
             "gui": {
-                "description": "通过命名管道驱动 GUI 程序执行操作并截图。",
+                "description": "Drive a GUI program through named pipes to perform operations and take screenshots.",
                 "needs_auto_unit": True,
-                "stop_on_failure": "默认 true。首个失败后停止执行后续依赖步骤，并在 report.steps 中标记 skip；需要全量探索时可显式设 false。",
+                "stop_on_failure": "Default true. After the first failure, stop executing subsequent dependent steps and mark them as skip in report.steps; set explicitly to false when full exploration is needed.",
                 "script_shape": (
-                    "script 可为文件路径、JSON 字符串、步骤数组，或推荐的完整脚本对象 "
-                    '{"test_name":"smoke","steps":[...]}；对象内除 steps 外的字段会作为 script_metadata 返回。'
+                    "script can be a file path, JSON string, step array, or the recommended full script object "
+                    '{"test_name":"smoke","steps":[...]}; fields in the object other than steps are returned as script_metadata.'
                 ),
                 "exception_filter": (
-                    "脚本 metadata 可设 exception_filter 在步骤间自动检测异常弹窗/焦点丢失/会话过期，"
-                    "处理后继续执行不中断测试。支持的异常类型: dialog/notification/focus_lost/session_expired。"
-                    "支持的动作: close(ESC)/refocus(goto)/restart_app/log/ignore/abort。"
-                    "配置示例: {'exception_filter': {'enabled': true, 'on_exception': {'dialog': 'close', 'focus_lost': 'refocus'}}}。"
-                    "返回值中附带 exception_filter 统计: {enabled, exception_count, max_exceptions, exceptions_handled}。"
+                    "Script metadata can set exception_filter to automatically detect exception dialogs/focus loss/session expiration between steps, "
+                    "handle them, and continue execution without interrupting the test. Supported exception types: dialog/notification/focus_lost/session_expired. "
+                    "Supported actions: close(ESC)/refocus(goto)/restart_app/log/ignore/abort. "
+                    "Configuration example: {'exception_filter': {'enabled': true, 'on_exception': {'dialog': 'close', 'focus_lost': 'refocus'}}}. "
+                    "The return value includes exception_filter statistics: {enabled, exception_count, max_exceptions, exceptions_handled}."
                 ),
                 "environment": (
                     "Optional `env` / `environment` top-level script fields inject temporary child-process "
@@ -1487,182 +1482,182 @@ TOOL_HELP_DOCS: dict = {
                     "the tested app; the MCP server itself does not need to restart."
                 ),
                 "callgraph_diagnostics": (
-                    "完整脚本对象可设 callgraph_diagnostics=true，并在失败步骤声明 handler/entry/callgraph_target；"
-                    "报告会附加 diagnostics.callgraph，默认关闭。"
+                    "The full script object can set callgraph_diagnostics=true, and declare handler/entry/callgraph_target on failed steps; "
+                    "the report will attach diagnostics.callgraph; disabled by default."
                 ),
                 "protocol": {
-                    "transport": "命名管道 JSON 请求/响应",
+                    "transport": "Named pipe JSON request/response",
                     "async_cmds": "click/rclick/dblclick/hover/move/drag/msgclick/dlgclick/rcall/key/rset/type",
                     "sync_cmds": "goto/capture/waitfor/wait/dumpstate/listwnd/dlgscan/msgscan/msgclose/dlgfile/snapdir/exit/rget/rinspect/textbounds/run_tests/callgraph/callgraph_diff/callgraph_path/callgraph_impact/callgraph_select_tests/callgraph_failure_diag/callgraph_boundary_check/callgraph_refactor_check/callgraph_orphan_candidates/callgraph_explain_exception",
                 },
                 "commands_by_phase": {
                     "perception": {
-                        "description": "获取 UI 当前状态",
+                        "description": "Get the current UI state",
                         "cmds": {
-                            "capture": "截取当前窗口截图（验证状态/对比预期）",
-                            "dumpstate": "导出完整控件树JSON（含所有RTTI属性，定位控件路径）",
-                            "formsum": "窗体摘要JSON — 从 dumpstate 提炼纯净结构：关键字段展平，Controls 嵌套层级，省 token",
-                            "listwnd": "枚举所有顶层窗口（新窗口出现时获取句柄）",
-                            "callgraph": "获取函数调用关系图（direction=callees/callers；max_depth 控制 BFS；project_only/exclude_prefixes/include_prefixes 过滤；edge_limit 控制输出上限并返回 edge_count/returned_count/truncated；边包含 call_addr/call_file/call_line/category；需额外 uses DaofyAutomation.CallGraph + Detailed .map）",
-                            "callgraph_diff": "对 baseline 与当前 callgraph 做边级 added/removed/unchanged 对比（默认 compare_by=name，可选 addr/full；可用 save_as 保存快照，路径限制在 snapshots_dir；Python 侧命令，管道内仍请求 callgraph）",
-                            "callgraph_path": "查询 source 到 target 的调用路径（max_depth/max_paths/include_prefixes 控制范围；返回 found 和 paths；Delphi 侧命令）",
-                            "callgraph_impact": "变更影响分析：对 functions/targets 或 file+line/locations 批量查询 callers，汇总入口候选和 unresolved（Python 侧命令，管道内仍请求 callgraph）",
-                            "callgraph_select_tests": "根据 callgraph_impact 和测试 handler 映射推荐回归脚本（Python 侧命令）",
-                            "callgraph_failure_diag": "把失败步骤和 callgraph 摘要组合成 diagnostics.callgraph（Python 侧命令）",
-                            "callgraph_boundary_check": "按前缀规则检查架构边界违规调用（Python 侧命令）",
-                            "callgraph_refactor_check": "重构前列出受影响调用者并标注静态图盲区（Python 侧命令）",
-                            "callgraph_orphan_candidates": "从符号表和 direct call 图生成低置信孤岛候选（Python 侧命令）",
-                            "callgraph_explain_exception": "用 callgraph/impact 解释异常栈顶函数的上下游影响（Python 侧命令）",
-                            "msgscan": "扫描 MessageBox 弹窗（同步，每步执行后必做）",
-                            "dlgscan": "扫描文件对话框状态（同步）",
-                            "rinspect": "RTTI 成员发现：列出控件的属性名+类型+方法（非属性值）。支持 visibility 参数过滤可见度（默认 public,published）",
-                            "textbounds": "按显示文本查找控件中匹配项的边界矩形（替代 OCR）。两种模式: paint-hook（拦截 GDI/GDI+ 文本绘制，通用，支持任意控件含第三方/自绘）和 type-bound（按控件类型分发，覆盖标准 VCL 控件）。Mode 路由: paint=仅 paint-hook; type=仅 type-bound; auto=paint-hook 优先失败回退 type-bound。脚本参数: target='ControlName@searchText' 或 JSON {'text':'searchText','mode':'auto','include_invisible':false}。返回值: 简单模式 {\"x\":..,\"y\":..,\"width\":..,\"height\":..}; paint-hook 富模式额外含 visible_state(full/partial/invisible/unknown)/clipped/clip_*/visible_*/api",
+                            "capture": "Capture a screenshot of the current window (verify state/compare with expectation)",
+                            "dumpstate": "Export the full control tree JSON (includes all RTTI properties, locates control paths)",
+                            "formsum": "Form summary JSON — distilled clean structure from dumpstate: key fields flattened, Controls nesting hierarchy, saves tokens",
+                            "listwnd": "Enumerate all top-level windows (get the handle when a new window appears)",
+                            "callgraph": "Get the function call graph (direction=callees/callers; max_depth controls BFS; project_only/exclude_prefixes/include_prefixes filters; edge_limit controls output cap and returns edge_count/returned_count/truncated; edges include call_addr/call_file/call_line/category; requires additional uses DaofyAutomation.CallGraph + Detailed .map)",
+                            "callgraph_diff": "Compare baseline and current callgraph at edge level with added/removed/unchanged (default compare_by=name, optional addr/full; save_as can save a snapshot, path restricted to snapshots_dir; Python-side command, but still requests callgraph through the pipe)",
+                            "callgraph_path": "Query call paths from source to target (max_depth/max_paths/include_prefixes control scope; returns found and paths; Delphi-side command)",
+                            "callgraph_impact": "Change impact analysis: batch query callers for functions/targets or file+line/locations, summarize entry candidates and unresolved (Python-side command, but still requests callgraph through the pipe)",
+                            "callgraph_select_tests": "Recommend regression scripts based on callgraph_impact and test handler mapping (Python-side command)",
+                            "callgraph_failure_diag": "Combine failed steps and callgraph summary into diagnostics.callgraph (Python-side command)",
+                            "callgraph_boundary_check": "Check architectural boundary violation calls according to prefix rules (Python-side command)",
+                            "callgraph_refactor_check": "List affected callers before refactoring and mark static graph blind spots (Python-side command)",
+                            "callgraph_orphan_candidates": "Generate low-confidence orphan candidates from the symbol table and direct call graph (Python-side command)",
+                            "callgraph_explain_exception": "Use callgraph/impact to explain upstream and downstream impact of the top function in an exception stack (Python-side command)",
+                            "msgscan": "Scan MessageBox dialogs (synchronous, must be done after each step)",
+                            "dlgscan": "Scan file dialog state (synchronous)",
+                            "rinspect": "RTTI member discovery: list a control's property names + types + methods (not property values). Supports visibility parameter to filter visibility (default public,published)",
+                            "textbounds": "Find the bounding rectangle of matching items in a control by displayed text (replaces OCR). Two modes: paint-hook (intercepts GDI/GDI+ text drawing, generic, supports any control including third-party/custom-drawn) and type-bound (dispatches by control type, covers standard VCL controls). Mode routing: paint=only paint-hook; type=only type-bound; auto=paint-hook first, fall back to type-bound on failure. Script parameters: target='ControlName@searchText' or JSON {'text':'searchText','mode':'auto','include_invisible':false}. Return values: simple mode {\"x\":..,\"y\":..,\"width\":..,\"height\":..}; paint-hook rich mode additionally includes visible_state(full/partial/invisible/unknown)/clipped/clip_*/visible_*/api",
                         },
                     },
                     "execution": {
-                        "description": "对 UI 执行操作",
+                        "description": "Perform operations on the UI",
                         "cmds": {
-                            "goto": "导航到目标控件（先定位再操作）",
-                            "click": "单击（异步）",
-                            "rclick": "右键单击（异步）",
-                            "dblclick": "双击（异步）",
-                            "type": "输入文本（异步）",
-                            "key": "按键 Tab/Enter/Esc（异步）",
-                            "hover": "鼠标悬停（异步）",
-                            "move": "鼠标移动到坐标（异步）",
-                            "drag": "拖拽操作（异步）",
-                            "msgclick": "点 MessageBox 按钮 确认/取消（异步）",
-                            "dlgclick": "点文件对话框按钮 打开/保存（异步）",
-                            "dlgfile": "文件对话框输入路径（同步）",
-                            "rcall": "RTTI 调用方法（异步，首选降级方案）",
-                            "rset": "RTTI 设置属性值（异步）",
-                            "uiaclick": "UIA 单击（按 Name 属性匹配，步 step 添加 via:'uia' 可复用 click/goto/get 命令）",
-                            "uiagoto": "UIA 导航到控件",
-                            "uiaget": "UIA 读取控件 Name",
-                            "uiaset": "UIA 设置控件值",
-                            "uiascan": "UIA 扫描控件树",
-                            "uiawait": "UIA 等待控件出现",
-                            "uia.rclick": "UIA 右键单击",
-                            "uia.dblclick": "UIA 双击",
-                            "uia.hover": "UIA 悬停（触发 Tooltip）",
-                            "uia.drag": "UIA 拖拽到坐标",
-                            "uia.wheel": "UIA 鼠标滚轮滚动",
-                            "uia.scroll": "UIA 滚动控件（方向+量）",
-                            "uia.scrollinto": "UIA 将子项滚动到可视区域",
-                            "uia.type": "UIA 模拟键盘打字",
-                            "uia.key": "UIA 发送按键",
-                            "uia.toggle": "UIA 切换开关状态",
-                            "uia.select": "UIA 选中项",
-                            "uia.expand": "UIA 展开节点",
-                            "uia.collapse": "UIA 折叠节点",
-                            "uia.invoke": "UIA 调用默认操作",
-                            "uia.find": "UIA 按条件查找控件",
-                            "uia.list": "UIA 列出子控件",
-                            "uia.close": "UIA 关闭窗口",
-                            "uia.minimize": "UIA 最小化窗口",
-                            "uia.maximize": "UIA 最大化窗口",
-                            "uia.restore": "UIA 恢复窗口",
-                            "uia.move": "UIA 移动窗口",
-                            "uia.resize": "UIA 调整窗口尺寸",
-                            "uia.state": "UIA 读取窗口状态",
-                            "uia.exists": "UIA 判断控件是否存在",
-                            "uia.rect": "UIA 获取控件边界矩形",
-                            "uia.screenshot": "UIA 截取控件截图",
+                            "goto": "Navigate to the target control (locate first, then operate)",
+                            "click": "Single click (asynchronous)",
+                            "rclick": "Right-click (asynchronous)",
+                            "dblclick": "Double-click (asynchronous)",
+                            "type": "Input text (asynchronous)",
+                            "key": "Press key Tab/Enter/Esc (asynchronous)",
+                            "hover": "Mouse hover (asynchronous)",
+                            "move": "Move mouse to coordinates (asynchronous)",
+                            "drag": "Drag operation (asynchronous)",
+                            "msgclick": "Click MessageBox button Confirm/Cancel (asynchronous)",
+                            "dlgclick": "Click file dialog button Open/Save (asynchronous)",
+                            "dlgfile": "Input path in file dialog (synchronous)",
+                            "rcall": "RTTI call method (asynchronous, preferred fallback)",
+                            "rset": "RTTI set property value (asynchronous)",
+                            "uiaclick": "UIA click (match by Name property; add via:'uia' to step to reuse click/goto/get commands)",
+                            "uiagoto": "UIA navigate to control",
+                            "uiaget": "UIA read control Name",
+                            "uiaset": "UIA set control value",
+                            "uiascan": "UIA scan control tree",
+                            "uiawait": "UIA wait for control to appear",
+                            "uia.rclick": "UIA right-click",
+                            "uia.dblclick": "UIA double-click",
+                            "uia.hover": "UIA hover (trigger Tooltip)",
+                            "uia.drag": "UIA drag to coordinates",
+                            "uia.wheel": "UIA mouse wheel scroll",
+                            "uia.scroll": "UIA scroll control (direction+amount)",
+                            "uia.scrollinto": "UIA scroll child item into view",
+                            "uia.type": "UIA simulate keyboard typing",
+                            "uia.key": "UIA send key",
+                            "uia.toggle": "UIA toggle switch state",
+                            "uia.select": "UIA select item",
+                            "uia.expand": "UIA expand node",
+                            "uia.collapse": "UIA collapse node",
+                            "uia.invoke": "UIA invoke default action",
+                            "uia.find": "UIA find control by condition",
+                            "uia.list": "UIA list child controls",
+                            "uia.close": "UIA close window",
+                            "uia.minimize": "UIA minimize window",
+                            "uia.maximize": "UIA maximize window",
+                            "uia.restore": "UIA restore window",
+                            "uia.move": "UIA move window",
+                            "uia.resize": "UIA resize window",
+                            "uia.state": "UIA read window state",
+                            "uia.exists": "UIA determine whether control exists",
+                            "uia.rect": "UIA get control bounding rectangle",
+                            "uia.screenshot": "UIA capture control screenshot",
                         },
-                        "uia_note": "通过 step 中加 via:'uia' 字段可将 click/goto/get/set/wait 命令路由到 Python UIA（uiautomation 库），绕过 Delphi 管道和主线程死锁问题。当前台有 IFileDialog / DirectUI / #32770 等 Win32 消息无法穿透的对话框时，使用 UIA 命令。",
+                        "uia_note": "Adding the via:'uia' field to a step can route click/goto/get/set/wait commands to Python UIA (uiautomation library), bypassing Delphi pipe and main-thread deadlock issues. When foreground dialogs such as IFileDialog / DirectUI / #32770 cannot be penetrated by Win32 messages, use UIA commands.",
                     },
                     "verification": {
-                        "description": "验证执行结果。新脚本用 assert_expr 写 Python 表达式；自然语言预期写 expected/note：{'cmd':'rget','target':'btnSave.Enabled','assert_expr':\"actual=='True'\"}",
+                        "description": "Verify execution results. For new scripts, use assert_expr to write Python expressions; for natural-language expectations, write expected/note: {'cmd':'rget','target':'btnSave.Enabled','assert_expr':\"actual=='True'\"}",
                         "cmds": {
-                            "capture": "操作后截图对比",
-                            "waitfor": "等待条件满足（控件可见/消失）",
-                            "wait": "固定时间等待（毫秒）",
-                            "rget": "RTTI 读属性值（同步，首选结果断言）",
-                            "rinspect": "RTTI 成员发现（同步，查看属性名/类型/方法，非值；支持 visibility 参数）",
+                            "capture": "Compare screenshots after operations",
+                            "waitfor": "Wait for condition to be satisfied (control visible/disappeared)",
+                            "wait": "Wait a fixed time (milliseconds)",
+                            "rget": "RTTI read property value (synchronous, preferred result assertion)",
+                            "rinspect": "RTTI member discovery (synchronous, view property names/types/methods, not values; supports visibility parameter)",
                         },
                     },
                 },
                 # Legacy flat commands for backward compat
                 "commands": {
-                    "goto/click/rclick/dblclick": "激活/点击控件",
-                    "hover/move/drag": "鼠标操作",
-                    "type/key": "输入/按键",
-                    "wait/waitfor": "等待(ms/条件)",
-                    "capture/listwnd/dumpstate/formsum": "截图/枚举/控件树/窗体摘要",
-                    "dlgscan/msgscan/msgclose": "弹窗/菜单扫描与关闭（同步）",
-                    "dlgclick/msgclick": "弹窗/菜单点击（异步）",
-                    "rget": "RTTI 读属性值（同步）",
-                    "callgraph": "获取函数调用关系图（direction=callees/callers；max_depth 控制 BFS；project_only/exclude_prefixes/include_prefixes 过滤；edge_limit 控制输出上限并返回 edge_count/returned_count/truncated；边包含 call_addr/call_file/call_line/category）",
-                    "callgraph_diff": "对 baseline 与当前 callgraph 做边级 added/removed/unchanged 对比（默认 compare_by=name，可选 addr/full；save_as/baseline_path 限制在 snapshots_dir）",
-                    "callgraph_path": "查询 source 到 target 的调用路径，支持 max_depth/max_paths/include_prefixes",
-                    "callgraph_impact": "对变更函数或 file/line 位置批量查询 callers，汇总入口候选和 unresolved",
-                    "callgraph_select_tests": "根据 impact 和测试元数据选择建议回归脚本",
-                    "callgraph_failure_diag": "为失败步骤生成 callgraph 诊断摘要",
-                    "callgraph_boundary_check": "按前缀规则检查架构边界",
-                    "callgraph_refactor_check": "重构安全检查，输出受影响调用者和盲区提示",
-                    "callgraph_orphan_candidates": "死代码/孤岛候选，结果仅作候选不可自动删除",
-                    "callgraph_explain_exception": "异常栈扩展解释，输出上下游调用摘要",
-                    "rset/rcall": "RTTI 写属性/调用方法（异步）",
-                    "rinspect": "RTTI 成员发现（同步；支持 visibility 参数）",
-                    "textbounds": "按显示文本查找控件中匹配项的边界矩形（替代 OCR）。paint-hook 模式拦截 GDI/GDI+ 文本绘制通用匹配；type-bound 模式按控件类型分发覆盖标准 VCL 控件。mode=paint/type/auto（auto=paint 优先回退 type）。FMX 端仅支持 paint-hook",
-                    "dlgfile/snapdir": "文件对话框/截图目录（同步）",
-                    "exit": "退出进程",
-                    "uiaclick/uiagoto/uiaget/uiascan/uiaset/uiawait": "UIA 自动化（Python 端执行，按 Name/ClassName 匹配控件，不受 Delphi 管道/线程限制）",
-                    "uia.rclick/uia.dblclick/uia.hover/uia.drag/uia.wheel": "UIA 鼠标操作",
-                    "uia.scroll/uia.scrollinto": "UIA 滚动操作",
-                    "uia.type/uia.key/uia.toggle": "UIA 输入操作",
-                    "uia.select/uia.expand/uia.collapse/uia.invoke": "UIA 列表/树操作",
-                    "uia.find/uia.list": "UIA 导航/探查",
-                    "uia.close/uia.minimize/uia.maximize/uia.restore/uia.move/uia.resize/uia.state": "UIA 窗口操作",
-                    "uia.exists/uia.rect/uia.screenshot": "UIA 属性/状态",
-                    "via:'uia'": "路由字段：对 click/goto/get/set/wait 加 via:'uia' 可改用 Python UIA 执行（如 {\"cmd\":\"click\",\"target\":\"打开(&O)\",\"via\":\"uia\"}）",
+                    "goto/click/rclick/dblclick": "Activate/click control",
+                    "hover/move/drag": "Mouse operations",
+                    "type/key": "Input/key press",
+                    "wait/waitfor": "Wait (ms/condition)",
+                    "capture/listwnd/dumpstate/formsum": "Screenshot/enumerate/control tree/form summary",
+                    "dlgscan/msgscan/msgclose": "Dialog/menu scan and close (synchronous)",
+                    "dlgclick/msgclick": "Dialog/menu click (asynchronous)",
+                    "rget": "RTTI read property value (synchronous)",
+                    "callgraph": "Get the function call graph (direction=callees/callers; max_depth controls BFS; project_only/exclude_prefixes/include_prefixes filters; edge_limit controls output cap and returns edge_count/returned_count/truncated; edges include call_addr/call_file/call_line/category)",
+                    "callgraph_diff": "Compare baseline and current callgraph at edge level with added/removed/unchanged (default compare_by=name, optional addr/full; save_as/baseline_path restricted to snapshots_dir)",
+                    "callgraph_path": "Query call paths from source to target, supports max_depth/max_paths/include_prefixes",
+                    "callgraph_impact": "Batch query callers for changed functions or file/line positions, summarize entry candidates and unresolved",
+                    "callgraph_select_tests": "Select recommended regression scripts based on impact and test metadata",
+                    "callgraph_failure_diag": "Generate a callgraph diagnostic summary for failed steps",
+                    "callgraph_boundary_check": "Check architectural boundaries according to prefix rules",
+                    "callgraph_refactor_check": "Refactoring safety check, outputs affected callers and blind-spot hints",
+                    "callgraph_orphan_candidates": "Dead code/orphan candidates; results are candidates only and must not be deleted automatically",
+                    "callgraph_explain_exception": "Exception stack extended explanation, outputs upstream/downstream call summary",
+                    "rset/rcall": "RTTI write property/call method (asynchronous)",
+                    "rinspect": "RTTI member discovery (synchronous; supports visibility parameter)",
+                    "textbounds": "Find the bounding rectangle of matching items in a control by displayed text (replaces OCR). paint-hook mode intercepts GDI/GDI+ text drawing for generic matching; type-bound mode dispatches by control type and covers standard VCL controls. mode=paint/type/auto (auto=paint first, fall back to type). FMX only supports paint-hook",
+                    "dlgfile/snapdir": "File dialog/screenshot directory (synchronous)",
+                    "exit": "Exit process",
+                    "uiaclick/uiagoto/uiaget/uiascan/uiaset/uiawait": "UIA automation (executed on Python side, matches controls by Name/ClassName, not limited by Delphi pipe/thread)",
+                    "uia.rclick/uia.dblclick/uia.hover/uia.drag/uia.wheel": "UIA mouse operations",
+                    "uia.scroll/uia.scrollinto": "UIA scroll operations",
+                    "uia.type/uia.key/uia.toggle": "UIA input operations",
+                    "uia.select/uia.expand/uia.collapse/uia.invoke": "UIA list/tree operations",
+                    "uia.find/uia.list": "UIA navigation/inspection",
+                    "uia.close/uia.minimize/uia.maximize/uia.restore/uia.move/uia.resize/uia.state": "UIA window operations",
+                    "uia.exists/uia.rect/uia.screenshot": "UIA properties/state",
+                    "via:'uia'": "Routing field: add via:'uia' to click/goto/get/set/wait to use Python UIA execution instead (e.g. {\"cmd\":\"click\",\"target\":\"Open(&O)\",\"via\":\"uia\"})",
                 },
             },
             "prepare": {
-                "description": "将 DaofyAutomation 路径注册到 Delphi 全局 Library Search Path（注册表）。一劳永逸，此后任何项目无需额外配置即可 uses DaofyAutomation。",
+                "description": "Register the DaofyAutomation path in the Delphi global Library Search Path (registry). Do it once and any project can use DaofyAutomation without extra configuration.",
                 "needs_auto_unit": False,
                 "params": {},
-                "effect": "读取 HKCU\\SOFTWARE\\Embarcadero\\BDS\\{version}\\Library\\{platform} 的 Search Path，若 tools/auto/ 或 tools/stacktrace/ 不在其中则追加。影响 Win32 + Win64 双平台。",
+                "effect": "Read Search Path from HKCU\\SOFTWARE\\Embarcadero\\BDS\\{version}\\Library\\{platform}; if tools/auto/ or tools/stacktrace/ is not present, append it. Affects both Win32 + Win64 platforms.",
             },
             "console": {
-                "description": "通过 subprocess stdin/stdout 驱动控制台程序交互。无需 Delphi 端改造。",
+                "description": "Drive console program interaction through subprocess stdin/stdout. No Delphi-side changes required.",
                 "needs_auto_unit": False,
                 "params": {
-                    "input": "发送到 stdin 的文本",
-                    "expect": "等待的 stdout 正则模式",
-                    "timeout": "超时秒数（默认 30）",
-                    "args": "额外命令行参数数组",
+                    "input": "Text sent to stdin",
+                    "expect": "stdout regex pattern to wait for",
+                    "timeout": "Timeout in seconds (default 30)",
+                    "args": "Array of additional command-line arguments",
                 },
             },
         },
         "planning_guide": {
-            "principle": "每步明确标注阶段（perceive/execute/verify），「一步一验证」",
-            "prefer_order": ["RTTI 调用（最稳定）", "控件级 goto+click（最常用）", "坐标级 move+click（兼容模式）"],
+            "principle": "Explicitly mark each step's phase (perceive/execute/verify), 'one step, one verification'",
+            "prefer_order": ["RTTI calls (most stable)", "control-level goto+click (most common)", "coordinate-level move+click (compatibility mode)"],
             "failure_recovery": {
-                "waitfor_timeout": "capture 当前状态 → 分析原因 → 重试或上报",
-                "click_error": "dumpstate 查 Enabled/Visible → 降级 RTTI 或上报",
-                "unexpected_dialog": "msgscan → msgclick(OK/Cancel) → capture 新状态",
-                "rtti_exception": "降级到 goto+click 操作",
+                "waitfor_timeout": "capture current state → analyze cause → retry or report",
+                "click_error": "dumpstate to check Enabled/Visible → fall back to RTTI or report",
+                "unexpected_dialog": "msgscan → msgclick(OK/Cancel) → capture new state",
+                "rtti_exception": "fall back to goto+click operation",
             },
             "prompt_templates": (
-                "delphi://coding-rules / get_coding_rules(section=\"automation\") 提供 4 个可复用的提示词模板："
-                "F1=测试规划模板（从目标到步骤序列），"
-                "F2=单步执行协议（前置感知→执行→等待→验证），"
-                "F3=失败恢复模板（诊断→决策→恢复→学习），"
-                "F4=经验保存模板（将测试成果沉淀为经验）。"
-                "\n用法: get_coding_rules(section=\"automation\") 获取完整模板。"
+                "delphi://coding-rules / get_coding_rules(section=\"automation\") provides 4 reusable prompt templates: "
+                "F1=test planning template (from goal to step sequence), "
+                "F2=single-step execution protocol (pre-perception→execute→wait→verify), "
+                "F3=failure recovery template (diagnose→decide→recover→learn), "
+                "F4=experience saving template (turn test results into experience)."
+                "\nUsage: get_coding_rules(section=\"automation\") to get the full templates."
             ),
             "experience_optimization": (
-                "通过 experience 工具实现持续自我进化（见 delphi://coding-rules / get_coding_rules(section=\"automation\")）："
-                "\n1) 测试前: experience/search 检索同类场景的历史经验 → 调整策略"
-                "\n2) 测试中: 遇到失败按 F3 恢复，记录学习"
-                "\n3) 测试后: experience/save 按 F4 模板保存经验（自动去重）"
-                "\n4) 定期: experience/merge 合并同类经验 → experience/prune 淘汰低价值记录"
+                "Use the experience tool to achieve continuous self-evolution (see delphi://coding-rules / get_coding_rules(section=\"automation\")):"
+                "\n1) Before testing: experience/search to retrieve historical experience for similar scenarios → adjust strategy"
+                "\n2) During testing: when encountering failures, recover according to F3 and record learnings"
+                "\n3) After testing: experience/save to save experience according to the F4 template (automatic deduplication)"
+                "\n4) Periodically: experience/merge to merge similar experiences → experience/prune to eliminate low-value records"
             ),
         },
         "examples": [
-            'automate_delphi(action="prepare")  # ← 首次使用前先注册全局搜索路径',
-            'automate_delphi(action="list_tests", app_path="TestHost.exe")  # ← 列出已注册测试类和方法',
+            'automate_delphi(action="prepare")  # ← register the global search path before first use',
+            'automate_delphi(action="list_tests", app_path="TestHost.exe")  # ← list registered test classes and methods',
             'automate_delphi(action="gui", app_path="App.exe", script={"test_name":"main-smoke","steps":[{"cmd":"goto","target":"TMainForm"},{"cmd":"capture","target":"main"}]})',
             'automate_delphi(action="gui", app_path="App.exe", stop_on_failure=true, script=[{"cmd":"rget","target":"StatusBar.Caption","assert_expr":"actual==\'OK\'"}])',
             'automate_delphi(action="gui", app_path="App.exe", script=[{"cmd":"listwnd"}])',
@@ -1671,253 +1666,252 @@ TOOL_HELP_DOCS: dict = {
             'automate_delphi(action="test", app_path="App.exe", test_timeout=30, tests=[{"id":"add","className":"Tests.TCalculator","method":"Add","params":[1,2],"expected":"3"}])',
             'automate_delphi(action="test", app_path="App.exe", tests=[{"id":"exception","className":"Tests.TCalculator","method":"Parse","params":["bad"],"expected_exception":"EConvertError","expected_message":"invalid"}])',
             'automate_delphi(action="gui", app_path="App.exe", script={"test_name":"resilient","exception_filter":{"enabled":true,"on_exception":{"dialog":"close","focus_lost":"refocus"}},"steps":[{"cmd":"goto","target":"TMainForm"},{"cmd":"click","target":"btnRun"}]})',
-            '# 感知-规划-执行-反馈 完整循环示例见 get_coding_rules(section="automation")',
+            '# See get_coding_rules(section="automation") for a complete perceive-plan-execute-feedback loop example',
         ],
         "action_params": {
             "gui": {
-                "description": "通过命名管道驱动 GUI 程序自动化测试（需链接 DaofyAutomation 单元）",
+                "description": "Drive GUI program automation testing through named pipes (requires linking the DaofyAutomation unit)",
                 "required": ["app_path"],
                 "optional": {
-                    "script": "JSON 脚本（文件路径、JSON 字符串、步骤数组、或完整脚本对象）",
-                    "snapshots_dir": "截图输出目录绝对路径（可选，默认 docs/copyright/snapshots）",
-                    "wait_timeout": "等待 Delphi 管道就绪的超时秒数（默认 10s）",
-                    "keep_alive": "True=执行完后保持进程运行供后续复用",
-                    "stop_on_failure": "True=首个失败后停止执行后续依赖步骤（默认 true）",
-                    "env": "临时环境变量 dict",
+                    "script": "JSON script (file path, JSON string, step array, or full script object)",
+                    "snapshots_dir": "Absolute path to screenshot output directory (optional, default docs/copyright/snapshots)",
+                    "wait_timeout": "Timeout in seconds to wait for the Delphi pipe to be ready (default 10s)",
+                    "keep_alive": "True=keep the process running after execution for later reuse",
+                    "stop_on_failure": "True=stop executing subsequent dependent steps after the first failure (default true)",
+                    "env": "Temporary environment variable dict",
                 },
             },
             "console": {
-                "description": "通过 subprocess stdin/stdout 驱动控制台程序交互（无需 Delphi 端改造）",
+                "description": "Drive console program interaction through subprocess stdin/stdout (no Delphi-side changes required)",
                 "required": ["app_path"],
                 "optional": {
-                    "input": "发送到 stdin 的文本",
-                    "expect": "等待的 stdout 正则模式",
-                    "timeout": "超时秒数（默认 30s）",
-                    "args": "额外命令行参数数组",
-                    "keep_alive": "True=执行完后保持进程运行供后续复用",
-                    "env": "临时环境变量 dict",
+                    "input": "Text sent to stdin",
+                    "expect": "stdout regex pattern to wait for",
+                    "timeout": "Timeout in seconds (default 30s)",
+                    "args": "Array of additional command-line arguments",
+                    "keep_alive": "True=keep the process running after execution for later reuse",
+                    "env": "Temporary environment variable dict",
                 },
             },
             "auto": {
-                "description": "自动检测模式（PE 头判断 GUI vs Console）",
+                "description": "Automatic detection mode (PE header determines GUI vs Console)",
                 "required": ["app_path"],
                 "optional": {
-                    "script": "JSON 脚本",
-                    "input": "发送到 stdin 的文本",
-                    "expect": "等待的 stdout 正则模式",
-                    "timeout": "超时秒数",
-                    "keep_alive": "True=执行完后保持进程运行供后续复用",
+                    "script": "JSON script",
+                    "input": "Text sent to stdin",
+                    "expect": "stdout regex pattern to wait for",
+                    "timeout": "Timeout in seconds",
+                    "keep_alive": "True=keep the process running after execution for later reuse",
                 },
             },
             "prepare": {
-                "description": "将 DaofyAutomation 路径注册到 Delphi 全局搜索路径（一劳永逸）",
+                "description": "Register the DaofyAutomation path in the Delphi global search path (one-time setup)",
                 "required": [],
                 "optional": {},
             },
             "list_tests": {
                 "description": (
-                    "列出 TestHost 中已注册的测试类和方法。返回每个类的注册名、单元名、"
-                    "方法名、参数签名（名称+类型）和返回类型，无需 grep 源码。"
-                    "需要 TestHost 进程已启动（keep_alive=True）或自动启动新进程。"
+                    "List test classes and methods already registered in TestHost. Returns each class's registered name, unit name, "
+                    "method name, parameter signature (name+type), and return type, without grepping source code. "
+                    "Requires the TestHost process to already be started (keep_alive=True) or automatically starts a new process."
                 ),
                 "required": ["app_path"],
                 "optional": {
-                    "visibility": "RTTI 可见度过滤（默认 public,published）",
-                    "wait_timeout": "等待 TestHost 管道就绪的超时秒数（默认 10s）",
-                    "env": "临时环境变量 dict",
+                    "visibility": "RTTI visibility filter (default public,published)",
+                    "wait_timeout": "Timeout in seconds to wait for TestHost pipe to be ready (default 10s)",
+                    "env": "Temporary environment variable dict",
                 },
             },
             "test": {
-                "description": "批量执行 RTTI 测试 — 每例独立发送 run_tests 命令，超时后重启 TestHost，并返回稳定统计与逐例结果",
+                "description": "Batch execute RTTI tests — each case independently sends a run_tests command, restarts TestHost after timeout, and returns stable statistics and per-case results",
                 "required": ["app_path", "tests"],
                 "optional": {
                     "tests": (
-                        "测试用例列表；每项支持 id/name、target(控件名) 或 className、method、params、"
-                        "constructor_params、expected、expected_exception、expected_message、assert_expr、"
-                        "visibility、timeout(覆盖该例超时秒数)。"
-                        "\n\nclassName 查找顺序（优先级从高到低）："
-                        "\n  1. RegisterTestClass 注册名（如 'Agent.EditEngineV3Test'）— 不会被链接器裁剪"
-                        "\n  2. TRttiContext.FindType 全限定名（如 'Tests.TCalculator'）— 需 RTTI 可发现"
-                        "\n  3. FindClass（Delphi VCL 类名）— 仅限 TComponent 派生类"
-                        "\n推荐：优先用 RegisterTestClass 注册名（最稳定）；RTTI 可发现的类可用全限定名。"
-                        "\n需要 setup/teardown 时用 RegisterFixture。"
-                        "\n⚠️ 传入的必须是上述三种之一，不是 Delphi 源码中的类名（如 TEditEngineV3Test）"
+                        "Test case list; each item supports id/name, target(control name) or className, method, params, "
+                        "constructor_params, expected, expected_exception, expected_message, assert_expr, "
+                        "visibility, timeout(override that case's timeout in seconds)."
+                        "\n\nclassName lookup order (highest to lowest priority):"
+                        "\n  1. RegisterTestClass registered name (e.g. 'Agent.EditEngineV3Test') — will not be trimmed by the linker"
+                        "\n  2. TRttiContext.FindType fully qualified name (e.g. 'Tests.TCalculator') — requires RTTI discoverability"
+                        "\n  3. FindClass (Delphi VCL class name) — only for TComponent-derived classes"
+                        "\nRecommended: prefer the RegisterTestClass registered name (most stable); for RTTI-discoverable classes, use the fully qualified name."
+                        "\nUse RegisterFixture when setup/teardown is needed."
+                        "\n⚠️ The value passed in must be one of the above three, not the Delphi source class name (e.g. TEditEngineV3Test)"
                     ),
-                    "visibility": "全局 RTTI 可见度过滤（默认 public,published，可由每个测试项覆盖；测试私有方法时设 private,protected,public,published）",
-                    "wait_timeout": "等待 TestHost 管道就绪的超时秒数（默认 10s）",
-                    "test_timeout": "每个测试的默认超时秒数（默认 30s；由测试项 timeout 覆盖）。超时后进程自动终止，下一例启动新进程",
-                    "keep_alive": "True=执行后保持进程运行（默认 true）",
-                    "env": "临时环境变量 dict",
+                    "visibility": "Global RTTI visibility filter (default public,published, can be overridden per test item; when testing private methods set private,protected,public,published)",
+                    "wait_timeout": "Timeout in seconds to wait for TestHost pipe to be ready (default 10s)",
+                    "test_timeout": "Default timeout in seconds for each test (default 30s; overridden by the test item's timeout). After timeout the process is automatically terminated, and the next case starts a new process",
+                    "keep_alive": "True=keep the process running after execution (default true)",
+                    "env": "Temporary environment variable dict",
                 },
                 "assert_modes": (
-                    "三种断言模式互斥，每例只能选一种："
-                    "\n  1. expected: Delphi 侧精确字符串匹配（result.ToString = expected）"
-                    "\n  2. expected_exception: Delphi 侧异常匹配（phase=test 时异常类名+消息）"
-                    "\n  3. assert_expr: Python 表达式（变量 actual 为返回值字符串，如 \"actual == '3'\")"
-                    "\n❌ 禁止组合：assert_expr 会覆盖 Delphi 侧 assert 字段，导致 result=PASS + assert=fail 困惑"
+                    "The three assertion modes are mutually exclusive; each case can use only one:"
+                    "\n  1. expected: Delphi-side exact string match (result.ToString = expected)"
+                    "\n  2. expected_exception: Delphi-side exception match (when phase=test, exception class name+message)"
+                    "\n  3. assert_expr: Python expression (variable actual is the return value string, e.g. \"actual == '3'\")"
+                    "\n❌ Forbidden combination: assert_expr overrides Delphi-side assert fields, causing confusing result=PASS + assert=fail"
                 ),
             },
         },
-    },
-    "lazarus_compile": {
-        "summary": "Lazarus/Free Pascal 项目编译 (lazbuild)",
-        "description": "Lazarus/Free Pascal 项目编译",
+    },    "lazarus_compile": {
+        "summary": "Lazarus/Free Pascal project compilation (lazbuild)",
+        "description": "Lazarus/Free Pascal project compilation",
         "triggers": [
-            "编译 Lazarus 工程、lazbuild、lpi、lpr、Free Pascal",
+            "Compile Lazarus project, lazbuild, lpi, lpr, Free Pascal",
         ],
         "constraints": [
-            "❌ 不得用 bash/cmd 运行 lazbuild",
+            "❌ Do not run lazbuild with bash/cmd",
         ],
-        "workflow": "lazarus_compile(project_path=.lpi) → 检查 result.status",
+        "workflow": "lazarus_compile(project_path=.lpi) → check result.status",
         "actions": {
-            "compile": "编译 .lpi/.lpr 项目",
+            "compile": "Compile .lpi/.lpr project",
         },
         "action_params": {
             "compile": {
-                "description": "编译 Lazarus 项目",
+                "description": "Compile Lazarus project",
                 "required": ["project_path"],
                 "optional": {
-                    "target_platform": "win32/win64，默认 win32",
+                    "target_platform": "win32/win64, default win32",
                     "build_configuration": "Default/Release/Debug",
-                    "timeout": "超时秒数，默认 600",
+                    "timeout": "Timeout seconds, default 600",
                 },
             },
         },
     },
     "lazarus_project": {
-        "summary": "Lazarus 项目信息查询 — 解析 .lpi 文件",
-        "description": "Lazarus 项目信息查询",
+        "summary": "Lazarus project information query — parse .lpi file",
+        "description": "Lazarus project information query",
         "triggers": [
-            "查看 lpi 项目信息、Lazarus 单元列表、FPC 编译器选项",
+            "View lpi project information, Lazarus unit list, FPC compiler options",
         ],
         "constraints": [],
         "workflow": "lazarus_project(project_path=.lpi) → info/units/options",
         "actions": {
-            "info": "项目概要（名称/主源文件/单元数/搜索路径/编译器选项）",
-            "units": "单元列表（含 IsPartOfProject）",
-            "options": "编译器选项（CPU/OS/调试/优化级别）",
+            "info": "Project summary (name/main source file/unit count/search paths/compiler options)",
+            "units": "Unit list (including IsPartOfProject)",
+            "options": "Compiler options (CPU/OS/debug/optimization level)",
         },
         "action_params": {
             "info": {
-                "description": "获取项目概要",
+                "description": "Get project summary",
                 "required": ["project_path"],
                 "optional": {},
             },
             "units": {
-                "description": "获取单元列表",
+                "description": "Get unit list",
                 "required": ["project_path"],
                 "optional": {},
             },
             "options": {
-                "description": "获取编译器选项",
+                "description": "Get compiler options",
                 "required": ["project_path"],
                 "optional": {},
             },
         },
     },
     "lazarus_kb": {
-        "summary": "Lazarus/FPC 源码知识库 — 索引和搜索 LCL/FPC RTL 源码",
-        "description": "独立的 Lazarus/FPC 源码知识库。自动检测 C:\\lazarus 安装目录，索引 LCL、组件和 FPC RTL 源码。使用与 Delphi 文档 KB 相同的 ZVec 引擎。",
+        "summary": "Lazarus/FPC source code knowledge base — index and search LCL/FPC RTL source",
+        "description": "Standalone Lazarus/FPC source code knowledge base. Automatically detects C:\\lazarus installation directory, indexes LCL, components, and FPC RTL source. Uses the same ZVec engine as the Delphi documentation KB.",
         "triggers": [
-            "lazarus kb、FPC API、LCL 文档、搜索 lazarus 源码、lazarus 函数定义",
+            "lazarus kb, FPC API, LCL docs, search lazarus source, lazarus function definitions",
         ],
         "constraints": [],
         "workflow": "lazarus_kb(action=build) → lazarus_kb(action=search, query=...)",
         "actions": {
-            "build": "自动检测并索引 LCL / FPC RTL 源码",
-            "search": "搜索已索引的源码（query 参数必需）",
-            "stats": "知识库统计信息",
-            "read": "读取指定源码文件（file_path 参数必需）",
+            "build": "Auto-detect and index LCL / FPC RTL source",
+            "search": "Search indexed source (query parameter required)",
+            "stats": "Knowledge base statistics",
+            "read": "Read specified source file (file_path parameter required)",
         },
         "action_params": {
             "build": {
-                "description": "构建 Lazarus/FPC 源码知识库",
+                "description": "Build Lazarus/FPC source code knowledge base",
                 "required": [],
                 "optional": {},
             },
             "search": {
-                "description": "搜索 Lazarus/FPC 源码",
+                "description": "Search Lazarus/FPC source",
                 "required": ["query"],
                 "optional": {
-                    "top_k": "返回结果数上限（默认20，最大100）",
-                    "content_type": "按文件类型过滤（如 pas/inc/pp）",
+                    "top_k": "Max number of results (default 20, max 100)",
+                    "content_type": "Filter by file type (e.g. pas/inc/pp)",
                 },
             },
             "stats": {
-                "description": "知识库统计",
+                "description": "Knowledge base statistics",
                 "required": [],
                 "optional": {},
             },
             "read": {
-                "description": "读取源码文件",
+                "description": "Read source file",
                 "required": ["file_path"],
                 "optional": {},
             },
         },
     },
     "lazarus_file": {
-        "summary": "Lazarus/FPC 文件读写 — read/write(edits,自动备份)/backup",
-        "description": "Lazarus/FPC 文件读写，复用共享文件内核。仅支持 read / write(edits 批量修改) / backup。自动 BOM 编码检测，write 前自动备份到 __history。",
+        "summary": "Lazarus/FPC file read/write — read/write(edits,auto-backup)/backup",
+        "description": "Lazarus/FPC file read/write, reusing the shared file kernel. Supports only read / write(edits batch modifications) / backup. Automatic BOM encoding detection, auto-backup to __history before write.",
         "triggers": [
-            "lazarus 文件、读取 lfm、修改 lpi、编辑 lazarus 源码",
+            "lazarus files, read lfm, modify lpi, edit lazarus source",
         ],
         "constraints": [
-            "❌ 不支持 grep/format/uses/encode/fix_garbled — 这些是 Delphi 特有的操作",
+            "❌ Does not support grep/format/uses/encode/fix_garbled — these are Delphi-specific operations",
         ],
-        "workflow": "lazarus_file(action=read, file_path=...) → 修改 → lazarus_file(action=write, file_path=..., edits=[...])",
+        "workflow": "lazarus_file(action=read, file_path=...) → modify → lazarus_file(action=write, file_path=..., edits=[...])",
         "actions": {
-            "read": "读取文件（BOM 自动检测）",
-            "write": "写入文件（edits 批量修改，自动备份到 __history）",
-            "backup": "手动创建备份到 __history",
+            "read": "Read file (BOM auto-detection)",
+            "write": "Write file (edits batch modifications, auto-backup to __history)",
+            "backup": "Manually create backup to __history",
         },
         "action_params": {
             "read": {
-                "description": "读取文件内容",
+                "description": "Read file content",
                 "required": ["file_path"],
                 "optional": {},
             },
             "write": {
-                "description": "写入文件（edits 批量修改）",
+                "description": "Write file (edits batch modifications)",
                 "required": ["file_path", "edits"],
                 "optional": {
-                    "encoding": "文件编码（不传则自动检测 BOM）",
+                    "encoding": "File encoding (if omitted, auto-detect BOM)",
                 },
             },
             "backup": {
-                "description": "手动备份到 __history",
+                "description": "Manually backup to __history",
                 "required": ["file_path"],
                 "optional": {},
             },
         },
     },
     "structured_content": {
-        "summary": "结构化文档统一读写/搜索/修改 — DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf。按 JSONPath 路径读写，自动生成 JSON Schema。",
-        "description": "结构化文档统一读写/搜索/修改 — DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf。按 JSONPath 路径读写，自动生成 JSON Schema。",
+        "summary": "Unified read/write/search/modify for structured documents — DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf. Read/write by JSONPath path, auto-generate JSON Schema.",
+        "description": "Unified read/write/search/modify for structured documents — DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf. Read/write by JSONPath path, auto-generate JSON Schema.",
         "triggers": [
-            "结构化文档、DFM文件、XML配置、JSON数据、MessagePack、ProtoBuf、读写配置文件",
-            "修改组件属性、添加组件、搜索组件、路径查询、JSON Schema生成",
+            "structured documents, DFM files, XML config, JSON data, MessagePack, ProtoBuf, read/write config files",
+            "modify component properties, add components, search components, path query, JSON Schema generation",
         ],
         "constraints": [
-            "❌ 不能用于非结构化文本文件（.pas/.dpr/.txt/.md）",
-            "❌ ProtoBuf 需要先有 .proto 文件或已编译的 pb2 模块",
+            "❌ Cannot be used for unstructured text files (.pas/.dpr/.txt/.md)",
+            "❌ ProtoBuf requires a .proto file or a compiled pb2 module first",
         ],
-        "workflow": "structured_content(action=\"get_schema\", file_path=...) → 查看 Schema → 按 JSONPath 路径读写",
+        "workflow": "structured_content(action=\"get_schema\", file_path=...) → view Schema → read/write by JSONPath path",
         "actions": {
-            "read": "读取结构化文件，返回 JSON / Schema / both。path 参数截取子树，output 控制返回格式。",
-            "get_schema": "生成目标文件的 JSON Schema，帮助 LLM 理解文档结构用于后续路径构造。",
-            "set": "按 JSONPath 路径修改节点值。例如 path='$.Form.Left' value='200'。",
-            "search": "按 JSONPath 路径搜索节点，支持通配符 (*)、递归下降 (..)、过滤表达式 ([?@.name=='Button1'])。",
+            "read": "Read structured file, returns JSON / Schema / both. path parameter extracts a subtree, output controls return format.",
+            "get_schema": "Generate JSON Schema for target file, helping LLM understand document structure for subsequent path construction.",
+            "set": "Modify node value by JSONPath path. For example path='$.Form.Left' value='200'.",
+            "search": "Search nodes by JSONPath path, supports wildcards (*), recursive descent (..), filter expressions ([?@.name=='Button1']).",
         },
         "action_params": {
             "read": {
-                "description": "读取结构化文件为 JSON / Schema / both",
+                "description": "Read structured file as JSON / Schema / both",
                 "required": ["file_path"],
                 "optional": {
-                    "path": "JSONPath 路径，默认 $（根）",
-                    "format": "强制格式：dfm/lfm/fmx/xml/json/msgpack/protobuf（默认从扩展名检测）",
-                    "output": "输出格式：json(默认)/schema/both",
-                    "proto_file": "ProtoBuf 模式时传入 .proto 文件绝对路径",
-                    "message_name": "ProtoBuf 模式时传入消息名",
+                    "path": "JSONPath path, default $ (root)",
+                    "format": "Force format: dfm/lfm/fmx/xml/json/msgpack/protobuf (default detects from extension)",
+                    "output": "Output format: json(default)/schema/both",
+                    "proto_file": "In ProtoBuf mode, pass absolute path to .proto file",
+                    "message_name": "In ProtoBuf mode, pass message name",
                 },
                 "examples": [
                     'structured_content(action="read", file_path="MainForm.dfm")',
@@ -1926,12 +1920,12 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "get_schema": {
-                "description": "生成目标文件的 JSON Schema",
+                "description": "Generate JSON Schema for target file",
                 "required": ["file_path"],
                 "optional": {
-                    "format": "强制格式（默认从扩展名检测）",
-                    "proto_file": "ProtoBuf 模式时传入 .proto 文件绝对路径",
-                    "message_name": "ProtoBuf 模式时传入消息名",
+                    "format": "Force format (default detects from extension)",
+                    "proto_file": "In ProtoBuf mode, pass absolute path to .proto file",
+                    "message_name": "In ProtoBuf mode, pass message name",
                 },
                 "examples": [
                     'structured_content(action="get_schema", file_path="MainForm.dfm")',
@@ -1939,12 +1933,12 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "set": {
-                "description": "按 JSONPath 路径修改节点值",
+                "description": "Modify node value by JSONPath path",
                 "required": ["file_path", "path", "value"],
                 "optional": {
-                    "format": "强制格式（默认从扩展名检测）",
-                    "proto_file": "ProtoBuf 模式时传入 .proto 文件绝对路径",
-                    "message_name": "ProtoBuf 模式时传入消息名",
+                    "format": "Force format (default detects from extension)",
+                    "proto_file": "In ProtoBuf mode, pass absolute path to .proto file",
+                    "message_name": "In ProtoBuf mode, pass message name",
                 },
                 "examples": [
                     'structured_content(action="set", file_path="MainForm.dfm", path="$.Form.Left", value="200")',
@@ -1952,13 +1946,13 @@ TOOL_HELP_DOCS: dict = {
                 ],
             },
             "search": {
-                "description": "按 JSONPath 路径搜索节点",
+                "description": "Search nodes by JSONPath path",
                 "required": ["file_path"],
                 "optional": {
-                    "path": "JSONPath 路径，支持通配符/递归下降/过滤表达式，默认 $",
-                    "format": "强制格式（默认从扩展名检测）",
-                    "proto_file": "ProtoBuf 模式时传入 .proto 文件绝对路径",
-                    "message_name": "ProtoBuf 模式时传入消息名",
+                    "path": "JSONPath path, supports wildcards/recursive descent/filter expressions, default $",
+                    "format": "Force format (default detects from extension)",
+                    "proto_file": "In ProtoBuf mode, pass absolute path to .proto file",
+                    "message_name": "In ProtoBuf mode, pass message name",
                 },
                 "examples": [
                     'structured_content(action="search", file_path="MainForm.dfm", path="$..Button1")',
@@ -1970,7 +1964,7 @@ TOOL_HELP_DOCS: dict = {
     },
 }
 
-# 工具名列表（保持顺序，用于 list_tools 和 tool_help 的 enum）
+# Tool name list (keep order, used for list_tools and tool_help enum)
 TOOL_NAMES: list = [
     "delphi_project",
     "delphi_kb",
@@ -1994,98 +1988,98 @@ TOOL_NAMES: list = [
     "lazarus_file",
     "structured_content",
 ]
-# 规则：一句话用途 + 硬约束（不遵守会报错的规则）
+# Rule: one-sentence purpose + hard constraints (rules that error if not followed)
 TOOL_SHORT_DESC: dict = {
     "delphi_project": (
-        "Delphi 项目生命周期: 编译/配置/审计。"
-        " compile(编译)/info(配置查看)/set(修改)/add_config/remove_config/"
-        "add_source/remove_source/audit(静态分析50+规则)/ast(代码骨架)/runtime(注册表检查)/layout(UI布局审计)。"
-        " 仅支持 Delphi 项目文件(.dproj/.dpr/.dpk)。"
-        " 禁止手动 dcc32/msbuild。"
+        "Delphi project lifecycle: compile/config/audit."
+        " compile(compilation)/info(config view)/set(modify)/add_config/remove_config/"
+        "add_source/remove_source/audit(static analysis 50+ rules)/ast(code skeleton)/runtime(registry check)/layout(UI layout audit)."
+        " Only supports Delphi project files(.dproj/.dpr/.dpk)."
+        " Manual dcc32/msbuild is prohibited."
     ),
     "delphi_kb": (
-        "搜 Delphi API/项目代码/文档。"
-        " search_type=class(类)/function(函数)/semantic(语义)/reference(引用)/unit(单元)/all。"
-        " kb_type=delphi(官方)/project(项目)/thirdparty(三方库)/document(文档)/example(示例代码)。"
-        " search_in=all(默认)/delphi/project/thirdparty。"
-        " ⚠️ Delphi 文件必须用 delphi_file 读写/搜索/正则匹配+替换，不要用内置 Read/Edit/Write/grep。"
+        "Search Delphi API/project code/docs."
+        " search_type=class(class)/function(function)/semantic(semantic)/reference(reference)/unit(unit)/all."
+        " kb_type=delphi(official)/project(project)/thirdparty(third-party)/document(document)/example(sample code)."
+        " search_in=all(default)/delphi/project/thirdparty."
+        " ⚠️ Delphi files must use delphi_file for read/write/search/regex match+replace; do not use built-in Read/Edit/Write/grep."
     ),
     "delphi_file": (
-        "Delphi 文件专用读写入口: read/write(edits)/replace/insert/delete/format/backup/encode/uses。"
-        " 看到 .pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx/.groupproj 时，即使只是读取也用本工具。"
-        " Delphi 文件必须用 delphi_file，不要用内置 Read/Edit/Write/grep/apply_patch/PowerShell/Python。"
-        " 内置工具和外部写入只能由 edit guard 事后兜底，不能作为主编辑路径。"
-        " 🚫 同文件多处修改必须合并到一次 write(edits=[...])。"
+        "Delphi file-specific read/write entry: read/write(edits)/replace/insert/delete/format/backup/encode/uses."
+        " When seeing .pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx/.groupproj, use this tool even if just reading."
+        " Delphi files must use delphi_file; do not use built-in Read/Edit/Write/grep/apply_patch/PowerShell/Python."
+        " Built-in tools and external writes can only be post-hoc fallback by edit guard, and cannot be the primary editing path."
+        " 🚫 Multiple changes in the same file must be merged into one write(edits=[...])."
     ),
     "manage_component": (
-        "DFM 组件管理: create(生成DFM+代码)/add(添加组件)/remove/modify(属性)。自动同步PAS。"
+        "DFM component management: create(generate DFM+code)/add(add component)/remove/modify(property). Automatically sync PAS."
     ),
     "check_environment": (
-        "诊断编译环境: check(检查状态)/detect(重检测编译器)/install(安装pasfmt)。首次编译前调用。"
+        "Diagnose build environment: check(check status)/detect(redetect compiler)/install(install pasfmt). Call before first compilation."
     ),
     "async_task": (
-        "管理后台异步任务: start(启动)/status(进度)/result(结果)/list/cancel。知识库构建等耗时操作。"
+        "Manage background async tasks: start(start)/status(progress)/result(result)/list/cancel. For time-consuming operations such as knowledge base build."
     ),
     "package": (
-        "编译安装 Delphi 组件包: install(编译安装)/list(查已装)。"
+        "Compile and install Delphi component packages: install(compile and install)/list(list installed)."
     ),
     "get_coding_rules": (
-        "获取编码规范（Delphi/Lazarus）。写/改代码前必须先调用。"
-        " language=delphi(默认)或lazarus。各语言具体规则见 coding-rules/{language}/。"
+        "Get coding rules (Delphi/Lazarus). Must call before writing/modifying code."
+        " language=delphi(default) or lazarus. See coding-rules/{language}/ for specific rules by language."
     ),
     "code_hosting": (
-        "Git 操作: status/diff/show/log/add/commit/fetch/pull/branch/switch/merge/restore/unstage/stash/tag/push/clone"
-        " + 平台API(issue/PR/MR/release)。"
-        " 禁止用 bash 执行 git。"
+        "Git operations: status/diff/show/log/add/commit/fetch/pull/branch/switch/merge/restore/unstage/stash/tag/push/clone"
+        " + platform API(issue/PR/MR/release)."
+        " Do not use bash to run git."
     ),
     "tool_help": (
-        "获取任意工具的完整帮助文档（参数/示例/触发词）。用法不清时先调这个。"
+        "Get complete help docs for any tool (parameters/examples/triggers). Call this first when usage is unclear."
     ),
     "experience": (
-        "经验记忆: save(保存,自动去重)/search/get/list/update/merge/prune/delete/rebuild_embedding。"
-        " AI 问题解决后保存经验，下次同类问题直接复用。"
+        "Experience memory: save(save,auto-deduplicate)/search/get/list/update/merge/prune/delete/rebuild_embedding."
+        " Save experience after solving an AI problem, and reuse it directly for similar problems next time."
     ),
     "daofy_update": (
-        "检查和更新 Daofy 版本: check(快速检查)/update(git pull)/version(当前版本)。"
+        "Check and update Daofy version: check(quick check)/update(git pull)/version(current version)."
     ),
     "automate_delphi": (
-        "Delphi 自动化测试: gui(命名管道GUI操作+截图)/console(stdin/stdout交互)/auto(自动检测)/prepare(注册全局搜索路径)/test(批量RTTI测试)。"
-        " gui需链接DaofyAutomation(uses Vcl/Fmx.DaofyAutomation)；console无需改造；prepare一劳永逸。"
-        " 支持 keep_alive 复用进程。cmd: formsum/dumpstate/capture/goto/click/type/rget/rinspect(支持visibility参数)/rcall/rset/waitfor/msgscan/listwnd/exit/run_tests/callgraph/callgraph_diff/callgraph_path/callgraph_impact/callgraph_select_tests/callgraph_failure_diag/callgraph_boundary_check/callgraph_refactor_check/callgraph_orphan_candidates/callgraph_explain_exception。callgraph 需额外 uses DaofyAutomation.CallGraph，支持 edge_limit/include_prefixes/category；callgraph_path 支持 source/target/max_depth/max_paths/include_prefixes；callgraph_diff 默认 compare_by=name，可选 addr/full，save_as/baseline_path 限制在 snapshots_dir。"
+        "Delphi automated testing: gui(named pipe GUI operations+screenshots)/console(stdin/stdout interaction)/auto(auto-detect)/prepare(register global search paths)/test(batch RTTI tests)."
+        " gui requires linking DaofyAutomation(uses Vcl/Fmx.DaofyAutomation); console requires no modification; prepare is one-time setup."
+        " Supports keep_alive to reuse processes. cmd: formsum/dumpstate/capture/goto/click/type/rget/rinspect(supports visibility parameter)/rcall/rset/waitfor/msgscan/listwnd/exit/run_tests/callgraph/callgraph_diff/callgraph_path/callgraph_impact/callgraph_select_tests/callgraph_failure_diag/callgraph_boundary_check/callgraph_refactor_check/callgraph_orphan_candidates/callgraph_explain_exception. callgraph requires additional uses DaofyAutomation.CallGraph, supports edge_limit/include_prefixes/category; callgraph_path supports source/target/max_depth/max_paths/include_prefixes; callgraph_diff defaults to compare_by=name, optional addr/full, save_as/baseline_path limited to snapshots_dir."
     ),
     "generate_copyright": (
-        "生成软著文档: generate(源代码+说明书)/validate(检查配置)/audit(审计草稿)。浏览器PDF渲染+自动校验。"
+        "Generate software copyright documents: generate(source code+manual)/validate(check config)/audit(audit draft). Browser PDF rendering+automatic validation."
     ),
     "delphi_rtti": (
-        "Delphi RTTI 桥接: discover(扫描能力)/call(调用方法)/guide(使用指南)。"
-        " 三步法: discover→call，无需UI操作。需链接DaofyAutomation。"
+        "Delphi RTTI bridge: discover(scan capabilities)/call(invoke method)/guide(usage guide)."
+        " Three-step method: discover→call, no UI operations needed. Requires linking DaofyAutomation."
     ),
     "ocr": (
-        "图像分析: recognize(文字识别)/detect(文本框)/diff(截图对比)/color(颜色分析)/match(图标匹配)/status(模型状态)。"
-        " 纯ONNX+OpenCV+Pillow。diff需两张截图；match需模板图；color支持区域分析。"
+        "Image analysis: recognize(text recognition)/detect(text boxes)/diff(screenshot comparison)/color(color analysis)/match(icon matching)/status(model status)."
+        " Pure ONNX+OpenCV+Pillow. diff requires two screenshots; match requires a template image; color supports region analysis."
     ),
     "lazarus_compile": (
-        "Lazarus/Free Pascal 项目编译 (lazbuild)。"
-        " project_path(.lpi/.lpr)必需。支持 target_platform(win32/win64)/build_configuration/timeout。"
+        "Lazarus/Free Pascal project compilation (lazbuild)."
+        " project_path(.lpi/.lpr) is required. Supports target_platform(win32/win64)/build_configuration/timeout."
     ),
     "lazarus_project": (
-        "Lazarus 项目信息查询 — 解析 .lpi 文件。"
-        " action=info(默认，项目概要)/units(单元列表)/options(编译器选项)。"
+        "Lazarus project information query — parse .lpi file."
+        " action=info(default, project summary)/units(unit list)/options(compiler options)."
     ),
     "lazarus_kb": (
-        "Lazarus/FPC 源码知识库。"
-        " build(构建)/search(搜索)/stats(统计)/read(读取源码)。"
-        " 自动检测 C:\\lazarus 下的 LCL/FPC RTL 源码。"
+        "Lazarus/FPC source code knowledge base."
+        " build(build)/search(search)/stats(statistics)/read(read source)."
+        " Automatically detects LCL/FPC RTL source under C:\\lazarus."
     ),
     "lazarus_file": (
-        "Lazarus/FPC 文件读写。"
-        " read(读)/write(edits修改，自动备份到__history)/backup(手动备份)。"
-        " 只读/写/备份，不支持 grep/format/uses 等 Delphi 特有操作。"
+        "Lazarus/FPC file read/write."
+        " read(read)/write(edits modify, auto-backup to __history)/backup(manual backup)."
+        " Only read/write/backup; does not support Delphi-specific operations such as grep/format/uses."
     ),
     "structured_content": (
-        "结构化文档统一读写/搜索/修改。格式: DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf。"
-        " read(读取为JSON或Schema)/get_schema(生成JSON Schema)/set(按JSONPath路径修改)/search(路径搜索)。"
-        " 自动检测格式（支持 .dfm/.lfm/.fmx/.xml/.json/.msgpack/.proto/.pb）。"
-        " ProtoBuf需额外指定 proto_file 和 message_name。"
+        "Unified read/write/search/modify for structured documents. Formats: DFM/LFM/FMX/XML/JSON/MessagePack/ProtoBuf."
+        " read(read as JSON or Schema)/get_schema(generate JSON Schema)/set(modify by JSONPath path)/search(path search)."
+        " Auto-detect format (supports .dfm/.lfm/.fmx/.xml/.json/.msgpack/.proto/.pb)."
+        " ProtoBuf requires additionally specifying proto_file and message_name."
     ),
 }

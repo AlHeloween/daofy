@@ -1,161 +1,162 @@
-﻿<!-- @when: 需要自动化测试提示词模板时 -->
+<!-- @when: Need automated testing prompt templates -->
 
-# 自动化测试提示词模板
+# Automated Testing Prompt Templates
 
-以下模板供 AI 在自动化测试各阶段直接套用，将 `{变量}` 替换为实际值。
+The following templates are for the AI to apply directly at each stage of automated testing; replace `{variables}` with actual values.
 
-MCP resource URI: `delphi://automation/prompts`。
+MCP resource URI: `delphi://automation/prompts`.
 
-## F0. 系统角色与思维框架
+## F0. System Role and Thinking Framework
 
-> **角色注入**：调用 MCP prompt `automate-expert-primer` 即可注入完整「Delphi UI 自动化测试专家」角色（含三层递进思维模型 + 角色边界），无需在此展开。
+> **Role injection**: Call the MCP prompt `automate-expert-primer` to inject the complete "Delphi UI Automation Testing Expert" role (including the three-layer progressive thinking model + role boundaries); no need to expand it here.
 >
-> 调用方式：`prompts/get automate-expert-primer`，参数：`app_name`, `project_path`
+> Invocation: `prompts/get automate-expert-primer`, parameters: `app_name`, `project_path`
 >
-> 角色边界：仅用于自动化测试阶段。测试完成后角色自动切回 Delphi 开发专家。
+> Role boundary: Used only during the automated testing phase. After testing is complete, the role automatically switches back to Delphi Development Expert.
 
 ---
 
-## F1. 测试规划模板
+## F1. Test Planning Template
 
 ```
-== 测试规划 ==
+== Test Planning ==
 
-**目标**: {测试目标描述}
-**前置条件**: {当前应用状态}
+**Goal**: {test goal description}
+**Preconditions**: {current application state}
 
-**① 检索经验**
-experience(action="search", query="{场景关键词}", top_k=3)
-- 有匹配 → 参考其工具选择、失败模式、恢复策略
-- 无匹配 → 按默认策略规划
+**① Retrieve experience**
+experience(action="search", query="{scenario keywords}", top_k=3)
+- Match found → refer to its tool selection, failure modes, and recovery strategies
+- No match → plan according to the default strategy
 
-**② 感知当前状态**
-- listwnd → 确认窗口列表
-- dumpstate / capture → 获取 UI 结构和截图
-- msgscan → 检查残留弹窗
+**② Perceive current state**
+- listwnd → confirm the window list
+- dumpstate / capture → obtain the UI structure and screenshot
+- msgscan → check for residual pop-ups
 
-**③ 规划步骤序列**
+**③ Plan the step sequence**
 
-| # | 阶段 | 工具 | 目标 | 预期结果 | 超时 | 失败处理 |
+| # | Phase | Tool | Target | Expected result | Timeout | Failure handling |
 |---|---|------|------|---------|------|---------|
-| 1 | perceive | listwnd+dumpstate | 获取初始状态 | 主窗口已打开 | 5s | 上报 |
-| 2 | execute | goto+click | 点击按钮X | 对话框打开 | 10s | capture→msgscan→分析 |
-| 3 | verify | waitfor+capture | 确认对话框 | 控件Y可见 | 5s | 降级RTTI |
+| 1 | perceive | listwnd+dumpstate | Obtain initial state | Main window is open | 5s | Escalate |
+| 2 | execute | goto+click | Click button X | Dialog opens | 10s | capture→msgscan→analyse |
+| 3 | verify | waitfor+capture | Confirm dialog | Control Y is visible | 5s | Degrade to RTTI |
 
-**④ 执行循环**
-严格 感知→执行→验证 每步循环，失败即停。
+**④ Execution loop**
+Strictly loop perceive→execute→verify for each step; stop on failure.
 ```
 
-## F2. 单步执行协议
+## F2. Single-Step Execution Protocol
 
-每步操作严格按四段式执行：
+Each step must be executed strictly according to the four-stage protocol:
 
 ```
-┌─ ① 前置感知 ──────────────────┐
-│ msgscan：检查弹窗（每步前必做） │
-│ capture/dumpstate：确认当前状态 │
-│ 确认上一步验证已通过            │
+┌─ ① Pre-perception ──────────────┐
+│ msgscan: check for pop-ups (required before every step) │
+│ capture/dumpstate: confirm current state │
+│ Confirm the previous step's verification passed │
 └────────────────────────────────┘
           ↓
-┌─ ② 执行 ──────────────────────┐
-│ 调用目标工具/命令               │
-│ 同步命令 → 检查返回码和结果     │
-│ 异步命令 → 记录操作已发送       │
+┌─ ② Execute ──────────────────────┐
+│ Invoke the target tool/command │
+│ Synchronous command → check return code and result │
+│ Asynchronous command → record that the operation was sent │
 └────────────────────────────────┘
           ↓
-┌─ ③ 等待 ──────────────────────┐
-│ 异步命令 → wait(500~2000ms) /  │
-│   waitfor(控件, 超时=10000)     │
-│ 同步命令 → 跳过等待             │
+┌─ ③ Wait ──────────────────────┐
+│ Asynchronous command → wait(500~2000ms) / │
+│   waitfor(control, timeout=10000) │
+│ Synchronous command → skip waiting │
 └────────────────────────────────┘
           ↓
-┌─ ④ 验证 ──────────────────────┐
-│ msgscan：确认无意外弹窗         │
-│ capture/rget/ocr：确认结果符合  │
-│ 一致 → 标记完成，继续下一步     │
-│ 不一致 → 转入失败恢复模板(F3)   │
+┌─ ④ Verify ──────────────────────┐
+│ msgscan: confirm there are no unexpected pop-ups │
+│ capture/rget/ocr: confirm the result matches │
+│ Match → mark complete, continue to next step │
+│ Mismatch → switch to Failure Recovery Template (F3) │
 └────────────────────────────────┘
 ```
 
-**模板化提交**：
+**Templated submission**:
 ```
-[步骤{N}] 阶段=perceive|execute|verify
-工具={tool} 参数={params}
-预期={expected}
-前置感知: {msgscan/dumpstate/capture 结果}
-执行结果: {工具返回}
-等待结果: {waitfor/wait 结果}
-验证结果: {一致/不一致，差异描述}
+[Step {N}] phase=perceive|execute|verify
+tool={tool} params={params}
+expected={expected}
+Pre-perception: {msgscan/dumpstate/capture result}
+Execution result: {tool return}
+Wait result: {waitfor/wait result}
+Verification result: {match/mismatch, difference description}
 ```
 
-## F3. 失败恢复模板
+## F3. Failure Recovery Template
 
 ```
-**失败恢复 — 步骤{N}**
+**Failure Recovery — Step {N}**
 
-**失败信号**: {超时/返回值错误/弹窗/OCR不匹配...}
-**预期**: {expected}
-**实际**: {actual}
+**Failure signal**: {timeout/error return value/pop-up/OCR mismatch...}
+**Expected**: {expected}
+**Actual**: {actual}
 
-**① 诊断**
-- capture 当前状态（截图留存）
-- dumpstate 获取当前控件树
-- msgscan 检测弹窗
-- 分析差异原因：操作未生效？弹窗干扰？时序问题？控件变化？
+**① Diagnose**
+- capture current state (save screenshot)
+- dumpstate to obtain the current control tree
+- msgscan to detect pop-ups
+- Analyse the cause of the difference: operation did not take effect? pop-up interference? timing issue? control changed?
 
-**② 决策**
-| 条件 | 恢复策略 |
+**② Decide**
+| Condition | Recovery strategy |
 |------|---------|
-| 弹窗干扰 | msgclick(OK/Cancel) → 重试原操作 |
-| 控件不可见 | dumpstate 查替代路径 → 修正 goto |
-| 超时但无错误 | 增加 waitfor 时间 → 重试 |
-| 可用 RTTI | 黑盒先修 UI 路径；灰盒诊断可用 rcall/rset |
-| 确定性失败 | 上报（记录到经验库） |
+| Pop-up interference | msgclick(OK/Cancel) → retry the original operation |
+| Control not visible | dumpstate to find an alternative path → correct goto |
+| Timeout but no error | Increase waitfor time → retry |
+| RTTI available | Black-box first fixes the UI path; grey-box diagnostics may use rcall/rset |
+| Deterministic failure | Escalate (record in experience base) |
 
-**③ 恢复执行**
-{选择的恢复策略 + 具体操作}
+**③ Recovery execution**
+{selected recovery strategy + specific operations}
 
-**④ 学习记录**
-保存到经验库：
-- problem: "{场景} — {失败原因}"
-- solution: "{恢复策略} — {应用/版本} 上有效"
+**④ Learning record**
+Save to the experience base:
+- problem: "{scenario} — {failure reason}"
+- solution: "{recovery strategy} — effective on {application/version}"
 - tags: ["automation", "{app_name}", "{failure_type}"]
 ```
 
-## F4. 经验保存模板
+## F4. Experience Saving Template
 
 ```
-**经验保存**
+**Experience Save**
 
-**场景**: {测试用例名称}
-**应用**: {应用名/版本}
-**执行概况**: 总步骤数 N，成功 N，失败+恢复 N，不可恢复 N，耗时 Xs
+**Scenario**: {test case name}
+**Application**: {application name/version}
+**Execution summary**: Total steps N, succeeded N, failed+recovered N, unrecoverable N, elapsed Xs
 
-**成功模式**（哪些工具/命令组合效果好）:
-- 工具组合: {如 "goto+click 配合 waitfor 稳定"}
-- RTTI 使用: {如 "灰盒诊断用 rcall 定位，黑盒脚本保持真实 UI 操作"}
+**Success patterns** (which tool/command combinations worked well):
+- Tool combination: {e.g. "goto+click combined with waitfor is stable"}
+- RTTI usage: {e.g. "use rcall for grey-box diagnosis, while black-box scripts keep real UI operations"}
 
-**失败模式**（哪些操作容易出问题，如何恢复）:
-- {失败描述}: {原因} → {恢复方式} → {是否可自动化恢复}
+**Failure patterns** (which operations are prone to problems, and how to recover):
+- {failure description}: {cause} → {recovery method} → {whether automated recovery is possible}
 
-**优化建议**:
-1. {建议1}
-2. {建议2}
+**Optimisation suggestions**:
+1. {suggestion 1}
+2. {suggestion 2}
 
-**保存**:
-experience(action="save", problem="{场景关键词}", solution="{核心做法}", tags=["automation", "{app_name}"])
+**Save**:
+experience(action="save", problem="{scenario keywords}", solution="{core practice}", tags=["automation", "{app_name}"])
 ```
 
-## F5. MCP Prompt 一览
+## F5. MCP Prompt Overview
 
-| Prompt | 用途 | 参数 | 对应 F 节 |
+| Prompt | Purpose | Parameters | Corresponding F section |
 |--------|------|------|-----------|
-| `automate-expert-primer` | 注入测试专家角色 | `app_name`, `project_path` | F0 |
-| `automate-code-analysis` | 代码感知分析 | `form_name`, `project_path`, `app_path` | H |
-| `automate-test-plan` | 完整测试规划 | `goal`, `app_path`, `project_path` | F1 |
-| `automate-step-execute` | 单步执行协议 | `phase`, `tool`, `target`, `expected` | F2 |
-| `automate-failure-recover` | 失败恢复 | `signal`, `expected`, `actual` | F3 |
-| `automate-save-experience` | 保存经验到知识库 |（无参数）| F4 |
-| `automate-session-end` | 结束会话 | `save_experience`, `export_script` | — |
+| `automate-expert-primer` | Inject testing expert role | `app_name`, `project_path` | F0 |
+| `automate-code-analysis` | Code-aware analysis | `form_name`, `project_path`, `app_path` | H |
+| `automate-test-plan` | Complete test planning | `goal`, `app_path`, `project_path` | F1 |
+| `automate-step-execute` | Single-step execution protocol | `phase`, `tool`, `target`, `expected` | F2 |
+| `automate-failure-recover` | Failure recovery | `signal`, `expected`, `actual` | F3 |
+| `automate-save-experience` | Save experience to knowledge base | (none) | F4 |
+| `automate-session-end` | End session | `save_experience`, `export_script` | — |
 
-> 所有 prompt 通过 `prompts/get <prompt_name>` 调用。部分需前置参数，建议调用前阅读对应 F 节。
+> All prompts are invoked via `prompts/get <prompt_name>`. Some require prerequisite parameters; it is recommended to read the corresponding F section before invoking.
+

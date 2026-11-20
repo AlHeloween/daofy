@@ -1,7 +1,7 @@
 """
-环境检查工具
+Environment check tool
 
-提供编译器环境检查功能
+Provides compiler environment checking
 """
 
 from pathlib import Path
@@ -14,41 +14,41 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# 全局配置管理器实例
+# Global config manager instance
 _config_manager: Optional[ConfigManager] = None
 
-# 全局第三方库服务实例
+# Global third-party library service instance
 _thirdparty_kb_service = None
 
 
 def set_config_manager(manager: ConfigManager):
-    """设置配置管理器实例"""
+    """Set the config manager instance"""
     global _config_manager
     _config_manager = manager
 
 
 def set_thirdparty_kb_service(service):
-    """设置第三方库知识库服务实例"""
+    """Set the third-party library knowledge base service instance"""
     global _thirdparty_kb_service
     _thirdparty_kb_service = service
 
 
 async def check_environment(arguments: dict = None) -> CallToolResult:
     """
-    检查编译器环境状态
+    Check the compiler environment status
 
     Args:
-        arguments: 可选的参数字典
+        arguments: optional argument dict
 
     Returns:
         CallToolResult
     """
-    logger.info("收到环境检查请求")
+    logger.info("Received an environment-check request")
 
     if _config_manager is None:
-        logger.error("配置管理器未初始化")
+        logger.error("The config manager is not initialized")
         return CallToolResult(
-            content=[{"type": "text", "text": "配置管理器未初始化，请先启动服务"}],
+            content=[{"type": "text", "text": "The config manager is not initialized; start the service first"}],
             isError=True
         )
 
@@ -56,7 +56,7 @@ async def check_environment(arguments: dict = None) -> CallToolResult:
         compilers = _config_manager.get_all_compilers()
         default_compiler = _config_manager.get_compiler()
 
-        # 检查每个编译器是否可用
+        # Check whether each compiler is usable
         validator = Validator()
         compiler_infos = []
 
@@ -70,13 +70,13 @@ async def check_environment(arguments: dict = None) -> CallToolResult:
                 "is_default": compiler.is_default
             })
 
-        # 判断整体状态
+        # Decide the overall status
         available_count = sum(1 for info in compiler_infos if info["is_available"])
         status = "available" if available_count > 0 else "unavailable"
 
-        logger.info(f"环境检查完成: {available_count}/{len(compilers)} 个编译器可用")
+        logger.info(f"Environment check finished: {available_count}/{len(compilers)} compiler(s) available")
 
-        # 获取第三方库路径（按默认编译器的 registry_version 过滤，与 RTL 库路径策略一致）
+        # Fetch the third-party library paths (filtered by the default compiler's registry_version, matching the RTL library path policy)
         thirdparty_paths = []
         try:
             if _thirdparty_kb_service:
@@ -88,17 +88,17 @@ async def check_environment(arguments: dict = None) -> CallToolResult:
                 )
                 thirdparty_paths = _thirdparty_kb_service.get_library_paths(version)
         except Exception as e:
-            logger.warning(f"获取第三方库路径失败: {e}")
+            logger.warning(f"Failed to fetch the third-party library paths: {e}")
 
-        # 格式化输出
-        output = f"Delphi 编译器环境状态: {status}\n\n"
-        output += f"编译器数量: {len(compilers)} ({available_count} 个可用)\n"
+        # Format the output
+        output = f"Delphi compiler environment status: {status}\n\n"
+        output += f"Compiler count: {len(compilers)} ({available_count} available)\n"
         if default_compiler:
-            output += f"默认编译器: {default_compiler.name} ({default_compiler.version})\n"
+            output += f"Default compiler: {default_compiler.name} ({default_compiler.version})\n"
 
         output += (
-            "MSBuild: 项目配置 .daofy/project.json 优先，"
-            "其次按版本映射，最后自动探测（vswhere → VS → Delphi → PATH）\n"
+            "MSBuild: the project config .daofy/project.json wins first, "
+            "then the per-version mapping, and lastly auto-probing (vswhere → VS → Delphi → PATH)\n"
         )
 
         version_msbuild = getattr(
@@ -107,25 +107,25 @@ async def check_environment(arguments: dict = None) -> CallToolResult:
             None,
         )
         if version_msbuild:
-            output += "按 Delphi 版本配置的 MSBuild:\n"
+            output += "MSBuild configured per Delphi version:\n"
             for version_key, msbuild_value in version_msbuild.items():
                 resolved_value = (
                     _config_manager.get_msbuild_for_version(version_key)
                     or msbuild_value
                 )
-                exists_mark = "存在" if Path(resolved_value).is_file() else "不存在"
+                exists_mark = "present" if Path(resolved_value).is_file() else "missing"
                 output += f"  {version_key} → {resolved_value} [{exists_mark}]\n"
 
         output += (
-            "项目级覆盖: 工程目录或父目录下的 "
+            "Project-level override: in the project directory or a parent directory, "
             ".daofy/project.json / daofy.project.json\n"
         )
 
-        output += f"\n第三方库路径: {len(thirdparty_paths)} 个\n"
+        output += f"\nThird-party library paths: {len(thirdparty_paths)}\n"
         for i, path in enumerate(thirdparty_paths[:10], 1):
             output += f"  {i}. {path}\n"
         if len(thirdparty_paths) > 10:
-            output += f"  ... 还有 {len(thirdparty_paths) - 10} 个\n"
+            output += f"  ... {len(thirdparty_paths) - 10} more\n"
 
         guard = snapshot_status()
         output += "\nDelphi edit guard:\n"
@@ -136,7 +136,7 @@ async def check_environment(arguments: dict = None) -> CallToolResult:
         for item in guard["recent_unauthorized_edits"][:5]:
             output += f"  - {item['path']} ({item['event_type']}, age_ms={item.get('age_ms', 0)})\n"
         if guard["recent_unauthorized_count"] > 5:
-            output += f"  ... 还有 {guard['recent_unauthorized_count'] - 5} 条\n"
+            output += f"  ... {guard['recent_unauthorized_count'] - 5} more\n"
         output += (
             "  note: strict mode blocks delphi_project compile after the watcher "
             "detects non-Daofy Delphi file writes.\n"
@@ -145,7 +145,7 @@ async def check_environment(arguments: dict = None) -> CallToolResult:
         return CallToolResult(content=[{"type": "text", "text": output}])
 
     except Exception as e:
-        error_msg = f"环境检查过程发生异常: {str(e)}"
+        error_msg = f"Exception during the environment check: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return CallToolResult(
             content=[{"type": "text", "text": error_msg}],
@@ -155,21 +155,21 @@ async def check_environment(arguments: dict = None) -> CallToolResult:
 
 async def get_compile_history(limit: int = 10) -> Dict[str, Any]:
     """
-    获取编译历史记录
+    Get the compile history
 
     Args:
-        limit: 最大记录数
+        limit: the maximum number of entries
 
     Returns:
-        编译历史字典
+        The compile history dict
     """
-    logger.info(f"收到获取编译历史请求,限制: {limit}")
+    logger.info(f"Received a get-compile-history request, limit: {limit}")
 
     if _config_manager is None:
-        logger.error("配置管理器未初始化")
+        logger.error("The config manager is not initialized")
         return {
             "success": False,
-            "message": "配置管理器未初始化",
+            "message": "The config manager is not initialized",
             "entries": []
         }
 
@@ -178,15 +178,16 @@ async def get_compile_history(limit: int = 10) -> Dict[str, Any]:
 
         return {
             "success": True,
-            "message": f"共 {len(entries)} 条历史记录",
+            "message": f"{len(entries)} history record(s)",
             "entries": [e.to_dict() for e in entries]
         }
 
     except Exception as e:
-        error_msg = f"获取编译历史过程发生异常: {str(e)}"
+        error_msg = f"Exception while fetching the compile history: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return {
             "success": False,
             "message": error_msg,
             "entries": []
         }
+

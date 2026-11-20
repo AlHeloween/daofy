@@ -1,21 +1,21 @@
-<!-- @when: 编写或修改 automate_delphi GUI 脚本时 -->
+<!-- @when: Writing or modifying an automate_delphi GUI script -->
 <!-- @chain: after=script-generation-workflow.md -->
 
-# 自动化脚本格式规范
+# Automation Script Format Specification
 
-传给 `automate_delphi(action="gui", script=...)` 的脚本可以是：
+The script passed to `automate_delphi(action="gui", script=...)` can be:
 
-- 包含 `steps` 数组的完整脚本对象；
-- 直接传 step 对象数组；
-- 以上任一种形状的 JSON 字符串或文件路径。
+- a complete script object containing a `steps` array;
+- a step object array directly;
+- a JSON string or file path in either of the above shapes.
 
-保存可复用脚本时推荐使用完整对象，Daofy 会将 `steps` 之外的字段保留为 `script_metadata` 供执行结果使用。
+When saving reusable scripts, the complete object is recommended; Daofy will preserve fields other than `steps` as `script_metadata` for use in execution results.
 
-MCP resource URI: `delphi://automation/script-schema`。
+MCP resource URI: `delphi://automation/script-schema`.
 
-## 脚本元数据
+## Script Metadata
 
-可复用脚本应声明测试级别：
+Reusable scripts should declare the test level:
 
 ```json
 {
@@ -36,18 +36,18 @@ redact values to `{count, names}`. Passing `null` unsets an inherited variable f
 tested process. With `keep_alive=true`, a cached tested process is reused only when the
 requested environment is the same; changing `env` restarts the tested process.
 
-测试级别说明：
-- `black-box` — 通过可见 UI 入口的真实用户工作流。
-- `gray-box` — 使用 RTTI 读取/调用做诊断、夹具或项目特定探测。
-- `white-box` — 直接检查业务方法或数据层。
+Test level descriptions:
+- `black-box` — real user workflows through visible UI entry points.
+- `gray-box` — use RTTI reads/calls for diagnostics, fixtures, or project-specific probes.
+- `white-box` — directly inspect business methods or the data layer.
 
-黑盒 `execute` 步骤不得使用 `rcall`、`rset` 或 `delphi_rtti(action="call")`。这些命令绕过了真实 UI 路径。如果脚本需要它们，标记为 `gray-box` 或 `white-box` 并在 `goal` 或 `note` 中说明原因。
+Black-box `execute` steps must not use `rcall`, `rset`, or `delphi_rtti(action="call")`. These commands bypass the real UI path. If a script needs them, mark it `gray-box` or `white-box` and explain why in `goal` or `note`.
 
-**合规检查**：执行 `grep 'rcall' tests/**/*.json` 确认无黑盒脚本包含 RTTI 执行命令。零匹配即合规。
+**Compliance check**: run `grep 'rcall' tests/**/*.json` to confirm no Black-box script contains RTTI execution commands. Zero matches means compliant.
 
-`callgraph_diagnostics=true` 时，失败步骤若声明 `handler` / `entry` / `callgraph_target`，Daofy 会在自动退出前追加一次 `callgraph(direction=callers)` 查询，并把摘要写入 `report.first_failure.diagnostics.callgraph`。默认关闭，避免普通 UI 测试额外消耗。
+When `callgraph_diagnostics=true`, if a failed step declares `handler` / `entry` / `callgraph_target`, Daofy appends a `callgraph(direction=callers)` query before automatic exit and writes the summary into `report.first_failure.diagnostics.callgraph`. It is disabled by default to avoid extra overhead for ordinary UI tests.
 
-可选全局配置：
+Optional global configuration:
 
 ```json
 {
@@ -64,7 +64,7 @@ requested environment is the same; changing `env` restarts the tested process.
 }
 ```
 
-## 步骤字段
+## Step Fields
 
 ```json
 {
@@ -72,125 +72,125 @@ requested environment is the same; changing `env` restarts the tested process.
   "cmd": "rget",
   "target": "BtnSave.Caption",
   "handler": "main.TfrmMain.SaveIfModified",
-  "expected": "保存按钮标题正确",
+  "expected": "Save button caption is correct",
   "assert_expr": "actual == '保存'",
-  "note": "供人类和 AI 规划查看的说明"
+  "note": "Explanation for human and AI planning"
 }
 ```
 
-字段说明：
-- `phase` — 用于报告分组。
-- `cmd` — Daofy 自动化命令。
-- `target` 和命令特定字段（`prop`、`value`、`timeout`、`text`、`params`、`props` 等）。
-- `expected` — 人工可读的预期行为。
-- `assert_expr` — Daofy 评估的 Python 断言表达式。
-- `note` — 推理过程或源码推导的上下文。
-- `handler` / `entry` / `callgraph_target` — 可选源码入口函数名，用于失败报告附加 callgraph 诊断和测试选择。
-- `callgraph_diff` 步骤可使用 `baseline` 或 `baseline_path`、`compare_by=name|addr|full`、`save_as`；`save_as` 必须是 `snapshots_dir` 下的相对 JSON 路径，`baseline_path` 等文件型快照输入必须 resolve 后仍在 `snapshots_dir` 内。
-- `cmd` 带 `uia.xxx` 前缀时通过 Python UIA（uiautomation 库）执行，不走 Delphi 管道。所有 `uia.xxx` 命令运行在 Python 进程内，可访问任何 UIA 兼容控件——Delphi、Win32、WPF、Qt、Chrome、系统对话框等。**非注入黑盒**：无需修改被测程序源码。
-  > `via` 字段（旧方案）已废弃，统一使用 `uia.xxx` 命令前缀。迁移期兼容 `via: "uia"`，但新脚本禁用。
+Field descriptions:
+- `phase` — used for report grouping.
+- `cmd` — Daofy automation command.
+- `target` and command-specific fields (`prop`, `value`, `timeout`, `text`, `params`, `props`, etc.).
+- `expected` — human-readable expected behavior.
+- `assert_expr` — Python assertion expression evaluated by Daofy.
+- `note` — reasoning process or source-derived context.
+- `handler` / `entry` / `callgraph_target` — optional source entry function name, used for attaching callgraph diagnostics to failure reports and test selection.
+- `callgraph_diff` steps may use `baseline` or `baseline_path`, `compare_by=name|addr|full`, `save_as`; `save_as` must be a relative JSON path under `snapshots_dir`, and file-based snapshot inputs such as `baseline_path` must resolve to a path still within `snapshots_dir`.
+- When `cmd` has the `uia.xxx` prefix, it is executed through Python UIA (uiautomation library) and does not go through the Delphi pipe. All `uia.xxx` commands run inside the Python process and can access any UIA-compatible control—Delphi, Win32, WPF, Qt, Chrome, system dialogs, etc. **Non-injection black-box**: no need to modify the application under test.
+  > The `via` field (old approach) is deprecated; use the `uia.xxx` command prefix uniformly. `via: "uia"` is compatible during migration, but new scripts must not use it.
 
-> 完整 UIA 命令表见 `delphi://automation/uia-commands`。
+> See `delphi://automation/uia-commands` for the complete UIA command table.
 
-### dumpstate 属性白名单
+### dumpstate Property Whitelist
 
-`dumpstate` 接受 `props` 参数（逗号分隔的属性名列表），Delphi 内联单元仅输出这些属性（跳过 `IsSkippedProp` 黑名单）。避免管道溢出并加速响应：
+`dumpstate` accepts a `props` parameter (comma-separated property name list); the Delphi inline unit outputs only these properties (skipping the `IsSkippedProp` blacklist). This avoids pipe overflow and speeds up responses:
 
 ```json
 {"cmd": "dumpstate", "props": "caption,enabled"}
 {"cmd": "dumpstate", "props": "name,class,caption,items"}
-{"cmd": "dumpstate"}  // 默认输出全部属性
+{"cmd": "dumpstate"}  // outputs all properties by default
 ```
 
-使用 Daofy MCP 工具时，`props` 从步骤 JSON 转发到 Delphi 管道。对于仅发 `cmd`/`target` 的工具，属性列表可通过 `target` 字段传递：
+When using Daofy MCP tools, `props` is forwarded from the step JSON to the Delphi pipe. For tools that only send `cmd`/`target`, the property list can be passed through the `target` field:
 
 ```json
 {"cmd": "dumpstate", "target": "caption,enabled"}
 ```
 
-### 通用 RTTI 项点击
+### Generic RTTI Item Click
 
-`click` 支持 `ControlName@ItemCaption` 语法，通过泛型 RTTI 查找并点击任何 `TCollection` 属性的项，无需计算坐标：
+`click` supports the `ControlName@ItemCaption` syntax, finding and clicking items in any `TCollection` property through generic RTTI without calculating coordinates:
 
 ```json
 {"cmd": "click", "target": "cbMenus@打开工程..."}
 ```
 
-Delphi 内联单元使用纯 RTTI 读取每项的 `Caption`（或回退到 `Text`）和 `Bounds`（Left/Top/Right/Bottom），然后点击匹配项的中心。无需 VCL 类型绑定，任何基于 `TCollection` 的控件均支持。
+The Delphi inline unit uses pure RTTI to read each item's `Caption` (or fall back to `Text`) and `Bounds` (Left/Top/Right/Bottom), then clicks the center of the matching item. No VCL type binding is required; any `TCollection`-based control is supported.
 
-### 坐标点击
+### Coordinate Click
 
-坐标点击的坐标为相对于目标控件的客户区坐标。推荐使用 `"target": "ControlName@x,y"` 格式以便脚本可复用——Delphi 内联单元直接识别。新版 Daofy 也接受 `click` 的 `"target": "ControlName", "x": 10, "y": 20` 格式并自动转换为相同线协议。
+Coordinates for coordinate clicks are client-area coordinates relative to the target control. The recommended format is `"target": "ControlName@x,y"` so scripts are reusable—the Delphi inline unit recognizes it directly. Newer Daofy also accepts the `"target": "ControlName", "x": 10, "y": 20` format for `click` and automatically converts it to the same wire protocol.
 
-**优先使用基于标题的点击**（菜单、列表、分类按钮等集合类控件），其对布局变化和 DPI 缩放的鲁棒性更好。
+**Prefer title-based clicks** (menus, lists, category buttons, and other collection controls), as they are more robust to layout changes and DPI scaling.
 
-### textbounds 按文本定位控件边界
+### textbounds Locates Control Bounds by Text
 
-`textbounds` 通过拦截 GDI/GDI+ 文本绘制函数（paint-hook）定位控件中匹配文本的客户端边界矩形，替代 OCR。两种模式：
+`textbounds` locates the client-area bounding rectangle of matching text in a control by intercepting GDI/GDI+ text drawing functions (paint-hook), replacing OCR. Two modes:
 
-- `paint` — 仅 paint-hook（拦截文本绘制，通用，支持任意控件含第三方/自绘/FMX）
-- `type` — 仅 type-bound（按控件类型分发，覆盖标准 VCL 控件：TListBox/TComboBox/TTreeView/TListView/TPageControl/TTabControl/TMemo/TRichEdit）
-- `auto` — paint-hook 优先，失败回退 type-bound（默认）
+- `paint` — paint-hook only (intercepts text drawing, generic, supports any control including third-party/custom-drawn/FMX)
+- `type` — type-bound only (dispatches by control type, covering standard VCL controls: TListBox/TComboBox/TTreeView/TListView/TPageControl/TTabControl/TMemo/TRichEdit)
+- `auto` — paint-hook first, fall back to type-bound on failure (default)
 
 ```json
 {"cmd": "textbounds", "target": "ListBox1@打开工程", "mode": "auto"}
 {"cmd": "textbounds", "target": "Panel1", "text": "保存", "mode": "paint", "include_invisible": false}
 ```
 
-字段说明：
-- `target` — 控件名（`ControlName@searchText` 旧式语法兼容，文本也可通过 `text` 字段单独提供）。
-- `text` — 搜索文本（与 `target` 中 `@` 后的文本二选一）。
-- `mode` — `paint`/`type`/`auto`，默认 `auto`。
-- `include_invisible` — 是否包含完全不可见的记录（默认 `false`，仅诊断用）。
+Field descriptions:
+- `target` — control name (the old `ControlName@searchText` syntax is compatible; text can also be provided separately via the `text` field).
+- `text` — search text (choose one of this and the text after `@` in `target`).
+- `mode` — `paint`/`type`/`auto`, default `auto`.
+- `include_invisible` — whether to include completely invisible records (default `false`, for diagnostics only).
 
-返回值（`response.state` 自动反序列化）：
-- 简单模式（type-bound）：`{"x":..,"y":..,"width":..,"height":..}`
-- 富模式（paint-hook）额外含：
-  - `visible_state` — `full`/`partial`/`invisible`/`unknown`（文本可见性）
-  - `clipped` — 是否被剪裁（`true`/`false`）
-  - `clip_x`/`clip_y`/`clip_width`/`clip_height` — 剪裁矩形（clipped=true 时）
-  - `visible_x`/`visible_y`/`visible_width`/`visible_height` — 可见矩形
-  - `api` — 来源 API（`ExtTextOutW`/`DrawTextExW`/`GdipDrawString` 等）
+Return value (`response.state` is automatically deserialized):
+- Simple mode (type-bound): `{"x":..,"y":..,"width":..,"height":..}`
+- Rich mode (paint-hook) additionally contains:
+  - `visible_state` — `full`/`partial`/`invisible`/`unknown` (text visibility)
+  - `clipped` — whether clipped (`true`/`false`)
+  - `clip_x`/`clip_y`/`clip_width`/`clip_height` — clipping rectangle (when clipped=true)
+  - `visible_x`/`visible_y`/`visible_width`/`visible_height` — visible rectangle
+  - `api` — source API (`ExtTextOutW`/`DrawTextExW`/`GdipDrawString`, etc.)
 
-错误码：`NO_TARGET`/`NO_TEXT`/`NO_FORM`/`NF:控件名`/`TXT_NF`/`PAINT_NF`（paint 模式未找到）。
+Error codes: `NO_TARGET`/`NO_TEXT`/`NO_FORM`/`NF:<control name>`/`TXT_NF`/`PAINT_NF` (paint mode not found).
 
-#### 适用范围与限制（必读）
+#### Scope and Limitations (Must Read)
 
-`textbounds` 的 paint-hook 只拦截 **GDI（gdi32.dll）和 GDI+（gdiplus.dll）** 的文本绘制函数。**不覆盖 Direct2D / DirectWrite / MIL / Skia / Blink / Qt RHI 等其他渲染栈。**
+The `textbounds` paint-hook only intercepts **GDI (gdi32.dll) and GDI+ (gdiplus.dll)** text drawing functions. **It does not cover Direct2D / DirectWrite / MIL / Skia / Blink / Qt RHI or other rendering stacks.**
 
-各 UI 栈覆盖情况：
+Coverage by UI stack:
 
-| UI 栈 | 渲染方式 | textbounds 覆盖 | 应选用工具 |
+| UI Stack | Rendering Method | textbounds Coverage | Recommended Tool |
 |--------|---------|:---:|------|
-| VCL 标准/自绘控件 | GDI | ✅ | `textbounds` |
-| 第三方 GDI 库（DevExpress/TMS 等）| GDI | ✅ | `textbounds` |
-| FMX（Windows 平台）| GDI+ | ✅ | `textbounds` |
-| **DirectUI**（Win8+ 系统组件、Ribbon、新版文件对话框现代视图）| Direct2D + DirectWrite | ❌ | `uiascan`/`uiaget`（DirectUI 实现了 UIA Provider） |
-| **WPF** | MIL/Direct2D | ❌ | `uia.*` 命令 |
-| **UWP / WinUI 3** | XAML + Direct2D | ❌ | `uia.*` 命令 |
+| VCL standard/custom-drawn controls | GDI | ✅ | `textbounds` |
+| Third-party GDI libraries (DevExpress/TMS, etc.) | GDI | ✅ | `textbounds` |
+| FMX (Windows platform) | GDI+ | ✅ | `textbounds` |
+| **DirectUI** (Win8+ system components, Ribbon, modern view of new file dialogs) | Direct2D + DirectWrite | ❌ | `uiascan`/`uiaget` (DirectUI implements UIA Provider) |
+| **WPF** | MIL/Direct2D | ❌ | `uia.*` commands |
+| **UWP / WinUI 3** | XAML + Direct2D | ❌ | `uia.*` commands |
 | **Electron / WebView2** | Blink / Skia | ❌ | `capture` + `daofy_ocr` |
 | **Qt Quick** | OpenGL / RHI | ❌ | `capture` + `daofy_ocr` |
-| **系统旧版对话框**（`GetOpenFileName`、`MessageBox`、`TOpenDialog` 经典视图）| GDI | ✅ | `textbounds`（但与下方现代视图混合时见陷阱） |
+| **Legacy system dialogs** (`GetOpenFileName`, `MessageBox`, classic view of `TOpenDialog`) | GDI | ✅ | `textbounds` (but see the trap below when mixed with modern views) |
 
-**DirectUI 混合渲染陷阱**：Windows 8+ 的现代文件对话框（`IFileOpenDialog`）等是**混合渲染**——对话框外框和经典控件走 GDI，但文件列表区域的新样式视图走 DirectUI。`textbounds` 只能拿到 GDI 部分，文件列表项的文本拿不到。这种场景应该用 `uiascan`。
+**DirectUI mixed-rendering trap**: Modern Windows 8+ file dialogs (`IFileOpenDialog`) and similar are **mixed-rendering**—the dialog frame and classic controls use GDI, but the new-style view in the file list area uses DirectUI. `textbounds` can only obtain the GDI part and cannot get the text of file list items. In this scenario, use `uiascan`.
 
-**何时不应选 textbounds**：
-- 目标控件在 WebView/浏览器内 → 用 `capture` + `daofy_ocr`
-- 目标是 WPF/UWP/Electron/Qt 窗口 → 用 `uia.*` 或 `capture` + `daofy_ocr`
-- 目标是系统对话框的文件列表项（DirectUI 部分）→ 用 `uiascan`，不要用 `textbounds`
-- 目标控件已知是标准 VCL 类型（TListBox/TComboBox/TTreeView/TListView/TPageControl 等）且文本可通过 RTTI 读取 → 直接用 `rget` 更快更准
+**When not to choose textbounds**:
+- The target control is inside WebView/browser → use `capture` + `daofy_ocr`
+- The target is a WPF/UWP/Electron/Qt window → use `uia.*` or `capture` + `daofy_ocr`
+- The target is a file list item in a system dialog (DirectUI part) → use `uiascan`, not `textbounds`
+- The target control is known to be a standard VCL type (TListBox/TComboBox/TTreeView/TListView/TPageControl, etc.) and text can be read through RTTI → use `rget` directly, faster and more accurate
 
-## 断言规则
+## Assertion Rules
 
-`assert_expr` 是可在 Python 中求值的表达式，`__builtins__` 为空，显式可用变量：
+`assert_expr` is an expression evaluable in Python; `__builtins__` is empty, and the explicitly available variables are:
 
-| 变量 | 含义 |
+| Variable | Meaning |
 |------|------|
-| `actual` | 从命令响应提取的字符串值 |
-| `re` | Python `re` 模块 |
-| `len`、`str`、`int`、`float`、`bool` | 显式提供的辅助函数 |
+| `actual` | String value extracted from the command response |
+| `re` | Python `re` module |
+| `len`, `str`, `int`, `float`, `bool` | Explicitly provided helper functions |
 
-示例：
+Examples:
 
 ```json
 {"cmd": "rget", "target": "EditName.Text", "assert_expr": "actual == '张三'"}
@@ -199,44 +199,44 @@ Delphi 内联单元使用纯 RTTI 读取每项的 `Caption`（或回退到 `Text
 {"cmd": "rget", "target": "PhoneEdit.Text", "assert_expr": "re.search(r'^1\\\d{10}$', actual)"}
 ```
 
-禁止在 `assert_expr` 中写自然语言。将说明文字放在 `expected` 中，添加真实的验证步骤：
+Natural language must not be written in `assert_expr`. Put explanatory text in `expected`, and add real verification steps:
 
 ```json
-{"cmd": "msgscan", "expected": "无意外弹窗", "assert_expr": "actual == 'NOD'"}
+{"cmd": "msgscan", "expected": "No unexpected dialogs", "assert_expr": "actual == 'NOD'"}
 ```
 
-`msgscan` 在无 MessageBox 时返回 `NOD`，有 MessageBox 时返回 `OK` 并将对话框 JSON 写入 `_formstate.json` 供 `response.state` 使用。
+`msgscan` returns `NOD` when there is no MessageBox, and returns `OK` when there is a MessageBox, writing the dialog JSON to `_formstate.json` for use by `response.state`.
 
-## OCR / 视觉验证
+## OCR / Visual Verification
 
-对于无法通过 `rget`/`msgscan` 读取的原生 OS 对话框或自绘控件，使用 `capture` + `daofy_ocr` 验证：
+For native OS dialogs or custom-drawn controls that cannot be read via `rget`/`msgscan`, use `capture` + `daofy_ocr` for verification:
 
 ```json
-{"cmd": "capture", "expected": "对话框截图供 OCR", "note": "执行后用 daofy_ocr recognize 读取"}
+{"cmd": "capture", "expected": "Dialog screenshot for OCR", "note": "After execution, read with daofy_ocr recognize"}
 ```
 
-**选中行检测**（颜色阈值）：
-- `capture` 后用 `daofy_ocr color region=[x,y,w,h] threshold=0.5`。
-- `light_brightness` < 0.98 且无 `>` 展开符 = 选中。
-- 最佳粒度：`8x8` 块，左边缘 `X=105`（避开文字干扰）。
+**Selected-row detection** (color threshold):
+- After `capture`, use `daofy_ocr color region=[x,y,w,h] threshold=0.5`.
+- `light_brightness` < 0.98 and no `>` expander = selected.
+- Best granularity: `8x8` blocks, left edge `X=105` (to avoid text interference).
 
-完整原生对话框处理模式见 `delphi://automation/script-generation-workflow`。
+See `delphi://automation/script-generation-workflow` for complete native dialog handling patterns.
 
-## 缓存测试文件
+## Cached Test Files
 
-可复用脚本保存到被测项目根目录：
+Persist reusable scripts under the tested project root:
 
 ```
 <project-root>\Tests\<测试类型>\<测试名>.json
 ```
 
-常用分类目录：`黑盒测试`、`回归测试`、`灰盒测试`、`白盒测试`、`冒烟测试`。
+Common category directories: `黑盒测试`, `回归测试`, `灰盒测试`, `白盒测试`, `冒烟测试`.
 
-文件格式：
+File format:
 
 ```json
 {
-  "test_name": "新建客户-成功路径",
+  "test_name": "Create Customer - Success Path",
   "app_path": "C:/App/CustomerApp.exe",
   "target_form": "TNewCustomerForm",
   "version": 1,
@@ -253,7 +253,7 @@ Delphi 内联单元使用纯 RTTI 读取每项的 `Caption`（或回退到 `Text
 Persist reusable scripts under the tested project root:
 
 ```text
-<project-root>\Tests\<测试类型>\<test-name>.json
+<project-root>\Tests\<测试类型>\<测试名>.json
 ```
 
 Common test type directories are `黑盒测试`, `回归测试`, `灰盒测试`, `白盒测试`,
@@ -263,7 +263,7 @@ Use this file shape:
 
 ```json
 {
-  "test_name": "新建客户-成功路径",
+  "test_name": "Create Customer - Success Path",
   "app_path": "C:/App/CustomerApp.exe",
   "target_form": "TNewCustomerForm",
   "version": 1,
@@ -275,3 +275,4 @@ Use this file shape:
   "steps": []
 }
 ```
+

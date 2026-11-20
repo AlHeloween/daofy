@@ -1,7 +1,7 @@
 """
-project 统一工具 — 合并 compile_project + dproj_tool + run_audit + deploy
+project unified tool — merges compile_project + dproj_tool + run_audit + deploy
 
-通过 action 路由到各子功能，复用现有实现。
+Routes to each sub-function via action, reusing existing implementations.
 """
 
 import json
@@ -13,8 +13,8 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# ── 导入现有工具函数 ──
-# compile_project 相关
+# ── Import existing tool functions ──
+# compile_project related
 from .compile_project import compile_project as _compile_project, set_compiler_service as _set_compile_svc
 from .compile_file import compile_file as _compile_file
 from .get_args import get_compiler_args as _get_compiler_args
@@ -28,25 +28,25 @@ from .audit import run_audit as _run_audit
 # deploy
 from .deploy import deploy_project as _deploy_project
 
-# 编译服务（全局实例由 server.py 设置，但需要在这里 re-export 给 server.py）
+# Compiler service (global instance set by server.py, but needs to be re-exported here to server.py)
 _compiler_service_set = False
 
 
 def set_compiler_service(svc):
-    """设置编译器服务（由 server.py 初始化时调用）"""
+    """Set the compiler service (called by server.py during initialization)"""
     global _compiler_service_set
     _set_compile_svc(svc)
     _compiler_service_set = True
 
 
-# ── action 路由 ──
+# ── action routing ──
 
 _ACTIONS = {
-    # compile_project 系列
+    # compile_project series
     "compile": "compile",
     "dry_run": "dry_run",
     "compile_file": "compile_file",
-    # dproj_tool 系列
+    # dproj_tool series
     "info": "dproj",
     "create": "dproj",
     "set": "dproj",
@@ -54,32 +54,32 @@ _ACTIONS = {
     "remove_config": "dproj",
     "add_source": "dproj",
     "remove_source": "dproj",
-    # run_audit 系列
+    # run_audit series
     "audit": "audit",
     "ast": "audit",
     "runtime": "audit",
     "layout": "audit",
-    # deploy 系列
+    # deploy series
     "devices": "deploy",
     "deploy": "deploy",
 }
 
-_DISABLED_WARNINGS = {"W1000"}  # 默认禁用的警告
+_DISABLED_WARNINGS = {"W1000"}  # warnings disabled by default
 
-# ── MSBuild 属性提取（从 extra_args 同步 /p:Platform 和 /p:Config）──
+# ── MSBuild property extraction (sync /p:Platform and /p:Config from extra_args) ──
 
 _MS_BUILD_PROPERTY_RE = re.compile(r'^/p:(\w+)=(.+)$', re.IGNORECASE)
 
 
 def _extract_msbuild_property(extra_args: Optional[List[str]], prop_name: str) -> Optional[str]:
-    """从 extra_args 中提取最后一个 /p:{prop_name}=... 的值（MSBuild last-wins 语义）。
+    """Extract the value of the last /p:{prop_name}=... from extra_args (MSBuild last-wins semantics).
 
     Args:
-        extra_args: 附加编译参数列表
-        prop_name: MSBuild 属性名（如 "Platform"、"Config"）
+        extra_args: list of additional compile arguments
+        prop_name: MSBuild property name (e.g. "Platform", "Config")
 
     Returns:
-        属性值字符串，未找到时返回 None
+        the property value string, or None if not found
     """
     if not extra_args:
         return None
@@ -96,19 +96,19 @@ def _warn_extra_args_conflict(
     prop_name: str,
     explicit_value: str,
 ) -> Optional[str]:
-    """检测 extra_args 中的 /p:{prop_name} 是否与显式传入的值冲突。
+    """Detect whether /p:{prop_name} in extra_args conflicts with the explicitly passed value.
 
-    冲突时以 extra_args 值为准（MSBuild last-wins），并记录警告。
+    On conflict, the extra_args value wins (MSBuild last-wins), and a warning is logged.
 
     Returns:
-        冲突时返回 extra_args 中的值；无冲突返回 None
+        the value from extra_args on conflict; None if there is no conflict
     """
     extra_value = _extract_msbuild_property(extra_args, prop_name)
     if extra_value is None:
         return None
     if extra_value.lower() != explicit_value.lower():
         logger.warning(
-            "extra_args 中 /p:%s=%s 与显式参数 %s=%s 冲突，以 extra_args 值为准",
+            "extra_args /p:%s=%s conflicts with explicit parameter %s=%s; the extra_args value wins",
             prop_name, extra_value, prop_name, explicit_value,
         )
         return extra_value
@@ -116,14 +116,14 @@ def _warn_extra_args_conflict(
 
 
 async def handle_project(**kwargs) -> Any:
-    """统一的 project 工具入口，按 action 路由到子功能。
+    """Unified project tool entry point; routes to sub-functions by action.
 
-    前一步可调用 tool_help(tool_name="delphi_project") 查看各 action 的详细参数。
+    As a prior step, call tool_help(tool_name="delphi_project") to view detailed parameters for each action.
     """
     action = kwargs.get("action", "")
 
     try:
-        # ── compile 系列 ──
+        # ── compile series ──
         if action in ("compile",):
             return await _handle_compile(kwargs)
 
@@ -133,35 +133,35 @@ async def handle_project(**kwargs) -> Any:
         elif action == "compile_file":
             return await _handle_compile_file(kwargs)
 
-        # ── dproj_tool 系列 ──
+        # ── dproj_tool series ──
         elif action in ("info", "create", "set", "add_config", "remove_config",
                          "add_source", "remove_source"):
             return await _handle_dproj(action, kwargs)
 
-        # ── run_audit 系列 ──
+        # ── run_audit series ──
         elif action in ("audit", "ast", "runtime", "layout"):
             return await _handle_audit(kwargs)
 
-        # ── deploy 系列 ──
+        # ── deploy series ──
         elif action in ("devices", "deploy"):
             return await _handle_deploy(action, kwargs)
 
         else:
-            return {"status": "failed", "message": f"未知 action: {action}。"
-                    f"运行 tool_help(tool_name='delphi_project') 查看所有可用 action 及其参数。"}
+            return {"status": "failed", "message": f"Unknown action: {action}. "
+                    f"Run tool_help(tool_name='delphi_project') to view all available actions and their parameters."}
     except Exception as e:
-        logger.exception("project 执行失败")
+        logger.exception("project execution failed")
         return {"status": "failed", "message": str(e)}
 
 
-# ── 子处理器 ──
+# ── sub-handlers ──
 
 
 async def _handle_compile(kwargs: dict) -> Any:
-    """处理 compile action，完成后记录到经验追踪器。"""
+    """Handle the compile action and record to the experience tracker when done."""
     project_path = kwargs.get("project_path", "")
     if not project_path:
-        return {"status": "failed", "message": "缺少必需参数: project_path"}
+        return {"status": "failed", "message": "Missing required parameter: project_path"}
 
     if project_path.lower().endswith('.pas'):
         result = await _compile_file(
@@ -174,27 +174,27 @@ async def _handle_compile(kwargs: dict) -> Any:
         _record_compile_to_tracker(project_path, result, "compile_file")
         return result
 
-    # ── 从 extra_args 同步平台/配置（修复 /p:Platform 和 /p:Config 被忽略的问题）──
-    # 优先级：显式参数 > extra_args /p: > .dproj 解析 > "win32"/"Debug" 兜底
+    # ── Sync platform/config from extra_args (fixes /p:Platform and /p:Config being ignored) ──
+    # Priority: explicit parameter > extra_args /p: > .dproj parsing > "win32"/"Debug" fallback
     extra_args = kwargs.get("extra_args")
     target_platform = kwargs.get("target_platform")
     build_configuration = kwargs.get("build_configuration")
 
-    # 用户未传 target_platform 时，从 extra_args 提取 /p:Platform
+    # When the user did not pass target_platform, extract /p:Platform from extra_args
     if not target_platform:
         extra_platform = _extract_msbuild_property(extra_args, "Platform")
         if extra_platform:
             target_platform = extra_platform.lower()
-            logger.info("从 extra_args 提取目标平台: %s", target_platform)
+            logger.info("Extracted target platform from extra_args: %s", target_platform)
 
-    # 用户未传 build_configuration 时，从 extra_args 提取 /p:Config
+    # When the user did not pass build_configuration, extract /p:Config from extra_args
     if not build_configuration:
         extra_config = _extract_msbuild_property(extra_args, "Config")
         if extra_config:
             build_configuration = extra_config
-            logger.info("从 extra_args 提取构建配置: %s", build_configuration)
+            logger.info("Extracted build configuration from extra_args: %s", build_configuration)
 
-    # ── 冲突检测：显式参数与 extra_args 中的同名属性不一致时，以 extra_args 为准 ──
+    # ── Conflict detection: when an explicit parameter differs from the same-named property in extra_args, extra_args wins ──
     if target_platform and extra_args:
         conflict = _warn_extra_args_conflict(extra_args, "Platform", target_platform)
         if conflict:
@@ -207,7 +207,7 @@ async def _handle_compile(kwargs: dict) -> Any:
 
     result = await _compile_project(
         project_path=project_path,
-        target_platform=target_platform,  # None 时由 compile_project 从 .dproj 解析
+        target_platform=target_platform,  # when None, compile_project parses it from the .dproj
         build_configuration=build_configuration or "Debug",
         extra_args=extra_args,
         output_path=kwargs.get("output_path"),
@@ -230,11 +230,11 @@ async def _handle_compile(kwargs: dict) -> Any:
 
 
 def _record_compile_to_tracker(project_path: str, result: Any, action: str) -> None:
-    """将编译结果记录到经验追踪器。"""
+    """Record the compile result to the experience tracker."""
     try:
         from ..services.experience_tracker import get_tracker
 
-        # 判断是否成功
+        # Determine whether it succeeded
         success = True
         result_text = ""
         if hasattr(result, 'isError'):
@@ -255,11 +255,11 @@ def _record_compile_to_tracker(project_path: str, result: Any, action: str) -> N
             result_text=result_text,
         )
     except Exception as e:
-        logger.debug("记录编译结果到追踪器失败（不影响编译）: %s", e)
+        logger.debug("Failed to record compile result to tracker (does not affect compilation): %s", e)
 
 
 async def _handle_dry_run(kwargs: dict) -> Any:
-    """处理 dry_run action"""
+    """Handle the dry_run action"""
     accepted_keys = {
         "project_path", "target_platform", "output_path", "compiler_version",
         "conditional_defines", "unit_search_paths", "resource_search_paths",
@@ -272,7 +272,7 @@ async def _handle_dry_run(kwargs: dict) -> Any:
 
 
 async def _handle_compile_file(kwargs: dict) -> Any:
-    """处理 compile_file action"""
+    """Handle the compile_file action"""
     return await _compile_file(
         file_path=kwargs.get("file_path", kwargs.get("project_path", "")),
         unit_search_paths=kwargs.get('unit_search_paths'),
@@ -283,7 +283,7 @@ async def _handle_compile_file(kwargs: dict) -> Any:
 
 
 async def _handle_dproj(action: str, kwargs: dict) -> Any:
-    """处理 dproj_tool 系列 action"""
+    """Handle dproj_tool series actions"""
     return await _dproj_tool(
         action=action,
         project_path=kwargs.get("project_path", ""),
@@ -314,12 +314,12 @@ async def _handle_dproj(action: str, kwargs: dict) -> Any:
 
 
 async def _handle_audit(kwargs: dict) -> Any:
-    """处理 run_audit 系列 action"""
+    """Handle run_audit series actions"""
     return await _run_audit(kwargs)
 
 
 async def _handle_deploy(action: str, kwargs: dict) -> Any:
-    """处理 deploy 系列 action"""
-    # 移除 kwargs 中的 action 以避免重复
+    """Handle deploy series actions"""
+    # Remove action from kwargs to avoid duplication
     deploy_kwargs = {k: v for k, v in kwargs.items() if k != "action"}
     return await _deploy_project(action=action, **deploy_kwargs)

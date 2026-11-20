@@ -1,13 +1,13 @@
-<!-- @when: 测试列表/表格的新增、选中、编辑、删除行操作 -->
+<!-- @when: Test add, select, edit, and delete row operations in lists/grids -->
 <!-- @part-of: ui-testing -->
 
-#### D. 列表/表格行操作
+#### D. List/Grid Row Operations
 
-| 要素 | 内容 |
+| Element | Content |
 |------|------|
-| **目标** | 新增、选中、编辑、删除列表行，验证数据变更 |
-| **策略** | click 新增 → 填写 → click 保存 → rget 首行内容验证 → click 编辑/删除 → 状态确认 |
-| **关键命令** | `rget` 读单元格, `click` 选中行, `waitfor` 确认状态 |
+| **Goal** | Add, select, edit, and delete list rows, and verify data changes |
+| **Strategy** | click add → fill in → click save → rget first row content verify → click edit/delete → state confirmation |
+| **Key commands** | `rget` read cell, `click` select row, `waitfor` confirm state |
 
 ```json
 [
@@ -24,4 +24,5 @@
 ]
 ```
 
-**陷阱**：DBGrid 行号在增删后变化 → 用 DataSet.RecNo 定位而非假设行号；删除前的确认框用 `msgscan`+`dlgclick` 处理。
+**Pitfall**: DBGrid row numbers change after additions/deletions → use DataSet.RecNo to locate rows instead of assuming row numbers; handle the confirmation dialog before deletion with `msgscan`+`dlgclick`.
+

@@ -1,13 +1,13 @@
 """
-读取源码文件 MCP 工具
+Read Source File MCP Tool
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Province Zuoyou Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
 Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
 
-提供读取 Delphi 源码文件内容的能力
-工具会先在知识库中验证文件是否存在，然后从磁盘直接读取文件内容
-支持从全局知识库（官方源码、第三方库）和项目知识库中定位文件
+Provides the ability to read Delphi source file content
+The tool first verifies whether the file exists in the knowledge base, then reads the file content directly from disk
+Supports locating files from the global knowledge base (official source, third-party libraries) and the project knowledge base
 """
 
 import os
@@ -25,45 +25,45 @@ from .project_knowledge_base import get_project_kb
 logger = logging.getLogger(__name__)
 
 
-# ── 工作区根目录缓存（与 file_tool._workspace_root 同步） ──
+# ── Workspace root cache (synced with file_tool._workspace_root) ──
 _workspace_root: Optional[str] = None
 
 
 def set_workspace_root(root: Optional[str]) -> None:
-    """设置 AI Agent 工作区根目录（由 server.py 初始化时调用）。"""
+    """Set the AI Agent workspace root directory (called by server.py during initialization)."""
     global _workspace_root
     _workspace_root = root
     if root:
-        logger.info("read_source_file: 工作区根目录已设置: %s", root)
+        logger.info("read_source_file: Workspace root directory set: %s", root)
 
 
 def get_workspace_root() -> Optional[str]:
-    """获取已缓存的工作区根目录，未设置时返回 None。"""
+    """Get the cached workspace root directory, returns None if not set."""
     return _workspace_root
 
 
 def _resolve_relative_path(file_path: str, project_path: Optional[str] = None) -> str:
-    """解析相对路径，优先基于 project_path 或 _workspace_root 解析。
+    """Resolve a relative path, preferring resolution based on project_path or _workspace_root.
 
-    当 file_path 是相对路径时，按以下优先级尝试解析：
-      1. 基于 project_path 解析（显式传入的项目根目录）
-      2. 基于 _workspace_root 解析（AI Agent 工作区根目录）
-      3. 基于当前工作目录解析（保持原有行为）
+    When file_path is a relative path, resolution is attempted in the following priority order:
+      1. Resolve based on project_path (explicitly provided project root directory)
+      2. Resolve based on _workspace_root (AI Agent workspace root directory)
+      3. Resolve based on the current working directory (preserving the original behavior)
 
-    当 file_path 已经是绝对路径或解析后文件不存在时，返回原始路径。
+    When file_path is already an absolute path or the resolved file does not exist, the original path is returned.
 
     Args:
-        file_path: 文件路径（可能是相对或绝对路径）
-        project_path: 项目根目录（可选）
+        file_path: File path (may be relative or absolute)
+        project_path: Project root directory (optional)
 
     Returns:
-        解析后的路径（优先返回存在文件的路径）
+        The resolved path (preferring a path where the file exists)
     """
-    # 绝对路径直接返回
+    # Absolute paths are returned directly
     if os.path.isabs(file_path):
         return file_path
 
-    # 相对路径，按优先级尝试解析
+    # Relative path, attempt resolution by priority
     candidates = []
     if project_path:
         candidates.append(os.path.join(project_path, file_path))
@@ -72,29 +72,29 @@ def _resolve_relative_path(file_path: str, project_path: Optional[str] = None) -
 
     for candidate in candidates:
         if os.path.isfile(candidate):
-            logger.debug("相对路径已解析: %s -> %s", file_path, candidate)
+            logger.debug("Relative path resolved: %s -> %s", file_path, candidate)
             return candidate
 
-    # 未找到，返回原始路径（由调用方决定后续行为）
+    # Not found, return the original path (the caller decides the subsequent behavior)
     return file_path
 
-# 知识库服务实例
+# Knowledge base service instances
 delphi_kb_service = None
 thirdparty_kb_service = None
 
 
 def set_knowledge_base_services(delphi_service, thirdparty_service):
-    """设置知识库服务实例"""
+    """Set the knowledge base service instances"""
     global delphi_kb_service, thirdparty_kb_service
     delphi_kb_service = delphi_service
     thirdparty_kb_service = thirdparty_service
 
 
 def _get_kb_db_path(kb_service) -> Path:
-    """获取知识库实际的数据库文件路径（读取 config.json）"""
+    """Get the actual database file path of the knowledge base (reads config.json)"""
     kb_dir = kb_service.kb_dir
     config_path = kb_dir / "config.json"
-    db_name = "knowledge.sqlite"  # 默认值
+    db_name = "knowledge.sqlite"  # Default value
     if config_path.exists():
         try:
             import json
@@ -102,12 +102,12 @@ def _get_kb_db_path(kb_service) -> Path:
                 config = json.load(f)
             db_name = config.get('database', {}).get('file', db_name)
         except Exception as e:
-            logger.debug("读取知识库配置失败: %s", str(e))
+            logger.debug("Failed to read knowledge base config: %s", str(e))
     return kb_dir / db_name
 
 
 def _search_project_kb_db(project_path: str, file_path: str) -> Optional[Path]:
-    """在项目知识库 SQLite 中搜索文件"""
+    """Search for a file in the project knowledge base SQLite"""
     try:
         kb_dir = Path(project_path).parent / DIR_DELPHI_KB
         db_file = kb_dir / "knowledge.sqlite"
@@ -139,44 +139,44 @@ def _search_project_kb_db(project_path: str, file_path: str) -> Optional[Path]:
             if row and row['full_path'] and Path(row['full_path']).exists():
                 return Path(row['full_path'])
     except Exception as e:
-        logger.debug("项目KB搜索失败: %s", str(e))
+        logger.debug("Project KB search failed: %s", str(e))
     return None
 
 
 def _find_file_in_knowledge_base(file_path: str, project_path: Optional[str] = None) -> Optional[Path]:
     """
-    在知识库中查找文件
+    Search for a file in the knowledge base
     
     Args:
-        file_path: 文件路径（可以是相对路径或完整路径）
-        project_path: 项目根目录（可选，用于解析相对路径）
+        file_path: File path (may be a relative path or a full path)
+        project_path: Project root directory (optional, used to resolve relative paths)
         
     Returns:
-        文件的完整路径，如果未找到则返回 None
+        The full path of the file, or None if not found
     """
-    # 0. 解析相对路径：基于 project_path 或 _workspace_root
+    # 0. Resolve relative path: based on project_path or _workspace_root
     resolved_path = _resolve_relative_path(file_path, project_path)
 
-    # 1. 首先检查是否是完整路径且文件存在
+    # 1. First check whether it is a full path and the file exists
     full_path = Path(resolved_path)
     if full_path.exists() and full_path.is_file():
         return full_path
     
-    # 准备多种路径格式用于匹配（DB 可能存 正斜杠 / 或 反斜杠 \）
-    normalized = file_path.replace('\\', '/')            # 正斜杠版本
-    backslashed = file_path.replace('/', '\\')            # 反斜杠版本
-    name_part = Path(file_path).name                      # 仅文件名，如 "System.Classes.pas"
+    # Prepare multiple path formats for matching (the DB may store forward slashes / or backslashes \)
+    normalized = file_path.replace('\\', '/')            # Forward-slash version
+    backslashed = file_path.replace('/', '\\')            # Backslash version
+    name_part = Path(file_path).name                      # File name only, e.g. "System.Classes.pas"
     
-    # 2. 在所有知识库中查找（Delphi 官方 + 第三方库）
+    # 2. Search in all knowledge bases (Delphi official + third-party libraries)
     for kb_service in [delphi_kb_service, thirdparty_kb_service]:
         if not kb_service:
             continue
-        # 自动加载知识库（首次调用时 kb_instance 为 None）
+        # Auto-load the knowledge base (kb_instance is None on the first call)
         if kb_service.kb_instance is None:
             try:
                 kb_service.load_knowledge_base()
             except Exception as e:
-                logger.debug("加载知识库失败: %s", str(e))
+                logger.debug("Failed to load knowledge base: %s", str(e))
         if not kb_service.kb_instance:
             continue
         try:
@@ -189,15 +189,15 @@ def _find_file_in_knowledge_base(file_path: str, project_path: Optional[str] = N
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
-                # 检测 files 表的路径列名
+                # Detect the path column name of the files table
                 cursor.execute(f"PRAGMA table_info(files)")
                 col_names = {r['name'] for r in cursor.fetchall()}
                 path_col = 'relative_path' if 'relative_path' in col_names else 'path'
                 
-                # 多策略匹配：
-                #   1) 精确匹配（原始路径、正斜杠、反斜杠三种格式）
-                #   2) LIKE 模糊匹配（路径后缀匹配，处理两种分隔符）
-                #   3) 按文件名后缀匹配
+                # Multi-strategy matching:
+                #   1) Exact match (original path, forward-slash, backslash formats)
+                #   2) LIKE fuzzy matching (path suffix matching, handling both separators)
+                #   3) Match by file name suffix
                 cursor.execute(f"""
                     SELECT full_path FROM files 
                     WHERE {path_col} = ? OR {path_col} = ? OR {path_col} = ?
@@ -219,70 +219,70 @@ def _find_file_in_knowledge_base(file_path: str, project_path: Optional[str] = N
             if row and row['full_path'] and Path(row['full_path']).exists():
                 return Path(row['full_path'])
         except Exception as e:
-            logger.debug("全局KB搜索失败: %s", str(e))
+            logger.debug("Global KB search failed: %s", str(e))
     
-    # 3. 在项目知识库中查找
+    # 3. Search in the project knowledge base
     if project_path:
         try:
             result = _search_project_kb_db(project_path, file_path)
             if result:
                 return result
         except Exception as e:
-            logger.debug("项目KB搜索失败: %s", str(e))
+            logger.debug("Project KB search failed: %s", str(e))
     
     return None
 
 
 async def read_source_file(arguments: Any) -> CallToolResult:
     """
-    读取 Delphi 源码文件内容
+    Read Delphi source file content
     
-    工具会先在知识库中验证文件是否存在，获取文件的完整路径，
-    然后直接从磁盘读取文件内容。支持读取完整文件或指定范围的内容。
+    The tool first verifies whether the file exists in the knowledge base and obtains the full path of the file,
+    then reads the file content directly from disk. Supports reading the full file or a specified range of content.
     
     Args:
-        arguments: 包含以下参数:
-            - file_path: 文件路径（相对路径或完整路径）(必需)
-            - start_line: 起始行号（可选，从1开始，默认1）
-            - end_line: 结束行号（可选，默认文件末尾）
-            - max_lines: 最大返回行数（可选，默认500，最大1000）
-            - search_in: 搜索范围（可选）
-                - "all": 所有知识库（默认）
-                - "delphi": 仅 Delphi 官方源码
-                - "thirdparty": 仅第三方库
+        arguments: Contains the following parameters:
+            - file_path: File path (relative path or full path) (required)
+            - start_line: Start line number (optional, starts from 1, default 1)
+            - end_line: End line number (optional, defaults to end of file)
+            - max_lines: Maximum number of lines to return (optional, default 500, max 1000)
+            - search_in: Search scope (optional)
+                - "all": All knowledge bases (default)
+                - "delphi": Delphi official source only
+                - "thirdparty": Third-party libraries only
     
     Returns:
-        文件内容
+        File content
     """
     file_path = arguments.get("file_path")
     if not file_path:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供文件路径"}],
+            content=[{"type": "text", "text": "Please provide a file path"}],
             isError=True
         )
     
-    # 解析参数
+    # Parse arguments
     start_line = arguments.get("start_line", 1)
     end_line = arguments.get("end_line")
-    max_lines = min(arguments.get("max_lines", 500), 1000)  # 限制最大1000行
+    max_lines = min(arguments.get("max_lines", 500), 1000)  # Limit to a maximum of 1000 lines
     search_in = arguments.get("search_in", "all")
     project_path = arguments.get("project_path")
     
     try:
-        # 查找文件
+        # Find the file
         full_path = _find_file_in_knowledge_base(file_path, project_path)
         
         if not full_path:
             return CallToolResult(
-                content=[{"type": "text", "text": f"未找到文件: {file_path}\n\n"
-                        f"提示: 文件可能不在知识库中。您可以:\n"
-                        f"1. 使用 search_class 或 search_function 查找相关文件\n"
-                        f"2. 使用 semantic_search 语义搜索相关代码\n"
-                        f"3. 确保已构建相应的知识库"}],
+                content=[{"type": "text", "text": f"File not found: {file_path}\n\n"
+                        f"Tip: The file may not be in the knowledge base. You can:\n"
+                        f"1. Use search_class or search_function to find related files\n"
+                        f"2. Use semantic_search to semantically search related code\n"
+                        f"3. Make sure the corresponding knowledge base has been built"}],
                 isError=True
             )
         
-        # 编码检测 + 降级链读取（与 delphi_file._read_content 一致）
+        # Encoding detection + fallback chain reading (consistent with delphi_file._read_content)
         detected = detect_encoding(str(full_path))
         encodings_to_try = [detected]
         if detected not in ('utf-8', 'utf-8-sig'):
@@ -292,7 +292,7 @@ async def read_source_file(arguments: Any) -> CallToolResult:
             if ansi.lower() not in (e.lower() for e in encodings_to_try):
                 encodings_to_try.append(ansi)
         except Exception as e:
-            logger.debug("获取 ANSI 编码失败（不影响主流程）: %s", e)
+            logger.debug("Failed to get ANSI encoding (does not affect the main flow): %s", e)
 
         encoding_used = 'utf-8'
         all_lines = None
@@ -306,13 +306,13 @@ async def read_source_file(arguments: Any) -> CallToolResult:
                 continue
 
         if all_lines is None:
-            # 所有编码尝试失败，保底用 utf-8 并忽略错误字符
+            # All encoding attempts failed; fall back to utf-8 and ignore erroneous characters
             with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
                 all_lines = f.readlines()
         
         total_lines = len(all_lines)
         
-        # 处理行号范围
+        # Handle the line number range
         if start_line < 1:
             start_line = 1
         
@@ -322,48 +322,48 @@ async def read_source_file(arguments: Any) -> CallToolResult:
         if end_line < start_line:
             end_line = start_line
         
-        # 限制最大行数
+        # Limit the maximum number of lines
         if end_line - start_line + 1 > max_lines:
             end_line = start_line + max_lines - 1
         
-        # 提取指定范围的行
+        # Extract the lines in the specified range
         selected_lines = all_lines[start_line - 1:end_line]
         
-        # 构建输出
-        output = f"文件: {full_path.name}\n"
-        output += f"完整路径: {full_path}\n"
-        output += f"编码: {encoding_used}\n"
-        output += f"总行数: {total_lines}\n"
-        output += f"显示范围: 第 {start_line} 行 到 第 {end_line} 行"
+        # Build the output
+        output = f"File: {full_path.name}\n"
+        output += f"Full path: {full_path}\n"
+        output += f"Encoding: {encoding_used}\n"
+        output += f"Total lines: {total_lines}\n"
+        output += f"Showing range: line {start_line} to line {end_line}"
         
         if end_line < total_lines:
-            output += f" (共 {end_line - start_line + 1} 行)"
+            output += f" ({end_line - start_line + 1} lines in total)"
         output += "\n"
         output += "=" * 60 + "\n\n"
         
-        # 添加行号并输出
+        # Add line numbers and output
         for i, line in enumerate(selected_lines, start=start_line):
-            # 确保行号对齐
+            # Ensure line numbers are aligned
             line_num = str(i).rjust(len(str(total_lines)))
             output += f"{line_num} | {line}"
         
-        # 如果还有剩余内容，提示用户
+        # If there is remaining content, prompt the user
         if end_line < total_lines:
             remaining = total_lines - end_line
-            output += f"\n... (还有 {remaining} 行未显示) ...\n"
-            output += f"提示: 使用 start_line={end_line + 1} 继续读取后续内容\n"
+            output += f"\n... ({remaining} lines not shown) ...\n"
+            output += f"Tip: Use start_line={end_line + 1} to continue reading the following content\n"
         
         return CallToolResult(content=[{"type": "text", "text": output}])
         
     except Exception as e:
         return CallToolResult(
-            content=[{"type": "text", "text": f"读取文件时出错: {str(e)}"}],
+            content=[{"type": "text", "text": f"Error reading file: {str(e)}"}],
             isError=True
         )
 
 
 def _extract_result_file_path(result: dict) -> Optional[str]:
-    """从 KB 搜索结果中提取文件路径"""
+    """Extract the file path from a KB search result"""
     file_info = result.get('file')
     if isinstance(file_info, dict):
         path = file_info.get('full_path') or file_info.get('path')
@@ -372,8 +372,9 @@ def _extract_result_file_path(result: dict) -> Optional[str]:
     return result.get('full_path') or result.get('relative_path')
 
 
+
 def _read_file_for_function(file_path: str, function_name: str, max_lines: int) -> CallToolResult:
-    """同步读取文件并用正则查找函数定义"""
+    """Synchronously read the file and use a regex to find the function definition"""
     for enc in ('utf-8', 'gbk', 'utf-8-sig'):
         try:
             with open(file_path, 'r', encoding=enc, errors='replace') as f:
@@ -383,7 +384,7 @@ def _read_file_for_function(file_path: str, function_name: str, max_lines: int) 
             continue
     else:
         return CallToolResult(
-            content=[{"type": "text", "text": f"无法以 utf-8/gbk 编码读取文件: {file_path}"}],
+            content=[{"type": "text", "text": f"Unable to read file with utf-8/gbk encoding: {file_path}"}],
             isError=True
         )
 
@@ -399,7 +400,7 @@ def _read_file_for_function(file_path: str, function_name: str, max_lines: int) 
 
     if not found:
         return CallToolResult(
-            content=[{"type": "text", "text": f"在文件 '{os.path.basename(file_path)}' 中未找到函数/过程 '{function_name}'"}],
+            content=[{"type": "text", "text": f"Function/procedure '{function_name}' not found in file '{os.path.basename(file_path)}'"}],
             isError=True
         )
 
@@ -408,14 +409,14 @@ def _read_file_for_function(file_path: str, function_name: str, max_lines: int) 
     read_end = min(total_lines, read_start + max_lines - 1)
     selected = lines[read_start - 1:read_end]
 
-    output = f"文件: {file_path} (第 {read_start}-{read_end} 行, 共 {total_lines} 行)\n"
+    output = f"File: {file_path} (lines {read_start}-{read_end}, {total_lines} lines in total)\n"
     output += "=" * 60 + "\n\n"
     for i, ln in enumerate(selected, start=read_start):
         line_num = str(i).rjust(len(str(total_lines)))
         output += f"{line_num} | {ln}\n"
 
     if read_end < total_lines:
-        output += f"\n... (还有 {total_lines - read_end} 行未显示) ...\n"
+        output += f"\n... ({total_lines - read_end} lines not shown) ...\n"
 
     return CallToolResult(content=[{"type": "text", "text": output}])
 
@@ -425,33 +426,33 @@ async def _search_function_in_file(
     function_name: str,
     max_lines: int = 100,
 ) -> CallToolResult:
-    """回退策略：直接读文件，用正则查找函数定义行号，返回上下文"""
+    """Fallback strategy: read the file directly, use a regex to find the function definition line number, and return context"""
     import asyncio
     return await asyncio.to_thread(_read_file_for_function, file_path, function_name, max_lines)
 
 
 async def search_and_read_file(arguments: Any) -> CallToolResult:
     """
-    搜索并读取文件
+    Search for and read a file
     
-    根据类型名（类、record、interface）或函数名搜索，然后读取找到的文件内容。
+    Searches by type name (class, record, interface) or function name, then reads the content of the found file.
     
     Args:
-        arguments: 包含以下参数:
-            - file_path: 指定文件路径（可选，指定后按路径过滤 KB 结果，无匹配时回退到直接 grep 文件）
-            - type_name: 类型名称（类、record、interface，可选）
-            - record_name: record 类型名称（可选，与 type_name 二选一）
-            - function_name: 函数名（可选）
-            - search_in: 搜索范围（可选）
-                - "all": 所有知识库（默认）
-                - "delphi": 仅 Delphi 官方源码
-                - "project": 仅项目源码（需要 project_path）
-                - "thirdparty": 仅第三方库
-            - start_line: 起始行号（可选，默认1）
-            - max_lines: 最大返回行数（可选，默认100）
+        arguments: Contains the following parameters:
+            - file_path: Specify a file path (optional; when specified, filters KB results by path, and falls back to directly grepping the file when there is no match)
+            - type_name: Type name (class, record, interface, optional)
+            - record_name: Record type name (optional, choose one of type_name)
+            - function_name: Function name (optional)
+            - search_in: Search scope (optional)
+                - "all": All knowledge bases (default)
+                - "delphi": Delphi official source only
+                - "project": Project source only (requires project_path)
+                - "thirdparty": Third-party libraries only
+            - start_line: Start line number (optional, default 1)
+            - max_lines: Maximum number of lines to return (optional, default 100)
     
     Returns:
-        文件内容
+        File content
     """
     type_name = arguments.get("type_name")
     record_name = arguments.get("record_name")
@@ -462,31 +463,32 @@ async def search_and_read_file(arguments: Any) -> CallToolResult:
     project_path = arguments.get("project_path")
     file_path = arguments.get("file_path")
     
-    # 兼容旧参数名 class_name
+    # Compatible with the old parameter name class_name
     if not type_name and arguments.get("class_name"):
         type_name = arguments.get("class_name")
     
     if not type_name and not record_name and not function_name:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供类型名（type_name/record_name）或函数名"}],
+            content=[{"type": "text", "text": "Please provide a type name (type_name/record_name) or a function name"}],
             isError=True
         )
 
     if search_in == "project" and not project_path:
         return CallToolResult(
-            content=[{"type": "text", "text": "search_in='project' 需要提供 project_path 参数"}],
+            content=[{"type": "text", "text": "search_in='project' requires the project_path parameter"}],
             isError=True
         )
     
     try:
         results = []
         
-        # 确定搜索名称
+        # Determine the search name
         search_name = type_name or record_name
         is_record_search = record_name is not None
 
-        # 在项目知识库中搜索（需要 project_path）。search_in=all 时只有显式
-        # 提供项目路径才包含项目结果，避免无上下文时意外扫描当前目录。
+        # Search in the project knowledge base (requires project_path). When search_in=all, project
+        # results are only included if the project path is explicitly provided, to avoid accidentally
+        # scanning the current directory without context.
         if search_in in ["all", "project"] and project_path:
             try:
                 project_kb = get_project_kb(project_path)
@@ -517,22 +519,22 @@ async def search_and_read_file(arguments: Any) -> CallToolResult:
                         ]
                         results.extend(func_results)
             except Exception as e:
-                logger.debug("项目KB搜索失败: %s", str(e))
+                logger.debug("Project KB search failed: %s", str(e))
         
-        # 在 Delphi 官方源码中搜索
+        # Search in the Delphi official source
         if search_in in ["all", "delphi"] and delphi_kb_service:
-            # 确保知识库已加载
+            # Ensure the knowledge base is loaded
             if not delphi_kb_service.kb_instance:
                 delphi_kb_service.load_knowledge_base()
             
             if delphi_kb_service.kb_instance:
                 if search_name:
-                    # DelphiKnowledgeBaseService 只有 search_by_name，用它搜索后按 kind_code 过滤
+                    # DelphiKnowledgeBaseService only has search_by_name; use it to search and then filter by kind_code
                     all_results = delphi_kb_service.search_by_name(search_name)
                     if is_record_search:
                         all_results = [r for r in all_results if r.get('kind_code', '') == 'TR']
                     elif type_name:
-                        # 搜索类/接口/枚举等类型定义
+                        # Search for type definitions such as classes/interfaces/enums
                         all_results = [r for r in all_results if r.get('kind_code', '') in ('TC', 'TR', 'TI', 'TE', 'TS', 'TY')]
                     results.extend(all_results)
                 if function_name:
@@ -540,9 +542,9 @@ async def search_and_read_file(arguments: Any) -> CallToolResult:
                     func_results = [r for r in func_results if r.get('kind_code', '') in ('FF', 'FP')]
                     results.extend(func_results)
         
-        # 在第三方库中搜索（ThirdPartyKnowledgeBase 有 search_by_class_name / search_by_function_name）
+        # Search in third-party libraries (ThirdPartyKnowledgeBase has search_by_class_name / search_by_function_name)
         if search_in in ["all", "thirdparty"] and thirdparty_kb_service:
-            # 确保知识库已加载
+            # Ensure the knowledge base is loaded
             if not thirdparty_kb_service.kb_instance:
                 thirdparty_kb_service.load_knowledge_base()
             
@@ -555,7 +557,7 @@ async def search_and_read_file(arguments: Any) -> CallToolResult:
                 if function_name:
                     results.extend(thirdparty_kb_service.search_by_function_name(function_name))
         
-        # 如果指定了 file_path，按路径过滤 KB 结果，确保返回匹配指定文件的记录
+        # If file_path is specified, filter KB results by path to ensure records matching the specified file are returned
         if file_path and results:
             target = os.path.abspath(file_path).lower()
             filtered = [
@@ -566,22 +568,22 @@ async def search_and_read_file(arguments: Any) -> CallToolResult:
             if filtered:
                 results = filtered
             elif function_name and os.path.exists(file_path):
-                # 指定了文件但 KB 中无匹配 → 回退到直接 grep 文件
+                # A file was specified but there is no match in the KB → fall back to directly grepping the file
                 return await _search_function_in_file(file_path, function_name, max_lines)
 
         if not results:
             search_term = search_name or function_name
             return CallToolResult(
-                content=[{"type": "text", "text": f"未找到 '{search_term}'"}],
+                content=[{"type": "text", "text": f"'{search_term}' not found"}],
                 isError=True
             )
         
-        # 获取第一个结果
+        # Get the first result
         result = results[0]
         
-        # 从结果中提取文件路径：check 多层格式
-        # search_by_name 返回格式: result['file']['path'] / result['file']['full_path']
-        # search_by_class_name 返回格式: result['full_path'] / result['relative_path']
+        # Extract the file path from the result: check multiple nested formats
+        # search_by_name return format: result['file']['path'] / result['file']['full_path']
+        # search_by_class_name return format: result['full_path'] / result['relative_path']
         file_path = None
         file_info = result.get('file')
         if isinstance(file_info, dict):
@@ -589,7 +591,7 @@ async def search_and_read_file(arguments: Any) -> CallToolResult:
         if not file_path:
             file_path = result.get('full_path') or result.get('relative_path')
         
-        # 如果还没有，从 file_id 回退查询
+        # If still not found, fall back to querying by file_id
         if not file_path:
             file_id = result.get('file_id')
             kb = delphi_kb_service or thirdparty_kb_service
@@ -606,18 +608,18 @@ async def search_and_read_file(arguments: Any) -> CallToolResult:
                             if row:
                                 file_path = row['full_path'] or row['relative_path'] or row['path']
                 except Exception as e:
-                    logger.debug("搜索文件路径失败: %s", str(e))
+                    logger.debug("Failed to search for file path: %s", str(e))
         
         if not file_path:
             return CallToolResult(
-                content=[{"type": "text", "text": f"搜索结果缺少文件路径信息: {result}"}],
+                content=[{"type": "text", "text": f"Search result is missing file path information: {result}"}],
                 isError=True
             )
         
         line = result.get('line', 1)
         start_line = max(1, line - 5)
         
-        # 调用 read_source_file 读取文件
+        # Call read_source_file to read the file
         read_args = {
             "file_path": file_path,
             "start_line": start_line,
@@ -629,6 +631,6 @@ async def search_and_read_file(arguments: Any) -> CallToolResult:
         
     except Exception as e:
         return CallToolResult(
-            content=[{"type": "text", "text": f"搜索并读取文件时出错: {str(e)}"}],
+            content=[{"type": "text", "text": f"Error searching and reading file: {str(e)}"}],
             isError=True
         )

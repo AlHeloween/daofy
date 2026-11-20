@@ -1,111 +1,111 @@
-# 道飞自动化测试指南
+# Daofy Automated Testing Guide
 
-大模型驱动的 Delphi 自动化测试框架。
+LLM-driven Delphi automated testing framework.
 
-## 架构概览
+## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     大模型 (LLM)                             │
-│  分析需求 → 规划步骤 → 验证结果 → 生成报告                   │
+│                           LLM                               │
+│  Analyze requirements → Plan steps → Verify results → Generate report │
 └──────────┬──────────────────────────────────────┬──────────┘
-           │ automate_delphi 工具                    │ delphi_file / ...
+           │ automate_delphi tool                   │ delphi_file / ...
            ▼                                        ▼
 ┌──────────────────────┐              ┌──────────────────────┐
-│    Python 服务层       │              │   辅助工具            │
+│   Python service layer│              │   Auxiliary tools    │
 │  automation_service   │              │   rget / rset /       │
-│  ─ 进程池管理          │              │   delphi_kb 等        │
-│  ─ 管道通信            │              │                      │
+│  ─ Process pool mgmt  │              │   delphi_kb etc.      │
+│  ─ Pipe communication │              │                      │
 │  ─ ERROR_MORE_DATA    │              └──────────────────────┘
-│    循环读取             │
+│    Loop read          │
 └──────────┬────────────┘
-           │ 命名管道 \\.\pipe\daofy_auto
+           │ Named pipe \\.\pipe\daofy_auto
            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   Delphi 程序 (AUT)                          │
+│                   Delphi program (AUT)                       │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  DaofyAutomation 单元 (链接到被测程序)                │   │
-│  │  ─ 管道线程 + JSON 协议                              │   │
+│  │  DaofyAutomation unit (linked into app under test)   │   │
+│  │  ─ Pipe thread + JSON protocol                       │   │
 │  │  ─ Vcl.DaofyAutomation / Fmx.DaofyAutomation         │   │
-│  │  ─ RTTI 操作 (rget/rset/rcall/rinspect)              │   │
-│  │  ─ 截图 (2D PaintTo / 3D GPU / 对话框 BitBlt)       │   │
+│  │  ─ RTTI operations (rget/rset/rcall/rinspect)        │   │
+│  │  ─ Screenshot (2D PaintTo / 3D GPU / dialog BitBlt)  │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 启用指南（给 Delphi 开发者）
+## Enablement Guide (for Delphi Developers)
 
-> 本节面向 **需要在自己的 Delphi 项目中启用自动化测试的开发者**。
-> 按步骤操作后，你的程序就可以被 `automate_delphi` 工具远程操控和测试。
+> This section is for **developers who need to enable automated testing in their own Delphi projects**.
+> After following the steps, your program can be remotely controlled and tested by the `automate_delphi` tool.
 
-### 前置文件清单
+### Prerequisite File List
 
-自动化框架文件位于 Daofy 安装目录下的 `tools/auto/`：
+Automation framework files are located in the Daofy installation directory under `tools/auto/`:
 
-| 文件 | 必需？ | 用途 |
+| File | Required? | Purpose |
 |------|--------|------|
-| `DaofyAutomation.Base.pas` | ✅ 必需 | 命名管道协议、命令分发、异步结果缓存 |
-| `Vcl.DaofyAutomation.pas` | VCL 项目必选 | VCL 控件查找、截图、RTTI 操作 |
-| `Fmx.DaofyAutomation.pas` | FMX 项目必选 | FMX 控件查找、截图、RTTI 操作 |
-| `DaofyAutomation.RttiDiscovery.pas` | 可选 | RTTI 能力发现（供 `delphi_rtti` 工具使用） |
-| `DaofyAutomation.RttiAttributes.pas` | 可选 | AI 注解属性声明 |
-| `DaofyAutomation.CallGraph.pas` + `StackTrace.pas` | 可选 | `callgraph` / `callgraph_diff` / `callgraph_path` / `callgraph_impact` 以及用途层 `callgraph_*` 诊断命令 |
+| `DaofyAutomation.Base.pas` | ✅ Required | Named pipe protocol, command dispatch, asynchronous result cache |
+| `Vcl.DaofyAutomation.pas` | Required for VCL projects | VCL control lookup, screenshots, RTTI operations |
+| `Fmx.DaofyAutomation.pas` | Required for FMX projects | FMX control lookup, screenshots, RTTI operations |
+| `DaofyAutomation.RttiDiscovery.pas` | Optional | RTTI capability discovery (used by the `delphi_rtti` tool) |
+| `DaofyAutomation.RttiAttributes.pas` | Optional | AI annotation attribute declarations |
+| `DaofyAutomation.CallGraph.pas` + `StackTrace.pas` | Optional | `callgraph` / `callgraph_diff` / `callgraph_path` / `callgraph_impact` and purpose-layer `callgraph_*` diagnostic commands |
 
-> ⚠️ `DaofyAutomation.Base.pas` 必须同时被项目引用（VCL/FMX 单元依赖它）。
+> ⚠️ `DaofyAutomation.Base.pas` must also be referenced by the project (the VCL/FMX units depend on it).
 
-### 步骤一：将 `tools/auto` 添加到项目搜索路径
+### Step 1: Add `tools/auto` to the Project Search Path
 
-在 Delphi IDE 中打开项目 → **Project → Options → Delphi Compiler → Search path**，添加：
+In the Delphi IDE, open the project → **Project → Options → Delphi Compiler → Search path**, and add:
 
 ```
 $(DaofyRoot)\tools\auto
 ```
 
-若要使用 `callgraph`，再添加：
+To use `callgraph`, also add:
 
 ```
 $(DaofyRoot)\tools\stacktrace
 ```
 
-`callgraph` 支持 `direction=callees|callers`、`project_only=true`、`exclude_prefixes`、`include_prefixes` 过滤和 `edge_limit` 输出上限；响应包含 `edge_count`、`returned_count`、`truncated`，每条边包含 `call_addr`、`call_file`、`call_line` 用于定位调用发生处（无行号信息时为空/0），并包含 `category`、`from_category`、`to_category`（`project|thirdparty|framework|system|unknown`）。`callgraph_path` 接收 `source`、`target`、`max_depth`、`max_paths`、`include_prefixes`，返回 `found` 和 `paths`，找不到路径不是错误；`callgraph_diff` 使用 baseline JSON 或 `baseline_path` 快照文件与当前调用图做边级 added/removed/unchanged 对比，默认 `compare_by=name` 避免重编译地址漂移，必要时可用 `compare_by=addr|full`，并可用 `save_as` 保存当前快照；`save_as` 必须是 `snapshots_dir` 下的相对 JSON 路径，`baseline_path` 及用途层命令的文件型 graph/impact 输入也必须 resolve 后仍在 `snapshots_dir` 内。`callgraph_impact` 接收 `functions`/`targets`、`file`+`line`/`locations`，也接收 PR/diff 风格 `changes`（每项可含 `function` 或 `file`+`start_line/new_line/line`），批量查询 callers 并汇总入口候选和 unresolved。`callgraph_select_tests` 的脚本元数据可用 `handler`/`entry`、`tags`、`covers`/`functions`/`targets` 显式声明覆盖范围。`callgraph_boundary_check` 支持 `from_prefix`/`to_prefix` 禁止规则、`exclude_from_prefixes`/`exclude_to_prefixes` 例外和 `severity`/`message` 输出。`callgraph_refactor_check` 会输出 `safe_to_refactor`、`affected_targets`、`unresolved` 和保守风险级别。`callgraph_orphan_candidates` 接收 `symbols`、入口 `entries` 和可选 `test_prefixes`，区分无 caller 候选与只被测试调用候选。`callgraph_explain_exception` 可从带地址/offset/source 的异常帧中提取函数名并输出上下游 summary。用途层命令还包括 `callgraph_failure_diag`。
+`callgraph` supports `direction=callees|callers`, `project_only=true`, `exclude_prefixes`, `include_prefixes` filtering, and `edge_limit` output limits; the response includes `edge_count`, `returned_count`, and `truncated`; each edge includes `call_addr`, `call_file`, and `call_line` for locating where the call occurs (empty/0 when line number information is unavailable), and includes `category`, `from_category`, and `to_category` (`project|thirdparty|framework|system|unknown`). `callgraph_path` accepts `source`, `target`, `max_depth`, `max_paths`, and `include_prefixes`, and returns `found` and `paths`; not finding a path is not an error. `callgraph_diff` uses baseline JSON or a `baseline_path` snapshot file to compare added/removed/unchanged at the edge level with the current call graph; by default `compare_by=name` avoids address drift from recompilation, and `compare_by=addr|full` can be used when necessary; `save_as` can save the current snapshot. `save_as` must be a relative JSON path under `snapshots_dir`; `baseline_path` and file-based graph/impact inputs for purpose-layer commands must also resolve to within `snapshots_dir`. `callgraph_impact` accepts `functions`/`targets`, `file`+`line`/`locations`, and also accepts PR/diff-style `changes` (each item may contain `function` or `file`+`start_line/new_line/line`); it queries callers in batches and summarizes entry candidates and unresolved items. Script metadata for `callgraph_select_tests` can use `handler`/`entry`, `tags`, and `covers`/`functions`/`targets` to explicitly declare coverage scope. `callgraph_boundary_check` supports `from_prefix`/`to_prefix` prohibition rules, `exclude_from_prefixes`/`exclude_to_prefixes` exceptions, and `severity`/`message` output. `callgraph_refactor_check` outputs `safe_to_refactor`, `affected_targets`, `unresolved`, and a conservative risk level. `callgraph_orphan_candidates` accepts `symbols`, entry `entries`, and optional `test_prefixes`, distinguishing caller-less candidates from candidates called only by tests. `callgraph_explain_exception` can extract a function name from exception frames with address/offset/source and output upstream/downstream summaries. Purpose-layer commands also include `callgraph_failure_diag`.
 
-或用相对路径（假设 Daofy 与项目同级）：
+Or use a relative path (assuming Daofy and the project are siblings):
 
 ```
 ..\daofy\tools\auto
 ```
 
-> **为什么？** 将目录加入搜索路径后，`.dpr` 中不需要写冗长的 `in 'path\to\xxx.pas'`，只需写 `uses Vcl.DaofyAutomation;`。所有自动化单元会自动解析。
+> **Why?** After adding the directory to the search path, you do not need to write lengthy `in 'path\to\xxx.pas'` clauses in the `.dpr`; just write `uses Vcl.DaofyAutomation;`. All automation units will be resolved automatically.
 
-### 步骤二：修改 `.dpr` 文件
+### Step 2: Modify the `.dpr` File
 
-在 `program` 的 `uses` 中添加自动化单元，在 `begin..end.` 块中添加 `AutoStart`/`AutoStop` 调用：
+In the `uses` clause of `program`, add the automation unit, and in the `begin..end.` block add `AutoStart`/`AutoStop` calls:
 
 ```pascal
 program MyApp;
 
 uses
   Vcl.Forms,
-  Vcl.DaofyAutomation,          // ← 添加（已配置搜索路径，无需 in 子句）
+  Vcl.DaofyAutomation,          // ← Add (search path already configured, no in clause needed)
   MainForm in 'MainForm.pas';
 
 begin
-  Vcl.DaofyAutomation.AutoStart;    // ← 添加：创建命名管道 \\.\pipe\daofy_auto
+  Vcl.DaofyAutomation.AutoStart;    // ← Add: creates named pipe \\.\pipe\daofy_auto
   Application.Initialize;
   Application.CreateForm(TMainForm, MainForm);
   Application.Run;
-  Vcl.DaofyAutomation.AutoStop;     // ← 添加：清理管道资源
+  Vcl.DaofyAutomation.AutoStop;     // ← Add: cleans up pipe resources
 end.
 ```
 
-**FMX 项目**请使用 `Fmx.DaofyAutomation`：
+**FMX projects** should use `Fmx.DaofyAutomation`:
 
 ```pascal
 uses
   FMX.Forms,
-  Fmx.DaofyAutomation;          // ← FMX 版本
+  Fmx.DaofyAutomation;          // ← FMX version
 
 begin
   Fmx.DaofyAutomation.AutoStart;
@@ -116,34 +116,34 @@ begin
 end.
 ```
 
-> ⚠️ `AutoStart` **必须在** `Application.Initialize` **之前**调用，确保管道在线程启动阶段就绪。
+> ⚠️ `AutoStart` **must be called before** `Application.Initialize` to ensure the pipe is ready when the thread starts.
 
-### 步骤三：编译并验证管道就绪
+### Step 3: Compile and Verify the Pipe Is Ready
 
 ```bash
-# 在 IDE 中编译（Ctrl+F9），或在命令行中：
+# Compile in the IDE (Ctrl+F9), or from the command line:
 dcc32 MyApp.dproj
 ```
 
-启动编译后的 exe：
+Start the compiled exe:
 
 ```bash
 MyApp.exe
-# 控制台程序输入：MyApp.exe arg1 arg2
+# Console program input: MyApp.exe arg1 arg2
 ```
 
-验证命名管道已创建：
+Verify that the named pipe has been created:
 
 ```powershell
-# 使用 PowerShell 检查管道是否存在
+# Use PowerShell to check whether the pipe exists
 [System.IO.Directory]::GetFiles("\\.\\pipe\\").Where({$_ -match "daofy_auto"})
 ```
 
-如果输出包含 `daofy_auto`，说明自动化单元已成功接入。
+If the output contains `daofy_auto`, the automation unit has been successfully integrated.
 
-### 步骤四：运行冒烟测试确认可通信
+### Step 4: Run a Smoke Test to Confirm Communication
 
-通过 `automate_delphi` 工具发送一条简单的 `goto` + `capture` 命令，验证完整链路：
+Send a simple `goto` + `capture` command through the `automate_delphi` tool to verify the complete chain:
 
 ```python
 automate_delphi(
@@ -157,11 +157,11 @@ automate_delphi(
 )
 ```
 
-**期望结果**：
-- 返回 `status: "ok"`，`process_alive: false`（exit 后退出）
-- `docs/copyright/snapshots/` 目录下生成 `smoke_001.jpg`
+**Expected result**:
+- Returns `status: "ok"`, `process_alive: false` (exits after exit)
+- Generates `smoke_001.jpg` in the `docs/copyright/snapshots/` directory
 
-如果收到 `target_not_found`，先用 `listwnd` 查看实际窗体类名：
+If you receive `target_not_found`, first use `listwnd` to view the actual form class name:
 
 ```python
 automate_delphi(
@@ -170,189 +170,189 @@ automate_delphi(
 )
 ```
 
-### 验证检查清单
+### Verification Checklist
 
 ```
-[ ] tools/auto/ 的 3 个核心 .pas 文件存在且可读
-[ ] 搜索路径已包含 tools/auto 目录
-[ ] .dpr 文件中已添加 Vcl.DaofyAutomation / Fmx.DaofyAutomation
-[ ] AutoStart 调用在 Application.Initialize 之前
-[ ] 编译通过（0 error, 0 warning）
-[ ] 进程启动后命名管道 \\.\pipe\daofy_auto 已创建
-[ ] automate_delphi 冒烟测试返回 status=ok
+[ ] The 3 core .pas files in tools/auto/ exist and are readable
+[ ] The search path includes the tools/auto directory
+[ ] Vcl.DaofyAutomation / Fmx.DaofyAutomation has been added to the .dpr file
+[ ] The AutoStart call is before Application.Initialize
+[ ] Compilation passes (0 errors, 0 warnings)
+[ ] The named pipe \\.\pipe\daofy_auto has been created after the process starts
+[ ] The automate_delphi smoke test returns status=ok
 ```
 
-### 常见集成问题
+### Common Integration Issues
 
-| 问题 | 原因 | 修复 |
+| Issue | Cause | Fix |
 |------|------|------|
-| 编译报错 `File not found: 'DaofyAutomation.Base.pas'` | 搜索路径未包含 `tools/auto` | 检查 Project Options → Search path |
-| 编译报错 `Duplicate resource` | dpr 中 `in` 子句和搜索路径双重引用 | 统一用搜索路径，删除 `in` 子句 |
-| 进程启动但 `automate_delphi` 连不上管道 | AutoStart 未调用或被异常跳过 | 在 `Application.Initialize` 前确认 `AutoStart` 执行 |
-| Windows 防火墙弹窗 | exe 首次侦听管道 | 允许私网访问 |
-| FMX 启动崩溃 | 缺少 FMX 运行时 DLL | 确保 PATH 含 FMX 运行时目录，或启用静态链接 |
+| Compilation error `File not found: 'DaofyAutomation.Base.pas'` | Search path does not include `tools/auto` | Check Project Options → Search path |
+| Compilation error `Duplicate resource` | The `.dpr` has both an `in` clause and search path reference | Use the search path consistently and remove the `in` clause |
+| Process starts but `automate_delphi` cannot connect to the pipe | `AutoStart` was not called or was skipped due to an exception | Confirm that `AutoStart` runs before `Application.Initialize` |
+| Windows Firewall popup | The exe listens on a pipe for the first time | Allow private network access |
+| FMX startup crash | Missing FMX runtime DLLs | Ensure PATH contains the FMX runtime directory, or enable static linking |
 
 ---
 
-## 快速开始（给 AI 代理）
+## Quick Start (for AI Agents)
 
-> 以下内容供 AI 代理在完成启用步骤后，编写和执行自动化测试脚本。
+> The following content is for AI agents to write and execute automation test scripts after completing the enablement steps.
 
 ---
 
-## 命令参考
+## Command Reference
 
-### 导航
+### Navigation
 ```json
 {"cmd": "goto", "target": "TMainForm"}
 ```
-激活指定类名或 Name 的窗体。
+Activates the form with the specified class name or Name.
 
-### 鼠标操作
+### Mouse Operations
 ```json
-{"cmd": "click", "target": "BtnSave"}                  // RTTI 点击
-{"cmd": "click", "target": "ListBox1@5,5"}             // 坐标点击（相对控件）
-{"cmd": "rclick", "target": "EditName"}                // 右键弹出菜单
-{"cmd": "dblclick", "target": "ListItem1"}             // 双击
-{"cmd": "hover", "target": "Panel1"}                   // 悬停
-{"cmd": "move", "target": "BtnSave"}                   // 移动鼠标到控件中心
-{"cmd": "move", "x": "500", "y": "300"}                // 移动鼠标到屏幕坐标
-{"cmd": "drag", "source": "Slider1", "target": "TrackBar1"}  // 拖拽到目标控件
-{"cmd": "drag", "source": "Header1", "x": "500", "y": "300"} // 拖拽到坐标
+{"cmd": "click", "target": "BtnSave"}                  // RTTI click
+{"cmd": "click", "target": "ListBox1@5,5"}             // Coordinate click (relative to control)
+{"cmd": "rclick", "target": "EditName"}                // Right-click to open context menu
+{"cmd": "dblclick", "target": "ListItem1"}             // Double-click
+{"cmd": "hover", "target": "Panel1"}                   // Hover
+{"cmd": "move", "target": "BtnSave"}                   // Move mouse to control center
+{"cmd": "move", "x": "500", "y": "300"}                // Move mouse to screen coordinates
+{"cmd": "drag", "source": "Slider1", "target": "TrackBar1"}  // Drag to target control
+{"cmd": "drag", "source": "Header1", "x": "500", "y": "300"} // Drag to coordinates
 ```
 
-### 键盘操作
+### Keyboard Operations
 ```json
-{"cmd": "type", "target": "EditName", "value": "张三"}        // 输入文本
-{"cmd": "key", "target": "EditName", "key": "Tab"}            // 按键
+{"cmd": "type", "target": "EditName", "value": "张三"}        // Enter text
+{"cmd": "key", "target": "EditName", "key": "Tab"}            // Press key
 {"cmd": "key", "key": "Enter"}
 {"cmd": "key", "key": "Esc"}
 {"cmd": "key", "key": "F5"}
 ```
-支持的键名：`Tab`, `Enter`, `Esc`, `Back`, `Del`, `Home`, `End`,
-`Up`, `Down`, `Left`, `Right`, `Space`, `F1`~`F12`, 单字符。
+Supported key names: `Tab`, `Enter`, `Esc`, `Back`, `Del`, `Home`, `End`,
+`Up`, `Down`, `Left`, `Right`, `Space`, `F1`~`F12`, single characters.
 
-### 等待
+### Waiting
 ```json
-{"cmd": "wait", "ms": "2000"}                                          // 固定等待
-{"cmd": "waitfor", "target": "BtnSave", "prop": "Enabled",            // 等条件满足
+{"cmd": "wait", "ms": "2000"}                                          // Fixed wait
+{"cmd": "waitfor", "target": "BtnSave", "prop": "Enabled",            // Wait for condition to be met
                   "value": "True", "timeout": "5000", "interval": "100"}
 ```
-`timeout` 默认 5000ms，`interval` 默认 100ms。支持嵌套属性：
+`timeout` defaults to 5000ms, and `interval` defaults to 100ms. Nested properties are supported:
 ```json
 {"cmd": "waitfor", "target": "ListBox1", "prop": "Items.Count", "value": "10", "timeout": "3000"}
 ```
 
-### 截图
+### Screenshots
 ```json
 {"cmd": "capture", "target": "test_001"}
 ```
-截图保存到 `snapshots_dir/{target}.jpg`。内部自动选择最佳方式：
+Screenshots are saved to `snapshots_dir/{target}.jpg`. The best method is automatically selected internally:
 
-| 场景 | 方式 |
+| Scenario | Method |
 |------|------|
-| MessageBox/TaskDialog 弹窗 | `FindWindowW('#32770')` → GDI BitBlt → JPEG |
-| FMX 模态对话框 | `TFmxFormState.Modal` 检测 → PaintTo |
-| FMX 3D 窗体 | `TContext3D.CopyToBitmap` GPU readback |
-| FMX 2D 窗体 | `TCustomForm.PaintTo(Canvas)` |
-| VCL 窗体 | `GetWindowDC` + GDI BitBlt |
+| MessageBox/TaskDialog popup | `FindWindowW('#32770')` → GDI BitBlt → JPEG |
+| FMX modal dialog | `TFmxFormState.Modal` detection → PaintTo |
+| FMX 3D form | `TContext3D.CopyToBitmap` GPU readback |
+| FMX 2D form | `TCustomForm.PaintTo(Canvas)` |
+| VCL form | `GetWindowDC` + GDI BitBlt |
 
-### 窗口枚举
+### Window Enumeration
 ```json
 {"cmd": "listwnd"}
 ```
-返回所有窗口的 name/class/caption/active 状态：
+Returns the name/class/caption/active status of all windows:
 ```json
 {"status": "ok", "data": "{\"windows\":[{\"name\":\"Form1\",\"class\":\"TForm1\",\"caption\":\"MyApp\",\"active\":\"true\"}]}"}
 ```
 
-### 全量控件树
+### Full Control Tree
 ```json
 {"cmd": "dumpstate"}
 ```
-通过管道返回完整控件树 JSON（含所有控件的属性），不再写文件。
+Returns the complete control tree JSON through the pipe (including all control properties); no longer writes to a file.
 
-### 弹出菜单
+### Popup Menus
 ```json
-{"cmd": "dlgscan"}           // 扫描弹出菜单项
-{"cmd": "dlgclick", "target": "复制"}  // 点击菜单项
+{"cmd": "dlgscan"}           // Scan popup menu items
+{"cmd": "dlgclick", "target": "复制"}  // Click menu item
 ```
 
-### MessageBox / 对话框
+### MessageBox / Dialogs
 ```json
-{"cmd": "msgscan"}                              // 扫描弹窗
-{"cmd": "msgclick", "target": "ok"}             // 点按钮（支持 TaskDialog）
-{"cmd": "msgclose", "target": "DaofyAuto"}      // 关闭弹窗（按标题匹配）
-{"cmd": "dlgfile", "path": "C:\\test.txt", "target": "open"}   // 文件对话框
-{"cmd": "dlgfile", "target": "cancel"}          // 取消文件对话框
+{"cmd": "msgscan"}                              // Scan popups
+{"cmd": "msgclick", "target": "ok"}             // Click button (supports TaskDialog)
+{"cmd": "msgclose", "target": "DaofyAuto"}      // Close popup (match by title)
+{"cmd": "dlgfile", "path": "C:\\test.txt", "target": "open"}   // File dialog
+{"cmd": "dlgfile", "target": "cancel"}          // Cancel file dialog
 ```
 
-### RTTI 操作
+### RTTI Operations
 ```json
-{"cmd": "rget", "target": "EditName", "prop": "Text"}                        // 读属性
-{"cmd": "rget", "target": "ListBox1", "prop": "Items.Count"}                 // 嵌套属性
-{"cmd": "rset", "target": "EditName", "prop": "Text", "value": "Hello"}      // 写属性
-{"cmd": "rcall", "target": "EditName", "method": "Clear"}                    // 调用无参方法
-{"cmd": "rcall", "target": "ListBox1", "method": "Items.Add",               // 调用带参方法
+{"cmd": "rget", "target": "EditName", "prop": "Text"}                        // Read property
+{"cmd": "rget", "target": "ListBox1", "prop": "Items.Count"}                 // Nested property
+{"cmd": "rset", "target": "EditName", "prop": "Text", "value": "Hello"}      // Write property
+{"cmd": "rcall", "target": "EditName", "method": "Clear"}                    // Call parameterless method
+{"cmd": "rcall", "target": "ListBox1", "method": "Items.Add",               // Call method with parameters
          "params": ["Hello"]}
-{"cmd": "rcall", "target": "Form1", "method": "Close"}                      // 关闭窗体
-{"cmd": "rinspect", "target": "EditName"}                                    // 检视成员列表
+{"cmd": "rcall", "target": "Form1", "method": "Close"}                      // Close form
+{"cmd": "rinspect", "target": "EditName"}                                    // Inspect member list
 ```
 
-### 进程管理
+### Process Management
 ```json
-{"cmd": "snapdir", "target": "D:\\screenshots\\"}    // 设置截图目录
-{"cmd": "exit"}                                        // 退出程序
+{"cmd": "snapdir", "target": "D:\\screenshots\\"}    // Set screenshot directory
+{"cmd": "exit"}                                        // Exit program
 ```
 
 ---
 
-## 进程复用模式
+## Process Reuse Mode
 
-**问题**：每次调用 `automate_delphi` 都要启动 exe、等管道初始化、执行、退出——重复开销大。
+**Problem**: Every call to `automate_delphi` has to start the exe, wait for pipe initialization, execute, and exit—repeated overhead is high.
 
-**解决**：`keep_alive=true` 让进程常驻：
+**Solution**: `keep_alive=true` keeps the process resident:
 
 ```
-# 第一次：启动并保持
+# First time: start and keep alive
 automate_delphi(app_path="MyApp.exe", script=[goto, capture], keep_alive=true)
-→ 返回 process_reused:false, process_alive:true
+→ Returns process_reused:false, process_alive:true
 
-# 第二次：复用已有进程
+# Second time: reuse the existing process
 automate_delphi(app_path="MyApp.exe", script=[click, capture])
-→ 返回 process_reused:true, process_alive:true
+→ Returns process_reused:true, process_alive:true
 
-# 最后：发送 exit 终止
+# Finally: send exit to terminate
 automate_delphi(app_path="MyApp.exe", script=[exit])
-→ 返回 process_alive:false
+→ Returns process_alive:false
 ```
 
-进程池自动管理：
-- 同一 `app_path` 自动复用
-- **5 分钟无调用**自动 `kill()`
-- 进程崩溃后下次调用自动重启
-- 返回 `process_reused` / `process_alive` 字段让 AI 感知状态
+The process pool is managed automatically:
+- Automatically reuses the same `app_path`
+- Automatically calls `kill()` after **5 minutes without calls**
+- Automatically restarts on the next call after a process crash
+- Returns `process_reused` / `process_alive` fields so the AI can perceive status
 
 ---
 
-## 自动化测试流程模板
+## Automation Test Process Template
 
-### 基本流程
+### Basic Process
 ```
-1. 启动程序（keep_alive=true）
-2. goto 激活目标窗体
-3. listwnd / dumpstate 了解当前界面结构
-4. 执行测试操作（click / type / key / rcall）
-5. 截图或 rget 验证结果
-6. `waitfor` 等待异步操作完成
-7. 重复 4-6 直到测试结束
-8. exit 退出
+1. Start the program (keep_alive=true)
+2. goto activates the target form
+3. listwnd / dumpstate to understand the current UI structure
+4. Execute test operations (click / type / key / rcall)
+5. Capture screenshots or use rget to verify results
+6. `waitfor` waits for asynchronous operations to complete
+7. Repeat 4-6 until the test ends
+8. exit to quit
 ```
 
-### 实际示例
+### Actual Example
 
 ```python
-# 模拟用户登录
+# Simulate user login
 脚本 = [
     {"cmd": "goto", "target": "TLoginForm"},
     {"cmd": "type", "target": "EditUser", "value": "admin"},
@@ -365,7 +365,7 @@ automate_delphi(app_path="MyApp.exe", script=[exit])
     {"cmd": "capture", "target": "login_result"},
 ]
 
-# 验证列表加载
+# Verify list loading
 脚本2 = [
     {"cmd": "waitfor", "target": "ListView1", "prop": "Items.Count",
      "value": "10", "timeout": "5000"},
@@ -375,9 +375,9 @@ automate_delphi(app_path="MyApp.exe", script=[exit])
 
 ---
 
-## 报告与修复闭环
+## Reporting and Fix Loop
 
-`automate_delphi` 返回的 `report` 是后续决策入口：
+The `report` returned by `automate_delphi` is the entry point for subsequent decisions:
 
 ```json
 {
@@ -400,16 +400,16 @@ automate_delphi(app_path="MyApp.exe", script=[exit])
 }
 ```
 
-处理规则：
+Processing rules:
 
-1. `report.first_failure != null` 时停止后续依赖步骤。
-2. `signal` 是 `target_not_found/property_not_found` 时先用 `formsum/rinspect` 修脚本。
-3. `signal` 是 `assertion_failed/timeout/command_error` 且预期来自源码分析时，切回编码模式：`get_coding_rules(section="writing")` → `delphi_file` 修代码 → `delphi_project(action="compile")` → 重新执行脚本。
-4. 修复后保存通过脚本到 `tests/scripts/`，保存可复用经验到 `experience`。
+1. When `report.first_failure != null`, stop subsequent dependent steps.
+2. When `signal` is `target_not_found/property_not_found`, first use `formsum/rinspect` to fix the script.
+3. When `signal` is `assertion_failed/timeout/command_error` and the expectation comes from source code analysis, switch back to coding mode: `get_coding_rules(section="writing")` → `delphi_file` to modify code → `delphi_project(action="compile")` → re-execute the script.
+4. After fixing, save the passing script to `tests/scripts/`, and save reusable experience to `experience`.
 
-默认 `stop_on_failure=true`。首个失败后的步骤不会继续操作 UI，而是在 `report.steps` 中标为 `skip`；需要一次性探索全部步骤时才显式传 `stop_on_failure=false`。
+The default is `stop_on_failure=true`. Steps after the first failure will not continue operating the UI; instead, they are marked as `skip` in `report.steps`. Only explicitly pass `stop_on_failure=false` when you need to explore all steps at once.
 
-需要源码影响面时，可在完整脚本对象中启用：
+When source-level impact analysis is needed, enable it in the full script object:
 
 ```json
 {
@@ -421,48 +421,48 @@ automate_delphi(app_path="MyApp.exe", script=[exit])
 }
 ```
 
-失败步骤会在自动 `exit` 前追加一次 `callgraph(direction=callers)`，并把摘要写入 `report.first_failure.diagnostics.callgraph`。如果 callgraph 查询失败，只记录二级 warning，不覆盖原始 UI 失败原因。
+For a failed step, an automatic `callgraph(direction=callers)` is appended before the automatic `exit`, and the summary is written to `report.first_failure.diagnostics.callgraph`. If the callgraph query fails, only a secondary warning is recorded, without overwriting the original UI failure reason.
 
 ---
 
-## 各框架差异说明
+## Framework Differences
 
-| 特性 | VCL | FMX 2D | FMX 3D |
+| Feature | VCL | FMX 2D | FMX 3D |
 |------|-----|--------|--------|
-| 截图 | GDI BitBlt | PaintTo | CopyToBitmap |
-| 控件查找 | FindChildControl | FindComponent | FindComponent |
-| 右键菜单 | TPopupMenu | TPopupMenu(手动扫) | TPopupMenu(手动扫) |
-| 点击 | SendMessage BM_CLICK | RTTI Click / OnClick | RTTI Click / OnClick |
-| 坐标点击 @x,y | SendMessage WM_LBUTTONDOWN | FormToHWND + SendMessage | FormToHWND + SendMessage |
-| 类型转换接口 | 通用 | 通用 | 通用 |
+| Screenshot | GDI BitBlt | PaintTo | CopyToBitmap |
+| Control lookup | FindChildControl | FindComponent | FindComponent |
+| Context menu | TPopupMenu | TPopupMenu (manual scan) | TPopupMenu (manual scan) |
+| Click | SendMessage BM_CLICK | RTTI Click / OnClick | RTTI Click / OnClick |
+| Coordinate click @x,y | SendMessage WM_LBUTTONDOWN | FormToHWND + SendMessage | FormToHWND + SendMessage |
+| Type conversion interface | Generic | Generic | Generic |
 
 ---
 
-## 调试技巧
+## Debugging Tips
 
-1. **先 `listwnd` 再操作**：查看当前有哪些窗体可用，确认窗体名
-2. **`rinspect` 了解控件**：查看控件有哪些方法和属性。默认只显示 public+published 方法，需查看 private/protected 时传 `visibility=private,protected,public,published`
-3. **`dumpstate` 获取全量状态**：排查控件属性值
-4. **`capture` 直观验证**：截图确认界面状态
-5. **`rget` 断言**：AI 自行比较预期值
-6. **`waitfor` 替代固定 wait**：减少等待时间，提高稳定性
-7. **进程残留**：检查 `process_alive` 字段，定期 exit
+1. **`listwnd` first, then operate**: See which forms are currently available and confirm the form name.
+2. **`rinspect` to understand controls**: See what methods and properties a control has. By default, only public+published methods are shown; to view private/protected, pass `visibility=private,protected,public,published`.
+3. **`dumpstate` to get full state**: Troubleshoot control property values.
+4. **`capture` for intuitive verification**: Take screenshots to confirm the UI state.
+5. **`rget` assertions**: The AI compares expected values itself.
+6. **Use `waitfor` instead of fixed wait**: Reduce waiting time and improve stability.
+7. **Process leftovers**: Check the `process_alive` field and exit regularly.
 
 ---
 
-## 常见问题
+## FAQ
 
-**Q: `waitfor` 一直超时返回 TIMEOUT？**  
-A: 检查 `prop` 属性名是否正确，先用 `rget` 确认。
+**Q: `waitfor` keeps timing out with TIMEOUT?**  
+A: Check whether the `prop` property name is correct; use `rget` first to confirm.
 
-**Q: `msgclick` 关不掉弹窗？**  
-A: FMX 的 MessageDlg 在 Windows 上创建 TaskDialog（`#32770`），`msgclick` 找的是 `#32770` 类窗口。确认弹窗类型。
+**Q: `msgclick` cannot close the popup?**  
+A: FMX's MessageDlg creates a TaskDialog (`#32770`) on Windows; `msgclick` looks for a window of class `#32770`. Confirm the popup type.
 
-**Q: FMX exe 启动时报找不到文件？**  
-A: FMX 运行时 DLL 需要能被进程找到。确保 PATH 环境变量包含 FMX 运行时目录，或使用静态链接。
+**Q: FMX exe reports missing files at startup?**  
+A: FMX runtime DLLs need to be findable by the process. Ensure the PATH environment variable contains the FMX runtime directory, or use static linking.
 
-**Q: `click` 点了但没反应？**  
-A: 检查目标控件名是否正确，先用 `rinspect` 查看控件是否有 `Click` 方法或 `OnClick` 事件。
+**Q: `click` clicked but nothing happened?**  
+A: Check whether the target control name is correct; use `rinspect` first to see whether the control has a `Click` method or `OnClick` event.
 
-**Q: FileNotFoundError 启动失败？**  
-A: FMX 项目需确保 Win32\Debug\ 目录下有 FMX 依赖的 DLL（如 `fmx260.bpl`）。可以试试用 VCL 测试项目验证基础功能。
+**Q: FileNotFoundError on startup?**  
+A: For FMX projects, ensure the Win32\Debug\ directory contains the FMX-dependent DLLs (such as `fmx260.bpl`). You can try using a VCL test project to verify basic functionality.

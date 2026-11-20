@@ -1,42 +1,43 @@
-<!-- @title: 编码规则导航 -->
-<!-- @purpose: 快速定位编码各阶段所需规则文件。首次阅读或走完一次完整流程后，按需调用 get_coding_rules(section=...) 获取详情。 -->
+<!-- @title: Coding Rules Navigation -->
+<!-- @purpose: Quickly locate the rule files needed at each coding stage. On first read or after completing a full workflow, call get_coding_rules(section=...) as needed for details. -->
 
-## 编码规则导航
-> 最后更新: 2026-07-17 | 版本: 1.14.0
+## Coding Rules Navigation
+> Last updated: 2026-07-17 | Version: 1.14.0
 
-按流程选择入口：
+Choose an entry point by workflow:
 
-## 基础编码
+## Basic Coding
 ```
-计划 → get_coding_rules(section="planning")    # P0 前置计划与审查（新功能必做）
-流程 → get_coding_rules(section="workflow")     # 流程总览
-查API → get_coding_rules(section="kb_search")   # 搜索定义
-编码 → get_coding_rules(section="writing")      # 代码规范
-改文件 → get_coding_rules(section="delphi_file_write_rule")  # 写入规则/脏标记
-编译 → get_coding_rules(section="compile")      # 编译+run_verify
-审核 → get_coding_rules(section="review")       # 审核检查表
-清理 → get_coding_rules(section="cleanup")      # 最终清理+经验保存
-```
-
-## 异常诊断
-```
-入门 → get_coding_rules(section="human_collab")   # 触发条件 + 前置自检
-调试 → get_coding_rules(section="debugging")      # 8.1–8.14 全文合集（六步法/崩溃分类/DCC解码/…）
+Plan → get_coding_rules(section="planning")    # P0 pre-planning and review (required for new features)
+Workflow → get_coding_rules(section="workflow")     # Workflow overview
+Check API → get_coding_rules(section="kb_search")   # Search definitions
+Code → get_coding_rules(section="writing")      # Code conventions
+Modify files → get_coding_rules(section="delphi_file_write_rule")  # Write rules/dirty flags
+Compile → get_coding_rules(section="compile")      # Compile + run_verify
+Review → get_coding_rules(section="review")       # Review checklist
+Cleanup → get_coding_rules(section="cleanup")      # Final cleanup + experience saving
 ```
 
-## 自动化测试
+## Exception Diagnosis
 ```
-方法论(AI框架) → get_coding_rules(section="automation")
-布局审计 → get_coding_rules(section="ui_layout")  # DFM 静态布局规范 + delphi_project(action="layout")
-工具参考 → read_mcp_resource("delphi://automation/script-schema")
-```
-
-## 其他
-```
-多改动排序 → get_coding_rules(section="multi_change")
-经验保存 → get_coding_rules(section="experience")
-知识库 → get_coding_rules(section="kb_build")
-Agent规范 → get_coding_rules(section="agent_rules")
+Getting started → get_coding_rules(section="human_collab")   # Trigger conditions + pre-flight self-check
+Debugging → get_coding_rules(section="debugging")      # Full collection of 8.1–8.14 (six-step method / crash classification / DCC decoding / …)
 ```
 
-`delphi://coding-rules` 是导航入口；完整规则正文通过 `get_coding_rules(section=...)` 按需读取。
+## Automated Testing
+```
+Methodology (AI framework) → get_coding_rules(section="automation")
+Layout audit → get_coding_rules(section="ui_layout")  # DFM static layout specification + delphi_project(action="layout")
+Tool reference → read_mcp_resource("delphi://automation/script-schema")
+```
+
+## Other
+```
+Multi-change ordering → get_coding_rules(section="multi_change")
+Experience saving → get_coding_rules(section="experience")
+Knowledge base → get_coding_rules(section="kb_build")
+Agent conventions → get_coding_rules(section="agent_rules")
+```
+
+`delphi://coding-rules` is the navigation entry point; read the full rule text on demand via `get_coding_rules(section=...)`.
+

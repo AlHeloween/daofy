@@ -1,14 +1,14 @@
 """
-Delphi 版本号与名称映射工具
+Delphi version number and product name mapping utilities
 
-提供统一的版本名称查询，避免多处重复定义。
-所有新旧版本映射应集中在此维护。
+Provides a single place to look up version names, so the mapping is not redefined in
+several places. All old and new version mappings are maintained here.
 """
 
 import re
 from typing import Optional
 
-# 注册表版本键 → 产品名称（完整映射）
+# Registry version key → product name (full mapping)
 DELPHI_VERSION_NAMES: dict[str, str] = {
     "37.0": "Delphi 13 Florence",
     "23.0": "Delphi 12 Athens",
@@ -33,8 +33,8 @@ DELPHI_VERSION_NAMES: dict[str, str] = {
     "3.0": "Delphi 2005",
 }
 
-# 产品名（去掉 "Delphi " 前缀、小写）→ 注册表版本号
-# 用于项目配置/版本映射中允许写 "XE4"、"12 Athens" 等易读写法
+# Product name (lowercase, with the "Delphi " prefix removed) → registry version number
+# Lets project configuration/version mappings write readable forms such as "XE4" or "12 Athens"
 _VERSION_NAME_ALIASES: dict[str, str] = {}
 for _registry_version, _product_name in DELPHI_VERSION_NAMES.items():
     _alias = _product_name.lower()
@@ -42,16 +42,16 @@ for _registry_version, _product_name in DELPHI_VERSION_NAMES.items():
         _alias = _alias[len("delphi "):]
     _VERSION_NAME_ALIASES[_alias.strip()] = _registry_version
 
-# .dproj ProjectVersion → 注册表版本号（反向映射）
-# 多数版本两者相同，此处仅记录有差异的
+# .dproj ProjectVersion → registry version number (reverse mapping)
+# Most versions are identical in both; only the differing ones are listed here
 PROJECT_VERSION_TO_REGISTRY: dict[str, str] = {
-    "14.6": "14.0",   # Delphi XE6：.dproj 14.6 → 注册表 14.0
-    "18.2": "18.0",   # Delphi 10.1 Berlin：.dproj 18.2 → 注册表 18.0
-    "19.2": "19.0",   # Delphi 10.2 Tokyo：.dproj 19.2 → 注册表 19.0
+    "14.6": "14.0",   # Delphi XE6: .dproj 14.6 → registry 14.0
+    "18.2": "18.0",   # Delphi 10.1 Berlin: .dproj 18.2 → registry 18.0
+    "19.2": "19.0",   # Delphi 10.2 Tokyo: .dproj 19.2 → registry 19.0
 }
 
-# .dproj 版本前缀(整数部分) → 产品名称
-# 用于 get_compiler_for_project 匹配编译器
+# .dproj version prefix (integer part) → product name
+# Used by get_compiler_for_project to match a compiler
 PROJECT_VERSION_PREFIX_MAP: dict[str, str] = {
     "37": "Delphi 13 Florence",
     "23": "Delphi 12 Athens",
@@ -73,21 +73,21 @@ PROJECT_VERSION_PREFIX_MAP: dict[str, str] = {
 
 
 def get_version_name(version_key: str) -> str:
-    """根据版本号键获取 Delphi 产品名称"""
+    """Get the Delphi product name for a version key"""
     return DELPHI_VERSION_NAMES.get(version_key, f"Delphi {version_key}")
 
 
 def normalize_registry_version(value: Optional[str]) -> Optional[str]:
-    """将用户输入的 Delphi 版本号规范化为 ``major.minor`` 形式。
+    """Normalize a user-supplied Delphi version number to ``major.minor`` form.
 
-    接受 ``"11"`` / ``"11.0"`` / ``" 11.0 "`` 等写法，统一返回 ``"11.0"``。
-    无法识别（非数字、超出合理范围）时返回 ``None``。
+    Accepts forms such as ``"11"`` / ``"11.0"`` / ``" 11.0 "`` and always returns ``"11.0"``.
+    Returns ``None`` when the value cannot be recognized (non-numeric or out of a reasonable range).
 
     Args:
-        value: 用户输入的版本号，如 ``"11"``、``"11.0"``
+        value: user-supplied version number, e.g. ``"11"``, ``"11.0"``
 
     Returns:
-        规范化后的版本号（如 ``"11.0"``），无法识别时返回 ``None``
+        The normalized version number (e.g. ``"11.0"``), or ``None`` when it cannot be recognized
     """
     if value is None:
         return None
@@ -105,25 +105,26 @@ def normalize_registry_version(value: Optional[str]) -> Optional[str]:
 
 
 def normalize_version_key(value: Optional[str]) -> Optional[str]:
-    """将“Delphi 版本标识”规范化为注册表版本号（``major.minor``）。
+    """Normalize a "Delphi version identifier" to a registry version number (``major.minor``).
 
-    与 :func:`normalize_registry_version` 相比，额外接受产品名写法，
-    便于在项目配置/版本→MSBuild 映射中直接写 ``"XE4"``、``"Delphi XE4"``
-    或 ``"Delphi 12 Athens"``：
+    Compared with :func:`normalize_registry_version`, this also accepts product-name forms,
+    so project configuration/version→MSBuild mappings can write ``"XE4"``, ``"Delphi XE4"``
+    or ``"Delphi 12 Athens"`` directly:
 
     - ``"11"`` / ``"11.0"`` / ``" 11.0 "`` → ``"11.0"``
     - ``"XE4"`` / ``"Delphi XE4"`` → ``"11.0"``
-    - ``"14.6"`` / ``"18.2"`` / ``"19.2"``（.dproj ProjectVersion）→ ``"14.0"`` / ``"18.0"`` / ``"19.0"``
+    - ``"14.6"`` / ``"18.2"`` / ``"19.2"`` (.dproj ProjectVersion) → ``"14.0"`` / ``"18.0"`` / ``"19.0"``
     - ``"Delphi 12 Athens"`` → ``"23.0"``
 
-    纯数字仍按注册表版本解释（``"12"`` → ``"12.0"`` = XE5），仅对已知的
-    ``.dproj ProjectVersion`` 差异（14.6/18.2/19.2）做映射；非数字写法按产品名匹配。
+    Plain numbers are still interpreted as registry versions (``"12"`` → ``"12.0"`` = XE5);
+    only the known ``.dproj ProjectVersion`` differences (14.6/18.2/19.2) are mapped.
+    Non-numeric forms are matched by product name.
 
     Args:
-        value: 版本号或 Delphi 产品名
+        value: version number or Delphi product name
 
     Returns:
-        规范化后的注册表版本号，无法识别时返回 None
+        The normalized registry version number, or None when it cannot be recognized
     """
     numeric = normalize_registry_version(value)
     if numeric:
@@ -143,7 +144,7 @@ def normalize_version_key(value: Optional[str]) -> Optional[str]:
         if alias:
             return alias
 
-    # 允许产品名后带平台后缀，如 "XE4 Win32"、"Delphi 12 Athens Win64"
+    # Allow a platform suffix after the product name, e.g. "XE4 Win32", "Delphi 12 Athens Win64"
     for name, registry in _VERSION_NAME_ALIASES.items():
         for suffix in (" win32", " win64", " 32-bit", " 64-bit"):
             if text == name + suffix:
@@ -152,7 +153,7 @@ def normalize_version_key(value: Optional[str]) -> Optional[str]:
 
 
 def get_version_name_from_path(delphi_path: str) -> str:
-    """从安装路径（末尾含版本号）提取版本并获取名称"""
+    """Extract the version from an install path (which ends with a version number) and get its name"""
     path = delphi_path.rstrip("\\/")
     match = re.search(r"(\d+\.\d+)$", path)
     if not match:
@@ -161,17 +162,17 @@ def get_version_name_from_path(delphi_path: str) -> str:
 
 
 def get_project_version_name(version_prefix: str) -> str | None:
-    """根据 .dproj 版本前缀获取 Delphi 产品名称"""
+    """Get the Delphi product name for a .dproj version prefix"""
     return PROJECT_VERSION_PREFIX_MAP.get(version_prefix)
 
 
 # ============================================================
-# dcc32 --version 输出中的编译器版本 → 注册表版本号
-# 当注册表不可用时，通过运行编译器 --version 并映射此表获取版本
+# Compiler version in dcc32 --version output → registry version number
+# When the registry is unavailable, run the compiler --version and map through this table
 # ============================================================
-# dcc32 --version 输出示例:
+# Example dcc32 --version output:
 #   Embarcadero Delphi for Win32 compiler version 35.0
-# 编译器版本 35.0 → 注册表版本 22.0 (Delphi 11 Alexandria)
+# Compiler version 35.0 → registry version 22.0 (Delphi 11 Alexandria)
 DCC_VERSION_TO_REGISTRY: dict[str, str] = {
     "35.0": "22.0",   # Delphi 11 Alexandria
     "36.0": "23.0",   # Delphi 12 Athens
@@ -185,13 +186,13 @@ DCC_VERSION_TO_REGISTRY: dict[str, str] = {
 
 def parse_compiler_version_from_output(output: str) -> Optional[str]:
     """
-    从 dcc32 --version 输出中提取编译器版本号。
+    Extract the compiler version number from dcc32 --version output.
 
     Args:
-        output: dcc32 --version 的 stdout 输出
+        output: stdout of dcc32 --version
 
     Returns:
-        编译器版本号如 "35.0"，解析失败返回 None
+        Compiler version number such as "35.0", or None when parsing fails
     """
     match = re.search(r'compiler version (\d+\.\d+)', output)
     return match.group(1) if match else None
@@ -199,17 +200,18 @@ def parse_compiler_version_from_output(output: str) -> Optional[str]:
 
 def detect_registry_version_from_compiler(compiler_path: str, timeout: int = 10) -> Optional[str]:
     """
-    运行编译器 --version 并解析输出，映射到注册表版本号。
+    Run the compiler --version and parse its output, mapping it to a registry version number.
 
-    适用于注册表不可用时（如手动配置的编译器、PATH 中找到的等）。
-    结果会被缓存到 CompilerConfig.registry_version 中，无需重复调用。
+    Useful when the registry is unavailable (a manually configured compiler, one found on PATH,
+    etc.). The result is cached in CompilerConfig.registry_version, so it need not be called
+    repeatedly.
 
     Args:
-        compiler_path: dcc32.exe/dcc64.exe 完整路径
-        timeout: 超时秒数
+        compiler_path: full path to dcc32.exe/dcc64.exe
+        timeout: timeout in seconds
 
     Returns:
-        注册表版本号如 "22.0"，检测失败返回 None
+        Registry version number such as "22.0", or None when detection fails
     """
     import subprocess
     try:
@@ -225,18 +227,18 @@ def detect_registry_version_from_compiler(compiler_path: str, timeout: int = 10)
         if not compiler_ver:
             return None
 
-        # 已知版本映射表精确匹配
+        # Exact match in the known-version table
         if compiler_ver in DCC_VERSION_TO_REGISTRY:
             return DCC_VERSION_TO_REGISTRY[compiler_ver]
 
-        # 未知版本：尝试公式推算
-        # 已知规律: registry_version ≈ compiler_version - 13
-        # 如 35.0 - 13 = 22.0, 36.0 - 13 = 23.0
+        # Unknown version: try the formula estimate
+        # Known pattern: registry_version ≈ compiler_version - 13
+        # e.g. 35.0 - 13 = 22.0, 36.0 - 13 = 23.0
         try:
             parts = compiler_ver.split('.')
             major = int(parts[0])
             estimated = major - 13
-            if 3 <= estimated <= 40:  # 合理范围
+            if 3 <= estimated <= 40:  # reasonable range
                 return f"{estimated}.0"
         except (ValueError, IndexError):
             pass
@@ -246,33 +248,33 @@ def detect_registry_version_from_compiler(compiler_path: str, timeout: int = 10)
         return None
 
 
-# 注册表版本(registry_version) → .dproj ProjectVersion 映射
-# 多数版本两者相同，此处仅记录有差异的
+# Registry version (registry_version) → .dproj ProjectVersion mapping
+# Most versions are identical in both; only the differing ones are listed here
 REGISTRY_TO_PROJECT_VERSION: dict[str, str] = {
-    "14.0": "14.6",   # Delphi XE6：注册表 14.0，但 .dproj 格式标记为 14.6
-    "18.0": "18.2",   # Delphi 10.1 Berlin：注册表 18.0，但 .dproj 格式标记为 18.2
-    "19.0": "19.2",   # Delphi 10.2 Tokyo：注册表 19.0，但 .dproj 格式标记为 19.2
+    "14.0": "14.6",   # Delphi XE6: registry 14.0, but the .dproj format marks it as 14.6
+    "18.0": "18.2",   # Delphi 10.1 Berlin: registry 18.0, but the .dproj format marks it as 18.2
+    "19.0": "19.2",   # Delphi 10.2 Tokyo: registry 19.0, but the .dproj format marks it as 19.2
 }
 
 
 def registry_to_project_version(registry_ver: str) -> str:
     """
-    将 Delphi 注册表版本号映射为 .dproj ProjectVersion。
+    Map a Delphi registry version number to a .dproj ProjectVersion.
 
-    Delphi 10.2 及更新版本的 ProjectVersion 与注册表版本号相同。
-    Delphi 10.1 Berlin 是特例：注册表 18.0 → ProjectVersion 18.2。
+    For Delphi 10.2 and newer the ProjectVersion equals the registry version number.
+    Delphi 10.1 Berlin is the exception: registry 18.0 → ProjectVersion 18.2.
 
     Args:
-        registry_ver: 注册表版本号，如 "22.0"
+        registry_ver: registry version number, e.g. "22.0"
 
     Returns:
-        .dproj 文件 ProjectVersion 值，如 "22.0"
+        The .dproj ProjectVersion value, e.g. "22.0"
     """
     return REGISTRY_TO_PROJECT_VERSION.get(registry_ver, registry_ver)
 
 
-# .dproj ProjectVersion → 注册表版本号（反向映射）
-# 定义在文件顶部（normalize_version_key 需要用到）
+# .dproj ProjectVersion → registry version number (reverse mapping)
+# Defined at the top of the file (normalize_version_key needs it)
 
 
 def resolve_registry_version(
@@ -282,20 +284,22 @@ def resolve_registry_version(
     override_version: Optional[str] = None,
 ) -> Optional[str]:
     """
-    从 compiler_version（或 .dproj ProjectVersion 回退）解析注册表版本号。
+    Resolve the registry version number from compiler_version (or, as a fallback, from the
+    .dproj ProjectVersion).
 
-    RTL 库搜索路径与第三方库路径共用此策略，保证两者按同一 Delphi 版本
-    过滤注册表，避免出现“默认编译器为 Delphi 12 而库路径取 Delphi 13”的错配。
+    RTL library search paths and third-party library paths share this policy, so both filter
+    the registry by the same Delphi version and avoid a mismatch such as "the default compiler
+    is Delphi 12 while the library paths come from Delphi 13".
 
     Args:
-        compiler_version: 用户/配置指定的编译器版本名称
-        project_version: .dproj ProjectVersion（可选，compiler_version 未指定时回退）
-        config_manager: 配置管理器实例（可选，未提供时仅能依靠 project_version 回退）
-        override_version: 项目级配置指定的注册表版本号（如 ``"11.0"``），
-            仅用于单工程配置，不影响其它工程
+        compiler_version: compiler version name given by the user/configuration
+        project_version: .dproj ProjectVersion (optional; fallback when compiler_version is not given)
+        config_manager: configuration manager instance (optional; without it only the project_version fallback is available)
+        override_version: registry version number set by project-level configuration (e.g. ``"11.0"``),
+            used for a single project configuration and not affecting other projects
 
     Returns:
-        注册表版本号如 "23.0"，无法解析返回 None
+        Registry version number such as "23.0", or None when it cannot be resolved
     """
     registry_version: Optional[str] = None
 
@@ -311,11 +315,12 @@ def resolve_registry_version(
     if not registry_version and override_version:
         registry_version = normalize_version_key(override_version)
     if not registry_version and config_manager is not None:
-        # 未显式指定编译器时，回退到"默认编译器"——与 compile_dpr_direct 实际
-        # 调用的 config_manager.get_compiler(None) 保持一致。若此处直接返回 None,
-        # 调用方 get_delphi_library_paths(None) 会取"最新已安装版本"的库路径,
-        # 而实际 dcc32 用的是默认编译器,当默认编译器不是最新版本时两者错配,
-        # 导致用 Delphi 12 的 dcc32 却找 Delphi 13 的 .dcu 而编译失败。
+        # When no compiler is given explicitly, fall back to the "default compiler" — the same
+        # choice compile_dpr_direct actually makes through config_manager.get_compiler(None).
+        # Returning None here would make the caller get_delphi_library_paths(None) take the
+        # library paths of the "newest installed version", while dcc32 actually uses the default
+        # compiler; when the default compiler is not the newest version the two disagree, and a
+        # Delphi 12 dcc32 ends up finding Delphi 13 .dcu files, so the build fails.
         try:
             default_cfg = config_manager.get_compiler(None)
             if default_cfg is not None:
@@ -323,7 +328,7 @@ def resolve_registry_version(
         except Exception:
             registry_version = None
 
-    # Fallback: compiler_version 未指定/无法解析时，从 .dproj ProjectVersion 推断
+    # Fallback: when compiler_version is not given or cannot be resolved, infer it from the .dproj ProjectVersion
     if not registry_version and project_version:
         registry_version = project_version_to_registry_version(project_version)
 
@@ -332,27 +337,27 @@ def resolve_registry_version(
 
 def project_version_to_registry_version(project_ver: str) -> Optional[str]:
     """
-    将 .dproj ProjectVersion 映射为注册表版本号（registry_version）。
+    Map a .dproj ProjectVersion to a registry version number (registry_version).
 
-    用于在 compiler_version 未指定时，从 .dproj 文件推断正确的 Delphi 版本，
-    以获取该版本对应的库搜索路径。
+    Used to infer the correct Delphi version from the .dproj file when compiler_version is not
+    specified, so that version's library search paths can be obtained.
 
-    Delphi 10.2 及更新版本两者相同。
-    Delphi 10.1 Berlin 是特例：.dproj 18.2 → 注册表 18.0。
+    For Delphi 10.2 and newer the two are identical.
+    Delphi 10.1 Berlin is the exception: .dproj 18.2 → registry 18.0.
 
     Args:
-        project_ver: .dproj 文件 ProjectVersion 值，如 "22.0" 或 "18.2"
+        project_ver: .dproj ProjectVersion value, e.g. "22.0" or "18.2"
 
     Returns:
-        注册表版本号如 "22.0"，无法映射返回 None
+        Registry version number such as "22.0", or None when it cannot be mapped
     """
-    # 精确匹配（处理 Berlin 等例外）
+    # Exact match (handles exceptions such as Berlin)
     if project_ver in PROJECT_VERSION_TO_REGISTRY:
         return PROJECT_VERSION_TO_REGISTRY[project_ver]
-    # 多数版本两者相同，直接验证是否已知
+    # Most versions are identical; just check that it is known
     if project_ver in DELPHI_VERSION_NAMES:
         return project_ver
-    # 尝试整数前缀匹配（如 "19" → "19.0"）
+    # Try an integer-prefix match (e.g. "19" → "19.0")
     parts = project_ver.split(".")
     if parts and parts[0].isdigit():
         candidate = f"{parts[0]}.0"

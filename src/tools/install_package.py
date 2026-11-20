@@ -1,7 +1,7 @@
 """
-组件包安装工具
+Package installation tool
 
-提供 Delphi 组件包编译和安装功能
+Provides Delphi package compilation and installation
 """
 
 import os
@@ -32,17 +32,18 @@ _compiler_service: Optional[CompilerService] = None
 
 
 def set_compiler_service(service: CompilerService):
-    """设置编译服务实例"""
+    """Set the compiler service instance."""
     global _compiler_service
     _compiler_service = service
 
 
 def _resolve_target_version(project_path: Optional[str]) -> Optional[str]:
-    """解析某个包工程应使用的 Delphi 注册表版本。
+    """Resolve the Delphi registry version a package project should use.
 
-    优先级与编译服务一致：项目配置 ``compiler_version`` > 项目配置
-    ``delphi_version`` > ``.dproj ProjectVersion``。返回 None
-    表示无法确定，由调用方回退到当前生效编译器/最新安装版本。
+    Priority matches the compile service: project setting ``compiler_version``
+    > project setting ``delphi_version`` > ``.dproj ProjectVersion``. A None
+    return means it cannot be determined, and the caller falls back to the
+    active compiler / newest installed version.
     """
     if not project_path or _compiler_service is None:
         return None
@@ -82,7 +83,7 @@ def _resolve_target_version(project_path: Optional[str]) -> Optional[str]:
             return None
         project_version = parser.get_project_version()
     except Exception:
-        logger.debug("读取 .dproj ProjectVersion 失败: %s", dproj, exc_info=True)
+        logger.debug("Failed to read .dproj ProjectVersion: %s", dproj, exc_info=True)
         return None
     if not project_version:
         return None
@@ -97,24 +98,24 @@ async def install_package(
     install: bool = True
 ) -> CallToolResult:
     """
-    编译并安装 Delphi 组件包
+    Compile and install a Delphi package
 
     Args:
-        package_path: 包文件路径(.dproj/.dpk/.groupproj)
-        target_platform: 目标平台(win32/win64)
-        build_configuration: 构建配置(Debug/Release)
-        timeout: 超时时间(秒)
-        install: 是否自动安装到IDE
+        package_path: Package file path (.dproj/.dpk/.groupproj)
+        target_platform: Target platform (win32/win64)
+        build_configuration: Build configuration (Debug/Release)
+        timeout: Timeout in seconds
+        install: Whether to install into the IDE automatically
 
     Returns:
-        编译安装结果
+        The compile/install result
     """
-    logger.info(f"收到组件包安装请求: {package_path}")
+    logger.info(f"Received package install request: {package_path}")
 
     if _compiler_service is None:
-        logger.error("编译服务未初始化")
+        logger.error("Compiler service is not initialized")
         return CallToolResult(
-            content=[{"type": "text", "text": "编译服务未初始化"}],
+            content=[{"type": "text", "text": "Compiler service is not initialized"}],
             isError=True
         )
 
@@ -122,7 +123,7 @@ async def install_package(
         path_obj = Path(package_path)
         if not path_obj.exists():
             return CallToolResult(
-                content=[{"type": "text", "text": f"文件不存在: {package_path}"}],
+                content=[{"type": "text", "text": f"File not found: {package_path}"}],
                 isError=True
             )
 
@@ -135,14 +136,14 @@ async def install_package(
             result = await _install_dpk_package(package_path, target_platform, build_configuration, timeout, install)
         else:
             return CallToolResult(
-                content=[{"type": "text", "text": f"不支持的文件类型: {ext}，支持: .dproj, .dpk, .groupproj"}],
+                content=[{"type": "text", "text": f"Unsupported file type: {ext}, supported: .dproj, .dpk, .groupproj"}],
                 isError=True
             )
 
         return result
 
     except Exception as e:
-        error_msg = f"组件包安装过程发生异常: {str(e)}"
+        error_msg = f"Exception during package installation: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return CallToolResult(
             content=[{"type": "text", "text": error_msg}],
@@ -158,12 +159,12 @@ async def _install_group_project(
     install: bool
 ) -> CallToolResult:
     """
-    处理项目组 (.groupproj)
+    Handle a project group (.groupproj)
 
-    支持的 XML 节点：
-      - <Projects Include="..."> + <Dependencies>  (旧格式)
-      - <ProjectReference Include="...">             (新格式)
-      - <BuildOrder>                                 (编译顺序)
+    Supported XML nodes:
+      - <Projects Include="..."> + <Dependencies>  (legacy format)
+      - <ProjectReference Include="...">             (new format)
+      - <BuildOrder>                                 (build order)
     """
     import xml.etree.ElementTree as ET
     from ..utils.groupproj_parser import (
@@ -175,12 +176,12 @@ async def _install_group_project(
         info = parse_groupproj(group_path)
     except ET.ParseError as e:
         return CallToolResult(
-            content=[{"type": "text", "text": f"解析 .groupproj XML 失败: {e}"}],
+            content=[{"type": "text", "text": f"Failed to parse .groupproj XML: {e}"}],
             isError=True,
         )
     except FileNotFoundError:
         return CallToolResult(
-            content=[{"type": "text", "text": f".groupproj 文件不存在: {group_path}"}],
+            content=[{"type": "text", "text": f".groupproj file not found: {group_path}"}],
             isError=True,
         )
 
@@ -188,7 +189,7 @@ async def _install_group_project(
 
     for proj_path in info.child_projects:
         proj_str = str(proj_path)
-        # 从 .groupproj 获取默认平台，如果未指定则使用传入的 platform
+        # Take the default platform from the .groupproj; fall back to the passed platform
         child_platform = target_platform or get_platform_for_project(info, fallback="win32")
         is_runtime = _is_runtime_only_package(proj_str)
         result = await _compile_single_package(
@@ -198,7 +199,7 @@ async def _install_group_project(
 
     if not results:
         return CallToolResult(
-            content=[{"type": "text", "text": f"项目组中未找到有效的子项目: {group_path}"}],
+            content=[{"type": "text", "text": f"No valid child project found in the project group: {group_path}"}],
             isError=True,
         )
 
@@ -212,7 +213,7 @@ async def _install_dproj_package(
     timeout: int,
     install: bool
 ) -> CallToolResult:
-    """处理单个项目"""
+    """Handle a single project."""
     is_runtime = _is_runtime_only_package(dproj_path)
     result = await _compile_single_package(dproj_path, target_platform, build_configuration, timeout)
     return _format_group_results([(dproj_path, is_runtime, result)], install, target_platform)
@@ -225,12 +226,12 @@ async def _install_dpk_package(
     timeout: int,
     install: bool
 ) -> CallToolResult:
-    """处理 dpk 包 - 转为 dproj"""
+    """Handle a dpk package - converted to a dproj."""
     dproj_path = str(Path(dpk_path).with_suffix('.dproj'))
     
     if not Path(dproj_path).exists():
         return CallToolResult(
-            content=[{"type": "text", "text": f"未找到对应的 .dproj 文件: {dproj_path}"}],
+            content=[{"type": "text", "text": f"No matching .dproj file found: {dproj_path}"}],
             isError=True
         )
     
@@ -245,7 +246,7 @@ async def _compile_single_package(
     timeout: int,
     extra_args: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """编译单个包项目"""
+    """Compile a single package project."""
     from ..models.compile_request import ProjectCompileRequest, CompileOptions, TargetPlatform
     
     target_version = _resolve_target_version(project_path)
@@ -301,7 +302,7 @@ async def _compile_single_package(
 
 
 async def _compile_dpk(dpk_path: str, target_platform: str, output_dir: str, timeout: int) -> Dict[str, Any]:
-    """直接编译 DPK 包文件"""
+    """Compile a DPK package file directly."""
     import subprocess
     import tempfile
     
@@ -309,7 +310,7 @@ async def _compile_dpk(dpk_path: str, target_platform: str, output_dir: str, tim
         return {
             "success": False,
             "output_file": None,
-            "errors": [{"message": "编译服务未初始化"}],
+            "errors": [{"message": "Compiler service is not initialized"}],
             "warnings": [],
             "log": "",
             "duration": 0
@@ -332,7 +333,7 @@ async def _compile_dpk(dpk_path: str, target_platform: str, output_dir: str, tim
         return {
             "success": False,
             "output_file": None,
-            "errors": [{"message": "未找到 rsvars.bat"}],
+            "errors": [{"message": "rsvars.bat not found"}],
             "warnings": [],
             "log": "",
             "duration": 0
@@ -343,7 +344,7 @@ async def _compile_dpk(dpk_path: str, target_platform: str, output_dir: str, tim
         return {
             "success": False,
             "output_file": None,
-            "errors": [{"message": "无法获取 Delphi 安装目录"}],
+            "errors": [{"message": "Could not get the Delphi installation directory"}],
             "warnings": [],
             "log": "",
             "duration": 0
@@ -355,8 +356,8 @@ async def _compile_dpk(dpk_path: str, target_platform: str, output_dir: str, tim
             "success": False,
             "output_file": None,
             "errors": [{
-                "message": f"无法确定 Delphi 版本号（{version_key!r}），"
-                           "已停止写入 BPL/DCP 目录，避免与其它版本混用"
+                "message": f"Cannot determine the Delphi version number ({version_key!r}); "
+                           "stopped writing to the BPL/DCP directories to avoid mixing versions"
             }],
             "warnings": [],
             "log": "",
@@ -378,7 +379,7 @@ async def _compile_dpk(dpk_path: str, target_platform: str, output_dir: str, tim
     for _p_name, _p_val in [('rsvars_path', rsvars_path), ('dpk_path', dpk_path),
                              ('lib_path', lib_path), ('bpl_dir', bpl_dir), ('dcp_dir', dcp_dir)]:
         if '"' in str(_p_val):
-            return {"success": False, "errors": [{"message": "路径包含非法字符(\"): %s=%s" % (_p_name, _p_val)}],
+            return {"success": False, "errors": [{"message": "Path contains an illegal character (\"): %s=%s" % (_p_name, _p_val)}],
                     "output_file": None, "warnings": [], "log": ""}
     
     batch_content = '@echo off\ncall "%s"\ndcc32 -b "%s" -U"%s" -LE"%s" -LN"%s"\n' % (
@@ -405,7 +406,7 @@ async def _compile_dpk(dpk_path: str, target_platform: str, output_dir: str, tim
             return {
                 "success": False,
                 "output_file": None,
-                "errors": [{"message": f"编译超时 ({timeout}秒)"}],
+                "errors": [{"message": f"Compilation timed out ({timeout}s)"}],
                 "warnings": [],
                 "log": "",
                 "duration": timeout * 1000
@@ -433,14 +434,14 @@ async def _compile_dpk(dpk_path: str, target_platform: str, output_dir: str, tim
 
 
 def _get_delphi_version(version: Optional[str] = None) -> Optional[str]:
-    """获取 Delphi 版本号（优先使用调用方指定的项目版本）。"""
+    """Get the Delphi version number (preferring the caller's project version)."""
     if version:
         return version
     if _compiler_service:
         root_dir = _compiler_service._get_effective_delphi_root()
         if root_dir:
             version_key = Path(root_dir).name
-            # RootDir 通常以版本号结尾，但部分安装是 "...\Studio"，不能直接当版本用
+            # RootDir usually ends with the version number, but some installs are "...\Studio", so it is not a version
             if re.fullmatch(r"\d+\.\d+", version_key):
                 return version_key
         config_manager = getattr(_compiler_service, "config_manager", None)
@@ -458,7 +459,7 @@ def _find_bpl_file(
     build_configuration: str,
     version: Optional[str] = None,
 ) -> Optional[str]:
-    """查找编译生成的 BPL 文件"""
+    """Locate the BPL file produced by the build."""
     version = _get_delphi_version(version)
     if not version:
         return None
@@ -489,13 +490,13 @@ def _find_bpl_file(
 
 
 def _platform_to_dir(platform: str) -> str:
-    """将平台名称转换为目录名"""
+    """Convert a platform name to a directory name."""
     mapping = {"win32": "Win32", "win64": "Win64"}
     return mapping.get(platform.lower(), "Win32")
 
 
 def _is_runtime_only_package(project_path: str) -> bool:
-    """检查是否是运行时包（不需要安装到IDE）"""
+    """Check whether this is a runtime-only package (no IDE installation needed)."""
     import xml.etree.ElementTree as ET
     
     try:
@@ -515,49 +516,49 @@ def _is_runtime_only_package(project_path: str) -> bool:
 
 def _format_results(results: List[tuple], install: bool, target_platform: str) -> CallToolResult:
     """
-    格式化单个项目编译结果。
+    Format the compile result of a single project.
 
     Args:
         results: [(project_path, compile_result_dict), ...]
-        install: 是否显示安装指南
-        target_platform: 目标平台
+        install: Whether to show the installation guide
+        target_platform: Target platform
     """
     grouped = []
     for r in results:
         proj_path = r[0]
         result = r[1]
-        # 单项目无法确定是否为运行时包，默认 False（设计时包）
+        # A single project cannot be classified as runtime-only, so default to False (design-time package)
         grouped.append((proj_path, False, result))
     return _format_group_results(grouped, install, target_platform)
 
 
 def _format_group_results(results: List[tuple], install: bool, target_platform: str) -> CallToolResult:
-    """格式化项目组编译结果（包含运行时/设计时包区分）"""
+    """Format project-group compile results (distinguishing runtime and design-time packages)."""
     all_success = all(r[2].get("success", False) for r in results)
     
     output = "=" * 50 + "\n"
-    output += "组件包编译结果\n"
+    output += "Package Compilation Results\n"
     output += "=" * 50 + "\n\n"
     
     design_bpl_files = []
     
     for proj_path, is_runtime, result in results:
-        pkg_type = "运行时包" if is_runtime else "设计时包"
-        output += f"项目: {Path(proj_path).name} ({pkg_type})\n"
-        output += f"状态: {'成功' if result.get('success') else '失败'}\n"
+        pkg_type = "runtime package" if is_runtime else "design-time package"
+        output += f"Project: {Path(proj_path).name} ({pkg_type})\n"
+        output += f"Status: {'success' if result.get('success') else 'failed'}\n"
         
         output_file = result.get("output_file", "")
         if output_file and output_file.endswith('.bpl'):
-            output += f"BPL文件: {output_file}\n"
+            output += f"BPL file: {output_file}\n"
             if not is_runtime:
                 design_bpl_files.append(output_file)
         elif output_file:
-            output += f"输出目录: {output_file}\n"
+            output += f"Output directory: {output_file}\n"
         
         if result.get("warnings"):
-            output += f"警告: {len(result['warnings'])} 个\n"
+            output += f"Warnings: {len(result['warnings'])}\n"
         if result.get("errors"):
-            output += f"错误: {len(result['errors'])} 个\n"
+            output += f"Errors: {len(result['errors'])}\n"
         output += "\n"
     
     if install and all_success:
@@ -585,52 +586,52 @@ def _format_install_guide(
     results: List[tuple],
     version: Optional[str] = None,
 ) -> str:
-    """生成安装指南"""
+    """Build the installation guide."""
     output = "=" * 50 + "\n"
-    output += "IDE 安装指南\n"
+    output += "IDE Installation Guide\n"
     output += "=" * 50 + "\n\n"
     
     version = _get_delphi_version(version)
     
     if bpl_files:
-        output += "已找到以下 BPL 文件:\n"
+        output += "Found the following BPL files:\n"
         for bpl in bpl_files:
             output += f"  {bpl}\n"
         output += "\n"
         
         if _register_packages_to_ide(bpl_files, version):
-            output += "✅ 组件包已自动安装到 IDE!\n\n"
+            output += "✅ Package installed into the IDE automatically!\n\n"
         else:
-            output += "⚠️ 自动安装失败，请手动安装:\n"
+            output += "⚠️ Automatic installation failed, please install manually:\n"
     else:
-        output += "未找到预编译的 BPL 文件\n"
-        output += "编译后请手动安装:\n"
+        output += "No precompiled BPL file found\n"
+        output += "Please install manually after compiling:\n"
         for proj_path, _is_runtime, result in results:
             if result.get("success"):
                 project_name = Path(proj_path).stem.replace('GR32_', 'GR32')
-                output += f"  - {project_name}_R.bpl (运行时)\n"
-                output += f"  - {project_name}_D.bpl (设计时)\n"
+                output += f"  - {project_name}_R.bpl (runtime)\n"
+                output += f"  - {project_name}_D.bpl (design-time)\n"
         output += "\n"
     
-    output += "安装步骤:\n"
-    output += "1. 打开 Delphi IDE\n"
-    output += "2. 菜单: Component → Install Packages...\n"
-    output += "3. 点击 Add 按钮\n"
-    output += "4. 浏览并选择上面的 BPL 文件\n"
-    output += "5. 点击 OK 完成安装\n"
+    output += "Installation steps:\n"
+    output += "1. Open the Delphi IDE\n"
+    output += "2. Menu: Component → Install Packages...\n"
+    output += "3. Click the Add button\n"
+    output += "4. Browse to and select the BPL file(s) above\n"
+    output += "5. Click OK to finish the installation\n"
     
     return output
 
 
 def _register_packages_to_ide(bpl_files: List[str], version: Optional[str]) -> bool:
-    """将组件包注册到 IDE"""
+    """Register the packages with the IDE."""
     import winreg
 
-    # 版本号无效时绝不能写注册表：否则会创建 ...\Studio\Known Packages
-    # 之类的错误键，包实际没有安装到任何 IDE，却显示成功。
+    # Never write the registry with an invalid version: it would create a bogus
+    # key such as ...\Studio\Known Packages, report success while nothing is installed.
     if not version or not re.fullmatch(r"\d+\.\d+", str(version)):
         logger.error(
-            "无法确定 Delphi 版本号（%r），已跳过自动安装，避免写入错误的 IDE 版本",
+            "Cannot determine the Delphi version number (%r); skipping auto-install to avoid writing a wrong IDE version",
             version,
         )
         return False
@@ -642,27 +643,27 @@ def _register_packages_to_ide(bpl_files: List[str], version: Optional[str]) -> b
         for bpl_path in bpl_files:
             try:
                 winreg.SetValueEx(key, bpl_path, 0, winreg.REG_SZ, bpl_path)
-                logger.info(f"已注册组件包: {bpl_path}")
+                logger.info(f"Registered package: {bpl_path}")
             except Exception as e:
-                logger.error(f"注册组件包失败 {bpl_path}: {e}")
+                logger.error(f"Failed to register package {bpl_path}: {e}")
         
         winreg.CloseKey(key)
         return True
     except Exception as e:
-        logger.error(f"注册组件包失败: {e}")
+        logger.error(f"Failed to register package: {e}")
         return False
 
 
 async def list_installed_packages() -> CallToolResult:
     """
-    列出已安装的组件包
+    List installed packages
 
     Returns:
-        已安装包列表
+        List of installed packages
     """
     import winreg
     
-    output = "已安装的 Delphi 组件包:\n\n"
+    output = "Installed Delphi packages:\n\n"
     
     try:
         version = _get_delphi_version()
@@ -671,7 +672,7 @@ async def list_installed_packages() -> CallToolResult:
                 content=[
                     {
                         "type": "text",
-                        "text": "未检测到 Delphi 版本，无法读取已安装组件包",
+                        "text": "No Delphi version detected; cannot read the installed packages",
                     }
                 ],
                 isError=True,
@@ -696,17 +697,17 @@ async def list_installed_packages() -> CallToolResult:
         winreg.CloseKey(key)
         
     except Exception as e:
-        output += f"读取注册表失败: {e}\n"
+        output += f"Failed to read the registry: {e}\n"
     
     return CallToolResult(content=[{"type": "text", "text": output}])
 
 
 async def handle_package(**kwargs) -> dict:
-    """统一的 package 工具入口，通过 action 分发。
+    """Unified package tool entry point, dispatched by action.
 
     Args:
-        action: "install" 或 "list"
-        其他参数见对应函数。
+        action: "install" or "list"
+        See the corresponding function for the other parameters.
 
     Returns:
         dict: {"status": "ok"/"failed", "message": ...}
@@ -735,7 +736,7 @@ async def handle_package(**kwargs) -> dict:
             return {"status": "ok", "message": str(result)}
 
         else:
-            return {"status": "failed", "message": f"未知 action: {action}，可用: install/list"}
+            return {"status": "failed", "message": f"Unknown action: {action}, available: install/list"}
     except Exception as e:
-        logger.exception("package 执行失败")
+        logger.exception("package execution failed")
         return {"status": "failed", "message": str(e)}

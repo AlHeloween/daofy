@@ -87,7 +87,7 @@ def main() -> int:
         print("  7z", " ".join(args))
         subprocess.run([str(SEVEN_ZIP), *args], cwd=ROOT, check=True)
 
-    # 归档 stage 内容（非外层目录）: 与 AGENTS.md 文档流程一致，文件位于归档根目录
+    # Archive the stage contents (not the outer directory): matches the AGENTS.md documented flow, files sit at the archive root
     run_7z("a", "-ttar", str(tar_path), str(stage) + "\\*")
     run_7z("a", "-t7z", str(seven_path), str(tar_path), "-mx=9", "-m0=LZMA2")
     run_7z("a", "-tzip", str(zip_path), str(stage) + "\\*", "-mx=9")

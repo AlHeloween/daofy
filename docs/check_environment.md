@@ -1,102 +1,102 @@
-# Check Environment — 编译环境诊断
+# Check Environment — Build Environment Diagnostics
 
-> 版本：v1.0 | 最后更新：2026-06-08
-
----
-
-## 目录
-
-1. [概述](#1-概述)
-2. [Action 速查](#2-action-速查)
-3. [Check — 检查环境](#3-check--检查环境)
-4. [Detect — 检测编译器](#4-detect--检测编译器)
-5. [Install — 安装 pasfmt](#5-install--安装-pasfmt)
-6. [Format Install — 安装 RAD 插件](#6-format-install--安装-rad-插件)
-7. [支持的 Delphi 版本](#7-支持的-delphi-版本)
-8. [工作流](#8-工作流)
-9. [故障排除](#9-故障排除)
+> Version: v1.0 | Last updated: 2026-06-08
 
 ---
 
-## 1. 概述
+## Contents
 
-`check_environment` 是 Daofy 的环境诊断工具，用于检查 Delphi 编译器状态、重新检测已安装的编译器、以及安装 pasfmt 格式化工具。
-
-**一句话**：首次使用或编译失败时，先调用此工具确认环境就绪。
+1. [Overview](#1-overview)
+2. [Action Quick Reference](#2-action-quick-reference)
+3. [Check — Check Environment](#3-check--check-environment)
+4. [Detect — Detect Compilers](#4-detect--detect-compilers)
+5. [Install — Install pasfmt](#5-install--install-pasfmt)
+6. [Format Install — Install RAD Plugin](#6-format-install--install-rad-plugin)
+7. [Supported Delphi Versions](#7-supported-delphi-versions)
+8. [Workflows](#8-workflows)
+9. [Troubleshooting](#9-troubleshooting)
 
 ---
 
-## 2. Action 速查
+## 1. Overview
 
-| Action | 用途 |
+`check_environment` is Daofy's environment diagnostic tool, used to check Delphi compiler status, re-detect installed compilers, and install the pasfmt formatting tool.
+
+**In one sentence**: On first use or when compilation fails, call this tool first to confirm the environment is ready.
+
+---
+
+## 2. Action Quick Reference
+
+| Action | Purpose |
 |--------|------|
-| `check`（默认） | 检查当前编译环境状态 |
-| `detect` | 从注册表/指定路径重新检测 Delphi 编译器 |
-| `install` | 下载并安装 pasfmt 格式化工具 |
-| `format_install` | 安装 pasfmt RAD Studio IDE 插件 |
+| `check` (default) | Check the current build environment status |
+| `detect` | Re-detect Delphi compilers from the registry/specified path |
+| `install` | Download and install the pasfmt formatting tool |
+| `format_install` | Install the pasfmt RAD Studio IDE plugin |
 
 ---
 
-## 3. Check — 检查环境
+## 3. Check — Check Environment
 
-默认操作，检查当前编译环境状态：列出所有可用的编译器、各编译器的版本和路径。
+Default action; checks the current build environment status: lists all available compilers, and each compiler's version and path.
 
 ```python
 check_environment(action="check")
 ```
 
-**返回信息**：
-- 可用的编译器列表（名称、版本、路径）
-- 默认编译器
-- pasfmt 是否已安装
-- 环境状态（就绪/部分就绪/未就绪）
+**Returned information**:
+- List of available compilers (name, version, path)
+- Default compiler
+- Whether pasfmt is installed
+- Environment status (ready/partially ready/not ready)
 
 ---
 
-## 4. Detect — 检测编译器
+## 4. Detect — Detect Compilers
 
-从 Windows 注册表或指定路径重新检测 Delphi 编译器，更新 `config/compilers.json`。
+Re-detect Delphi compilers from the Windows registry or a specified path, and update `config/compilers.json`.
 
 ```python
-# 从注册表检测
+# Detect from the registry
 check_environment(action="detect")
 
-# 从指定路径检测
+# Detect from a specified path
 check_environment(action="detect", search_path="D:\Delphi\Studio")
 ```
 
-**检测流程**：
-1. 扫描注册表 `HKEY_CURRENT_USER\SOFTWARE\Embarcadero\BDS` 下所有版本
-2. 自动检测各版本的编译器路径（dcc32.exe / dcc64.exe）
-3. 写入 `config/compilers.json`
+**Detection process**:
+1. Scan all versions under the registry key `HKEY_CURRENT_USER\SOFTWARE\Embarcadero\BDS`
+2. Automatically detect the compiler path for each version (dcc32.exe / dcc64.exe)
+3. Write to `config/compilers.json`
 
 ---
 
-## 5. Install — 安装 pasfmt
+## 5. Install — Install pasfmt
 
-下载并安装 **pasfmt**——Delphi 代码格式化工具。
+Download and install **pasfmt**—a Delphi code formatting tool.
 
 ```python
-# 下载安装到默认位置
+# Download and install to the default location
 check_environment(action="install")
 
-# 安装到指定目录
+# Install to a specified directory
 check_environment(action="install", install_dir="C:\Tools\pasfmt")
 ```
 
-pasfmt 安装后，`delphi_file(action="format")` 即可使用。
+After pasfmt is installed, `delphi_file(action="format")` is ready to use.
 
 ---
 
-## 6. Format Install — 安装 RAD 插件
+## 6. Format Install — Install RAD Plugin
 
-将 pasfmt 安装为 RAD Studio IDE 插件，可在 IDE 中直接使用格式化功能。
+Install pasfmt as a RAD Studio IDE plugin so you can use the formatting feature directly in the IDE.
 
 ```python
-# 安装到 Delphi 11
+# Install to Delphi 11
 check_environment(action="format_install", delphi_version="11")
 
-# 安装到 Delphi 12
+# Install to Delphi 12
 check_environment(action="format_install",
     delphi_version="12",
     install_dir="C:\pasfmt")
@@ -104,11 +104,11 @@ check_environment(action="format_install",
 
 ---
 
-## 7. 支持的 Delphi 版本
+## 7. Supported Delphi Versions
 
-自动注册表检测支持以下版本：
+Automatic registry detection supports the following versions:
 
-| 版本 | 注册表版本号 |
+| Version | Registry version number |
 |------|------------|
 | Delphi 13 Florence | 37.0 |
 | Delphi 12 Athens | 23.0 |
@@ -134,45 +134,46 @@ check_environment(action="format_install",
 
 ---
 
-## 8. 工作流
+## 8. Workflows
 
-### 首次使用
+### First Use
 
 ```
-check_environment(action="check")    → 确认环境状态
-  ↓ 编译器未找到
-check_environment(action="detect")   → 从注册表检测
+check_environment(action="check")    → Confirm environment status
+  ↓ Compiler not found
+check_environment(action="detect")   → Detect from registry
   ↓
-delphi_project(action="compile", ...)       → 开始编译
+delphi_project(action="compile", ...)       → Start compiling
 ```
 
-### 编译失败时
+### When Compilation Fails
 
 ```
-delphi_project(action="compile")  失败
+delphi_project(action="compile")  Failed
   ↓
-check_environment(action="check")   → 确认编译器状态
-  ↓ 编译器不可用
-check_environment(action="detect")  → 重新检测
+check_environment(action="check")   → Confirm compiler status
+  ↓ Compiler unavailable
+check_environment(action="detect")  → Re-detect
   ↓
-delphi_project(action="compile")  重试
+delphi_project(action="compile")  Retry
 ```
 
-### 安装格式化工具
+### Install the Formatting Tool
 
 ```
-check_environment(action="install")          → 下载 pasfmt
+check_environment(action="install")          → Download pasfmt
   ↓
-delphi_file(action="format", file_path=...)  → 使用格式化
+delphi_file(action="format", file_path=...)  → Use formatting
 ```
 
 ---
 
-## 9. 故障排除
+## 9. Troubleshooting
 
-| 现象 | 原因 | 解决 |
+| Symptom | Cause | Solution |
 |------|------|------|
-| 未检测到编译器 | Delphi 未安装或注册表缺失 | 用 `search_path` 手动指定路径 |
-| 检测到但编译失败 | 编译器版本不兼容 | 检查 `config/compilers.json` 中路径是否正确 |
-| pasfmt 安装失败 | 网络问题无法下载 | 手动下载并放到 `tools/pasfmt/` 目录 |
-| 插件安装失败 | RAD Studio 版本不对 | 确认 `delphi_version` 与实际版本匹配 |
+| No compiler detected | Delphi is not installed or registry entries are missing | Use `search_path` to specify the path manually |
+| Detected but compilation fails | Compiler version is incompatible | Check whether the path in `config/compilers.json` is correct |
+| pasfmt installation fails | Network issues prevent download | Download manually and place it in the `tools/pasfmt/` directory |
+| Plugin installation fails | Wrong RAD Studio version | Confirm that `delphi_version` matches the actual version |
+

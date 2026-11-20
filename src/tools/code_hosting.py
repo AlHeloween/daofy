@@ -1,15 +1,15 @@
-"""代码托管平台统一工具 — 兼容 Gitea / GitHub / GitLab / Gitee / GitCode + Git 本地操作
+"""Unified code hosting platform tool — compatible with Gitea / GitHub / GitLab / Gitee / GitCode + local Git operations
 
-通过 action 参数分发操作，platform 参数切换后端。
-支持以下平台:
-  - gitea   : 自托管 Gitea
+Dispatch operations via the action parameter; switch backends via the platform parameter.
+Supported platforms:
+  - gitea   : Self-hosted Gitea
   - github  : GitHub (github.com)
   - gitlab  : GitLab CE/EE (gitlab.com)
-  - gitee   : Gitee 码云 (gitee.com) — API v5，GitHub 兼容风格
-  - gitcode : GitCode (gitcode.net) — GitLab 兼容风格
+  - gitee   : Gitee (gitee.com) — API v5, GitHub-compatible style
+  - gitcode : GitCode (gitcode.net) — GitLab-compatible style
 
-API 认证方式:
-  平台      | 认证头                          | base_url 示例
+API authentication methods:
+  Platform  | Auth header                     | base_url example
   ----------|---------------------------------|------------------------
   gitea     | Authorization: token {token}     | https://your-gitea.com
   github    | Authorization: Bearer {token}    | https://api.github.com
@@ -17,24 +17,24 @@ API 认证方式:
   gitee     | Authorization: Bearer {token}    | https://gitee.com/api/v5
   gitcode   | PRIVATE-TOKEN: {token}           | https://gitcode.net
 
-Git 相关操作（无需 platform 参数）:
-  - git_clone  克隆远程仓库（支持 GitHub 镜像源）
-  - git_status 查看仓库状态
-  - git_diff   查看工作区/暂存区差异
-  - git_show   查看提交或对象内容
-  - git_log    查看提交历史
-  - git_add    暂存文件
-  - git_commit 创建提交
-  - git_fetch  拉取远程引用
-  - git_pull   拉取并合并远程分支
+Git-related operations (no platform parameter required):
+  - git_clone  Clone a remote repository (supports GitHub mirrors)
+  - git_status View repository status
+  - git_diff   View working tree/staging area differences
+  - git_show   View commit or object contents
+  - git_log    View commit history
+  - git_add    Stage files
+  - git_commit Create a commit
+  - git_fetch  Fetch remote refs
+  - git_pull   Pull and merge remote branch
   - git_branch / git_switch / git_merge / git_restore / git_unstage / git_stash / git_tag
-  - git_push   推送到远程（依赖用户自身的网络/代理/SSH配置）
+  - git_push   Push to remote (depends on the user's own network/proxy/SSH configuration)
 
-GitHub / Gitee 国内访问:
-  - 拉取: git_clone 支持 mirror 参数指定镜像源
-  - 推送: 依赖用户自身配置（SSH/HTTPS代理/VPN），工具不做假设
+GitHub / Gitee access from mainland China:
+  - Pull: git_clone supports the mirror parameter to specify a mirror source
+  - Push: depends on the user's own configuration (SSH/HTTPS proxy/VPN); the tool makes no assumptions
 
-用法:
+Usage:
   code_hosting(platform="gitee", action="create_issue", ...)
   code_hosting(platform="gitcode", action="list_issues", ...)
   code_hosting(action="git_clone", repo_url="https://github.com/...", mirror="https://hub.fastgit.xyz")
@@ -64,7 +64,7 @@ from ..constants import (
     TIMEOUT_NETWORK_REQUEST,
 )
 
-# 复用项目已有的异步任务管理器
+# Reuse the project's existing async task manager
 try:
     from ..services.knowledge_base.async_task_manager import get_task_manager
 except ImportError:
@@ -73,65 +73,65 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# 路径安全 — 阻止目录遍历
+# Path safety — prevent directory traversal
 # ============================================================
 
-_ALLOWED_BASE = os.path.abspath(".")  # 默认：当前工作目录
+_ALLOWED_BASE = os.path.abspath(".")  # Default: current working directory
 
 
 def _resolve_safe_dir(dir_path: str) -> str:
-    """解析用户传入的目录路径，阻止路径遍历攻击。
+    """Resolve a user-supplied directory path and prevent path traversal attacks.
 
-    规则：
-    - 相对路径基于 _ALLOWED_BASE（当前工作目录）resolve，防止 .. 逃逸
-    - 绝对路径允许指向现有本地仓库/目录，但不会自动创建
-    - 相对路径不存在时自动创建，便于 git_clone 等操作
-    - 如果无法判定安全，抛出明确错误，避免回退到当前仓库误操作
+    Rules:
+    - Relative paths are resolved based on _ALLOWED_BASE (current working directory) to prevent .. escape
+    - Absolute paths may point to existing local repositories/directories, but are not created automatically
+    - Non-existent relative paths are created automatically, facilitating operations such as git_clone
+    - If safety cannot be determined, raise a clear error to avoid falling back to the current repository and causing accidental operations
 
     Args:
-        dir_path: 用户传入的目录路径
+        dir_path: User-supplied directory path
 
     Returns:
-        安全的绝对路径
+        Safe absolute path
     """
     if not dir_path:
         return _ALLOWED_BASE
 
     if '\0' in dir_path:
-        raise ValueError("dir 参数包含非法字符")
+        raise ValueError("dir parameter contains invalid characters")
 
-    # 绝对路径：支持已有本地仓库/目录，但不静默创建任意系统路径
+    # Absolute path: allow existing local repositories/directories, but do not silently create arbitrary system paths
     if os.path.isabs(dir_path):
         resolved = os.path.normpath(dir_path)
         if not os.path.exists(resolved):
-            raise ValueError(f"dir 绝对路径不存在: {resolved}")
+            raise ValueError(f"dir absolute path does not exist: {resolved}")
         if not os.path.isdir(resolved):
-            raise ValueError(f"dir 不是目录: {resolved}")
+            raise ValueError(f"dir is not a directory: {resolved}")
         return resolved
 
-    # 相对路径：基于 _ALLOWED_BASE resolve，阻止 .. 逃逸
+    # Relative path: resolve based on _ALLOWED_BASE, prevent .. escape
     resolved = os.path.abspath(os.path.join(_ALLOWED_BASE, dir_path))
     resolved = os.path.normpath(resolved)
     resolved_lower = resolved.lower()
     allowed_lower = os.path.normpath(_ALLOWED_BASE).lower()
 
     if not resolved_lower.startswith(allowed_lower + os.sep) and resolved_lower != allowed_lower:
-        logger.warning("路径遍历拦截: %s -> %s (base: %s)", dir_path, resolved, _ALLOWED_BASE)
-        raise ValueError("dir 参数不能逃逸当前工作目录")
+        logger.warning("Path traversal blocked: %s -> %s (base: %s)", dir_path, resolved, _ALLOWED_BASE)
+        raise ValueError("dir parameter cannot escape the current working directory")
 
     if not os.path.exists(resolved):
         try:
             os.makedirs(resolved, exist_ok=True)
         except OSError as exc:
-            raise ValueError(f"无法创建 dir 目录: {resolved}") from exc
+            raise ValueError(f"Unable to create dir directory: {resolved}") from exc
     if not os.path.isdir(resolved):
-        raise ValueError(f"dir 不是目录: {resolved}")
+        raise ValueError(f"dir is not a directory: {resolved}")
 
     return resolved
 
 
 # ============================================================
-# 平台 API 路径模板
+# Platform API path templates
 # ============================================================
 
 _API_PATHS = {
@@ -156,7 +156,7 @@ _API_PATHS = {
         "delete_release": "/api/v1/repos/{owner}/{repo}/releases/{release_id}",
     },
     "github": {
-        "create_token": None,  # GitHub 不支持 API 创建 token
+        "create_token": None,  # GitHub does not support creating tokens via API
         "list_labels":  "/repos/{owner}/{repo}/labels",
         "create_label": "/repos/{owner}/{repo}/labels",
         "create_issue": "/repos/{owner}/{repo}/issues",
@@ -238,47 +238,47 @@ _API_PATHS = {
 }
 
 # ============================================================
-# 标签定义 — 软件流程四维分类
+# Label definitions — four-dimensional software workflow categories
 # ============================================================
 
 ISSUE_LABELS = {
     "priority": [
-        {"name": "优先级/紧急", "color": "e53e3e", "description": "需要立即处理", "exclusive": True},
-        {"name": "优先级/高",   "color": "ed8936", "description": "重要问题，应尽快处理", "exclusive": True},
-        {"name": "优先级/中",   "color": "ecc94b", "description": "常规问题", "exclusive": True},
-        {"name": "优先级/低",   "color": "a0aec0", "description": "可延后处理", "exclusive": True},
+        {"name": "Priority/Urgent", "color": "e53e3e", "description": "Needs immediate attention", "exclusive": True},
+        {"name": "Priority/High",   "color": "ed8936", "description": "Important issue; should be handled as soon as possible", "exclusive": True},
+        {"name": "Priority/Medium", "color": "ecc94b", "description": "Regular issue", "exclusive": True},
+        {"name": "Priority/Low",    "color": "a0aec0", "description": "Can be deferred", "exclusive": True},
     ],
     "review": [
-        {"name": "审阅/待审阅", "color": "4299e1", "description": "等待代码审阅", "exclusive": True},
-        {"name": "审阅/需修改", "color": "ed8936", "description": "审阅发现问题，需要修改", "exclusive": True},
-        {"name": "审阅/已通过", "color": "48bb78", "description": "审阅通过", "exclusive": True},
-        {"name": "审阅/已拒绝", "color": "e53e3e", "description": "审阅不通过", "exclusive": True},
+        {"name": "Review/Pending Review", "color": "4299e1", "description": "Awaiting code review", "exclusive": True},
+        {"name": "Review/Changes Required", "color": "ed8936", "description": "Review found issues; changes required", "exclusive": True},
+        {"name": "Review/Approved", "color": "48bb78", "description": "Review passed", "exclusive": True},
+        {"name": "Review/Rejected", "color": "e53e3e", "description": "Review rejected", "exclusive": True},
     ],
     "status": [
-        {"name": "状态/待确认",   "color": "a0aec0", "description": "待确认是否有效", "exclusive": True},
-        {"name": "状态/处理中",   "color": "4299e1", "description": "正在修复中", "exclusive": True},
-        {"name": "状态/已验证",   "color": "48bb78", "description": "修复已验证", "exclusive": True},
-        {"name": "状态/已关闭",   "color": "718096", "description": "问题已关闭", "exclusive": True},
-        {"name": "状态/无法复现", "color": "9f7aea", "description": "无法复现", "exclusive": True},
+        {"name": "Status/Pending Confirmation",   "color": "a0aec0", "description": "Pending confirmation of validity", "exclusive": True},
+        {"name": "Status/In Progress",   "color": "4299e1", "description": "Being fixed", "exclusive": True},
+        {"name": "Status/Verified",   "color": "48bb78", "description": "Fix verified", "exclusive": True},
+        {"name": "Status/Closed",   "color": "718096", "description": "Issue closed", "exclusive": True},
+        {"name": "Status/Cannot Reproduce", "color": "9f7aea", "description": "Cannot reproduce", "exclusive": True},
     ],
     "type": [
-        {"name": "类型/缺陷", "color": "e53e3e", "description": "功能缺陷", "exclusive": True},
-        {"name": "类型/需求", "color": "48bb78", "description": "新功能需求", "exclusive": True},
-        {"name": "类型/改进", "color": "4299e1", "description": "优化/重构", "exclusive": True},
-        {"name": "类型/文档", "color": "ecc94b", "description": "文档相关", "exclusive": True},
-        {"name": "类型/测试", "color": "9f7aea", "description": "测试相关", "exclusive": True},
+        {"name": "Type/Defect", "color": "e53e3e", "description": "Functional defect", "exclusive": True},
+        {"name": "Type/Requirement", "color": "48bb78", "description": "New feature requirement", "exclusive": True},
+        {"name": "Type/Improvement", "color": "4299e1", "description": "Optimization/refactoring", "exclusive": True},
+        {"name": "Type/Documentation", "color": "ecc94b", "description": "Documentation related", "exclusive": True},
+        {"name": "Type/Testing", "color": "9f7aea", "description": "Testing related", "exclusive": True},
     ],
 }
 
 
 # ============================================================
-# HTTP 请求（带指数退避重试）
+# HTTP requests (with exponential backoff retry)
 # ============================================================
 
 def _request(base_url, token, method, path, body=None, params=None, platform="gitea", basic_auth=None, _retries=3):
-    """发送 HTTP 请求，支持指数退避重试（5xx 和网络错误）。
+    """Send an HTTP request, supporting exponential backoff retries (5xx and network errors).
 
-    注意：_retries 是内部参数，外部调用者不应使用。
+    Note: _retries is an internal parameter and should not be used by external callers.
     """
     url = f"{base_url.rstrip('/')}{path}"
     if params:
@@ -300,7 +300,7 @@ def _request(base_url, token, method, path, body=None, params=None, platform="gi
         headers["Authorization"] = f"token {token}"
 
     if not token and not basic_auth:
-        raise ValueError("请提供 token 或 basic_auth 认证信息")
+        raise ValueError("Please provide token or basic_auth credentials")
 
     data = json.dumps(body).encode("utf-8") if body else None
     req = Request(url, data=data, headers=headers, method=method)
@@ -316,63 +316,63 @@ def _request(base_url, token, method, path, body=None, params=None, platform="gi
         except HTTPError as e:
             last_exception = e
             detail = e.read().decode("utf-8", errors="replace") if e.fp else ""
-            # 5xx 错误可重试，4xx 不重试
+            # 5xx errors are retryable; 4xx are not
             if e.code >= 500 and attempt < _retries - 1:
                 wait = 2 ** attempt
-                logger.warning("API %d 错误 (第 %d/%d 次)，%ds 后重试", e.code, attempt + 1, _retries, wait)
+                logger.warning("API %d error (attempt %d/%d), retrying after %ds", e.code, attempt + 1, _retries, wait)
                 time.sleep(wait)
                 continue
-            # 脱敏：错误详情中可能包含 token 信息
+            # Sanitize: error details may contain token information
             safe_detail = detail[:300]
             raise RuntimeError(f"API {e.code}: {safe_detail}")
         except URLError as e:
             last_exception = e
             if attempt < _retries - 1:
                 wait = 2 ** attempt
-                logger.warning("网络错误 (第 %d/%d 次)，%ds 后重试: %s", attempt + 1, _retries, wait, e)
+                logger.warning("Network error (attempt %d/%d), retrying after %ds: %s", attempt + 1, _retries, wait, e)
                 time.sleep(wait)
                 continue
-            raise RuntimeError(f"无法连接 {base_url}: {e}")
+            raise RuntimeError(f"Unable to connect to {base_url}: {e}")
 
 
 # ============================================================
-# 统一入口
+# Unified entry point
 # ============================================================
 
 def code_hosting(**kwargs) -> dict:
-    """代码托管平台统一操作入口。
+    """Unified entry point for code hosting platform operations.
 
-    platform: gitea / github / gitlab / gitee / gitcode（默认 gitea）
+    platform: gitea / github / gitlab / gitee / gitcode (default: gitea)
     action:
-      - create_token  创建访问令牌（仅 Gitea）
-      - init_labels   批量初始化四维流程标签
-      - create_issue  创建工单
-      - get_issue     查看工单
-      - edit_issue    修改工单
-      - set_labels    设置工单标签
-      - create/get/list/edit_pull       PR/MR 操作
-      - create/get/list/edit/delete_release  Release 操作
-      - close_issue   关闭工单
-      - add_comment   添加评论
-      - list_issues   查询工单列表
+      - create_token  Create an access token (Gitea only)
+      - init_labels   Batch initialize four-dimensional workflow labels
+      - create_issue  Create an issue
+      - get_issue     View an issue
+      - edit_issue    Edit an issue
+      - set_labels    Set issue labels
+      - create/get/list/edit_pull       PR/MR operations
+      - create/get/list/edit/delete_release  Release operations
+      - close_issue   Close an issue
+      - add_comment   Add a comment
+      - list_issues   List issues
       - git_status/diff/show/log/add/commit/fetch/pull/branch/switch/merge/restore/unstage/stash/tag/push/clone
     """
     platform = kwargs.pop("platform", "gitea").lower()
     action = kwargs.pop("action", "")
 
     if platform not in _API_PATHS:
-        return _err(f"不支持的平台: {platform}，可选: {', '.join(_API_PATHS.keys())}")
+        return _err(f"Unsupported platform: {platform}, options: {', '.join(_API_PATHS.keys())}")
     handler = _DISPATCH.get(action)
     if not handler:
-        return _err(f"不支持的操作: {action}，可选: {', '.join(_DISPATCH.keys())}")
+        return _err(f"Unsupported action: {action}, options: {', '.join(_DISPATCH.keys())}")
 
     try:
-        # 前置校验：API 操作必须的参数
+        # Pre-validation: required parameters for API actions
         if action in _API_ACTIONS:
             if "base_url" not in kwargs:
-                return _err(f"{action} 需要 base_url 参数")
+                return _err(f"{action} requires base_url parameter")
             if action != "create_token" and "token" not in kwargs:
-                return _err(f"{action} 需要 token 参数")
+                return _err(f"{action} requires token parameter")
         return handler(platform, **kwargs)
     except Exception as e:
         logger.exception("code_hosting error")
@@ -408,7 +408,7 @@ _DISPATCH = {}
 
 
 def _reg(name):
-    """装饰器：注册 action 处理器"""
+    """Decorator: register an action handler"""
     def _(fn):
         _DISPATCH[name] = fn
         return fn
@@ -439,10 +439,10 @@ def _split_ref(ref: str) -> list[str]:
     if not ref:
         return []
     if re.search(r"[\r\n\0]", ref):
-        raise ValueError("ref 参数包含非法字符")
+        raise ValueError("ref parameter contains invalid characters")
     parts = ref.split()
     if any(part.startswith("-") for part in parts):
-        raise ValueError("ref 参数不能是 Git 选项")
+        raise ValueError("ref parameter cannot be a Git option")
     return parts
 
 
@@ -452,11 +452,11 @@ def _validate_git_arg(name: str, value: str, *, allow_empty: bool = False) -> st
     if not value:
         if allow_empty:
             return ""
-        raise ValueError(f"{name} 参数不能为空")
+        raise ValueError(f"{name} parameter cannot be empty")
     if re.search(r"[\r\n\0]", value):
-        raise ValueError(f"{name} 参数包含非法字符")
+        raise ValueError(f"{name} parameter contains invalid characters")
     if value.startswith("-"):
-        raise ValueError(f"{name} 参数不能是 Git 选项")
+        raise ValueError(f"{name} parameter cannot be a Git option")
     return value
 
 
@@ -464,23 +464,23 @@ def _require_files(kw: dict, action: str) -> list[str]:
     """Return explicit file list for workspace-changing commands."""
     files = kw.get("files") or []
     if not files:
-        raise ValueError(f"{action} 需要 files 参数，避免误操作整个工作区")
+        raise ValueError(f"{action} requires files parameter to avoid modifying the entire workspace")
     return _validate_git_paths(files, action)
 
 
 def _validate_git_paths(files: list[str], action: str) -> list[str]:
     """Validate user-supplied git pathspecs placed after '--'."""
     if isinstance(files, str) or not isinstance(files, (list, tuple)):
-        raise ValueError(f"{action} files 参数必须是路径列表")
+        raise ValueError(f"{action} files parameter must be a list of paths")
     result = []
     for file_path in files:
         if file_path is None:
-            raise ValueError(f"{action} files 参数不能包含空路径")
+            raise ValueError(f"{action} files parameter cannot contain empty paths")
         value = str(file_path)
         if not value:
-            raise ValueError(f"{action} files 参数不能包含空路径")
+            raise ValueError(f"{action} files parameter cannot contain empty paths")
         if re.search(r"[\r\n\0]", value):
-            raise ValueError(f"{action} files 参数包含非法字符")
+            raise ValueError(f"{action} files parameter contains invalid characters")
         result.append(value)
     return result
 
@@ -495,27 +495,27 @@ def _coerce_bool(value, default: bool = False) -> bool:
 
 
 def _split_repo(repo: str):
-    """将 repo 参数字符串分割为 owner + repo。
+    """Split the repo parameter string into owner + repo.
 
-    注意：
-    - GitHub/Gitea: owner/repo（简单分割，无嵌套）
-    - GitLab: group/subgroup/project（支持嵌套组）
-      _repo_path 对 GitLab 会做 URL 编码（quote(f"{owner}/{repo}", safe="")），
-      所以 nested group 场景也能正确处理。这里的 owner 返回的是最上层组名。
+    Note:
+    - GitHub/Gitea: owner/repo (simple split, no nesting)
+    - GitLab: group/subgroup/project (supports nested groups)
+      _repo_path URL-encodes for GitLab (quote(f"{owner}/{repo}", safe="")),
+      so nested group scenarios are also handled correctly. The owner returned here is the top-level group name.
     """
     parts = repo.split("/", 1)
     if len(parts) != 2:
-        raise ValueError("仓库格式应为 owner/repo (如 chinawsb/daofy)")
+        raise ValueError("Repository format should be owner/repo (e.g. chinawsb/daofy)")
     return parts[0], parts[1]
 
 
 def _repo_path(platform, action, owner, repo, index=None, **extra):
     tmpl = _API_PATHS[platform].get(action)
     if tmpl is None:
-        raise ValueError(f"{platform} 不支持 {action}")
+        raise ValueError(f"{platform} does not support {action}")
     kw = {"owner": owner, "repo": repo}
     if index is not None:
-        # Gitee 用 {number}，其他平台用 {index}
+        # Gitee uses {number}; other platforms use {index}
         if platform == "gitee":
             kw["number"] = index
         else:
@@ -635,12 +635,12 @@ def _pull_payload(platform, kw, require_branches=True):
     if require_branches or kw.get("source_branch"):
         source_branch = kw.get("source_branch")
         if not source_branch:
-            raise ValueError("create_pull 需要 source_branch 参数")
+            raise ValueError("create_pull requires source_branch parameter")
         payload["source_branch" if platform in ("gitlab", "gitcode") else "head"] = source_branch
     if require_branches or kw.get("target_branch"):
         target_branch = kw.get("target_branch")
         if not target_branch:
-            raise ValueError("create_pull 需要 target_branch 参数")
+            raise ValueError("create_pull requires target_branch parameter")
         payload["target_branch" if platform in ("gitlab", "gitcode") else "base"] = target_branch
     payload.update(_state_update_payload(platform, kw.get("state")))
     return payload
@@ -651,14 +651,14 @@ def _release_key(platform, kw):
     tag_name = kw.get("tag_name") or kw.get("tag")
     if platform in ("gitlab", "gitcode"):
         if not tag_name:
-            raise ValueError("release 操作需要 tag_name 或 tag 参数")
+            raise ValueError("release operation requires tag_name or tag parameter")
         return {"tag_name": tag_name}
     release_id = kw.get("release_id")
     if release_id is not None:
         return {"release_id": release_id}
     if tag_name:
         return {"tag_name": tag_name}
-    raise ValueError("release 操作需要 release_id、tag_name 或 tag 参数")
+    raise ValueError("release operation requires release_id, tag_name, or tag parameter")
 
 
 def _release_payload(platform, kw, require_tag=False):
@@ -666,7 +666,7 @@ def _release_payload(platform, kw, require_tag=False):
     payload = {}
     tag_name = kw.get("tag_name") or kw.get("tag")
     if require_tag and not tag_name:
-        raise ValueError("create_release 需要 tag_name 或 tag 参数")
+        raise ValueError("create_release requires tag_name or tag parameter")
     if tag_name:
         payload["tag_name"] = tag_name
     if kw.get("target_commitish") and platform not in ("gitlab", "gitcode"):
@@ -826,7 +826,7 @@ def _edit_issue(platform, **kw):
         )
 
     if not payload:
-        return _err("edit_issue 需要 title/body/state/labels 至少一个参数")
+        return _err("edit_issue requires at least one of title/body/state/labels")
 
     ep = _repo_path(platform, "edit_issue", owner, repo, index=num)
     result = _request(base_url, token, _issue_edit_method(platform), ep, body=payload, platform=platform)
@@ -843,7 +843,7 @@ def _act_edit_issue(platform, **kw):
 @_reg("set_labels")
 def _act_set_labels(platform, **kw):
     if "labels" not in kw:
-        return _err("set_labels 需要 labels 参数")
+        return _err("set_labels requires labels parameter")
     return _edit_issue(platform, **kw)
 
 
@@ -857,7 +857,7 @@ def _act_create_pull(platform, **kw):
     owner, repo = _split_repo(kw["repo"])
     payload = _pull_payload(platform, kw, require_branches=True)
     if "title" not in payload:
-        return _err("create_pull 需要 title 参数")
+        return _err("create_pull requires title parameter")
 
     path = _repo_path(platform, "create_pull", owner, repo)
     result = _request(base_url, token, "POST", path, body=payload, platform=platform)
@@ -908,7 +908,7 @@ def _act_edit_pull(platform, **kw):
     num = kw["pull_number"]
     payload = _pull_payload(platform, kw, require_branches=False)
     if not payload:
-        return _err("edit_pull 需要 title/body/state/source_branch/target_branch 至少一个参数")
+        return _err("edit_pull requires at least one of title/body/state/source_branch/target_branch")
 
     path = _repo_path(platform, "edit_pull", owner, repo, index=num)
     result = _request(base_url, token, _issue_edit_method(platform), path, body=payload, platform=platform)
@@ -1037,7 +1037,7 @@ def _act_edit_release(platform, **kw):
     key = _resolve_release_id(base_url, token, platform, owner, repo, key)
     payload = _release_payload(platform, kw, require_tag=False)
     if not payload:
-        return _err("edit_release 需要 name/body/draft/prerelease 至少一个参数")
+        return _err("edit_release requires at least one of name/body/draft/prerelease")
 
     path = _repo_path(platform, "edit_release", owner, repo, **key)
     result = _request(base_url, token, _issue_edit_method(platform), path, body=payload, platform=platform)
@@ -1067,7 +1067,7 @@ def _act_close_issue(platform, **kw):
     base_url, token = kw["base_url"], kw["token"]
     owner, repo = _split_repo(kw["repo"])
     num = kw["issue_number"]
-    # 兼容 comment_body 别名（旧版测试/客户端可能使用）
+    # Compatibility with comment_body alias (older tests/clients may use)
     comment = kw.get("comment", kw.get("comment_body", ""))
 
     if comment:
@@ -1115,9 +1115,9 @@ def _act_list_issues(platform, **kw):
     _validate_issue_state(state)
 
     lp = _repo_path(platform, "list_issues", owner, repo)
-    # 分页参数名因平台而异：gitea=limit, 其他=per_page
+    # Pagination parameter name varies by platform: gitea=limit, others=per_page
     page_size_key = "limit" if platform == "gitea" else "per_page"
-    # GitLab/GitCode 不支持 state=all，不传 state 参数则默认返回所有
+    # GitLab/GitCode do not support state=all; omitting state returns all by default
     params_state = _state_filter(platform, state) if not (platform in ("gitlab", "gitcode") and state == "all") else None
     params = {}
     if params_state:
@@ -1141,95 +1141,95 @@ def _act_list_issues(platform, **kw):
 
 
 # ============================================================
-# Git 本地操作（无需 platform 参数）
+# Git local operations (no platform parameter required)
 # ============================================================
 
 
 def _git_human_error(err_text: str, cmd_str: str) -> str:
-    """将 Git 原始错误信息转换为用户友好的中文提示。"""
+    """Convert raw Git error messages into user-friendly Chinese hints."""
     err_lower = err_text.lower()
 
-    # ── 认证相关 ──
+    # ── Authentication related ──
     if re.search(r"could not read (username|password)", err_lower):
         return (
-            "需要 Git 认证，但 MCP 环境不支持交互式输入。\n"
-            "  解决方式（任选其一）:\n"
-            "    1. 配置凭据管理器: git config --global credential.helper manager\n"
-            "    2. 使用 SSH 密钥: git remote set-url origin git@github.com:owner/repo.git\n"
-            "    3. 在 .netrc 文件中写入凭据\n"
-            f"  原始错误: {err_text[:200]}"
+            "Git authentication required, but MCP environment does not support interactive input.\n"
+            "  Solutions (choose one):\n"
+            "    1. Configure credential manager: git config --global credential.helper manager\n"
+            "    2. Use SSH key: git remote set-url origin git@github.com:owner/repo.git\n"
+            "    3. Write credentials in .netrc file\n"
+            f"  Original error: {err_text[:200]}"
         )
     if re.search(r"authentication failed|access denied|invalid username or password|auth fail", err_lower):
-        return f"认证失败，请检查用户名/密码或 Token 是否正确:\n  {err_text[:200]}"
+        return f"Authentication failed, please check whether username/password or Token is correct:\n  {err_text[:200]}"
     if "permission denied (publickey)" in err_lower:
         return (
-            "SSH 认证失败，请检查 SSH 密钥配置:\n"
-            "    1. 确认公钥已添加到 Git 平台\n"
-            "    2. 确认私钥在本地可用: ssh -T git@github.com\n"
-            f"  原始错误: {err_text[:200]}"
+            "SSH authentication failed, please check SSH key configuration:\n"
+            "    1. Confirm the public key has been added to the Git platform\n"
+            "    2. Confirm the private key is available locally: ssh -T git@github.com\n"
+            f"  Original error: {err_text[:200]}"
         )
 
-    # ── 网络相关 ──
+    # ── Network related ──
     if re.search(r"could not resolve host|couldn'?t resolve host|name or service not known", err_lower):
-        return f"无法解析主机地址，请检查网络连接或代理配置:\n  {err_text[:200]}"
+        return f"Unable to resolve host address, please check network connection or proxy configuration:\n  {err_text[:200]}"
     if re.search(r"connection refused|could not connect to|connect.*timed out|connection timed out", err_lower):
-        return f"连接被拒绝或超时，请检查网络/代理/防火墙设置:\n  {err_text[:200]}"
+        return f"Connection refused or timed out, please check network/proxy/firewall settings:\n  {err_text[:200]}"
 
-    # ── 仓库问题 ──
+    # ── Repository issues ──
     if "repository not found" in err_lower:
-        return f"仓库不存在或无权限访问，请检查 repo 地址是否正确:\n  {err_text[:200]}"
+        return f"Repository does not exist or access is denied, please check whether the repo address is correct:\n  {err_text[:200]}"
     if "not a git repository" in err_lower:
-        return f"当前目录不是 Git 仓库（或父目录缺少 .git），请确认 dir 参数指向正确的仓库:\n  {err_text[:200]}"
+        return f"Current directory is not a Git repository (or the parent directory is missing .git), please confirm the dir parameter points to the correct repository:\n  {err_text[:200]}"
     if re.search(r"pathspec.*did not match any", err_lower):
-        return f"指定的文件路径在仓库中不存在:\n  {err_text[:200]}"
+        return f"The specified file path does not exist in the repository:\n  {err_text[:200]}"
     if re.search(r"unknown switch|unrecognized argument|error: unknown option", err_lower):
-        return f"Git 命令参数有误，请检查参数拼写:\n  {err_text[:200]}"
+        return f"Invalid Git command parameters, please check parameter spelling:\n  {err_text[:200]}"
 
-    # ── 大文件/磁盘 ──
+    # ── Large files/disk ──
     if re.search(r"file too large|large file detected|exceeds github|file size", err_lower):
-        return f"文件大小超过限制，请使用 Git LFS 管理大文件:\n  {err_text[:200]}"
+        return f"File size exceeds the limit, please use Git LFS to manage large files:\n  {err_text[:200]}"
     if re.search(r"disk quota|no space left|insufficient disk", err_lower):
-        return f"磁盘空间不足:\n  {err_text[:200]}"
+        return f"Insufficient disk space:\n  {err_text[:200]}"
 
-    # ── 默认：返回原始错误的前 500 字符
+    # ── Default: return first 500 characters of raw error
     return err_text[:500]
 
 
 def _git_run(work_dir, *args, timeout=TIMEOUT_GIT_PUSH, env=None):
-    """在指定目录执行 git 命令，返回输出。
+    """Execute a git command in the specified directory and return the output.
 
-    Windows 上使用 utf-8 编码解码输出，避免 gbk 解码报错。
+    On Windows, use utf-8 encoding to decode output to avoid gbk decoding errors.
 
     Args:
-        work_dir: 工作目录（自动 resolve 防路径遍历）
-        timeout: 超时秒数，默认 300（5 分钟，适合大项目克隆）
-        env: 额外环境变量字典（可选），会合并到子进程环境
+        work_dir: Working directory (automatically resolves to prevent path traversal)
+        timeout: Timeout seconds, default 300 (5 minutes, suitable for cloning large projects)
+        env: Additional environment variable dictionary (optional), merged into the subprocess environment
     """
     safe_dir = _resolve_safe_dir(work_dir) if work_dir else None
     cwd = safe_dir if (safe_dir and os.path.isdir(safe_dir)) else None
     cmd = ["git"] + list(args)
 
-    # 构建子进程环境：继承当前环境 + 强制非交互
+    # Build subprocess environment: inherit current environment + force non-interactive
     proc_env = os.environ.copy()
-    proc_env["GIT_TERMINAL_PROMPT"] = "0"  # 禁止 git 弹出凭证提示
-    proc_env["GIT_PAGER"] = ""              # 禁止分页器（如 less）
-    proc_env["PAGER"] = ""                  # 全局分页器也禁掉
-    proc_env["GIT_EDITOR"] = ":"            # 禁止打开编辑器
+    proc_env["GIT_TERMINAL_PROMPT"] = "0"  # Disable git credential prompt
+    proc_env["GIT_PAGER"] = ""              # Disable pager (e.g. less)
+    proc_env["PAGER"] = ""                  # Also disable global pager
+    proc_env["GIT_EDITOR"] = ":"            # Disable opening editor
     if env:
         proc_env.update(env)
 
     try:
         r = subprocess.run(
             cmd, capture_output=True, cwd=cwd,
-            stdin=subprocess.DEVNULL,        # 防止 git 读 MCP 的 JSON-RPC 管道导致死锁
+            stdin=subprocess.DEVNULL,        # Prevent git from reading MCP's JSON-RPC pipe and causing deadlock
             timeout=timeout,
             env=proc_env,
         )
         
-        # 指定 utf-8 解码，避免 Windows gbk 编码问题
+        # Specify utf-8 decoding to avoid Windows gbk encoding issues
         def _decode(data):
             if isinstance(data, str):
-                return data  # 测试 mock 可能传 str，无需解码
+                return data  # Test mocks may pass str; no decoding needed
             for enc in ("utf-8", "gbk", "gb2312", "latin-1"):
                 try:
                     return data.decode(enc)
@@ -1243,24 +1243,24 @@ def _git_run(work_dir, *args, timeout=TIMEOUT_GIT_PUSH, env=None):
         if r.returncode != 0:
             err_text = stderr.strip()[:500]
             cmd_str = ' '.join(args)
-            raise RuntimeError(f"git {cmd_str} 失败:\n{_git_human_error(err_text, cmd_str)}")
+            raise RuntimeError(f"git {cmd_str} failed:\n{_git_human_error(err_text, cmd_str)}")
         return stdout.strip()
     except FileNotFoundError:
-        raise RuntimeError("git 命令未找到，请确保已安装 Git")
+        raise RuntimeError("git command not found, please make sure Git is installed")
     except subprocess.TimeoutExpired:
-        raise RuntimeError(f"git 操作超时 ({timeout}秒)")
+        raise RuntimeError(f"git operation timeout ({timeout}s)")
     except OSError as e:
-        raise RuntimeError(f"git 执行失败: {e}")
+        raise RuntimeError(f"git execution failed: {e}")
 
 
 
 # ============================================================
-# 异步 Git 任务（复用 AsyncTaskManager）
+# Async Git tasks (reuse AsyncTaskManager)
 # ============================================================
 
 
 def _submit_git_task(name: str, fn, **kw) -> tuple:
-    """通过 AsyncTaskManager 提交后台 git 任务。"""
+    """Submit a background git task via AsyncTaskManager."""
     if get_task_manager is None:
         return "", _err("async task manager not available")
     on_complete = kw.pop('_on_complete', None)
@@ -1312,12 +1312,12 @@ def _run_git_remote_action(action: str, work_dir: str, args: list[str], success_
 
 
 # ============================================================
-# Git 本地操作 — 快速操作（同步）
+# Git local operations — fast operations (synchronous)
 # ============================================================
 
 
 def _compact_git_status(raw: str) -> str:
-    """将 git status --porcelain=v1 -b 输出压缩为一行摘要。"""
+    """Compress git status --porcelain=v1 -b output into a one-line summary."""
     lines = raw.splitlines()
     branch = "?"
     sync = ""
@@ -1366,7 +1366,7 @@ def _compact_git_status(raw: str) -> str:
 
 @_reg("git_status")
 def _act_git_status(platform=None, **kw):
-    """查看仓库状态（同步，瞬间完成）。"""
+    """View repository status (synchronous, instantaneous)."""
     work_dir = kw.get("dir", ".")
     raw = _git_run(work_dir, "status", "--porcelain=v1", "-b", timeout=TIMEOUT_GIT_QUICK)
     return _ok(_compact_git_status(raw))
@@ -1374,7 +1374,7 @@ def _act_git_status(platform=None, **kw):
 
 @_reg("git_diff")
 def _act_git_diff(platform=None, **kw):
-    """查看差异（同步，只读）。"""
+    """View diff (synchronous, read-only)."""
     work_dir = kw.get("dir", ".")
     staged = _coerce_bool(kw.get("staged"), False)
     stat = _coerce_bool(kw.get("stat"), False)
@@ -1401,7 +1401,7 @@ def _act_git_diff(platform=None, **kw):
 
 @_reg("git_show")
 def _act_git_show(platform=None, **kw):
-    """查看提交/对象内容（同步，只读）。"""
+    """View commit/object contents (synchronous, read-only)."""
     work_dir = kw.get("dir", ".")
     ref = kw.get("ref", "HEAD")
     stat = _coerce_bool(kw.get("stat"), False)
@@ -1421,7 +1421,7 @@ def _act_git_show(platform=None, **kw):
 
 @_reg("git_log")
 def _act_git_log(platform=None, **kw):
-    """查看提交历史（同步，只读）。"""
+    """View commit history (synchronous, read-only)."""
     work_dir = kw.get("dir", ".")
     count = int(kw.get("limit", 20))
     ref = kw.get("ref", "")
@@ -1439,7 +1439,7 @@ def _act_git_log(platform=None, **kw):
 
 @_reg("git_add")
 def _act_git_add(platform=None, **kw):
-    """暂存文件（同步）。"""
+    """Stage files (synchronous)."""
     work_dir = kw.get("dir", ".")
     files = _validate_git_paths(kw.get("files", []), "git_add")
     if not files:
@@ -1449,8 +1449,9 @@ def _act_git_add(platform=None, **kw):
 
 
 @_reg("git_commit")
+
 def _act_git_commit(platform=None, **kw):
-    """创建提交（同步，本地操作极快）。"""
+    """Create a commit (synchronous, local operation is very fast)."""
     work_dir = kw.get("dir", ".")
     msg = kw.get("message", "")
     if not msg:
@@ -1465,7 +1466,7 @@ def _act_git_commit(platform=None, **kw):
 
 @_reg("git_fetch")
 def _act_git_fetch(platform=None, **kw):
-    """拉取远程引用（同步）。"""
+    """Fetch remote refs (synchronous)."""
     work_dir = kw.get("dir", ".")
     remote = _validate_git_arg("remote", kw.get("remote", "origin"))
     branch = _validate_git_arg("branch", kw.get("branch", ""), allow_empty=True)
@@ -1488,7 +1489,7 @@ def _act_git_fetch(platform=None, **kw):
 
 @_reg("git_pull")
 def _act_git_pull(platform=None, **kw):
-    """拉取并合并远程分支（同步）。"""
+    """Pull and merge remote branch (synchronous)."""
     work_dir = kw.get("dir", ".")
     remote = _validate_git_arg("remote", kw.get("remote", "origin"))
     branch = _validate_git_arg("branch", kw.get("branch", ""), allow_empty=True)
@@ -1514,7 +1515,7 @@ def _act_git_pull(platform=None, **kw):
 
 @_reg("git_branch")
 def _act_git_branch(platform=None, **kw):
-    """列出或创建分支（同步）。"""
+    """List or create branches (synchronous)."""
     work_dir = kw.get("dir", ".")
     branch = _validate_git_arg("branch", kw.get("branch", ""), allow_empty=True)
     start_point = _validate_git_arg("start_point", kw.get("start_point", ""), allow_empty=True)
@@ -1523,7 +1524,7 @@ def _act_git_branch(platform=None, **kw):
 
     if delete:
         if not branch:
-            return _err("git_branch delete 需要 branch 参数")
+            return _err("git_branch delete requires branch parameter")
         _git_run(work_dir, "branch", "-d", branch, timeout=TIMEOUT_GIT_QUICK)
         return _ok(f"branch deleted: {branch}")
 
@@ -1543,13 +1544,13 @@ def _act_git_branch(platform=None, **kw):
 
 @_reg("git_switch")
 def _act_git_switch(platform=None, **kw):
-    """切换或创建分支（同步）。"""
+    """Switch or create branches (synchronous)."""
     work_dir = kw.get("dir", ".")
     branch = _validate_git_arg("branch", kw.get("branch", ""), allow_empty=True)
     create = _coerce_bool(kw.get("create"), False)
     start_point = _validate_git_arg("start_point", kw.get("start_point", ""), allow_empty=True)
     if not branch:
-        return _err("git_switch 需要 branch 参数")
+        return _err("git_switch requires branch parameter")
 
     args = ["switch"]
     if create:
@@ -1564,13 +1565,13 @@ def _act_git_switch(platform=None, **kw):
 
 @_reg("git_merge")
 def _act_git_merge(platform=None, **kw):
-    """合并分支（同步）。默认 no-ff=false，支持 ff_only。"""
+    """Merge branches (synchronous). Default no-ff=false, supports ff_only."""
     work_dir = kw.get("dir", ".")
     branch = _validate_git_arg("branch", kw.get("branch", ""), allow_empty=True)
     ff_only = _coerce_bool(kw.get("ff_only"), False)
     no_commit = _coerce_bool(kw.get("no_commit"), False)
     if not branch:
-        return _err("git_merge 需要 branch 参数")
+        return _err("git_merge requires branch parameter")
 
     args = ["merge"]
     if ff_only:
@@ -1589,7 +1590,7 @@ def _act_git_merge(platform=None, **kw):
 
 @_reg("git_restore")
 def _act_git_restore(platform=None, **kw):
-    """恢复显式文件列表（同步，有破坏性，必须传 files）。"""
+    """Restore an explicit file list (synchronous, destructive, files is required)."""
     work_dir = kw.get("dir", ".")
     files = _require_files(kw, "git_restore")
     staged = _coerce_bool(kw.get("staged"), False)
@@ -1608,7 +1609,7 @@ def _act_git_restore(platform=None, **kw):
 
 @_reg("git_unstage")
 def _act_git_unstage(platform=None, **kw):
-    """取消暂存显式文件列表（同步，必须传 files）。"""
+    """Unstage an explicit file list (synchronous, files is required)."""
     work_dir = kw.get("dir", ".")
     files = _require_files(kw, "git_unstage")
     _git_run(work_dir, "restore", "--staged", "--", *files, timeout=TIMEOUT_GIT_QUICK)
@@ -1617,7 +1618,7 @@ def _act_git_unstage(platform=None, **kw):
 
 @_reg("git_stash")
 def _act_git_stash(platform=None, **kw):
-    """管理 stash（同步）。"""
+    """Manage stash (synchronous)."""
     work_dir = kw.get("dir", ".")
     op = kw.get("op", kw.get("stash_action", "push"))
     message = kw.get("message", "")
@@ -1636,7 +1637,7 @@ def _act_git_stash(platform=None, **kw):
         raw = _git_run(work_dir, *args, timeout=TIMEOUT_GIT_LOCAL_SLOW)
         return _ok(raw or f"stash {op}: {ref}")
     if op != "push":
-        return _err("git_stash op 可选: push/list/pop/apply/drop/show")
+        return _err("git_stash op options: push/list/pop/apply/drop/show")
 
     args = ["stash", "push"]
     if include_untracked:
@@ -1652,7 +1653,7 @@ def _act_git_stash(platform=None, **kw):
 
 @_reg("git_tag")
 def _act_git_tag(platform=None, **kw):
-    """列出或创建标签（同步）。"""
+    """List or create tags (synchronous)."""
     work_dir = kw.get("dir", ".")
     tag = _validate_git_arg("tag", kw.get("tag", ""), allow_empty=True)
     ref = _validate_git_arg("ref", kw.get("ref", "HEAD"))
@@ -1661,7 +1662,7 @@ def _act_git_tag(platform=None, **kw):
 
     if delete:
         if not tag:
-            return _err("git_tag delete 需要 tag 参数")
+            return _err("git_tag delete requires tag parameter")
         _git_run(work_dir, "tag", "-d", tag, timeout=TIMEOUT_GIT_QUICK)
         return _ok(f"tag deleted: {tag}")
     if tag:
@@ -1677,30 +1678,30 @@ def _act_git_tag(platform=None, **kw):
 
 
 # ============================================================
-# Git 远程操作 — 耗时操作（异步）
+# Git remote operations — time-consuming operations (asynchronous)
 # ============================================================
 
 
 @_reg("git_clone")
 def _act_git_clone(platform=None, **kw):
-    """克隆远程仓库（异步，大项目可能耗时数分钟）。
+    """Clone a remote repository (asynchronous; large projects may take several minutes).
 
-    支持 GitHub 镜像源（解决国内访问问题）:
-      设置 mirror="https://hub.fastgit.xyz"
-      会自动将 repo_url 中的 github.com 替换为镜像地址。
+    Supports GitHub mirror sources (solves access issues in mainland China):
+      Set mirror="https://hub.fastgit.xyz"
+      Automatically replaces github.com in repo_url with the mirror address.
 
-    提交后台任务，完成后自动推送 TaskStatusNotification 到 MCP 客户端。
+    Submits a background task and automatically pushes TaskStatusNotification to the MCP client when complete.
     """
     url = kw["repo_url"]
     work_dir = kw.get("dir", ".")
     branch = _validate_git_arg("branch", kw.get("branch", ""), allow_empty=True)
     mirror = kw.get("mirror", "")
 
-    # GitHub 镜像替换 — 只替换域名（netloc），不污染路径
+    # GitHub mirror replacement — replace only domain (netloc), do not contaminate path
     if mirror and "github.com" in url.lower():
         from urllib.parse import urlparse, urlunparse
         parsed = urlparse(url)
-        # 仅当 netloc 包含 github.com 时才替换
+        # Replace only when netloc contains github.com
         if "github.com" in parsed.netloc.lower():
             mirror_netloc = mirror.rstrip("/").replace("https://", "").replace("http://", "")
             parsed = parsed._replace(netloc=mirror_netloc, scheme="https")
@@ -1728,7 +1729,7 @@ def _act_git_clone(platform=None, **kw):
 
 @_reg("git_push")
 def _act_git_push(platform=None, **kw):
-    """推送到远程（异步，单次尝试）。"""
+    """Push to remote (asynchronous, single attempt)."""
     work_dir = kw.get("dir", ".")
     remote = _validate_git_arg("remote", kw.get("remote", "origin"))
     branch = _validate_git_arg("branch", kw.get("branch", ""), allow_empty=True)
@@ -1751,15 +1752,15 @@ def _act_git_push(platform=None, **kw):
 
 @_reg("git_push_retry")
 def _act_git_push_retry(platform=None, **kw):
-    """后台自动重试推送，直到成功或达到最大次数。
+    """Automatically retry push in the background until success or max attempts.
 
-    每 N 秒重试一次（默认 300 秒=5分钟），最多 M 次（默认 12 次=1小时）。
-    提交后台任务，每步结果自动推送 TaskStatusNotification 到 MCP 客户端。
+    Retry every N seconds (default 300 seconds = 5 minutes), max M attempts (default 12 attempts = 1 hour).
+    Submits a background task; each step result automatically pushes TaskStatusNotification to the MCP client.
     """
     work_dir = kw.get("dir", ".")
     remote = _validate_git_arg("remote", kw.get("remote", "origin"))
     branch = _validate_git_arg("branch", kw.get("branch", ""), allow_empty=True)
-    # 默认 5 分钟间隔，12 次 ≈ 1 小时
+    # Default 5-minute interval, 12 attempts ≈ 1 hour
     interval = int(kw.get("retry_interval", RETRY_INTERVAL_GIT_PUSH))
     max_retries = int(kw.get("max_retries", MAX_RETRIES_GIT_PUSH))
 

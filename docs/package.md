@@ -1,44 +1,44 @@
-# Package — 组件包管理
+# Package — Component Package Management
 
-> 版本：v1.0 | 最后更新：2026-06-08
-
----
-
-## 目录
-
-1. [概述](#1-概述)
-2. [Action 速查](#2-action-速查)
-3. [Install — 编译安装组件包](#3-install--编译安装组件包)
-4. [List — 列出已安装](#4-list--列出已安装)
-5. [工作流](#5-工作流)
-6. [故障排除](#6-故障排除)
+> Version: v1.0 | Last updated: 2026-06-08
 
 ---
 
-## 1. 概述
+## Contents
 
-`package` 管理 Delphi 组件包的编译和安装。支持 `.dproj`/`.dpk`/`.groupproj` 格式的包文件。
-
-**核心特点**：
-- 自动将**设计期包**注册到 IDE
-- **运行期包**仅编译，不注册
-- 支持多平台（win32/win64）编译
-- 自动处理包依赖关系
+1. [Overview](#1-overview)
+2. [Action Quick Reference](#2-action-quick-reference)
+3. [Install — Compile and install a package](#3-install--compile-and-install-a-package)
+4. [List — List what is installed](#4-list--list-what-is-installed)
+5. [Workflows](#5-workflows)
+6. [Troubleshooting](#6-troubleshooting)
 
 ---
 
-## 2. Action 速查
+## 1. Overview
 
-| Action | 用途 |
+`package` manages the compilation and installation of Delphi component packages. It supports package files in `.dproj`/`.dpk`/`.groupproj` format.
+
+**Key characteristics**:
+- **Design-time packages** are registered with the IDE automatically
+- **Runtime packages** are compiled only, never registered
+- Multi-platform builds (win32/win64)
+- Package dependencies are handled automatically
+
+---
+
+## 2. Action Quick Reference
+
+| Action | Purpose |
 |--------|------|
-| `install`（默认） | 编译并安装组件包 |
-| `list` | 列出已安装到 IDE 的组件包 |
+| `install` (default) | Compile and install a component package |
+| `list` | List the component packages installed into the IDE |
 
 ---
 
-## 3. Install — 编译安装组件包
+## 3. Install — Compile and install a package
 
-### 基本用法
+### Basic usage
 
 ```python
 # 安装 .dpk 包
@@ -51,7 +51,7 @@ package(action="install", package_path="MyPackage.dproj")
 package(action="install", package_path="MyPackage.groupproj")
 ```
 
-### 编译选项
+### Build options
 
 ```python
 # Release 配置，64 位
@@ -71,33 +71,33 @@ package(action="install",
     timeout=600)
 ```
 
-### 参数说明
+### Parameters
 
-| 参数 | 必需 | 默认值 | 说明 |
+| Parameter | Required | Default | Description |
 |------|------|--------|------|
-| `package_path` | ✅ | — | 包文件路径（.dproj/.dpk/.groupproj） |
-| `target_platform` | ❌ | win32 | 目标平台 |
-| `build_configuration` | ❌ | Debug | 编译配置 |
-| `timeout` | ❌ | 300 | 超时秒数 |
-| `install` | ❌ | true | 是否自动安装到 IDE |
+| `package_path` | ✅ | — | Package file path (.dproj/.dpk/.groupproj) |
+| `target_platform` | ❌ | win32 | Target platform |
+| `build_configuration` | ❌ | Debug | Build configuration |
+| `timeout` | ❌ | 300 | Timeout in seconds |
+| `install` | ❌ | true | Whether to install into the IDE automatically |
 
 ---
 
-## 4. List — 列出已安装
+## 4. List — List what is installed
 
-列出已注册到 Delphi IDE 中的组件包。
+Lists the component packages registered in the Delphi IDE.
 
 ```python
 package(action="list")
 ```
 
-返回已安装的包名列表，用于验证安装是否成功。
+Returns the list of installed package names, which is how you verify that an installation succeeded.
 
 ---
 
-## 5. 工作流
+## 5. Workflows
 
-### 安装组件包
+### Installing a component package
 
 ```
 package(action="install", package_path="MyPackage.dpk")
@@ -105,7 +105,7 @@ package(action="install", package_path="MyPackage.dpk")
 package(action="list")            → 验证安装成功
 ```
 
-### 多平台编译
+### Multi-platform builds
 
 ```
 package(action="install", package_path="MyPackage.dpk",
@@ -117,11 +117,11 @@ package(action="install", package_path="MyPackage.dpk",
 
 ---
 
-## 6. 故障排除
+## 6. Troubleshooting
 
-| 现象 | 原因 | 解决 |
+| Symptom | Cause | Fix |
 |------|------|------|
-| 编译失败 | 缺少依赖包 | 先安装依赖包，再重试 |
-| 安装失败 | 包签名/版本冲突 | 检查 `install` 参数，尝试加 `timeout` |
-| 64 位编译失败 | 缺少 64 位编译器 | `check_environment(action="detect")` 检测 |
-| list 不显示刚安装的包 | IDE 未刷新 | 重启 IDE 后再次 list |
+| Build fails | A dependency package is missing | Install the dependency first, then retry |
+| Installation fails | Package signature / version conflict | Check the `install` parameter and try adding `timeout` |
+| 64-bit build fails | The 64-bit compiler is missing | Detect it with `check_environment(action="detect")` |
+| list does not show the package just installed | The IDE has not refreshed | Restart the IDE, then run list again |

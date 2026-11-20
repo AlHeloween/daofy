@@ -1,11 +1,11 @@
-"""MCP Tool: delphi_rtti — Delphi RTTI 桥接
+"""MCP Tool: delphi_rtti — Delphi RTTI Bridge
 
-发现和调用 Delphi 应用程序的运行时能力。
+Discover and invoke runtime capabilities of Delphi applications.
 
-三步法：
-  ① discover → 扫描 RTTI 暴露的方法和参数 Schema
-  ② call → 调用方法
-  ③ guide → 返回完整使用指南
+Three-step workflow:
+  ① discover → scan methods and parameter schemas exposed via RTTI
+  ② call → invoke methods
+  ③ guide → return the complete usage guide
 """
 
 import json
@@ -18,12 +18,12 @@ from src.services.automation_service import _send_command_to_pipe
 
 
 def _call_via_pipe(pipe_name: str, req: dict, timeout_ms: int = 15000) -> dict:
-    """通过管道调用 rcall（async 协议：ack → 轮询 peekresult）。
+    """Invoke rcall through the pipe (async protocol: ack → poll peekresult).
 
-    rcall 在 Delphi 端是异步的：
-      1. 立即返回 {"status":"ack"}
-      2. 主线程处理后将结果存入 FAsyncResults（以 reqId 为 key）
-      3. 客户端需用 peekresult 命令轮询直到结果就绪
+    rcall is asynchronous on the Delphi side:
+      1. Immediately returns {"status":"ack"}
+      2. The main thread processes it and stores the result in FAsyncResults (keyed by reqId)
+      3. The client must poll with the peekresult command until the result is ready
     """
     from src.services.automation_service import (
         _open_pipe, _write_pipe, _read_pipe_message, _CloseHandle,
@@ -33,7 +33,7 @@ def _call_via_pipe(pipe_name: str, req: dict, timeout_ms: int = 15000) -> dict:
     req_id = req.get("reqId", "call_" + str(int(time.time() * 1000)))
     req["reqId"] = req_id
 
-    # 第一步：发送 rcall，读取 ack
+    # Step 1: send rcall and read ack
     handle = _open_pipe(pipe_name, timeout_ms)
     if handle is None:
         return {"status": "error", "message": f"pipe_unavailable (err={_GetLastError()})"}
@@ -47,7 +47,7 @@ def _call_via_pipe(pipe_name: str, req: dict, timeout_ms: int = 15000) -> dict:
             return {"status": "error", "message": "no ack response"}
         ack_resp = json.loads(raw.decode("utf-8", errors="replace").strip())
         if ack_resp.get("status") != "ack":
-            # 意外：直接返回了实际结果
+            # Unexpected: returned the actual result directly
             data_raw = ack_resp.get("data", "")
             if data_raw:
                 try:
@@ -67,7 +67,7 @@ def _call_via_pipe(pipe_name: str, req: dict, timeout_ms: int = 15000) -> dict:
     finally:
         _CloseHandle(handle)
 
-    # 第二步：轮询 peekresult
+    # Step 2: poll peekresult
     deadline = time.time() + (timeout_ms / 1000)
     peek_req = json.dumps({
         "reqId": f"peek_{req_id}",
@@ -93,11 +93,11 @@ def _call_via_pipe(pipe_name: str, req: dict, timeout_ms: int = 15000) -> dict:
 
         data_raw = peek.get("data", "")
         if data_raw.startswith("NR:"):
-            # 结果尚未就绪，等主线程处理完 rcall
+            # Result not ready yet; wait for the main thread to finish processing rcall
             time.sleep(0.1)
             continue
 
-        # 有结果了！（data 字段中是 HandleRCall 返回的完整响应 JSON）
+        # Result is ready! (the data field contains the complete response JSON returned by HandleRCall)
         try:
             result_resp = json.loads(data_raw)
             if isinstance(result_resp, dict):
@@ -106,7 +106,7 @@ def _call_via_pipe(pipe_name: str, req: dict, timeout_ms: int = 15000) -> dict:
                     "data": result_resp.get("data", ""),
                     "response": result_resp,
                 }
-            # 非 dict（如 JSON 数组）→ 直接作为 data 返回
+            # Not a dict (e.g., JSON array) → return directly as data
             return {
                 "status": "ok",
                 "data": data_raw,
@@ -119,104 +119,104 @@ def _call_via_pipe(pipe_name: str, req: dict, timeout_ms: int = 15000) -> dict:
 
     return {"status": "error", "message": f"timeout: result not ready for req_id={req_id}"}
 
-# ── 完整使用指南（L3 按需加载）──
+# ── Complete usage guide (L3 loaded on demand)──
 
 RTTI_GUIDE = """\
-# Delphi RTTI 桥接 — 使用指南
+# Delphi RTTI Bridge — Usage Guide
 
-## 概述
-通过 Delphi 的 Enhanced RTTI 发现和调用应用程序的运行时能力。
+## Overview
+Discover and invoke runtime capabilities of an application through Delphi's Enhanced RTTI.
 
-## 前提
-- Delphi 应用已链接 DaofyAutomation 单元（VCL: uses Vcl.DaofyAutomation; FMX: uses Fmx.DaofyAutomation）
-- 应用已编译运行，命名管道已就绪
+## Prerequisites
+- The Delphi application has linked the DaofyAutomation unit (VCL: uses Vcl.DaofyAutomation; FMX: uses Fmx.DaofyAutomation)
+- The application is compiled and running, and the named pipe is ready
 
-## 三步工作流
+## Three-step workflow
 
-### 第一步：连接并发现
+### Step 1: Connect and discover
 ```
 delphi_rtti(action="discover", app_path="C:\\App\\MyApp.exe")
 ```
-返回该应用所有类的 published+public 方法/属性清单，包含：
-- 方法名和参数 Schema（JSON Schema 格式）
-- 参数类型映射
-- 参数是否必需
+Returns the list of published+public methods/properties for all classes in the application, including:
+- Method names and parameter Schema (JSON Schema format)
+- Parameter type mapping
+- Whether parameters are required
 
-### 第二步：查看能力详情
-discover 返回的 tools 数组中包含每个方法的：
-- name: 方法名
-- description: 方法说明
-- parameters: JSON Schema 格式的参数定义
+### Step 2: View capability details
+The tools array returned by discover includes the following for each method:
+- name: method name
+- description: method description
+- parameters: parameter definitions in JSON Schema format
 
-### 第三步：调用方法
+### Step 3: Invoke a method
 ```
 delphi_rtti(
   action="call",
   app_path="C:\\App\\MyApp.exe",
   class_name="TMainForm",
   method="CreateOrder",
-  params={"customerName": "张三", "amount": 100}
+  params={"customerName": "John Doe", "amount": 100}
 )
 ```
 
-## 类型映射
-| Delphi 类型 | JSON 类型 | 说明 |
+## Type Mapping
+| Delphi Type | JSON Type | Description |
 |------------|----------|------|
-| string (UnicodeString, AnsiString, etc.) | string | UTF-8 编码 |
+| string (UnicodeString, AnsiString, etc.) | string | UTF-8 encoding |
 | Integer, SmallInt, Int64, etc. | integer | |
 | Single, Double, Currency | number | |
 | Boolean, ByteBool | boolean | |
 | TDateTime | string | format: date-time |
-| TObject / TPersistent | object | 子对象（有限支持） |
-| TArray<T> / array of ... | array | 元素类型递归映射 |
+| TObject / TPersistent | object | Child object (limited support) |
+| TArray<T> / array of ... | array | Element types mapped recursively |
 | TStrings / TStringList | array of string | |
-| 枚举类型 | string | 带 enum 约束 |
+| Enum type | string | With enum constraints |
 
-## AI 注解（Custom Attributes）
+## AI Annotations (Custom Attributes)
 
-在 Delphi 方法或参数上添加 `AI` 前缀的属性注解，可以给 AI Agent 提供更丰富的上下文：
+Add attribute annotations with the `AI` prefix on Delphi methods or parameters to provide richer context to AI Agents:
 
-| 属性 | 应用位置 | 说明 |
+| Attribute | Applied To | Description |
 |------|---------|------|
-| `[AIDescription('...')]` | 方法 | 功能描述 |
-| `[AIResultDescription('...')]` | 方法 | 返回值说明 |
-| `[AIExample('...')]` | 方法 | 调用示例 |
-| `[AIParamDescription('...')]` | 参数 | 参数含义 |
+| `[AIDescription('...')]` | Method | Function description |
+| `[AIResultDescription('...')]` | Method | Return value description |
+| `[AIExample('...')]` | Method | Call example |
+| `[AIParamDescription('...')]` | Parameter | Parameter meaning |
 
-示例：
+Example:
 ```pascal
-[AIDescription('创建客户订单，返回新订单号')]
-[AIResultDescription('新创建的订单编号，失败返回 -1')]
-[AIExample('CreateOrder("张三", 100) → 10001')]
+[AIDescription('Create a customer order and return the new order number')]
+[AIResultDescription('Newly created order number; returns -1 on failure')]
+[AIExample('CreateOrder("John Doe", 100) → 10001')]
 function CreateOrder(
-  [AIParamDescription('客户姓名')] const customerName: string;
-  [AIParamDescription('订单金额(元)')] amount: Integer
+  [AIParamDescription('Customer name')] const customerName: string;
+  [AIParamDescription('Order amount (CNY)')] amount: Integer
 ): Integer;
 ```
 
-注解后 discover 的 JSON Schema 会携带 `description`、`example` 等字段。
+After annotation, the JSON Schema returned by discover carries fields such as `description` and `example`.
 
-## 最佳实践
-1. **先 discover 再 call** — 始终先获取能力清单
-2. **缓存发现结果** — 同一应用的能力在生命周期内不变
-3. **使用 keep_alive** — 多次调用的场景保持进程
-4. **参数类型匹配** — 对照类型映射表确保参数类型正确
+## Best Practices
+1. **Discover first, then call** — always obtain the capability list first
+2. **Cache discovery results** — an application's capabilities do not change during its lifetime
+3. **Use keep_alive** — keep the process alive for scenarios with multiple calls
+4. **Match parameter types** — refer to the type mapping table to ensure parameter types are correct
 
-## 故障排除
-- "pipe_unavailable" → 确认 Delphi 应用已启动并链接 DaofyAutomation（VCL: uses Vcl.DaofyAutomation; FMX: uses Fmx.DaofyAutomation）
-- 方法调用失败 → 检查参数名和类型是否与 discover 返回的 Schema 一致
-- 空结果 → 确认目标类的方法标记为 published 或 public
+## Troubleshooting
+- "pipe_unavailable" → confirm that the Delphi application is started and linked with DaofyAutomation (VCL: uses Vcl.DaofyAutomation; FMX: uses Fmx.DaofyAutomation)
+- Method invocation fails → check whether parameter names and types match the Schema returned by discover
+- Empty result → confirm that the target class's methods are marked as published or public
 """
 
 
 async def handle_delphi_rtti(arguments: dict) -> dict:
-    """处理 delphi_rtti 工具调用。
+    """Handle delphi_rtti tool calls.
 
     Args:
-        arguments: 工具参数字典，包含 action/app_path/class_name/method/params
+        arguments: Tool parameter dictionary containing action/app_path/class_name/method/params
 
     Returns:
-        dict: 包含 content 和 isError 的响应
+        dict: Response containing content and isError
     """
     action = arguments.get("action", "guide")
     bridge = get_rtti_bridge()
@@ -239,7 +239,7 @@ async def handle_delphi_rtti(arguments: dict) -> dict:
 
     if not app_path and not pipe:
         return {
-            "content": [{"type": "text", "text": "错误: app_path 或 pipe 是必需的"}],
+            "content": [{"type": "text", "text": "Error: app_path or pipe is required"}],
             "isError": True,
         }
 
@@ -249,14 +249,14 @@ async def handle_delphi_rtti(arguments: dict) -> dict:
         keep_alive = arguments.get("keep_alive", False)
 
         if pipe:
-            # 使用已运行的管道（无需 app_path）
+            # Use an already running pipe (no app_path needed)
             result = bridge.discover_from_pipe(pipe, class_name, force)
             return {
                 "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, indent=2)}],
                 "isError": result.get("status") == "error",
             }
 
-        # 传统方式：通过 app_path 连接
+        # Traditional way: connect via app_path
         conn = bridge.connect(app_path)
         if conn.get("status") == "error":
             return {
@@ -278,17 +278,17 @@ async def handle_delphi_rtti(arguments: dict) -> dict:
 
         if not class_name:
             return {
-                "content": [{"type": "text", "text": "错误: class_name 是必需的"}],
+                "content": [{"type": "text", "text": "Error: class_name is required"}],
                 "isError": True,
             }
         if not method:
             return {
-                "content": [{"type": "text", "text": "错误: method 是必需的"}],
+                "content": [{"type": "text", "text": "Error: method is required"}],
                 "isError": True,
             }
 
         if pipe:
-            # 通过已有管道调用（无需 app_path）
+            # Invoke through an existing pipe (no app_path needed)
             req = {
                 "reqId": f"call_{int(time.time() * 1000)}",
                 "cmd": "rcall",
@@ -303,7 +303,7 @@ async def handle_delphi_rtti(arguments: dict) -> dict:
                 "isError": result.get("status") == "error",
             }
 
-        # 传统方式：通过 app_path
+        # Traditional way: via app_path
         conn = bridge.connect(app_path)
         if conn.get("status") == "error":
             return {
@@ -318,6 +318,6 @@ async def handle_delphi_rtti(arguments: dict) -> dict:
         }
 
     return {
-        "content": [{"type": "text", "text": f"未知 action: {action}，可用: guide, discover, call, list"}],
+        "content": [{"type": "text", "text": f"Unknown action: {action}, available: guide, discover, call, list"}],
         "isError": True,
     }

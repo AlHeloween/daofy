@@ -1,68 +1,68 @@
-<!-- @when: AI 生成或审核测试用例时，逐条对照质量清单 -->
+<!-- @when: When AI generates or reviews test cases, check against the quality checklist item by item -->
 <!-- @part-of: ui-testing -->
 
-## 附录：黑盒测试编写核对表
+## Appendix: Black-Box Test Authoring Checklist
 
-AI 生成或审核测试用例时，逐条对照以下清单：
+When AI generates or reviews test cases, check each item in the following checklist one by one:
 
-### 元数据核对
+### Metadata Checklist
 
-| # | 检查项 | 通过标准 | 检查方法 |
+| # | Check item | Pass criteria | Check method |
 |---|--------|---------|---------|
-| 1 | `test_level` 正确 | 纯黑盒（只用 UI 入口）→ `"black-box"`；用 RTTI 命令 → `"gray-box"` | 检查命令集符合黑盒边界 |
-| 2 | `goal` 描述具体 | 写明"测试什么操作，验证什么结果" | 读 goal 字段，应有明确的双向描述 |
-| 3 | `app_path` 和 `fixture_project` 存在 | 路径指向可执行文件和前置数据项目 | 检查路径存在性 |
-| 4 | `source_files` 列出被测试的源码 | 列出本次测试涉及的主要 pas 文件 | 核对列出的文件是否覆盖了测试的路径 |
-| 5 | `version` 递增 | 每次修改后 version+1 | 对比上一版 version |
+| 1 | `test_level` correct | Pure black-box (only UI entry points) → `"black-box"`; uses RTTI commands → `"gray-box"` | Check that the command set conforms to the black-box boundary |
+| 2 | `goal` describes specifics | State "what operation is tested and what result is verified" | Read the goal field; it should have a clear bidirectional description |
+| 3 | `app_path` and `fixture_project` exist | Paths point to executable and prerequisite data project | Check path existence |
+| 4 | `source_files` lists the source code under test | List the main pas files involved in this test | Check whether the listed files cover the tested paths |
+| 5 | `version` increments | version+1 after each modification | Compare with previous version |
 
-### 结构核对
+### Structure Checklist
 
-| # | 检查项 | 通过标准 | 检查方法 |
+| # | Check item | Pass criteria | Check method |
 |---|--------|---------|---------|
-| 6 | 步骤数合理 | 冒烟测试 5-15 步，功能测试 15-60 步 | 数 steps 条数 |
-| 7 | 每步有 `expected` | 100% 步骤有人类可读的预期说明 | grep expected 覆盖率 |
-| 8 | 关键步骤有 `assert_expr` | 验证状态/值的步骤必须断言 | 检查 rget/msgscan/capture 后的断言 |
-| 9 | 每步有 `phase` | 使用 perceive/execute/verify/wait/rebuild | 检查 phase 字段完备性 |
-| 10 | 操作后有时间间隔 | 异步命令后 `wait`/`waitfor` | 检查无连续异步命令无间隔 |
+| 6 | Step count reasonable | Smoke test 5-15 steps, functional test 15-60 steps | Count steps |
+| 7 | Every step has `expected` | 100% of steps have human-readable expected descriptions | grep expected coverage |
+| 8 | Key steps have `assert_expr` | Steps that verify state/values must assert | Check assertions after rget/msgscan/capture |
+| 9 | Every step has `phase` | Use perceive/execute/verify/wait/rebuild | Check phase field completeness |
+| 10 | Time interval after operations | `wait`/`waitfor` after async commands | Check no consecutive async commands without interval |
 
-### 内容核对（基于 A-O 标准）
+### Content Checklist (Based on A-O Standards)
 
-| # | 检查项 | 对应场景 | 通过标准 |
+| # | Check item | Corresponding scenario | Pass criteria |
 |---|--------|---------|---------|
-| 11 | 坐标定位不裸用 `@x,y` | M1 | 优先使用控件名/`@文本`；不得只用 `@x,y` 而不配套校准 |
-| 12 | 校准脚本存在 | M2 | 测试套件中必须有 00-calibration（验证 goto + rget + ClientWidth） |
-| 13 | 固定 delay 改为条件等待 | N1 | 无 `{"cmd":"wait","ms":>1000}`，少数极短 delay 需带注释 |
-| 14 | 控件重建后 `goto` 等待 | O1 | rescan/reload/切换操作后必须是 `goto TfrmMain` 而非直接 rget |
-| 15 | 重建步骤标记 `phase: rebuild` | O2 | 重建后的等待/验证步骤标记 rebuild |
-| 16 | 文件对话框有 `uia.xxx` 回退 | J0 | 涉及 Open/Save 回退的步骤使用 uia.goto/uia.click 兜底 |
-| 17 | `msgscan` 断言内容具体 | G | `msgscan` 的 `assert_expr` 必须验证文本内容，不仅仅是 `actual != 'NOD'` |
-| 18 | 每张截图有对应 OCR/diff 检测 | K7 | capture 后 Python 侧做了 recognize/detect/diff/color 分析 |
-| 19 | 操作后验证 dirty 状态 | C/F/G | 数据变更操作后验证 `actSaveProject.Enabled` 或 `Project.Modified` |
-| 20 | 运行在不同 DPI 下有变体 | M3/K4 | 跨 DPI 测试用 `coord_scale` 系数动态计算坐标 |
-| 21 | 边界场景覆盖 | 全部 | 功能用例至少覆盖正常路径、失败/取消路径、关键输入边界和环境边界中的适用项；不适用项在 `note` 写明理由 |
+| 11 | Coordinate targeting does not use bare `@x,y` | M1 | Prefer control name/`@text`; must not use only `@x,y` without accompanying calibration |
+| 12 | Calibration script exists | M2 | The test suite must have 00-calibration (verify goto + rget + ClientWidth) |
+| 13 | Fixed delay changed to conditional wait | N1 | No `{"cmd":"wait","ms":>1000}`; a few very short delays need comments |
+| 14 | `goto` wait after control rebuild | O1 | After rescan/reload/switch operations, must use `goto TfrmMain` instead of direct rget |
+| 15 | Rebuild steps marked `phase: rebuild` | O2 | Wait/verification steps after rebuild are marked rebuild |
+| 16 | File dialog has `uia.xxx` fallback | J0 | Steps involving Open/Save fallback use uia.goto/uia.click as fallback |
+| 17 | `msgscan` assertion content is specific | G | `msgscan`'s `assert_expr` must verify text content, not just `actual != 'NOD'` |
+| 18 | Every screenshot has corresponding OCR/diff detection | K7 | After capture, Python side performs recognize/detect/diff/color analysis |
+| 19 | Verify dirty state after operation | C/F/G | After data change operations, verify `actSaveProject.Enabled` or `Project.Modified` |
+| 20 | Variants under different DPI | M3/K4 | Cross-DPI tests use `coord_scale` factor to dynamically calculate coordinates |
+| 21 | Boundary scenarios covered | All | Functional cases cover at least the applicable items among normal path, failure/cancel path, key input boundaries, and environment boundaries; for inapplicable items, state the reason in `note` |
 
-### 质量门禁
+### Quality Gates
 
-| # | 检查项 | 一票否决 |
+| # | Check item | Veto |
 |---|--------|---------|
-| 22 | 功能用例没有边界场景说明 | ❌ 否决（纯启动冒烟用例除外） |
-| 23 | `wait ms` 超过 3000ms 无说明 | ❌ 否决 |
-| 24 | 缺少 `phase` 字段的步骤占比 >20% | ❌ 否决 |
-| 25 | 重建操作后无 `goto` 重建等待 | ❌ 否决 |
-| 26 | `@x,y` 坐标在校准脚本未校准 | ❌ 否决 |
-| 27 | 用例无 `assert_expr` 验证步骤 | ❌ 否决（纯记录型冒烟用例除外） |
+| 22 | Functional case has no boundary scenario description | ❌ Veto (except pure startup smoke cases) |
+| 23 | `wait ms` exceeds 3000ms without explanation | ❌ Veto |
+| 24 | Proportion of steps missing `phase` field >20% | ❌ Veto |
+| 25 | No `goto` rebuild wait after rebuild operation | ❌ Veto |
+| 26 | `@x,y` coordinates not calibrated in calibration script | ❌ Veto |
+| 27 | Test case has no `assert_expr` verification step | ❌ Veto (except pure recording smoke cases) |
 
-### 测试真实性门禁（反假通过）
+### Test Authenticity Gates (Anti-False-Pass)
 
-> 以下 6 条为**一票否决**项。违反任何一条，用例不合格，必须修改后重新提交。
+> The following 6 items are **veto** items. If any one is violated, the test case is unqualified and must be revised and resubmitted.
 
-| # | 检查项 | 通过标准 | 检查方法 | 否决 |
+| # | Check item | Pass criteria | Check method | Veto |
 |---|--------|---------|---------|------|
-| T1 | 无跳过式通过 | 不得以 `Assert(True)` / `assert True` / `assert 1==1` 作为唯一断言混入 passed；Runtime/组件不可用时必须**显式 skip 并说明原因**，不得静默降级 | grep assert 内容 + 检查执行时间 | ❌ |
-| T2 | 执行时间合理 | 冒烟测试 ≥3 秒；功能测试每步平均 ≥0.5 秒；100 次循环操作 ≥30 秒。低于阈值须在 `note` 提供性能说明 | 对比 step 数与总耗时 | ❌ |
-| T3 | 断言验证具体状态 | `assert_expr` 必须验证**具体值**（`len(actual)>0`、`actual=='True'`、`FileExists(actual)` 等），禁止 `assert_expr:"true"` / `assert_expr:"1=1"` / 省略断言 | grep assert_expr 内容 | ❌ |
-| T4 | 截图必须有后续验证 | `capture` 后必须有 `recognize`/`detect`/`diff`/`match` 或 `rget` 验证截图内容，不得只保存不检查 | capture 后 3 步内是否有验证命令 | ❌ |
-| T5 | 外部依赖失败处理 | 依赖外部组件（WebView2/Runtime/COM/DLL）时，若组件不可用必须**显式报错或标记 skip**，不得静默无操作 | 检查是否有前置条件检测 + 降级路径 | ❌ |
-| T6 | 循环操作有中间断言 | 循环 N 次操作时，至少每 N/10 次或首/末/中间各有一次断言，不得只断言首尾 | 检查循环步骤中的 assert 分布 | ❌ |
+| T1 | No skip-style passing | Must not mix in `Assert(True)` / `assert True` / `assert 1==1` as the only assertion and mark it as passed; when Runtime/component is unavailable, must **explicitly skip and explain the reason**, and must not silently degrade | grep assert content + check execution time | ❌ |
+| T2 | Reasonable execution time | Smoke test ≥3 seconds; functional test average per step ≥0.5 seconds; 100 loop operations ≥30 seconds. If below threshold, provide a performance explanation in `note` | Compare step count with total time | ❌ |
+| T3 | Assertions verify specific state | `assert_expr` must verify **specific values** (`len(actual)>0`, `actual=='True'`, `FileExists(actual)`, etc.); `assert_expr:"true"` / `assert_expr:"1=1"` / omitting assertions is prohibited | grep assert_expr content | ❌ |
+| T4 | Screenshots must have subsequent verification | After `capture`, there must be `recognize`/`detect`/`diff`/`match` or `rget` to verify screenshot content; must not only save without checking | Whether there is a verification command within 3 steps after capture | ❌ |
+| T5 | External dependency failure handling | When depending on external components (WebView2/Runtime/COM/DLL), if the component is unavailable, must **explicitly report an error or mark skip**; must not silently do nothing | Check whether there is precondition detection + degradation path | ❌ |
+| T6 | Loop operations have intermediate assertions | When looping N operations, assert at least every N/10 iterations or at the first/last/middle, and do not assert only the beginning and end | Check assert distribution in loop steps | ❌ |
 
-**使用方式**：AI 生成测试用例 → 逐条过核对表 → 标记未通过项 → 修改后再提交。
+**Usage**: AI generates test cases → go through the checklist item by item → mark failed items → revise before resubmitting.

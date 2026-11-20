@@ -1,11 +1,11 @@
 """
-异步任务管理 MCP 工具
+Asynchronous task management MCP tools
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin ZuoYou Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
-Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
+Update & Mod By Crystalxp (Night Killer QQ:281309196)
 
-提供异步任务的启动、查询和管理功能
+Provides asynchronous task start, query, and management functions
 """
 
 import json
@@ -23,22 +23,22 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# 大结果阈值：超过此大小写入临时文件（字节）
+# Large result threshold: write to temp file when exceeding this size (bytes)
 _RESULT_FILE_THRESHOLD = 10 * 1024  # 10 KB
-# 临时结果文件目录（写到项目 .tmp 子目录，避免系统 Temp 权限问题）
+# Temporary result file directory (write to project .tmp subdirectory to avoid system Temp permission issues)
 _RESULT_FILE_DIR = Path(__file__).resolve().parent.parent.parent / ".tmp" / "async_results"
-# 自动清理：超过此时间的临时文件删除（秒）
+# Auto-cleanup: delete temp files older than this time (seconds)
 _RESULT_FILE_TTL = 3600  # 1 hour
 
 
 def _ensure_result_dir() -> Path:
-    """确保临时结果目录存在"""
+    """Ensure temporary result directory exists"""
     _RESULT_FILE_DIR.mkdir(parents=True, exist_ok=True)
     return _RESULT_FILE_DIR
 
 
 def _cleanup_old_result_files() -> int:
-    """删除过期的临时结果文件，返回删除数量"""
+    """Delete expired temporary result files, return deleted count"""
     now = time.time()
     count = 0
     try:
@@ -52,49 +52,49 @@ def _cleanup_old_result_files() -> int:
 
 
 def _format_result_text(task_info: Any) -> str:
-    """将任务结果格式化为文本"""
-    result_text = "任务执行成功!\n\n"
+    """Format task result as text"""
+    result_text = "Task executed successfully!\n\n"
     if isinstance(task_info.result, dict):
         for key, value in task_info.result.items():
             result_text += f"{key}: {value}\n"
     else:
-        result_text += f"结果: {task_info.result}\n"
+        result_text += f"Result: {task_info.result}\n"
     return result_text
 
 
 def _write_result_to_file(task_id: str, result_text: str) -> str:
-    """将大结果写入临时文件，返回文件路径"""
+    """Write large result to temporary file, return file path"""
     _ensure_result_dir()
     file_path = _RESULT_FILE_DIR / f"{task_id}.json"
     try:
         file_path.write_text(result_text, encoding="utf-8")
         return str(file_path)
     except OSError as e:
-        logger.error(f"写入结果文件失败: {e}")
+        logger.error(f"Failed to write result file: {e}")
         return ""
 
 
 async def start_async_task(arguments: Any) -> CallToolResult:
     """
-    启动异步任务
+    Start asynchronous task
 
     Args:
-        arguments: 包含以下参数:
-             - task_type: 任务类型 (必需)
-                - "build_knowledge_base": 构建Delphi知识库
-                - "build_thirdparty_knowledge_base": 构建第三方库知识库
-                - "init_project_knowledge_base": 初始化项目知识库
-                - "build_document_knowledge_base": 构建文档知识库
-                - "build_example_knowledge_base": 构建示例知识库
-            - params: 任务参数 (可选, 根据任务类型不同)
+        arguments: contains the following parameters:
+             - task_type: task type (required)
+                - "build_knowledge_base": build Delphi knowledge base
+                - "build_thirdparty_knowledge_base": build third-party library knowledge base
+                - "init_project_knowledge_base": initialize project knowledge base
+                - "build_document_knowledge_base": build document knowledge base
+                - "build_example_knowledge_base": build example knowledge base
+            - params: task parameters (optional, depends on task type)
                 - build_document_knowledge_base:
-                    - urls: 网页URL列表
-                    - directory: 扫描目录路径
-                    - extensions: 文件扩展名列表
-            - show_progress: 是否显示进度 (可选, 默认 true)
+                    - urls: web page URL list
+                    - directory: scan directory path
+                    - extensions: file extension list
+            - show_progress: whether to show progress (optional, default true)
 
     Returns:
-        任务启动结果，包含任务ID
+        Task start result, containing task ID
     """
     task_type = arguments.get("task_type")
     params = arguments.get("task_params", {})
@@ -102,13 +102,13 @@ async def start_async_task(arguments: Any) -> CallToolResult:
 
     if not task_type:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供任务类型"}],
+            content=[{"type": "text", "text": "Please provide task type"}],
             isError=True
         )
 
     task_manager = get_task_manager()
 
-    # 根据任务类型创建任务函数
+    # Create task function based on task type
     if task_type == "build_knowledge_base":
         from ..services.knowledge_base.zvec_adapter import ZVecKnowledgeBaseAdapter
         from src.utils.delphi_env import get_delphi_version
@@ -116,8 +116,8 @@ async def start_async_task(arguments: Any) -> CallToolResult:
         from pathlib import Path
 
         def _get_delphi_source_dirs(version=None):
-            # 与 RTL/第三方库路径共用同一版本过滤策略：
-            # 传入 version 时只索引该 Delphi 版本的官方源码，否则取全部。
+            # Share the same version filtering strategy with RTL/third-party library paths:
+            # when version is passed, index only official source for that Delphi version; otherwise take all.
             try:
                 from ...utils.delphi_env import resolve_delphi_source_dirs
                 return resolve_delphi_source_dirs(version)
@@ -153,7 +153,7 @@ async def start_async_task(arguments: Any) -> CallToolResult:
         def build_kb_task(**kwargs):
             rebuild = kwargs.get("rebuild", False)
             progress_callback = kwargs.get("_progress_callback")
-            # version 透传：按版本过滤系统库源码目录（默认 None → 全部版本）
+            # version passthrough: filter system library source directories by version (default None → all versions)
             version = kwargs.get("version")
             source_dirs = _get_delphi_source_dirs(version)
             kb_dir = str(Path(__file__).parent.parent.parent / "data" / "delphi-knowledge-base")
@@ -161,13 +161,13 @@ async def start_async_task(arguments: Any) -> CallToolResult:
             service.progress_callback = progress_callback
             return service.build_knowledge_base(rebuild=rebuild)
 
-        # 确定显示的版本号
+        # Determine displayed version number
         display_version = params.get("version")
         if not display_version:
             display_version = get_delphi_version()
         if not display_version:
-            display_version = "最新"
-        task_name = f"构建Delphi知识库 (版本: {display_version})"
+            display_version = "latest"
+        task_name = f"Build Delphi knowledge base (version: {display_version})"
 
     elif task_type == "build_thirdparty_knowledge_base":
         from ..services.knowledge_base.thirdparty_knowledge_base import ThirdPartyKnowledgeBase
@@ -180,7 +180,7 @@ async def start_async_task(arguments: Any) -> CallToolResult:
             service = ThirdPartyKnowledgeBase(progress_callback=progress_callback)
             return service.build_thirdparty_knowledge_base(version=version, rebuild=rebuild)
 
-        task_name = "构建第三方库知识库"
+        task_name = "Build third-party library knowledge base"
 
     elif task_type == "init_project_knowledge_base":
         from ..services.knowledge_base.project_knowledge_base import ProjectKnowledgeBase
@@ -194,20 +194,20 @@ async def start_async_task(arguments: Any) -> CallToolResult:
 
             project_kb = ProjectKnowledgeBase(project_path, progress_callback)
 
-            # ── 热切换：重建时构建到临时目录，旧 KB 仍可查 ──
+            # ── Hot swap: when rebuilding, build to a temporary directory, old KB remains queryable ──
             old_kb_dir = project_kb.kb_dir
             has_old_kb = old_kb_dir.exists() and any(old_kb_dir.iterdir())
             use_temp_build = rebuild and has_old_kb
             temp_dir = None
 
             if use_temp_build:
-                # 用时间戳创建临时目录名，避免冲突
+                # Create temporary directory name with a timestamp to avoid conflicts
                 temp_suffix = f"-tmp-{int(_time_mod.time())}"
                 temp_dir = old_kb_dir.parent / f"{DIR_DELPHI_KB}{temp_suffix}"
-                # 临时用 kb_dir 指向 temp，构建到临时目录
+                # Temporarily point kb_dir to temp, build to the temporary directory
                 project_kb.kb_dir = temp_dir
                 logger.info(
-                    "重建项目 KB 到临时目录: %s （旧 KB 位于 %s，仍可查）",
+                    "Rebuilding project KB to temporary directory: %s (old KB is at %s, still queryable)",
                     temp_dir, old_kb_dir,
                 )
 
@@ -218,33 +218,33 @@ async def start_async_task(arguments: Any) -> CallToolResult:
                     rebuild=rebuild)
                 _elapsed = _time_mod.monotonic() - _t0
                 logger.info(
-                    "项目 KB 构建%s: %s (%.1f 秒, %s)",
-                    "完成" if success else "失败",
+                    "Project KB build %s: %s (%.1f seconds, %s)",
+                    "complete" if success else "failed",
                     project_path,
                     _elapsed,
-                    "全量" if rebuild else "增量",
+                    "full" if rebuild else "incremental",
                 )
                 results["project"] = success
 
-                # 构建成功 + 使用了临时目录 → 执行热切换
+                # Build succeeded + used temporary directory → perform hot swap
                 if use_temp_build and success:
                     project_kb.close()
-                    # 删除旧 KB
+                    # Delete old KB
                     shutil.rmtree(old_kb_dir, ignore_errors=True)
-                    # 临时目录 → 正式目录
+                    # Temp directory → official directory
                     shutil.move(str(temp_dir), str(old_kb_dir))
-                    # 清缓存，下次搜索走新实例
+                    # Clear cache, next search uses new instance
                     from ..tools.knowledge_base import _clear_pkb_cache
                     _clear_pkb_cache(project_path)
-                    logger.info("项目 KB 热切换完成: %s → %s", temp_dir, old_kb_dir)
+                    logger.info("Project KB hot swap complete: %s → %s", temp_dir, old_kb_dir)
                 elif use_temp_build and not success:
-                    # 构建失败：删除临时目录，旧 KB 保持不变
+                    # Build failed: delete temp directory, old KB remains unchanged
                     shutil.rmtree(temp_dir, ignore_errors=True)
-                    project_kb.kb_dir = old_kb_dir  # 恢复指针
-                    logger.warning("项目 KB 重建失败，已保留旧 KB: %s", old_kb_dir)
+                    project_kb.kb_dir = old_kb_dir  # Restore pointer
+                    logger.warning("Project KB rebuild failed, old KB retained: %s", old_kb_dir)
 
             except Exception:
-                # 异常时也清理临时目录
+                # Clean up temp directory on exception too
                 if use_temp_build and temp_dir and temp_dir.exists():
                     shutil.rmtree(temp_dir, ignore_errors=True)
                     project_kb.kb_dir = old_kb_dir
@@ -255,7 +255,7 @@ async def start_async_task(arguments: Any) -> CallToolResult:
 
             return results
 
-        task_name = f"初始化项目知识库 ({params.get('project_path', '未知项目')})"
+        task_name = f"Initialize project knowledge base ({params.get('project_path', 'unknown project')})"
 
     elif task_type == "build_embedding":
         from ..services.knowledge_base.project_knowledge_base import ProjectKnowledgeBase
@@ -269,7 +269,7 @@ async def start_async_task(arguments: Any) -> CallToolResult:
             pkb.close()
             return counts
 
-        task_name = f"构建 embedding 向量 ({params.get('project_path', '')})"
+        task_name = f"Build embedding vectors ({params.get('project_path', '')})"
 
     elif task_type == "build_example_knowledge_base":
         from ..services.knowledge_base.example_knowledge_base import (
@@ -282,7 +282,7 @@ async def start_async_task(arguments: Any) -> CallToolResult:
             ekb = ExampleKnowledgeBase(progress_callback=progress_callback)
             return ekb.build_example_knowledge_base(rebuild=rebuild)
 
-        task_name = "构建示例知识库"
+        task_name = "Build example knowledge base"
 
     elif task_type == "build_document_knowledge_base":
         from ..services.knowledge_base.scan_generic_documents import GenericDocumentScanner
@@ -309,7 +309,7 @@ async def start_async_task(arguments: Any) -> CallToolResult:
             
             results = {"success": 0, "failed": 0, "total": 0, "total_size": 0}
             
-            # 爬取网站（自动嵌套采集）
+            # Crawl website (automatic nested collection)
             if start_url:
                 crawl_result = scanner.crawl_website(
                     start_url=start_url,
@@ -320,7 +320,7 @@ async def start_async_task(arguments: Any) -> CallToolResult:
                 )
                 results.update(crawl_result)
             
-            # 添加指定 URL 列表
+            # Add specified URL list
             if urls:
                 for url in urls:
                     result = scanner.add_web_document(url)
@@ -330,41 +330,41 @@ async def start_async_task(arguments: Any) -> CallToolResult:
                         results["failed"] += 1
                     results["total"] += 1
             
-            # 扫描目录
+            # Scan directory
             if directory:
                 scan_result = scanner.scan_directory(directory, extensions=extensions, exclude=exclude,
                                                      rebuild=rebuild)
                 results["scan"] = scan_result
-                # 扫描器已直接写入 ZVec，无需额外导出步骤
+                # The scanner writes directly to ZVec; no extra export step is needed
                 if scan_result and not scan_result.get("error"):
                     results["zvec_built"] = True
 
             return results
         
         if params.get("start_url"):
-            task_name = f"爬取网站 (最多 {params.get('max_pages', 100)} 页)"
+            task_name = f"Crawl website (up to {params.get('max_pages', 100)} pages)"
         elif params.get("directory"):
-            task_name = f"构建文档知识库 (扫描目录: {params.get('directory')})"
+            task_name = f"Build document knowledge base (scan directory: {params.get('directory')})"
         else:
             urls_count = len(params.get("urls", []))
-            task_name = f"构建文档知识库 ({urls_count} 个URL)"
+            task_name = f"Build document knowledge base ({urls_count} URLs)"
 
     else:
         return CallToolResult(
-            content=[{"type": "text", "text": f"未知的任务类型: {task_type}"}],
+            content=[{"type": "text", "text": f"Unknown task type: {task_type}"}],
             isError=True
         )
 
-    # 取出 MCP 推送回调（由 server.py 注入）
+    # Get MCP push callback (injected by server.py)
     on_complete = arguments.pop('_on_complete', None)
 
     try:
-        # 创建进度回调
+        # Create progress callback
         def progress_callback(progress, message):
             if show_progress:
-                logger.info(f"任务进度: {progress:.1f}% - {message}")
+                logger.info(f"Task progress: {progress:.1f}% - {message}")
 
-        # 计算去重键，防止同类型构建重复提交
+        # Compute dedup key to prevent duplicate submissions of same build type
         dedup_key = params.pop("dedup_key", None)
         if dedup_key is None:
             if task_type == "init_project_knowledge_base":
@@ -380,7 +380,7 @@ async def start_async_task(arguments: Any) -> CallToolResult:
             elif task_type == "build_example_knowledge_base":
                 dedup_key = "example_rebuild"
 
-        # 提交异步任务
+        # Submit asynchronous task
         task_func = (
             build_kb_task if task_type == "build_knowledge_base" else
             build_thirdparty_task if task_type == "build_thirdparty_knowledge_base" else
@@ -399,51 +399,51 @@ async def start_async_task(arguments: Any) -> CallToolResult:
             **params
         )
 
-        result_text = f"✓ 异步任务已启动\n\n"
-        result_text += f"任务ID: {task_id}\n"
-        result_text += f"任务名称: {task_name}\n"
-        result_text += f"状态: 已提交到后台执行\n\n"
-        result_text += f"使用以下命令查询任务状态:\n"
-        result_text += f"  - get_task_status: 查询任务状态\n"
-        result_text += f"  - get_task_result: 获取任务结果\n"
-        result_text += f"  - list_tasks: 列出所有任务"
+        result_text = f"✓ Asynchronous task started\n\n"
+        result_text += f"Task ID: {task_id}\n"
+        result_text += f"Task name: {task_name}\n"
+        result_text += f"Status: submitted for background execution\n\n"
+        result_text += f"Use the following commands to query task status:\n"
+        result_text += f"  - get_task_status: query task status\n"
+        result_text += f"  - get_task_result: get task result\n"
+        result_text += f"  - list_tasks: list all tasks"
 
         return CallToolResult(content=[{"type": "text", "text": result_text}])
 
     except Exception as e:
-        logger.error(f"启动异步任务失败: {e}", exc_info=True)
+        logger.error(f"Failed to start asynchronous task: {e}", exc_info=True)
         return CallToolResult(
-            content=[{"type": "text", "text": f"启动异步任务失败: {str(e)}"}],
+            content=[{"type": "text", "text": f"Failed to start asynchronous task: {str(e)}"}],
             isError=True
         )
 
 
 async def get_task_status(arguments: Any) -> CallToolResult:
     """
-    获取任务状态（支持长轮询）
+    Get task status (supports long polling)
 
-    ⚠️ 注意：对于慢任务（如自动化测试、知识库构建），不要使用 long_poll_seconds。
-    长轮询会阻塞 MCP 请求通道，如果任务长时间未完成，可能导致客户端超时。
-    应改用 action="result" 轮询：立即返回当前状态，零等待。
+    ⚠️ Note: For slow tasks (such as automated tests, knowledge base builds), do not use long_poll_seconds.
+    Long polling blocks the MCP request channel; if the task does not complete for a long time, it may cause client timeout.
+    Use action="result" polling instead: return current status immediately with zero waiting.
 
     Args:
-        arguments: 包含以下参数:
-            - task_id: 任务ID (必需)
-            - long_poll_seconds: 长轮询等待秒数（可选，默认0即立即返回。MCP请求通道有超时限制，建议≤30秒，超时改用短轮询）
+        arguments: contains the following parameters:
+            - task_id: task ID (required)
+            - long_poll_seconds: long polling wait seconds (optional, default 0 returns immediately. MCP request channel has a timeout limit; ≤30 seconds recommended; use short polling after timeout)
 
     Returns:
-        任务状态信息
+        Task status information
     """
     task_id = arguments.get("task_id")
     if not task_id:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供任务ID"}],
+            content=[{"type": "text", "text": "Please provide task ID"}],
             isError=True
         )
 
     task_manager = get_task_manager()
     
-    # 长轮询：等待进度变化再返回
+    # Long polling: wait for progress change before returning
     long_poll = arguments.get("long_poll_seconds", 0)
     if long_poll > 0:
         task_info = task_manager.wait_for_progress_change(task_id, long_poll)
@@ -452,47 +452,47 @@ async def get_task_status(arguments: Any) -> CallToolResult:
 
     if not task_info:
         return CallToolResult(
-            content=[{"type": "text", "text": f"未找到任务: {task_id}"}],
+            content=[{"type": "text", "text": f"Task not found: {task_id}"}],
             isError=True
         )
 
-    result_text = f"任务状态: {task_id}\n\n"
-    result_text += f"任务名称: {task_info.name}\n"
-    result_text += f"状态: {task_info.status.value}\n"
-    result_text += f"进度: {task_info.progress:.1f}%\n"
-    result_text += f"消息: {task_info.message}\n"
-    result_text += f"创建时间: {task_info.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+    result_text = f"Task status: {task_id}\n\n"
+    result_text += f"Task name: {task_info.name}\n"
+    result_text += f"Status: {task_info.status.value}\n"
+    result_text += f"Progress: {task_info.progress:.1f}%\n"
+    result_text += f"Message: {task_info.message}\n"
+    result_text += f"Created at: {task_info.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
 
     if task_info.started_at:
-        result_text += f"开始时间: {task_info.started_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result_text += f"Started at: {task_info.started_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
 
     if task_info.completed_at:
-        result_text += f"完成时间: {task_info.completed_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result_text += f"Completed at: {task_info.completed_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
 
     if task_info.error:
-        result_text += f"错误: {task_info.error}\n"
+        result_text += f"Error: {task_info.error}\n"
 
     return CallToolResult(content=[{"type": "text", "text": result_text}])
 
 
 async def get_task_result(arguments: Any) -> CallToolResult:
     """
-    获取任务结果（立即返回，零等待）
+    Get task result (return immediately, zero waiting)
 
-    ✅ 推荐用于轮询慢任务状态：立即返回当前结果，不阻塞 MCP 通道。
-    任务未完成时返回「任务尚未完成」+ 当前进度；完成后返回完整结果。
+    ✅ Recommended for polling slow task status: return current result immediately without blocking the MCP channel.
+    When the task is not complete, returns "Task not yet complete" + current progress; when complete, returns full result.
 
     Args:
-        arguments: 包含以下参数:
-            - task_id: 任务ID (必需)
+        arguments: contains the following parameters:
+            - task_id: task ID (required)
 
     Returns:
-        任务结果（CallToolResult）
+        Task result (CallToolResult)
     """
     task_id = arguments.get("task_id")
     if not task_id:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供任务ID"}],
+            content=[{"type": "text", "text": "Please provide task ID"}],
             isError=True
         )
 
@@ -501,39 +501,39 @@ async def get_task_result(arguments: Any) -> CallToolResult:
 
     if not task_info:
         return CallToolResult(
-            content=[{"type": "text", "text": f"未找到任务: {task_id}"}],
+            content=[{"type": "text", "text": f"Task not found: {task_id}"}],
             isError=True
         )
 
     if task_info.status != TaskStatus.COMPLETED:
-        result_text = f"任务尚未完成\n\n"
-        result_text += f"任务ID: {task_id}\n"
-        result_text += f"当前状态: {task_info.status.value}\n"
-        result_text += f"进度: {task_info.progress:.1f}%\n"
-        result_text += f"消息: {task_info.message}\n"
+        result_text = f"Task not yet complete\n\n"
+        result_text += f"Task ID: {task_id}\n"
+        result_text += f"Current status: {task_info.status.value}\n"
+        result_text += f"Progress: {task_info.progress:.1f}%\n"
+        result_text += f"Message: {task_info.message}\n"
 
         return CallToolResult(content=[{"type": "text", "text": result_text}])
 
     if task_info.error:
         return CallToolResult(
-            content=[{"type": "text", "text": f"任务执行失败: {task_info.error}"}],
+            content=[{"type": "text", "text": f"Task execution failed: {task_info.error}"}],
             isError=True
         )
 
-    # 格式化结果
+    # Format result
     result_text = _format_result_text(task_info)
 
-    # 大结果写入临时文件，返回摘要 + 文件路径
+    # Write large result to temp file, return summary + file path
     if len(result_text.encode("utf-8")) > _RESULT_FILE_THRESHOLD:
         file_path = _write_result_to_file(task_id, result_text)
         if file_path:
-            # 同时清理过期文件
+            # Also clean up expired files
             _cleanup_old_result_files()
             summary = (
-                f"任务执行成功!\n\n"
-                f"结果较大（{len(result_text):,} 字符），已写入临时文件:\n"
+                f"Task executed successfully!\n\n"
+                f"Result is large ({len(result_text):,} characters) and has been written to a temporary file:\n"
                 f"{file_path}\n\n"
-                f"请用 Read 工具读取文件获取完整结果，读取后删除该文件。"
+                f"Use the Read tool to read the file for the full result, then delete the file after reading."
             )
             return CallToolResult(content=[{"type": "text", "text": summary}])
 
@@ -542,19 +542,19 @@ async def get_task_result(arguments: Any) -> CallToolResult:
 
 async def cancel_task(arguments: Any) -> CallToolResult:
     """
-    取消任务
+    Cancel task
 
     Args:
-        arguments: 包含以下参数:
-            - task_id: 任务ID (必需)
+        arguments: contains the following parameters:
+            - task_id: task ID (required)
 
     Returns:
-        操作结果
+        Operation result
     """
     task_id = arguments.get("task_id")
     if not task_id:
         return CallToolResult(
-            content=[{"type": "text", "text": "请提供任务ID"}],
+            content=[{"type": "text", "text": "Please provide task ID"}],
             isError=True
         )
 
@@ -562,39 +562,40 @@ async def cancel_task(arguments: Any) -> CallToolResult:
     success = task_manager.cancel_task(task_id)
 
     if success:
-        return CallToolResult(content=[{"type": "text", "text": f"任务 {task_id} 已取消"}])
+        return CallToolResult(content=[{"type": "text", "text": f"Task {task_id} has been cancelled"}])
     else:
         return CallToolResult(
-            content=[{"type": "text", "text": f"无法取消任务 {task_id}（任务不存在或已完成）"}],
+            content=[{"type": "text", "text": f"Cannot cancel task {task_id} (task does not exist or is already complete)"}],
             isError=True
         )
 
 
 async def list_tasks(arguments: Any) -> CallToolResult:
     """
-    列出所有任务
+    List all tasks
 
     Args:
-        arguments: 空参数
+        arguments: empty parameters
 
     Returns:
-        所有任务列表
+        List of all tasks
     """
     task_manager = get_task_manager()
     tasks = task_manager.get_all_tasks()
 
     if not tasks:
-        return CallToolResult(content=[{"type": "text", "text": "当前没有任务"}])
+        return CallToolResult(content=[{"type": "text", "text": "There are currently no tasks"}])
 
-    result_text = f"任务列表 (共 {len(tasks)} 个):\n\n"
+    result_text = f"Task list ({len(tasks)} total):\n\n"
 
     for task_id, task_info in tasks.items():
-        result_text += f"任务ID: {task_id}\n"
-        result_text += f"  名称: {task_info.name}\n"
-        result_text += f"  状态: {task_info.status.value}\n"
-        result_text += f"  进度: {task_info.progress:.1f}%\n"
-        result_text += f"  消息: {task_info.message}\n"
-        result_text += f"  创建时间: {task_info.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result_text += f"Task ID: {task_id}\n"
+        result_text += f"  Name: {task_info.name}\n"
+        result_text += f"  Status: {task_info.status.value}\n"
+        result_text += f"  Progress: {task_info.progress:.1f}%\n"
+        result_text += f"  Message: {task_info.message}\n"
+        result_text += f"  Created at: {task_info.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
         result_text += "\n"
 
     return CallToolResult(content=[{"type": "text", "text": result_text}])
+

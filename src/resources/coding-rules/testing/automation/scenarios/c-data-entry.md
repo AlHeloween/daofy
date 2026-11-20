@@ -1,13 +1,13 @@
-<!-- @when: 填写表单字段（文本框/下拉框/日期选择）并提交流程 -->
+<!-- @when: Fill in form fields (text box/drop-down/date picker) and submit -->
 <!-- @part-of: ui-testing -->
 
-#### C. 表单数据录入
+#### C. Form Data Entry
 
-| 要素 | 内容 |
+| Element | Content |
 |------|------|
-| **目标** | 填写表单字段（文本框/下拉框/日期选择）并提交 |
-| **策略** | type 文本 → click 下拉选项 → click 提交 → waitfor 结果 → rget 验证写入 |
-| **关键命令** | `type`, `click`（含 `@` 选项点击）, `waitfor`, `rget` |
+| **Goal** | Fill in form fields (text box/drop-down/date picker) and submit |
+| **Strategy** | type text → click drop-down option → click submit → waitfor result → rget verify write |
+| **Key commands** | `type`, `click` (including `@` option click), `waitfor`, `rget` |
 
 ```json
 [
@@ -23,4 +23,5 @@
 ]
 ```
 
-**陷阱**：保存前字段验证会弹提示框 → 先 `msgscan` 检测再继续；日期选择器用 `type` + 文本而非 click 日历。
+**Pitfall**: Field validation before saving may pop up a prompt box → use `msgscan` to detect it before continuing; for date pickers, use `type` + text rather than clicking the calendar.
+

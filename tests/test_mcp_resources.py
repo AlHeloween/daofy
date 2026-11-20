@@ -42,7 +42,7 @@ def test_reads_packaged_automation_resource() -> None:
     mime_type, text = get_public_resource_text("delphi://automation/script-generation-workflow")
 
     assert mime_type == "text/markdown"
-    assert "# 脚本生成工作流" in text
+    assert "# Script Generation Workflow" in text
     assert "MCP resource URI: `delphi://automation/script-generation-workflow`" in text
     assert "automate_delphi" in text
 
@@ -52,7 +52,7 @@ def test_reads_packaged_automation_resource() -> None:
     [
         (
             "delphi://automation/workflow",
-            ("DaofyCoding", "automation_run", "automate_delphi", "不依赖"),
+            ("DaofyCoding", "automation_run", "automate_delphi", "nor does it depend"),
         ),
         (
             "delphi://automation/script-generation-workflow",
@@ -80,11 +80,11 @@ def test_reads_packaged_rtti_test_runner_resource() -> None:
     )
 
     assert mime_type == "text/markdown"
-    assert "# RTTI 单元测试运行器" in text
+    assert "# RTTI Unit Test Runner" in text
     assert "expected_exception" in text
     assert "RegisterTestClass" in text
-    assert "无需调用" in text
-    assert "智能链接器" in text
+    assert "without calling" in text
+    assert "smart linker" in text
     assert "test_timeout" in text
 
 
@@ -123,7 +123,7 @@ def test_server_reads_coding_rules_resource() -> None:
 
     assert str(content.uri) == "delphi://coding-rules"
     assert content.mimeType == "text/markdown"
-    assert "# 编码规则导航" in content.text
+    assert "# Coding rules navigation" in content.text
 
 
 def test_server_reads_anyurl_resource_uri() -> None:
@@ -134,7 +134,7 @@ def test_server_reads_anyurl_resource_uri() -> None:
 
     assert str(content.uri) == "delphi://automation/workflow"
     assert content.mimeType == "text/markdown"
-    assert "# Delphi 自动化测试工作流" in content.text
+    assert "# Automated Testing Architecture" in content.text
 
 
 def test_server_reads_controls_reference_resource() -> None:
@@ -147,7 +147,7 @@ def test_server_reads_controls_reference_resource() -> None:
 
     assert str(content.uri) == "delphi://automation/controls-reference"
     assert content.mimeType == "text/markdown"
-    assert "控件" in content.text
+    assert "control" in content.text
 
 
 def test_server_read_resource_contents_matches_mcp_lowlevel_shape() -> None:
@@ -160,7 +160,7 @@ def test_server_read_resource_contents_matches_mcp_lowlevel_shape() -> None:
 
     assert len(contents) == 1
     assert contents[0].mime_type == "text/markdown"
-    assert "# 自动化脚本格式规范" in contents[0].content
+    assert "# Automation Script Format Specification" in contents[0].content
 
 
 async def test_server_read_resource_handler_accepts_lowlevel_contents() -> None:
@@ -185,7 +185,7 @@ async def test_server_read_resource_handler_accepts_lowlevel_contents() -> None:
 
     assert str(content.uri) == "delphi://automation/script-schema"
     assert content.mimeType == "text/markdown"
-    assert "# 自动化脚本格式规范" in content.text
+    assert "# Automation Script Format Specification" in content.text
 
 
 def test_server_read_resource_handler_uses_lowlevel_contents() -> None:
@@ -315,8 +315,8 @@ def test_public_resources_use_server_resource_directory_only() -> None:
 def test_server_read_resource_does_not_mask_unknown_automation_uri() -> None:
     server_source = (PROJECT_ROOT / "src" / "server.py").read_text(encoding="utf-8")
 
-    assert 'text=f"未知资源: {uri}"' not in server_source
-    assert 'raise ValueError(f"未知资源: {uri}")' in server_source
+    assert 'text=f"Unknown resource: {uri}"' not in server_source
+    assert 'raise ValueError(f"Unknown resource: {uri}")' in server_source
 
 
 def test_coding_rules_resource_is_preferred() -> None:

@@ -1,7 +1,7 @@
 """
-经验记忆服务层 — 保存/搜索/管理 AI 成功解决问题的经验
+Experience memory service layer — saves/searches/manages experiences from AI successfully solving problems
 
-复用 embedding_service 做语义搜索，SQLite 存储，线程安全连接。
+Reuses embedding_service for semantic search, SQLite storage, thread-safe connections.
 """
 
 import json
@@ -17,7 +17,7 @@ from src.constants import SQLITE_BUSY_TIMEOUT_MS
 
 logger = logging.getLogger(__name__)
 
-# numpy 可选依赖
+# numpy optional dependency
 np: Any = None
 try:
     import numpy
@@ -25,7 +25,7 @@ try:
 except ImportError:
     pass
 
-# embedding 服务（可选，不可用时降级为关键词搜索）
+# embedding service (optional; falls back to keyword search when unavailable)
 try:
     from .knowledge_base.embedding_service import (
         encode_single,
@@ -43,31 +43,31 @@ except ImportError:
 
 
 def _embedding_ok() -> bool:
-    """检查 embedding 是否可用（模型已加载且依赖齐全）
+    """Check whether embedding is available (model loaded and dependencies present)
 
-    与知识库保持一致：仅在模型已加载后才走 embedding 路径，
-    避免 save/search 触发懒加载导致超时。
+    Keeps consistent with the knowledge base: only use the embedding path after the model is loaded,
+    avoiding save/search triggering lazy loading and causing timeouts.
     """
     try:
-        # 必须模型已加载（不触发懒加载）
+        # Model must be loaded (do not trigger lazy loading)
         if not (_embedding_model_loaded and callable(_embedding_model_loaded)
                 and _embedding_model_loaded()):
             return False
-        # 依赖库可 import
+        # Dependencies can be imported
         if _embedding_available and callable(_embedding_available):
             return _embedding_available()
     except Exception as e:
-        logger.debug("embedding 可用性检查失败（视为不可用）: %s", e)
+        logger.debug("embedding availability check failed (treated as unavailable): %s", e)
     return False
 
 
 def _now() -> str:
-    """返回 ISO 格式时间戳"""
+    """Return an ISO-format timestamp"""
     return datetime.now(timezone.utc).isoformat()
 
 
 def _uuid() -> str:
-    """返回短 UUID"""
+    """Return a short UUID"""
     return uuid.uuid4().hex[:12]
 
 
@@ -75,29 +75,29 @@ _STORE_FILENAME = "experiences.sqlite"
 
 
 class ExperienceMemoryService:
-    """经验记忆服务。
+    """Experience memory service.
 
-    提供经验的 CRUD 和语义搜索。线程安全。embedding 降级友好的设计。
+    Provides CRUD and semantic search for experiences. Thread-safe. Designed for graceful embedding fallback.
 
     Args:
-        kb_dir: 存储目录，默认为 data/experience-knowledge-base/
+        kb_dir: Storage directory, defaults to data/experience-knowledge-base/
     """
 
     def __init__(self, kb_dir: Optional[str] = None):
         if kb_dir is None:
-            # 默认存到 data/ 下
+            # Default storage under data/
             kb_dir = str(Path(__file__).parent.parent.parent / "data" / "experience-knowledge-base")
         self._kb_dir = Path(kb_dir)
         self._kb_dir.mkdir(parents=True, exist_ok=True)
         self._db_path = str(self._kb_dir / _STORE_FILENAME)
-        self._conn = None  # 单连接，用锁保护并发
+        self._conn = None  # single connection, protected by a lock for concurrency
         self._conn_lock = threading.Lock()
         self._init_db()
 
-    # ── 连接管理（单连接 + 锁，防止多线程连接泄露）──
+    # ── Connection management (single connection + lock to prevent multi-thread connection leaks)──
 
     def _get_conn(self):
-        """获取数据库连接（线程安全，单连接模式）"""
+        """Get a database connection (thread-safe, single-connection mode)"""
         import sqlite3
         with self._conn_lock:
             if self._conn is None:
@@ -111,7 +111,7 @@ class ExperienceMemoryService:
                 try:
                     self._conn.execute("SELECT 1")
                 except Exception:
-                    # 连接失效，重建
+                    # Connection invalid, recreate it
                     conn = sqlite3.connect(self._db_path)
                     conn.execute("PRAGMA journal_mode=WAL")
                     conn.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
@@ -121,7 +121,7 @@ class ExperienceMemoryService:
             return self._conn
 
     def _init_db(self):
-        """初始化数据库（首次创建表）"""
+        """Initialize the database (create tables on first use)"""
         import sqlite3
         try:
             conn = sqlite3.connect(self._db_path)
@@ -129,10 +129,10 @@ class ExperienceMemoryService:
             self._init_tables(conn)
             conn.close()
         except Exception as e:
-            logger.error("初始化经验库失败: %s", e)
+            logger.error("Failed to initialize experience store: %s", e)
 
     def _init_tables(self, conn):
-        """创建表（幂等）"""
+        """Create tables (idempotent)"""
         conn.execute("""
             CREATE TABLE IF NOT EXISTS experiences (
                 id          TEXT PRIMARY KEY,
@@ -159,23 +159,23 @@ class ExperienceMemoryService:
         conn.commit()
 
     def close(self):
-        """关闭数据库连接（线程安全）"""
+        """Close the database connection (thread-safe)"""
         with self._conn_lock:
             if self._conn is not None:
                 try:
                     self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
                 except Exception as e:
-                    logger.debug("WAL checkpoint 失败（连接将正常关闭）: %s", e)
+                    logger.debug("WAL checkpoint failed (connection will be closed normally): %s", e)
                 try:
                     self._conn.close()
                 except Exception as e:
-                    logger.debug("关闭 sqlite 连接失败: %s", e)
+                    logger.debug("Failed to close sqlite connection: %s", e)
                 self._conn = None
 
-    # ── 内部 helpers ──
+    # ── Internal helpers ──
 
     def _row_to_dict(self, row) -> dict:
-        """sqlite3.Row → dict（解析 JSON 字段）"""
+        """sqlite3.Row → dict (parse JSON fields)"""
         d = dict(row)
         for field in ("tools_used", "context", "tags"):
             if isinstance(d.get(field), str):
@@ -183,12 +183,12 @@ class ExperienceMemoryService:
                     d[field] = json.loads(d[field])
                 except (json.JSONDecodeError, TypeError):
                     pass
-        # embedding 不返回
+        # embedding is not returned
         d.pop("embedding", None)
         return d
 
     def _maybe_encode(self, text: str, prefix: str = "passage"):
-        """尝试编码文本为 embedding BLOB"""
+        """Try to encode text as an embedding BLOB"""
         if not _embedding_ok() or encode_single is None or np is None:
             return None
         try:
@@ -196,10 +196,10 @@ class ExperienceMemoryService:
             if vec is not None:
                 return np.array(vec, dtype=np.float32).tobytes()
         except Exception as e:
-            logger.warning("编码 embedding 失败: %s", e)
+            logger.warning("Failed to encode embedding: %s", e)
         return None
 
-    # ── 核心操作 ──
+    # ── Core operations ──
 
     def save(
         self,
@@ -209,27 +209,27 @@ class ExperienceMemoryService:
         context: Optional[dict] = None,
         tags: Optional[list] = None,
     ) -> dict:
-        """保存经验（自动去重合并：embedding 相似度 >0.85 则更新旧记录而非新增）。
+        """Save an experience (automatic deduplication and merge: if embedding similarity >0.85, update the old record instead of adding a new one).
 
         Args:
-            problem: 问题描述
-            solution: 解决步骤
-            tools_used: 用到的工具名列表
-            context: 上下文信息（项目路径、文件等）
-            tags: 标签列表
+            problem: Problem description
+            solution: Solution steps
+            tools_used: List of tool names used
+            context: Context information (project path, files, etc.)
+            tags: Tag list
 
         Returns:
-            创建/更新的经验记录 dict，附带 _merged 标记
+            Created/updated experience record dict, with a _merged flag
         """
         now = _now()
 
-        # ── 去重：搜索语义相似的已有经验 ──
+        # ── Deduplication: search for semantically similar existing experiences ──
         merged = self._search_embedding(problem, top_k=1, tags=None)
         if merged:
             best = merged[0]
             sim = best.get("similarity", 0)
             if sim > 0.85:
-                # 合并不创建新记录
+                # Merge without creating a new record
                 best_id = best["id"]
                 merged_solution = best["solution"] + "\n" + solution
                 merged_tags = list(set(best.get("tags", []) + (tags or [])))
@@ -260,10 +260,10 @@ class ExperienceMemoryService:
                     "_merged": True,
                     "_merged_from": best_id,
                 })
-                logger.info("经验已合并到 %s — %s", best_id, problem[:80])
+                logger.info("Experience merged into %s — %s", best_id, problem[:80])
                 return result
 
-        # ── 无相似记录，新建 ──
+        # ── No similar record, create new ──
         exp_id = _uuid()
         embedding_blob = self._maybe_encode(problem, prefix="passage")
 
@@ -300,43 +300,43 @@ class ExperienceMemoryService:
             "updated_at": now,
             "_merged": False,
         }
-        logger.info("经验已保存: %s — %s", exp_id, problem[:80])
+        logger.info("Experience saved: %s — %s", exp_id, problem[:80])
         return result
 
     def search(self, query: str, top_k: int = 5, tags: Optional[list] = None) -> list:
-        """语义搜索经验。
+        """Semantically search experiences.
 
-        优先使用 embedding 做真语义搜索，不可用时降级到 LIKE 关键词匹配。
-        如果 embedding 模型已加载但搜不到结果（可能是旧记录缺少向量），
-        自动触发 rebuild_embeddings() 补全后重试。
+        Prefer embedding-based true semantic search; fall back to LIKE keyword matching when unavailable.
+        If the embedding model is loaded but no results are found (possibly old records lack vectors),
+        automatically trigger rebuild_embeddings() to fill them in then retry.
 
         Args:
-            query: 搜索关键词
-            top_k: 返回条数
-            tags: 按标签过滤（结果必须命中所有指定标签）
+            query: Search keywords
+            top_k: Number of results to return
+            tags: Filter by tags (results must match all specified tags)
 
         Returns:
             [{id, problem, solution, tools_used, tags, similarity, ...}, ...]
         """
-        # 尝试 embedding 语义搜索
+        # Try embedding semantic search
         emb_results = self._search_embedding(query, top_k, tags)
         if emb_results:
             return emb_results
 
-        # embedding 可用但无结果 → 可能是旧记录缺少向量，自动重建后重试
+        # embedding available but no results → old records may lack vectors; automatically rebuild and retry
         if _embedding_ok():
             rebuilt = self.rebuild_embeddings()
             if rebuilt.get("rebuilt", 0) > 0:
-                logger.info("自动重建了 %d 条缺失向量，重试语义搜索", rebuilt["rebuilt"])
+                logger.info("Automatically rebuilt %d missing vectors, retrying semantic search", rebuilt["rebuilt"])
                 emb_results = self._search_embedding(query, top_k, tags)
                 if emb_results:
                     return emb_results
 
-        # 降级：关键词 LIKE 搜索
+        # Fallback: keyword LIKE search
         return self._search_keyword(query, top_k, tags)
 
     def _search_embedding(self, query: str, top_k: int, tags: Optional[list]) -> list:
-        """基于 embedding 的语义搜索"""
+        """Embedding-based semantic search"""
         if not _embedding_ok() or encode_single is None or cosine_similarity is None:
             return []
 
@@ -346,7 +346,7 @@ class ExperienceMemoryService:
 
         conn = self._get_conn()
         cursor = conn.cursor()
-        # 限制扫描行数，避免全表扫描随数据增长越来越慢
+        # Limit scanned rows to avoid full-table scans becoming slower as data grows
         scan_limit = max(top_k * 10, 200)
         cursor.execute(
             "SELECT id, problem, solution, tools_used, context, tags, "
@@ -359,7 +359,7 @@ class ExperienceMemoryService:
         if not rows:
             return []
 
-        # 收集向量和行
+        # Collect vectors and rows
         vecs = []
         valid_rows = []
         for row in rows:
@@ -371,19 +371,19 @@ class ExperienceMemoryService:
         if not vecs:
             return []
 
-        # 计算余弦相似度
+        # Compute cosine similarity
         _np_local = np
         embs = _np_local.array(vecs, dtype=_np_local.float32)
         sims = cosine_similarity(query_emb, embs)
         if sims is None:
             return []
 
-        # 排序
+        # Sort
         scored = []
         for row, sim in zip(valid_rows, sims):
             entry = self._row_to_dict(row)
             entry["similarity"] = round(float(sim), 4)
-            # 标签过滤
+            # Tag filtering
             if tags:
                 row_tags = entry.get("tags", [])
                 if not isinstance(row_tags, list):
@@ -396,7 +396,7 @@ class ExperienceMemoryService:
         return scored[:top_k]
 
     def _search_keyword(self, query: str, top_k: int, tags: Optional[list]) -> list:
-        """关键词 LIKE 降级搜索"""
+        """Keyword LIKE fallback search"""
         conn = self._get_conn()
         cursor = conn.cursor()
 
@@ -421,19 +421,19 @@ class ExperienceMemoryService:
             if len(results) >= top_k:
                 break
 
-        # 关键词搜索不给 similarity 分数
+        # Keyword search does not assign a similarity score
         for r in results:
             r["similarity"] = 0.0
         return results
 
     def get(self, exp_id: str) -> Optional[dict]:
-        """获取经验详情，递增 hit_count。
+        """Get experience details and increment hit_count.
 
         Args:
-            exp_id: 经验 ID
+            exp_id: Experience ID
 
         Returns:
-            经验 dict 或 None
+            Experience dict or None
         """
         conn = self._get_conn()
         cursor = conn.cursor()
@@ -447,7 +447,7 @@ class ExperienceMemoryService:
         if row is None:
             return None
 
-        # 递增 hit_count
+        # Increment hit_count
         conn.execute(
             "UPDATE experiences SET hit_count = hit_count + 1 WHERE id = ?",
             (exp_id,),
@@ -462,12 +462,12 @@ class ExperienceMemoryService:
         sort_by: str = "updated_at",
         limit: int = 20,
     ) -> list:
-        """浏览经验列表。
+        """Browse the experience list.
 
         Args:
-            tags: 按标签过滤
-            sort_by: 排序字段，默认 updated_at，可选 created_at / hit_count / score
-            limit: 返回条数
+            tags: Filter by tags
+            sort_by: Sort field, defaults to updated_at, options are created_at / hit_count / score
+            limit: Number of results to return
 
         Returns:
             [{id, problem, solution, ...}, ...]
@@ -509,18 +509,18 @@ class ExperienceMemoryService:
         tools_used: Optional[list] = None,
         context: Optional[dict] = None,
     ) -> Optional[dict]:
-        """更新经验。
+        """Update an experience.
 
         Args:
-            exp_id: 经验 ID
-            solution: 新的解决步骤（可选）
-            tags: 新的标签列表（可选）
-            problem: 新的问题描述（可选，会重新生成 embedding）
-            tools_used: 新的工具名列表（可选）
-            context: 新的上下文信息（可选）
+            exp_id: Experience ID
+            solution: New solution steps (optional)
+            tags: New tag list (optional)
+            problem: New problem description (optional; regenerates embedding)
+            tools_used: New tool name list (optional)
+            context: New context information (optional)
 
         Returns:
-            更新后的经验 dict，不存在返回 None
+            Updated experience dict, or None if it does not exist
         """
         existing = self.get(exp_id)
         if existing is None:
@@ -533,7 +533,7 @@ class ExperienceMemoryService:
         if problem is not None:
             updates.append("problem = ?")
             params.append(problem)
-            # 重新生成 embedding
+            # Regenerate embedding
             blob = self._maybe_encode(problem, prefix="passage")
             updates.append("embedding = ?")
             params.append(blob)
@@ -565,7 +565,7 @@ class ExperienceMemoryService:
         )
         conn.commit()
 
-        # 重新读取
+        # Re-read
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, problem, solution, tools_used, context, tags, "
@@ -577,14 +577,14 @@ class ExperienceMemoryService:
         return self._row_to_dict(row) if row else None
 
     def merge(self, ids: list, keep: Optional[str] = None) -> Optional[dict]:
-        """合并多条经验为一条，删除其余。
+        """Merge multiple experiences into one and delete the rest.
 
         Args:
-            ids: 待合并的经验 ID 列表
-            keep: 保留的 ID（其余删除），None 则创建新条目
+            ids: List of experience IDs to merge
+            keep: ID to keep (others are deleted); if None, create a new entry
 
         Returns:
-            合并后的经验 dict，失败返回 None
+            Merged experience dict, or None on failure
         """
         records = []
         for eid in ids:
@@ -593,10 +593,10 @@ class ExperienceMemoryService:
                 records.append(r)
 
         if len(records) < 2:
-            logger.warning("merge 需要至少 2 条有效记录")
+            logger.warning("merge requires at least 2 valid records")
             return None
 
-        # 合并字段
+        # Merge fields
         problems = "\n".join(r["problem"] for r in records)
         solutions = "\n".join(r["solution"] for r in records)
         all_tags = list(set(t for r in records for t in r.get("tags", [])))
@@ -605,7 +605,7 @@ class ExperienceMemoryService:
         now = _now()
 
         if keep and keep in [r["id"] for r in records]:
-            # 更新到 keep 的记录
+            # Update the keep record
             target_id = keep
             conn = self._get_conn()
             conn.execute(
@@ -626,7 +626,7 @@ class ExperienceMemoryService:
             )
             conn.commit()
         else:
-            # 创建新条目
+            # Create a new entry
             target_id = _uuid()
             conn = self._get_conn()
             conn.execute(
@@ -648,27 +648,27 @@ class ExperienceMemoryService:
             )
             conn.commit()
 
-        # 删除其他记录
+        # Delete the other records
         delete_ids = [r["id"] for r in records if r["id"] != target_id]
         for did in delete_ids:
             self.delete(did)
 
-        # 重新读取
+        # Re-read
         return self.get(target_id)
 
     def _compute_experience_value(self, row) -> float:
-        """计算经验价值分数（用于 prune 排序）
+        """Compute the experience value score (used for prune sorting)
 
-        考虑因素：
-        - hit_count: 复用次数越多越有价值
-        - score: 分数越高越有价值
-        - recency: 越新越有价值（30 天内无使用则衰减）
+        Factors considered:
+        - hit_count: More reuse means higher value
+        - score: Higher score means higher value
+        - recency: Newer means higher value (decays if unused for more than 30 days)
         """
         hit = row.get("hit_count", 1)
         score = row.get("score", 1.0)
         recency = row.get("updated_at", "")
         value = hit * score
-        # 时间衰减：超过 30 天未更新，价值减半
+        # Time decay: value halves if not updated for more than 30 days
         if recency:
             try:
                 updated = datetime.fromisoformat(recency)
@@ -676,14 +676,14 @@ class ExperienceMemoryService:
                 if days_since > 30:
                     value *= 0.5 ** (days_since / 30)
             except Exception as e:
-                logger.debug("时间衰减计算失败（保留原始 score）: %s", e)
+                logger.debug("Time decay calculation failed (keeping original score): %s", e)
         return round(value, 4)
 
     def prune_list(self, limit: int = 20) -> list:
-        """列出低价值经验，按价值分升序排列。
+        """List low-value experiences, sorted ascending by value score.
 
         Args:
-            limit: 返回条数
+            limit: Number of results to return
 
         Returns:
             [{id, problem, tags, hit_count, value, ...}, ...]
@@ -704,13 +704,13 @@ class ExperienceMemoryService:
         return scored[:limit]
 
     def delete(self, exp_id: str) -> bool:
-        """删除经验。
+        """Delete an experience.
 
         Args:
-            exp_id: 经验 ID
+            exp_id: Experience ID
 
         Returns:
-            是否成功删除
+            Whether the deletion succeeded
         """
         conn = self._get_conn()
         cursor = conn.cursor()
@@ -718,17 +718,17 @@ class ExperienceMemoryService:
         conn.commit()
         deleted = cursor.rowcount > 0
         if deleted:
-            logger.info("经验已删除: %s", exp_id)
+            logger.info("Experience deleted: %s", exp_id)
         return deleted
 
     def rebuild_embeddings(self) -> dict:
-        """重建所有缺少 embedding 的经验记录的向量。
+        """Rebuild vectors for all experience records missing embeddings.
 
-        在模型已加载后调用，为之前因模型未加载而保存的无向量记录补生成 embedding。
-        已有 embedding 的记录不受影响。
+        Call after the model is loaded to generate embeddings for records saved earlier without vectors because the model was not loaded.
+        Records that already have embeddings are not affected.
 
         Returns:
-            {total: 总记录数, rebuilt: 重建数, skipped: 已有向量数, failed: 失败数}
+            {total: total record count, rebuilt: rebuilt count, skipped: existing vector count, failed: failure count}
         """
         if not _embedding_ok() or encode_single is None or np is None:
             return {
@@ -736,7 +736,7 @@ class ExperienceMemoryService:
                 "rebuilt": 0,
                 "skipped": 0,
                 "failed": 0,
-                "error": "embedding 模型未加载，请先调用 delphi_kb(action=build_embedding) 加载模型",
+                "error": "embedding model is not loaded; call delphi_kb(action=build_embedding) to load the model first",
             }
 
         conn = self._get_conn()
@@ -750,7 +750,7 @@ class ExperienceMemoryService:
         rebuilt = 0
         failed = 0
 
-        # 也扫描已有 embedding 的记录数
+        # Also scan the count of records that already have embeddings
         cursor.execute("SELECT COUNT(*) as cnt FROM experiences WHERE embedding IS NOT NULL")
         skipped = cursor.fetchone()["cnt"]
 
@@ -768,13 +768,13 @@ class ExperienceMemoryService:
                 else:
                     failed += 1
             except Exception as e:
-                logger.warning("重建 embedding 失败 (id=%s): %s", exp_id, e)
+                logger.warning("Failed to rebuild embedding (id=%s): %s", exp_id, e)
                 failed += 1
 
         if rebuilt > 0:
             conn.commit()
 
-        logger.info("经验 embedding 重建完成: rebuilt=%d, skipped=%d, failed=%d", rebuilt, skipped, failed)
+        logger.info("Experience embedding rebuild complete: rebuilt=%d, skipped=%d, failed=%d", rebuilt, skipped, failed)
         return {
             "total": total + skipped,
             "rebuilt": rebuilt,
@@ -783,13 +783,13 @@ class ExperienceMemoryService:
         }
 
 
-# 全局单例
+# Global singleton
 _instance: Optional[ExperienceMemoryService] = None
 _instance_lock = threading.Lock()
 
 
 def get_experience_service(kb_dir: Optional[str] = None) -> ExperienceMemoryService:
-    """获取全局 ExperienceMemoryService 实例（单例）"""
+    """Get the global ExperienceMemoryService instance (singleton)"""
     global _instance
     if _instance is None:
         with _instance_lock:
@@ -799,7 +799,7 @@ def get_experience_service(kb_dir: Optional[str] = None) -> ExperienceMemoryServ
 
 
 def cleanup():
-    """清理资源（服务关闭时调用）"""
+    """Clean up resources (called when the service shuts down)"""
     global _instance
     if _instance is not None:
         _instance.close()

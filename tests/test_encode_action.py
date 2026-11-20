@@ -182,7 +182,7 @@ class TestEncodeAction:
                 "to_encoding": "utf-8",
             }))
             assert result["status"] == "failed"
-            assert "不支持" in result["message"]
+            assert "Unsupported" in result["message"]
         finally:
             os.unlink(path)
 
@@ -197,7 +197,7 @@ class TestEncodeAction:
                 "backup": False,
             }))
             assert result["status"] == "failed"
-            assert "不可识别" in result["message"]
+            assert "is not recognized" in result["message"]
         finally:
             _cleanup(path)
 

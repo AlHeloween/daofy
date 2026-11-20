@@ -1,136 +1,131 @@
-# Callgraph 拆分实施计划
+# Callgraph Split Implementation Plan
 
-**计划状态**: 已实施
-**审计日期**: 2026-07-03
-**适用范围**: `automate_delphi(gui)` 新增 `callgraph` 能力、Delphi 自动化内联单元、StackTrace 诊断单元、文档和测试。
+**Plan Status**: Implemented
+**Audit Date**: 2026-07-03
+**Scope**: the new `callgraph` capability of `automate_delphi(gui)`, the Delphi automation inline units, the StackTrace diagnostic units, documentation and tests.
 
-## P0.1 需求澄清
+## P0.1 Requirements Clarification
 
-| 检查项 | 内容 |
+| Check Item | Content |
 |--------|------|
-| 显式需求 | 将 `callgraph` 从 `DaofyAutomation.Base.pas` 拆分为可选诊断能力，并按 Daofy 规范生成可审计计划。 |
-| 隐式需求 | 不能让普通 VCL/FMX 自动化用户因为未启用 callgraph 而新增编译依赖；`callgraph` 可用时必须返回可靠错误语义和可验证数据。 |
-| 边界范围 | 本计划只拆分和修正 callgraph 诊断能力，不重写 UIA、RTTI、截图、msgscan/dlgscan 等既有自动化命令。 |
-| 输入/输出 | 输入为 GUI 脚本步骤 `{ "cmd": "callgraph", "target": "<函数名>", "max_depth": N }`；输出为 JSON 图结构或明确错误。 |
-| 实现选择 | 主实现统一为 `tools/stacktrace/StackTrace.pas`；独立 `tools/stacktrace/StackTracer.pas` 兼容壳已移除。 |
-| 性能需求 | 首次扫描 `.text` 允许一次性成本，但单次 `callgraph` 目标查询应复用缓存；典型 GUI 程序首次扫描目标耗时控制在 2 秒内，后续查询控制在 200 ms 内。 |
-| 安全需求 | 不读取用户指定任意路径；默认只读取目标 exe 同名 `.map`。不执行外部命令，不写目标项目源码。 |
-| 文档需求 | 同步 `tool_docs.py`、automation resource、`docs/automate_test_guide.md`、教程示例和发布说明。 |
+| Explicit requirement | Split `callgraph` out of `DaofyAutomation.Base.pas` into an optional diagnostic capability, and produce an auditable plan following the Daofy convention. |
+| Implicit requirement | Ordinary VCL/FMX automation users must not gain a new compile dependency because callgraph is not enabled; when `callgraph` is available it must return reliable error semantics and verifiable data. |
+| Boundary scope | This plan only splits out and corrects the callgraph diagnostic capability; it does not rewrite the existing automation commands such as UIA, RTTI, screenshots, msgscan/dlgscan. |
+| Input/Output | The input is the GUI script step `{ "cmd": "callgraph", "target": "<function name>", "max_depth": N }`; the output is a JSON graph structure or an explicit error. |
+| Implementation choice | The main implementation is unified into `tools/stacktrace/StackTrace.pas`; the standalone `tools/stacktrace/StackTracer.pas` compatibility shell has been removed. |
+| Performance requirement | The first scan of `.text` may carry a one-off cost, but a single `callgraph` target query must reuse the cache; for a typical GUI program the first scan of the target should stay within 2 seconds and subsequent queries within 200 ms. |
+| Security requirement | No arbitrary user-specified path is read; by default only the `.map` named after the target exe is read. No external command is executed and no target project source is written. |
+| Documentation requirement | Synchronize `tool_docs.py`, the automation resource, `docs/automate_test_guide.md`, the tutorial examples and the release notes. |
+## P0.2 Impact Analysis
 
-## P0.2 影响分析
-
-| 文件/区域 | 实施前证据 | 修改点 | 风险 |
+| File/Area | Evidence before implementation | Change | Risk |
 |-----------|----------|--------|------|
-| `tools/auto/DaofyAutomation.Base.pas` | 实施前 line 19 无条件 `uses StackTracer`；line 704 分发 `callgraph` | 已移除 `StackTracer` 依赖和 `callgraph` 分支，恢复 Base 只承载基础协议 | 需要确保普通自动化命令行为不变 |
-| `tools/stacktrace/StackTrace.pas` | `TStackTracer.ScanCallGraph` / `GetCallChain` / `GetCallerChain` | 作为统一诊断主单元，承载异常报告、tokenized MAPDATA 和 callgraph facade | Delphi PE/map 解析存在 Win32/Win64 差异 |
-| 新增 `tools/auto/DaofyAutomation.CallGraph.pas` | 实施前不存在 | 已新建可选命令单元，注册 `callgraph` 处理器并调用 `StackTrace.TStackTracer` | 需要设计最小侵入的命令扩展接口 |
-| `src/services/automation_service.py` | line 1303 构造步骤请求；line 1456 反序列化 `callgraph` data | 透传 `max_depth`，校验范围，保留 JSON state 解析 | 协议字段变化需要测试 |
-| `src/tool_docs.py` | line 847/857/908 文档声明 `callgraph` | 明确 `callgraph` 需要启用可选 Delphi 单元和 Detailed map | 避免误导普通 GUI 用户 |
-| `src/server.py` prepare | line 1481 返回 `tools/auto` + `tools/stacktrace` | prepare 输出应说明 callgraph 是可选能力；普通自动化不强制 stacktrace | 兼容已注册路径 |
-| `src/tools/compile_project.py` | run_verify 使用 `tools/stacktrace/StackTrace.pas`；callgraph 也通过 `StackTrace.pas` 暴露 `TStackTracer` facade | 保持 run_verify 诊断能力与 callgraph 查询能力同属 StackTrace 主单元 | 独立 `StackTracer.pas` 已不再发布 |
-| docs/resources/tutorial | 多处只写 `tools/auto` | 增加可选 callgraph 接入方式：引用 `DaofyAutomation.CallGraph` + `tools/stacktrace` | 文档和资源镜像需同步 |
-| tests | 当前无 `callgraph` 覆盖 | 添加 Python 协议测试、文档一致性测试、map parser fixture 测试 | Delphi 实机编译测试可能依赖环境 |
+| `tools/auto/DaofyAutomation.Base.pas` | Before implementation, line 19 unconditionally did `uses StackTracer`; line 704 dispatched `callgraph` | The `StackTracer` dependency and the `callgraph` branch were removed, restoring Base to carrying only the base protocol | Must ensure ordinary automation command behaviour is unchanged |
+| `tools/stacktrace/StackTrace.pas` | `TStackTracer.ScanCallGraph` / `GetCallChain` / `GetCallerChain` | Serves as the unified main diagnostic unit, carrying the exception report, tokenized MAPDATA and the callgraph facade | Delphi PE/map parsing differs between Win32 and Win64 |
+| New `tools/auto/DaofyAutomation.CallGraph.pas` | Did not exist before implementation | A new optional command unit has been created that registers the `callgraph` handler and calls `StackTrace.TStackTracer` | A minimally invasive command extension interface had to be designed |
+| `src/services/automation_service.py` | Line 1303 builds the step request; line 1456 deserializes `callgraph` data | Passes `max_depth` through, validates the range, keeps JSON state parsing | Protocol field changes need tests |
+| `src/tool_docs.py` | Lines 847/857/908 declare `callgraph` in the documentation | States explicitly that `callgraph` requires enabling the optional Delphi unit and a Detailed map | Avoid misleading ordinary GUI users |
+| `src/server.py` prepare | Line 1481 returns `tools/auto` + `tools/stacktrace` | The prepare output must state that callgraph is an optional capability; ordinary automation does not force stacktrace | Stay compatible with the paths already registered |
+| `src/tools/compile_project.py` | run_verify uses `tools/stacktrace/StackTrace.pas`; callgraph also exposes the `TStackTracer` facade through `StackTrace.pas` | Keeps run_verify's diagnostic capability and the callgraph query capability in the same main StackTrace unit | The standalone `StackTracer.pas` is no longer shipped |
+| docs/resources/tutorial | Several places mention only `tools/auto` | Adds the optional callgraph integration route: reference `DaofyAutomation.CallGraph` + `tools/stacktrace` | The docs and resource mirrors must be synchronized |
+| tests | There is currently no `callgraph` coverage | Adds Python protocol tests, documentation consistency tests and map parser fixture tests | A real Delphi compile test may depend on the environment |
+## P0.2.1 Source Code Verification
 
-## P0.2.1 源码核验
+- Before implementation, `tools/auto/DaofyAutomation.Base.pas:19` placed `StackTracer` in the interface `uses`, so the dependency propagated to every VCL/FMX automation project.
+- Before implementation, `tools/auto/DaofyAutomation.Base.pas:704` handled `callgraph` inside the base command dispatch and had no optional-enable boundary.
+- The old `tools/stacktrace/StackTracer.pas` recorded the addresses of scanned edges and compared the entry address directly inside a linear BFS; after P0b this part has been migrated to the `TStackTracer` facade in `StackTrace.pas`.
+- `src/services/automation_service.py:1303` through `1414` had no `callgraph`-specific request-construction branch, so `max_depth` was not passed through.
+- `src/tool_docs.py:908` publicly declared `max_depth` to be controllable; the current implementation did not satisfy that.
+- Before implementation, `src/resources/automation/reference/inline-unit.md:38` recommended adding only `tools\auto`, which was inconsistent with the `StackTracer` dependency at that time.
+## P0.3 Solution Design
 
-- `tools/auto/DaofyAutomation.Base.pas:19` 实施前把 `StackTracer` 放在 interface `uses`，导致依赖传播到所有 VCL/FMX 自动化项目。
-- `tools/auto/DaofyAutomation.Base.pas:704` 实施前在基础命令分发里处理 `callgraph`，不具备可选启用边界。
-- 旧 `tools/stacktrace/StackTracer.pas` 曾记录扫描边地址并在线性 BFS 中直接比较入口地址；P0b 后这部分已迁移到 `StackTrace.pas` 的 `TStackTracer` facade。
-- `src/services/automation_service.py:1303` 到 `1414` 没有 `callgraph` 专用请求构造分支，`max_depth` 未透传。
-- `src/tool_docs.py:908` 对外声明 `max_depth` 可控，当前实现不满足。
-- `src/resources/automation/reference/inline-unit.md:38` 实施前只建议加入 `tools\auto`，和当时的 `StackTracer` 依赖不一致。
+### Overall Approach
 
-## P0.3 方案设计
+Split `callgraph` out of the base automation protocol into an optional diagnostic extension: an ordinary project references only `Vcl.DaofyAutomation` / `Fmx.DaofyAutomation`; when a call graph is needed it additionally references `DaofyAutomation.CallGraph` and `StackTrace`, and the preconditions are stated explicitly in the documentation and tool tips.
 
-### 整体思路
+### Technical Solution
 
-将 `callgraph` 从基础自动化协议中拆成可选诊断扩展：普通项目只引用 `Vcl.DaofyAutomation` / `Fmx.DaofyAutomation`；需要调用图时额外引用 `DaofyAutomation.CallGraph` 和 `StackTrace`，并在文档和工具提示里显式声明前置条件。
+1. **Command extension boundary**
+   - Add a lightweight extension registration point to `DaofyAutomation.Base.pas`, for example `RegisterCommandHandler(Cmd, Handler)` or the virtual method `TryHandleExtraCommand`.
+   - Base does not directly `uses StackTrace` / `StackTracer`; it calls the extension hook only before a command is treated as unknown.
+   - The new unit `DaofyAutomation.CallGraph.pas` registers the `callgraph` handler in its initialization.
 
-### 技术方案
+2. **Optional Delphi unit**
+   - Create `tools/auto/DaofyAutomation.CallGraph.pas`.
+   - That unit does `uses StackTrace` and is responsible for reading `target/max_depth`, calling `TStackTracer.GetCallChain`, and returning unified JSON.
+   - Ordinary VCL/FMX units do not depend on callgraph.
 
-1. **命令扩展边界**
-   - 在 `DaofyAutomation.Base.pas` 增加轻量扩展注册点，例如 `RegisterCommandHandler(Cmd, Handler)` 或虚方法 `TryHandleExtraCommand`。
-   - Base 不直接 `uses StackTrace` / `StackTracer`，只在命令未知前调用扩展 hook。
-   - 新单元 `DaofyAutomation.CallGraph.pas` 在 initialization 注册 `callgraph` 处理器。
+3. **StackTrace callgraph facade correction**
+   - Unify the address model on RVA: map entries, E8 targets, caller/callee and the BFS queue all use RVA.
+   - `LoadMap` supports the segment:offset form of a Detailed map and allows base/offset to be 0.
+   - `ScanCallGraph` records only near calls whose target lies inside the `.text` range, avoiding treating an `$E8` byte in data or an external thunk as an internal call.
+   - `GetCallChain` returns structured errors: `map_missing`, `entry_not_found`, `no_edges`, `scan_failed`.
+4. **Python protocol layer**
+   - Add a `cmd == "callgraph"` branch in `automation_service.py` that passes `target` and `max_depth` through.
+   - `max_depth` is limited to `0..20`; an illegal value returns an error directly on the Python side, avoiding an excessive scan on the Delphi side.
+   - Keep the JSON state deserialization at line 1456.
 
-2. **可选 Delphi 单元**
-   - 新建 `tools/auto/DaofyAutomation.CallGraph.pas`。
-   - 该单元 `uses StackTrace`，负责读取 `target/max_depth`、调用 `TStackTracer.GetCallChain`、返回统一 JSON。
-   - 普通 VCL/FMX 单元不依赖 callgraph。
+5. **Documentation and tool tips**
+   - In `tool_docs.py`, mark callgraph as an optional diagnostic command and state that it requires `DaofyAutomation.CallGraph` and a Detailed `.map`.
+   - Add an optional integration block to `inline-unit.md` / `base.md` / `docs/automate_test_guide.md`.
+   - Add a separate callgraph example under the sample dpr/dproj, without polluting the basic AutoTest example.
 
-3. **StackTrace callgraph facade 修正**
-   - 统一地址模型为 RVA：map entries、E8 target、caller/callee、BFS 队列全部用 RVA。
-   - `LoadMap` 支持 Detailed map 的 segment:offset，允许 base/offset 为 0。
-   - `ScanCallGraph` 只记录目标在 `.text` 范围内的 near call，避免把数据中的 `$E8` 或外部 thunk 当作内部调用。
-   - `GetCallChain` 返回结构化错误：`map_missing`、`entry_not_found`、`no_edges`、`scan_failed`。
+6. **Test strategy**
+   - Python unit tests: verify the `max_depth` pass-through, the range validation, and parsing of the returned `state`.
+   - Delphi static/fixture tests: use fixed map text to verify `LoadMap` parsing of segment:offset.
+   - Documentation consistency tests: the basic integration documentation must not require an ordinary project to reference `StackTracer`; the callgraph documentation must declare the optional dependency.
+   - On a machine where it is available, run one VCL demo: ordinary automation compiles; after additionally referencing callgraph, `callgraph` returns a non-empty result or an explicit error.
 
-4. **Python 协议层**
-   - 在 `automation_service.py` 添加 `cmd == "callgraph"` 分支，透传 `target` 和 `max_depth`。
-   - `max_depth` 限制为 `0..20`，非法值直接在 Python 端返回错误，避免 Delphi 端过度扫描。
-   - 保留 line 1456 的 JSON state 反序列化。
+### Subtask List
 
-5. **文档与工具提示**
-   - `tool_docs.py` 中将 callgraph 标记为可选诊断命令，说明需要 `DaofyAutomation.CallGraph` 和 Detailed `.map`。
-   - `inline-unit.md` / `base.md` / `docs/automate_test_guide.md` 增加可选接入块。
-   - 示例 dpr/dproj 增加单独的 callgraph 示例，不污染基础 AutoTest 示例。
-
-6. **测试策略**
-   - Python 单元测试：验证 `max_depth` 透传、范围校验、返回 `state` 解析。
-   - Delphi 静态/fixture 测试：用固定 map 文本验证 `LoadMap` 对 segment:offset 的解析。
-   - 文档一致性测试：基础接入文档不得要求普通项目引用 `StackTracer`；callgraph 文档必须声明可选依赖。
-   - 可用环境下运行一个 VCL demo：普通自动化编译通过；额外引用 callgraph 后 `callgraph` 返回非空或明确错误。
-
-### 子任务清单
-
-| 阶段 | 任务 | 验收标准 |
+| Phase | Task | Acceptance Criteria |
 |------|------|----------|
-| T1 | 在 Base 中加入命令扩展 hook，移除 `StackTracer` uses 和内联 `callgraph` 分支 | `tools/auto/DaofyAutomation.Base.pas` 不再出现 `StackTracer`；普通自动化命令路径不变 |
-| T2 | 新增 `DaofyAutomation.CallGraph.pas` | 只在该单元依赖 `StackTrace`；引用该单元后 `callgraph` 可分发 |
-| T3 | 修正 `StackTrace.pas` 中的 callgraph facade 地址模型和 map 解析 | fixture 测试覆盖入口函数、内部调用边、空图、入口不存在 |
-| T4 | 修正 Python 请求构造和输入校验 | `max_depth` 能透传；非法范围返回清晰错误 |
-| T5 | 同步文档、资源、工具提示和示例 | 文档说明普通接入与 callgraph 可选接入分离 |
-| T6 | 验证与回归 | Python 目标测试通过；可用 Delphi 环境下普通 demo 和 callgraph demo 均编译验证 |
+| T1 | Add the command extension hook to Base, remove the `StackTracer` uses and the inline `callgraph` branch | `tools/auto/DaofyAutomation.Base.pas` no longer mentions `StackTracer`; the ordinary automation command path is unchanged |
+| T2 | Add `DaofyAutomation.CallGraph.pas` | `StackTrace` is depended on in that unit only; once the unit is referenced, `callgraph` can be dispatched |
+| T3 | Correct the callgraph facade address model and the map parsing in `StackTrace.pas` | The fixture tests cover the entry function, internal call edges, the empty graph and a missing entry |
+| T4 | Correct the Python request construction and input validation | `max_depth` is passed through; an illegal range returns a clear error |
+| T5 | Synchronize the documentation, resources, tool tips and examples | The documentation states that ordinary integration and optional callgraph integration are separated |
+| T6 | Verification and regression | The targeted Python tests pass; on a machine with Delphi available, both the ordinary demo and the callgraph demo compile |
 
-### 验证命令
+### Verification Commands
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
 pytest tests\test_console_automation.py tests\test_doc_consistency.py tests\test_mcp_resources.py -q -p no:cacheprovider
 ```
 
-如修改 Delphi 单元：
+If Delphi units were modified:
 
 ```python
 delphi_project(action="compile", project_path="<demo>.dproj")
 delphi_project(action="compile", project_path="<callgraph-demo>.dproj", run_verify=True)
 ```
 
-### 回滚方案
+### Rollback Plan
 
-- T1/T2 失败：恢复 `DaofyAutomation.Base.pas` 备份，移除新 `DaofyAutomation.CallGraph.pas`。
-- T3 失败：保留拆分边界，但禁用 `callgraph` 注册，文档标记为实验能力不可用。
-- T4/T5 失败：回滚 Python 协议和文档改动，不影响普通 GUI 自动化。
+- T1/T2 fails: restore the `DaofyAutomation.Base.pas` backup and remove the new `DaofyAutomation.CallGraph.pas`.
+- T3 fails: keep the split boundary but disable the `callgraph` registration, and mark the capability in the documentation as experimental and unavailable.
+- T4/T5 fails: roll back the Python protocol and documentation changes; ordinary GUI automation is unaffected.
 
-## P0.4 方案自审
+## P0.4 Plan Self-Review
 
-| # | 审查项 | 结论 |
+| # | Review Item | Conclusion |
 |---|--------|------|
-| 1 | 需求覆盖 | 通过。覆盖拆分、协议、Delphi 实现、文档、测试。 |
-| 2 | 源码核验 | 通过。计划基于具体文件和行号。 |
-| 3 | 现有模式匹配 | 通过。沿用 `tools/auto` 分层和 `automate_delphi` JSON 协议。 |
-| 4 | 连锁反应 | 通过。明确普通自动化与可选诊断依赖的边界。 |
-| 5 | 风险可控 | 通过。PE/map 解析风险被收束到 `StackTrace.pas` 和 fixture 测试。 |
-| 6 | 接口兼容 | 通过。普通命令兼容；`callgraph` 仍保留原 cmd 名。 |
-| 7 | 边界处理 | 通过。包含 map 缺失、入口不存在、非法 depth、空图。 |
-| 8 | 安全合规 | 通过。不引入任意路径读取或外部命令执行。 |
-| 9 | 性能达标 | 通过。定义首次扫描和后续查询预算，并要求缓存复用。 |
-| 10 | 可观测完备 | 通过。要求结构化错误码和 JSON state。 |
-| 11 | 文档同步 | 通过。列明所有需同步文档和示例。 |
-| 12 | 测试完备 | 通过。列明 Python、fixture、文档一致性和 Delphi demo 验证。 |
-| 13 | 技术债务可控 | 通过。拆分后 callgraph 只通过 `StackTrace.pas` 独立硬化，不污染基础协议。 |
-| 14 | 子任务合理 | 通过。每个阶段可独立验证和回滚。 |
+| 1 | Requirement coverage | Pass. Covers the split, the protocol, the Delphi implementation, documentation and tests. |
+| 2 | Source verification | Pass. The plan rests on specific files and line numbers. |
+| 3 | Existing-pattern match | Pass. Follows the `tools/auto` layering and the `automate_delphi` JSON protocol. |
+| 4 | Chain reactions | Pass. Defines clearly the boundary between ordinary automation and the optional diagnostic dependency. |
+| 5 | Risk containment | Pass. The PE/map parsing risk is confined to `StackTrace.pas` and the fixture tests. |
+| 6 | Interface compatibility | Pass. Ordinary commands stay compatible; `callgraph` keeps its original cmd name. |
+| 7 | Edge-case handling | Pass. Covers a missing map, a missing entry, an illegal depth and an empty graph. |
+| 8 | Security compliance | Pass. Introduces no arbitrary path read and no external command execution. |
+| 9 | Performance target | Pass. Defines the first-scan and subsequent-query budgets and requires cache reuse. |
+| 10 | Observability completeness | Pass. Requires structured error codes and JSON state. |
+| 11 | Documentation synchronization | Pass. Lists every document and example that must be synchronized. |
+| 12 | Test completeness | Pass. Lists the Python, fixture, documentation-consistency and Delphi demo verification. |
+| 13 | Technical debt containment | Pass. After the split, callgraph is hardened independently through `StackTrace.pas` only and does not pollute the base protocol. |
+| 14 | Subtask soundness | Pass. Every phase can be verified and rolled back independently. |
+### Audit Conclusion
 
-### 审计结论
-
-**通过**。本计划满足 P0.4 要求，已完成 P0b 迁移：`StackTrace.pas` 为统一主实现，独立 `StackTracer.pas` 兼容壳已移除。
+**Pass**. This plan satisfies the P0.4 requirements and has completed the P0b migration: `StackTrace.pas` is the unified main implementation, and the standalone `StackTracer.pas` compatibility shell has been removed.
 

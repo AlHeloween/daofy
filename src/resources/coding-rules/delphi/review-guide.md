@@ -1,17 +1,18 @@
-<!-- @when: 编译通过后，审查最终代码质量 -->
+<!-- @when: After compilation passes, review final code quality -->
 <!-- @chain: after=compile.md, before=cleanup.md -->
 
-## ⑥ 代码审核
+## ⑥ Code Review
 
-**编译通过后按下方维度审查代码。**
+**After compilation passes, review the code according to the dimensions below.**
 
-| 维度 | 要点 |
+| Dimension | Key points |
 |------|------|
-| 一致性 | 命名/异常模式/排版统一性 |
-| 完整性 | 分支覆盖/边界条件/输入验证/资源释放 |
-| 资源泄露 | Create/Free 配对/句柄/接口释放 |
-| Delphi 特有 | 引用计数/字符串/TComponent 所有权 |
-| 代码质量 | 圈复杂度/魔法数字/重复代码 |
-| 安全 | SQL 注入/硬编码凭据/缓冲区溢出 |
+| Consistency | Naming/exception patterns/formatting uniformity |
+| Completeness | Branch coverage/boundary conditions/input validation/resource release |
+| Resource leaks | Create/Free pairing/handles/interface release |
+| Delphi-specific | Reference counting/strings/TComponent ownership |
+| Code quality | Cyclomatic complexity/magic numbers/duplicate code |
+| Security | SQL injection/hardcoded credentials/buffer overflow |
 
-> 完整检查项见 `get_coding_rules(section="review")`。
+> See `get_coding_rules(section="review")` for the complete checklist.
+

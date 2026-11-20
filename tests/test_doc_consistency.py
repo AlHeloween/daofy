@@ -60,8 +60,8 @@ class TestDocConsistency:
         cmds = gui.get("commands_by_phase", {})
         for phase in ("perception", "verification"):
             desc = cmds.get(phase, {}).get("cmds", {}).get("rinspect", "")
-            assert "成员发现" in desc, f"rinspect in {phase} should mention member discovery: {desc}"
-            assert "非属性值" in desc or "非值" in desc, f"rinspect in {phase} should clarify not for values: {desc}"
+            assert "member discovery" in desc, f"rinspect in {phase} should mention member discovery: {desc}"
+            assert "not property values" in desc or "not values" in desc, f"rinspect in {phase} should clarify not for values: {desc}"
 
     def test_rget_is_sync_in_all_docs(self):
         """rget should be sync across all doc sources."""
@@ -173,8 +173,8 @@ class TestDocConsistency:
             or "黑盒执行步骤不得使用 `rcall`、`rset`" in workflow
         )
         assert (
-            "For black-box tests, do not use `rcall`, `rset`" in script_workflow
-            or ("黑盒测试说明" in script_workflow and "不得使用 RTTI 写命令" in script_workflow)
+            "RTTI write commands (`rcall`/`rset`) must not be used" in script_workflow
+            or "do not modify the application under test" in script_workflow
         )
         assert (
             "Black-box `execute` steps must not use `rcall`, `rset`" in script_schema
@@ -230,7 +230,7 @@ class TestDocConsistency:
         optional = test_docs["optional"]
         assert "test_timeout" in optional
         assert "wait_timeout" in optional
-        assert "默认 true" in optional["keep_alive"]
+        assert "default true" in optional["keep_alive"]
         tests_help = optional["tests"]
         for term in (
             "id/name",
@@ -238,8 +238,8 @@ class TestDocConsistency:
             "expected_exception",
             "expected_message",
             "timeout",
-            "RTTI 可发现",
-            "链接器裁剪",
+            "RTTI-discoverable",
+            "trimmed by the linker",
             "RegisterTestClass",
             "RegisterFixture",
         ):
@@ -253,7 +253,7 @@ class TestDocConsistency:
         gui_docs = auto_docs.get("modes", {}).get("gui", {})
 
         script_shape = gui_docs.get("script_shape", "")
-        assert "完整脚本对象" in script_shape, f"script_shape missing '完整脚本对象': {script_shape}"
+        assert "full script object" in script_shape, f"script_shape missing 'full script object': {script_shape}"
         assert "script_metadata" in script_shape, f"script_shape missing 'script_metadata': {script_shape}"
 
         # Verify automation_service.py documents the script shape parsing
@@ -299,9 +299,9 @@ class TestDocConsistency:
             "server_name",
             "tool_name",
             "args",
-            "服务别名",
-            "不是 Daofy 固定值",
-            "不要把 server_name/tool_name 混进",
+            "service alias",
+            "not a fixed Daofy value",
+            "Do not mix server_name/tool_name",
         ]
         for term in required_terms:
             assert term in combined, f"delphi_file docs missing Trae wrapper term {term!r}"

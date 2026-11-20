@@ -1,19 +1,19 @@
 """
-JSONPath 查询引擎 — 在 StructuredNode 树上执行简化的 JSONPath 表达式。
+JSONPath query engine — evaluates simplified JSONPath expressions over a StructuredNode tree.
 
-支持的语法子集:
-  $               根节点
-  .key            按键名访问子节点
-  ["key"]         方括号键名
-  [N]             数组索引
-  [*]             通配（所有子节点或数组元素）
-  ..key           递归下降查找
-  [?(expr)]       过滤表达式（简化: @.key op val）
+Supported syntax subset:
+  $               the root node
+  .key            access a child node by key name
+  ["key"]         bracketed key name
+  [N]             array index
+  [*]             wildcard (all child nodes or array elements)
+  ..key           recursive descent lookup
+  [?(expr)]       filter expression (simplified: @.key op val)
 
-不支持（后续按需）:
-  切片 [start:end:step]
-  多键 ["a","b"]
-  脚本表达式
+Not supported (to be added as needed):
+  slices [start:end:step]
+  multiple keys ["a","b"]
+  script expressions
 """
 
 from __future__ import annotations
@@ -40,18 +40,18 @@ _TOKEN_RE = re.compile(
 
 
 def _tokenise(expression: str) -> list[tuple[str, str]]:
-    """解析 JSONPath 表达式为 tokens 列表: (type, value)。"""
+    """Parse a JSONPath expression into a token list: (type, value)."""
     tokens: list[tuple[str, str]] = []
     pos = 0
     while pos < len(expression):
-        # 跳过空白
+        # Skip whitespace
         if expression[pos] in " \t\r\n":
             pos += 1
             continue
 
         m = _TOKEN_RE.match(expression, pos)
         if m is None:
-            raise ValueError(f"无法解析 JSONPath 位置 {pos}: {expression[pos:]!r}")
+            raise ValueError(f"Unable to parse JSONPath at position {pos}: {expression[pos:]!r}")
 
         if m.group() == "$":
             tokens.append(("root", "$"))
@@ -78,8 +78,8 @@ def _tokenise(expression: str) -> list[tuple[str, str]]:
 
 
 def _apply_filter(node: StructuredNode, expr: str) -> bool:
-    """简化过滤表达式求值: @.key op val。"""
-    # expr 形如 "@.name == 'Button1'" 或 "@.Left > 100"
+    """Evaluate a simplified filter expression: @.key op val."""
+    # expr looks like "@.name == 'Button1'" or "@.Left > 100"
     m = re.match(
         r"""@\.(?P<key>[a-zA-Z_][\w]*)
         \s*(?P<op>==|!=|>=|<=|>|<|=~)\s*
@@ -88,7 +88,7 @@ def _apply_filter(node: StructuredNode, expr: str) -> bool:
         expr.strip(),
     )
     if not m:
-        return True  # 无法解析的过滤默认通过
+        return True  # a filter that cannot be parsed passes by default
     key, op, val_str = m.group("key"), m.group("op"), m.group("val")
     actual = node.child_by_key(key)
     if actual is None:
@@ -96,7 +96,7 @@ def _apply_filter(node: StructuredNode, expr: str) -> bool:
     actual_val = actual.value if actual.value is not None else (
         actual.to_json_compatible() if actual.kind in ("object", "array") else ""
     )
-    # 类型转换
+    # Type coercion
     try:
         if actual_val is not None and val_str.isdigit():
             actual_val = int(actual_val)
@@ -120,14 +120,14 @@ def _apply_filter(node: StructuredNode, expr: str) -> bool:
 
 
 def _query_single(node: StructuredNode, token: tuple[str, str]) -> list[StructuredNode]:
-    """在单个节点上应用一个 token，返回匹配的子节点列表。"""
+    """Apply one token to a single node and return the list of matching child nodes."""
     typ, val = token
 
     if typ == "root":
         return [node]
 
     if typ == "key":
-        if val == node.key:  # 用于递归后匹配 key
+        if val == node.key:  # used to match the key after recursion
             return [node]
         c = node.child_by_key(val)
         return [c] if c else []
@@ -150,14 +150,14 @@ def _query_single(node: StructuredNode, token: tuple[str, str]) -> list[Structur
 
 
 def query(node: StructuredNode, expression: str) -> list[StructuredNode]:
-    """在 StructuredNode 树上执行 JSONPath 查询。
+    """Run a JSONPath query over a StructuredNode tree.
 
     Args:
-        node: 根节点。
-        expression: JSONPath 表达式，如 ``$.components[0].name``。
+        node: the root node.
+        expression: the JSONPath expression, e.g. ``$.components[0].name``.
 
     Returns:
-        匹配的节点列表。
+        The list of matching nodes.
     """
     tokens = _tokenise(expression)
     if not tokens:
@@ -175,21 +175,21 @@ def query(node: StructuredNode, expression: str) -> list[StructuredNode]:
 
 
 def query_first(node: StructuredNode, expression: str) -> Optional[StructuredNode]:
-    """查询第一个匹配的节点。"""
+    """Return the first matching node."""
     results = query(node, expression)
     return results[0] if results else None
 
 
 def set_value(node: StructuredNode, expression: str, value: Any) -> int:
-    """按 JSONPath 表达式设置节点值。
+    """Set a node's value through a JSONPath expression.
 
     Args:
-        node: 根节点。
-        expression: JSONPath 表达式。
-        value: 新值（字符串或 JSON 兼容类型）。
+        node: the root node.
+        expression: the JSONPath expression.
+        value: the new value (a string or a JSON-compatible type).
 
     Returns:
-        修改的节点数。
+        The number of nodes changed.
     """
     targets = query(node, expression)
     for t in targets:
@@ -201,7 +201,7 @@ def set_value(node: StructuredNode, expression: str, value: Any) -> int:
 
 
 def set_value_by_path_keys(root: StructuredNode, keys: list[str], value: Any) -> bool:
-    """按 key 链设置值（用于 set action 的 path="a.b.c" 风格）。"""
+    """Set a value through a chain of keys (the path="a.b.c" style of the set action)."""
     node = root
     for k in keys[:-1]:
         child = node.child_by_key(k)

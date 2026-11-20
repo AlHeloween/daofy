@@ -1,11 +1,11 @@
 """
-PAS 声明解析器 — 解析 Delphi .pas 文件中的字段声明和事件方法
+PAS declaration parser — parses field declarations and event methods in Delphi .pas files
 
-支持:
-  - 从 class 声明中提取 published 字段（DFM 组件对应的字段）
-  - 从 class 声明中提取事件方法声明
-  - 同步增删字段和方法声明（保持 class 结构完整）
-  - 解析 uses 子句，支持增删单元
+Supports:
+  - Extracting published fields from a class declaration (the fields backing DFM components)
+  - Extracting event method declarations from a class declaration
+  - Adding and removing field and method declarations in sync (keeping the class structure intact)
+  - Parsing the uses clause, with support for adding and removing units
 """
 
 import re

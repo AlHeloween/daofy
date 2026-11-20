@@ -1,39 +1,39 @@
-<!-- @when: GUI 程序编译通过后，需进行 UI 交互验证 -->
+<!-- @when: After a GUI program compiles successfully, UI interaction verification is required -->
 <!-- @chain: before=console.md, after=review-table.md -->
 
-## ⑧ 自动化 UI 交互测试
+## ⑧ Automated UI Interaction Testing
 
-编译通过（可选 run_verify）后，对 GUI 程序进行交互操作和截图验证。
+After compilation passes (optional run_verify), perform interactive operations and screenshot verification on the GUI program.
 
-> AI 生成或修改 DFM 后，先执行 `delphi_project(action="layout", base_dir="...")` 做静态布局审计；通过后再进入本章的运行时 UI 验证。
+> After AI generates or modifies a DFM, first run `delphi_project(action="layout", base_dir="...")` for a static layout audit; after it passes, proceed to the runtime UI verification in this chapter.
 
-### 启用流程
+### Enablement Process
 
-首次接入 → 按 [automation/scenarios/base.md](automation/scenarios/base.md) 的「启用流程」操作（前置判断 → 修改 .dpr → 编译 → 冒烟验证）。
+First integration → follow the "Enablement Process" in [automation/scenarios/base.md](automation/scenarios/base.md) (pre-check → modify .dpr → compile → smoke verification).
 
-关键约束：
-- **`AutoStart` 必须在 `Application.Initialize` 之前调用**
-- **优先用 `in` 子句直接引用**（无需改 .dproj 配置，AI 可直接写）；已有搜索路径体系的项目可用搜索路径方式
-- 已配置过的项目直接跳到「工具调用」开始写脚本
+Key constraints:
+- **`AutoStart` must be called before `Application.Initialize`**
+- **Prefer direct reference with an `in` clause** (no need to change .dproj configuration; AI can write it directly); projects that already have a search-path system can use the search-path approach
+- For projects already configured, skip directly to "Tool Invocation" to start writing scripts
 
-### 工具调用
+### Tool Invocation
 ```python
 automate_delphi(app_path="App.exe", script=[...])
 automate_delphi(action="gui", app_path="App.exe", script=[...])
 automate_delphi(action="auto", app_path="App.exe", script="script.json", keep_alive=True)
 ```
-`action="auto"` 自动检测 PE 头 Subsystem 字段。
+`action="auto"` automatically detects the PE header Subsystem field.
 
-### 通信架构
+### Communication Architecture
 ```
 Python                              Delphi
-  ── CreateFile(\\.\pipe\daofy_auto) → 管道线程接收 JSON
-  ── WriteFile(JSON request)        → 主线程执行
-  ←── ReadFile(JSON response)       ← 返回结果/ACK
+  ── CreateFile(\\.\pipe\daofy_auto) → pipe thread receives JSON
+  ── WriteFile(JSON request)        → main thread executes
+  ←── ReadFile(JSON response)       ← returns result/ACK
 ```
 
-### 命令同步/异步分类
-| 同步 | 异步 |
+### Synchronous/Asynchronous Command Classification
+| Synchronous | Asynchronous |
 |------|------|
 | goto, capture, dumpstate, listwnd, formsum | click, rclick, dblclick |
 | wait, waitfor, dlgscan, msgscan, msgclose | hover, move, drag |
@@ -41,52 +41,53 @@ Python                              Delphi
 | rget, rinspect | rcall, rset, msgclick, dlgclick |
 
 ### keep_alive
-- `keep_alive=True` 进程保持运行，5 分钟未用自动清理
-- 新建进程首次调用自动设置 snapdir
+- `keep_alive=True` keeps the process running; it is automatically cleaned up after 5 minutes of inactivity
+- The first call on a newly created process automatically sets `snapdir`
 
-### 协议
-- 同步命令阻塞等待返回；异步立即 ACK
-- 响应：`{"reqId":"step_0","status":"ok","data":"OK"}`
-- >64KB 自动分块（ERROR_MORE_DATA 循环读）
+### Protocol
+- Synchronous commands block and wait for a response; asynchronous commands ACK immediately
+- Response: `{"reqId":"step_0","status":"ok","data":"OK"}`
+- >64KB is automatically chunked (ERROR_MORE_DATA loop read)
 
 ---
 
-### 场景索引
+### Scenario Index
 
-完整脚本字段定义见 `delphi://automation/script-schema`（MCP Resource）。各场景文件包含策略描述和可复用 JSON 模板：
+For complete script field definitions, see `delphi://automation/script-schema` (MCP Resource). Each scenario file contains a strategy description and reusable JSON templates:
 
-| 场景 | 对应文件 | 适用时机 |
+| Scenario | Corresponding file | Applicable timing |
 |------|---------|---------|
-| A. 冒烟测试 | [automation/scenarios/a-smoke.md](automation/scenarios/a-smoke.md) | 验证程序可启动、主窗体就绪 |
-| B. 登录流程 | [automation/scenarios/b-login.md](automation/scenarios/b-login.md) | 用户名密码输入、登录状态切换 |
-| C. 表单数据录入 | [automation/scenarios/c-data-entry.md](automation/scenarios/c-data-entry.md) | 填写表单并提交保存 |
-| D. 列表/表格行操作 | [automation/scenarios/d-grid.md](automation/scenarios/d-grid.md) | 新增/编辑/删除数据行 |
-| E. 树形导航 | [automation/scenarios/e-tree-navigation.md](automation/scenarios/e-tree-navigation.md) | 树节点展开/折叠/选中 |
-| F. 搜索/筛选 | [automation/scenarios/f-search.md](automation/scenarios/f-search.md) | 搜索命中、未命中、结果更新 |
-| G. 模态对话框 | [automation/scenarios/g-modal-dialogs.md](automation/scenarios/g-modal-dialogs.md) | MessageBox / OpenDialog / 确认框 |
-| H. 多步向导 | [automation/scenarios/h-wizard.md](automation/scenarios/h-wizard.md) | Wizard 步骤切换和提交 |
-| I. 右键菜单 | [automation/scenarios/i-context-menu.md](automation/scenarios/i-context-menu.md) | ContextMenu 弹出和选择 |
-| J. DirectUI 弹窗 | [automation/scenarios/j-directui.md](automation/scenarios/j-directui.md) | IFileDialog / TTaskDialog / uia.xxx 命令 |
-| K. 文本完整性 | [automation/scenarios/k-text-completeness.md](automation/scenarios/k-text-completeness.md) | OCR 检测截断/省略号/溢出 |
-| L. 布局视觉对齐 | [automation/scenarios/l-layout.md](automation/scenarios/l-layout.md) | 左对齐/间距/重叠/跨 DPI |
-| M. 控件定位策略 | [automation/scenarios/m-control-targeting.md](automation/scenarios/m-control-targeting.md) | 文本优先/坐标校准/DPI 系数 |
-| N. 等待与条件同步 | [automation/scenarios/n-wait-strategy.md](automation/scenarios/n-wait-strategy.md) | waitfor 优先/禁用裸固定延时 |
-| O. 控件重建安全 | [automation/scenarios/o-control-rebuild.md](automation/scenarios/o-control-rebuild.md) | Rescan/Reload 后控件重建等待 |
-| 附录: 核对表 | [automation/scenarios/checklist.md](automation/scenarios/checklist.md) | 27 条黑盒测试质量门禁 |
+| A. Smoke test | [automation/scenarios/a-smoke.md](automation/scenarios/a-smoke.md) | Verify the program can start and the main form is ready |
+| B. Login flow | [automation/scenarios/b-login.md](automation/scenarios/b-login.md) | Username/password input, login state switching |
+| C. Form data entry | [automation/scenarios/c-data-entry.md](automation/scenarios/c-data-entry.md) | Fill out a form and submit/save |
+| D. List/grid row operations | [automation/scenarios/d-grid.md](automation/scenarios/d-grid.md) | Add/edit/delete data rows |
+| E. Tree navigation | [automation/scenarios/e-tree-navigation.md](automation/scenarios/e-tree-navigation.md) | Tree node expand/collapse/select |
+| F. Search/filter | [automation/scenarios/f-search.md](automation/scenarios/f-search.md) | Search hit, miss, result update |
+| G. Modal dialogs | [automation/scenarios/g-modal-dialogs.md](automation/scenarios/g-modal-dialogs.md) | MessageBox / OpenDialog / confirmation dialog |
+| H. Multi-step wizard | [automation/scenarios/h-wizard.md](automation/scenarios/h-wizard.md) | Wizard step switching and submission |
+| I. Context menu | [automation/scenarios/i-context-menu.md](automation/scenarios/i-context-menu.md) | ContextMenu popup and selection |
+| J. DirectUI popups | [automation/scenarios/j-directui.md](automation/scenarios/j-directui.md) | IFileDialog / TTaskDialog / uia.xxx commands |
+| K. Text completeness | [automation/scenarios/k-text-completeness.md](automation/scenarios/k-text-completeness.md) | OCR detects truncation/ellipsis/overflow |
+| L. Layout visual alignment | [automation/scenarios/l-layout.md](automation/scenarios/l-layout.md) | Left alignment/spacing/overlap/cross-DPI |
+| M. Control targeting strategy | [automation/scenarios/m-control-targeting.md](automation/scenarios/m-control-targeting.md) | Text priority/coordinate calibration/DPI factor |
+| N. Waiting and condition synchronization | [automation/scenarios/n-wait-strategy.md](automation/scenarios/n-wait-strategy.md) | Prefer waitfor/disallow bare fixed delays |
+| O. Control rebuild safety | [automation/scenarios/o-control-rebuild.md](automation/scenarios/o-control-rebuild.md) | Wait for control rebuild after Rescan/Reload |
+| Appendix: Checklist | [automation/scenarios/checklist.md](automation/scenarios/checklist.md) | 27 black-box test quality gates |
 
-### 场景选择原则
+### Scenario Selection Principles
 
-先跑冒烟(A)确认主流程通畅 → 再按测试目标选 B-O。同一测试文件可组合多个场景的步骤（如 登录B → 搜索F → 选中行D → 编辑D → DPI异常检查K → 布局对齐L → 控件定位校准M → 重建安全O）。
+Run smoke (A) first to confirm the main flow is unobstructed → then choose B-O according to the test objective. The same test file can combine steps from multiple scenarios (e.g., login B → search F → select row D → edit D → DPI anomaly check K → layout alignment L → control targeting calibration M → rebuild safety O).
 
-通配模板（快速套用任意场景）：
+Generic template (quickly apply to any scenario):
 ```json
 [
-  {"cmd":"goto","target":"T<目标窗体>","note":"等待窗体就绪"},
-  {"cmd":"<命令>","target":"<目标>","<参数>":"<值>"},
-  {"cmd":"waitfor","target":"<状态目标>","prop":"<属性>","value":"<期望值>","timeout":5000},
-  {"cmd":"capture","target":"<截图名称>"},
+  {"cmd":"goto","target":"T<target form>","note":"Wait for form ready"},
+  {"cmd":"<command>","target":"<target>","<parameter>":"<value>"},
+  {"cmd":"waitfor","target":"<state target>","prop":"<property>","value":"<expected value>","timeout":5000},
+  {"cmd":"capture","target":"<screenshot name>"},
   {"cmd":"exit"}
 ]
 ```
 
-> 场景文件位于 `automation/scenarios/` 目录，通过相对路径引用。基础设施（通信/协议/tool 调用）见 [automation/scenarios/base.md](automation/scenarios/base.md)。架构方法论见 `automation/architecture.md`。
+> Scenario files are located in the `automation/scenarios/` directory and are referenced by relative path. Infrastructure (communication/protocol/tool invocation) is covered in [automation/scenarios/base.md](automation/scenarios/base.md). Architecture methodology is covered in `automation/architecture.md`.
+

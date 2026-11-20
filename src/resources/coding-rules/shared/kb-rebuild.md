@@ -1,22 +1,23 @@
-<!-- @when: 知识库数据缺失、需重建索引 -->
+<!-- @when: Knowledge base data is missing and the index must be rebuilt -->
 <!-- @chain: independent -->
 
-## 知识库重建
+## Knowledge Base Rebuild
 
 ```python
-# Delphi 源码 KB（~1分钟, 163737 类/300228 函数）
+# Delphi source KB (~1 minute, 163737 classes / 300228 functions)
 delphi_kb(action="build", kb_type="delphi", rebuild=True, async_mode=true)
-# 三方库 KB（~6秒, 5606 类/51265 函数）
+# Third-party library KB (~6 seconds, 5606 classes / 51265 functions)
 delphi_kb(action="build", kb_type="thirdparty", rebuild=True, async_mode=true)
-# 文档 KB（~6分钟, 含 DCC 错误码解释文档）
+# Documentation KB (~6 minutes, includes the DCC error-code explanation documents)
 delphi_kb(action="build", kb_type="document", rebuild=True, confirm=True, async_mode=true)
-# 项目 KB
+# Project KB
 delphi_kb(action="build", kb_type="project", project_path="Project.dproj", rebuild=True)
 
-# 进度查询（推荐 action=result，立即返回，零等待）
+# Progress query (action=result is recommended: returns immediately, zero waiting)
 async_task(action="result", task_id="task_xxx")
-# 或用短轮询 action=status（long_poll ≤30s）
+# Or use short polling action=status (long_poll ≤30s)
 async_task(action="status", task_id="task_xxx")
 ```
 
-> **文档 KB 重建安全**：对非空文档 KB 设 `rebuild=True` 时需追加 `confirm=True`，防止误清除已抓取的网页文档。保留旧内容可传旧源或改用增量构建。
+> **Documentation KB rebuild safety**: setting `rebuild=True` on a non-empty documentation KB requires adding `confirm=True`, to prevent accidentally wiping the web documents that were already fetched. To keep the old content, pass the old sources or switch to an incremental build.
+

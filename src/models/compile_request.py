@@ -1,7 +1,7 @@
 """
-编译请求模型
+Compile request models
 
-定义编译请求相关的数据模型
+Defines the data models related to compile requests.
 """
 
 from dataclasses import dataclass, field
@@ -10,15 +10,15 @@ from typing import List, Optional
 
 
 def _validate_extra_args(extra_args: List[str]) -> None:
-    """验证用户附加的编译参数。"""
+    """Validate the extra compile arguments supplied by the user."""
     if not isinstance(extra_args, list):
-        raise ValueError("额外编译参数必须是字符串数组")
+        raise ValueError("Extra compile arguments must be a list of strings")
     if any(not isinstance(arg, str) or not arg.strip() for arg in extra_args):
-        raise ValueError("额外编译参数必须是非空字符串")
+        raise ValueError("Extra compile arguments must be non-empty strings")
 
 
 class TargetPlatform(Enum):
-    """目标平台枚举（Delphi 支持的交叉编译目标）"""
+    """Target platform enum (cross-compilation targets supported by Delphi)"""
     WIN32 = "win32"
     WIN64 = "win64"
     OSX64 = "osx64"
@@ -32,21 +32,21 @@ class TargetPlatform(Enum):
 
 
 class OutputType(Enum):
-    """输出类型枚举"""
+    """Output type enum"""
     CONSOLE = "console"
     GUI = "gui"
     DLL = "dll"
 
 
 class RuntimeLibrary(Enum):
-    """运行时库链接方式枚举"""
+    """Runtime library linking mode enum"""
     STATIC = "static"
     DYNAMIC = "dynamic"
 
 
 @dataclass
 class CompileOptions:
-    """编译选项"""
+    """Compile options"""
     target_platform: TargetPlatform = TargetPlatform.WIN32
     output_path: Optional[str] = None
     compiler_version: Optional[str] = None
@@ -64,37 +64,37 @@ class CompileOptions:
     extra_args: List[str] = field(default_factory=list)
 
     def __post_init__(self):
-        """验证字段"""
-        # 验证警告级别
+        """Validate fields"""
+        # Validate the warning level
         if not 0 <= self.warning_level <= 4:
-            raise ValueError(f"警告级别必须在 0-4 之间,当前值: {self.warning_level}")
+            raise ValueError(f"Warning level must be between 0 and 4, current value: {self.warning_level}")
 
-        # 验证超时时间
+        # Validate the timeout
         if self.timeout <= 0:
-            raise ValueError(f"超时时间必须为正数,当前值: {self.timeout}")
+            raise ValueError(f"Timeout must be a positive number, current value: {self.timeout}")
 
         _validate_extra_args(self.extra_args)
 
 
 @dataclass
 class ProjectCompileRequest:
-    """工程编译请求"""
+    """Project compile request"""
     project_path: str
     options: CompileOptions = field(default_factory=CompileOptions)
 
     def __post_init__(self):
-        """验证项目路径"""
+        """Validate the project path"""
         if not self.project_path:
-            raise ValueError("项目路径不能为空")
+            raise ValueError("Project path must not be empty")
 
-        # 验证文件扩展名（支持 Delphi .dproj/.dpr/.dpk 和 Lazarus .lpi/.lpr）
+        # Validate the file extension (supports Delphi .dproj/.dpr/.dpk and Lazarus .lpi/.lpr)
         if not self.project_path.endswith(('.dproj', '.dpr', '.dpk', '.lpi', '.lpr')):
-            raise ValueError(f"项目文件必须是 .dproj、.dpr、.dpk、.lpi 或 .lpr 格式,当前路径: {self.project_path}")
+            raise ValueError(f"Project file must be .dproj, .dpr, .dpk, .lpi or .lpr format, current path: {self.project_path}")
 
 
 @dataclass
 class FileCompileRequest:
-    """单文件编译请求"""
+    """Single-file compile request"""
     file_path: str
     unit_search_paths: List[str] = field(default_factory=list)
     conditional_defines: List[str] = field(default_factory=list)
@@ -104,16 +104,16 @@ class FileCompileRequest:
     extra_args: List[str] = field(default_factory=list)
 
     def __post_init__(self):
-        """验证文件路径"""
+        """Validate the file path"""
         if not self.file_path:
-            raise ValueError("文件路径不能为空")
+            raise ValueError("File path must not be empty")
 
-        # 验证文件扩展名
+        # Validate the file extension
         if not self.file_path.endswith('.pas'):
-            raise ValueError(f"文件必须是 .pas 格式,当前路径: {self.file_path}")
+            raise ValueError(f"File must be .pas format, current path: {self.file_path}")
 
-        # 验证警告级别
+        # Validate the warning level
         if not 0 <= self.warning_level <= 4:
-            raise ValueError(f"警告级别必须在 0-4 之间,当前值: {self.warning_level}")
+            raise ValueError(f"Warning level must be between 0 and 4, current value: {self.warning_level}")
 
         _validate_extra_args(self.extra_args)

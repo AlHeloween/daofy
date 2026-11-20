@@ -1,19 +1,19 @@
 """
-create_component_dfm — 通过编译+运行 Delphi 代码，将组件序列化为 DFM 文本
+create_component_dfm — Compile and run Delphi code to serialize a component into DFM text
 
-工作流程:
-  1. AI 提供组件创建的 Pascal 代码（完整函数体 + uses 单元）
-  2. 代码注入到模板 .dpr → 编译 → 运行
-  3. 通过 WriteComponent + ObjectBinaryToText 序列化
-  4. 返回 DFM 文本（含组件名称）
+Workflow:
+  1. AI provides Pascal code that creates the component (complete function body + uses units)
+  2. The code is injected into a template .dpr → compiled → run
+  3. Serialize via WriteComponent + ObjectBinaryToText
+  4. Return DFM text (including the component name)
 
-模板约定:
-  - AI 的 code 必须定义 function CreateComponent(AOwner: TComponent): TComponent;
-  - 函数内部可创建 TForm/TFrame 等容器作为 Parent 上下文
-  - WriteComponent 在返回的组件上调用，无需关注容器清理
-  - 事件通过赋值到容器 Form 的方法来序列化名称
+Template conventions:
+  - AI's code must define function CreateComponent(AOwner: TComponent): TComponent;
+  - The function may create TForm/TFrame and other containers as Parent context
+  - WriteComponent is called on the returned component; container cleanup need not be handled
+  - Events serialize their names by assigning methods of the container Form
 
-典型 AI code 示例 (VCL TButton):
+Typical AI code example (VCL TButton):
   ```pascal
   type
     TGenForm = class(TForm)
@@ -25,7 +25,7 @@ create_component_dfm — 通过编译+运行 Delphi 代码，将组件序列化�
 
   constructor TGenForm.Create(AOwner: TComponent);
   begin
-    inherited CreateNew(AOwner);  // 不加载 DFM 资源
+    inherited CreateNew(AOwner);  // Do not load DFM resources
   end;
 
   procedure TGenForm.BtnClick(Sender: TObject);
@@ -43,12 +43,12 @@ create_component_dfm — 通过编译+运行 Delphi 代码，将组件序列化�
     B.Parent := F;
     B.Caption := 'Click Me';
     B.OnClick := F.BtnClick;
-    Result := F;  // ← 返回 Form（工具自动解包提取子组件 DFM）
+    Result := F;  // ← Return the Form (the tool automatically unwraps and extracts the child component DFM)
   end;
   ```
 
-  对应的 uses: ["Vcl.Forms", "Vcl.StdCtrls"]
-  对应的 init_code: "RegisterClass(TGenForm);"
+  Corresponding uses: ["Vcl.Forms", "Vcl.StdCtrls"]
+  Corresponding init_code: "RegisterClass(TGenForm);"
 """
 
 import os
@@ -71,59 +71,59 @@ from ..utils.logger import get_logger
 logger = get_logger(__name__)
 
 # ============================================================
-# 沙箱 — 危险操作阻断清单
+# Sandbox — dangerous operation block list
 # ============================================================
-# Layer 1: 静态分析 — 禁止使用的单元（提供底层 OS 访问能力）
+# Layer 1: Static analysis — forbidden units (provide low-level OS access)
 _DENY_UNITS: Set[str] = {
-    # Win32 API 直接访问
+    # Direct Win32 API access
     'Windows', 'Winapi.Windows',
-    # Shell 操作
+    # Shell operations
     'ShellAPI', 'Winapi.ShellAPI', 'Winapi.Shell', 'ShlObj', 'Winapi.ShlObj',
-    # 注册表
+    # Registry
     'Registry', 'System.Win.Registry',
-    # 文件 I/O（低级）
-    'SysUtils',  # 含 DeleteFile/RemoveDir — 但也是 VCL 基础单元，谨慎
-    # 进程/线程操作
+    # File I/O (low-level)
+    'SysUtils',  # Contains DeleteFile/RemoveDir — but is also a base VCL unit; use with caution
+    # Process/thread operations
     'TlHelp32', 'Winapi.TlHelp32',
-    # 网络
+    # Network
     'WinSock', 'Winapi.WinSock', 'WinHTTP', 'Winapi.WinHTTP',
     'WinINet', 'Winapi.WinINet',
-    # 安全
+    # Security
     'AclAPI', 'Winapi.AclAPI',
 }
 
-# Layer 1: 静态分析 — 禁止出现的函数/关键字模式
+# Layer 1: Static analysis — forbidden function/keyword patterns
 _DENY_PATTERNS: List[str] = [
-    # 文件系统破坏
+    # File system destruction
     r'\bDeleteFile\b',
     r'\bRemoveDir\b',
     r'\bRenameFile\b',
-    # 进程/代码执行
+    # Process/code execution
     r'\bCreateProcess\b',
     r'\bWinExec\b',
     r'\bShellExecute\b',
     r'\bShellExecuteEx\b',
     r'\bExecuteProcess\b',
     r'\bRunDLL\b',
-    # 内存操作
+    # Memory operations
     r'\bWriteProcessMemory\b',
     r'\bReadProcessMemory\b',
     r'\bVirtualProtect\b',
     r'\bVirtualAllocEx\b',
-    # 进程控制
+    # Process control
     r'\bTerminateProcess\b',
     r'\bCreateRemoteThread\b',
     r'\bOpenProcess\b',
-    # DLL 注入
+    # DLL injection
     r'\bLoadLibrary\b',
     r'\bGetProcAddress\b',
     r'\bSetWindowsHookEx\b',
-    # 外部导入（绕过 uses 检查）
+    # External imports (bypassing uses checks)
     r'\bexternal\b',
     r'\bdelayload\b',
 ]
 
-# Layer 2: Job Object 常量（Windows SDK）
+# Layer 2: Job Object constants (Windows SDK)
 _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000
 _JOB_OBJECT_LIMIT_JOB_TIME = 0x0004
 _JOB_OBJECT_LIMIT_PROCESS_TIME = 0x0002
@@ -133,19 +133,19 @@ _PROCESS_CREATE_SUSPENDED = 0x00000004
 
 
 def _validate_code_uses(uses: List[str]) -> Optional[str]:
-    """Layer 1a: 检查 uses 中是否有禁止单元。"""
+    """Layer 1a: Check whether uses contains forbidden units."""
     for unit_name in uses:
         stripped = unit_name.strip()
         if stripped in _DENY_UNITS:
-            return f"禁止使用危险单元 '{stripped}'：可能会被滥用来执行破坏性操作"
+            return f"Forbidden dangerous unit '{stripped}': it may be abused to perform destructive operations"
     return None
 
 
 def _validate_code_patterns(code: str, uses: List[str]) -> Optional[str]:
-    """Layer 1b: 检查代码中是否有危险函数调用。
+    """Layer 1b: Check whether the code contains dangerous function calls.
 
-    SysUtils 是例外 — VCL 基础单元必须可用，
-    但如果代码中同时出现 SysUtils + 危险函数调用，需要特殊处理。
+    SysUtils is an exception — base VCL units must be available,
+    but if code contains both SysUtils + dangerous function calls, special handling is needed.
     """
     has_sysutils = any(u.strip() == 'SysUtils' for u in uses)
 
@@ -153,18 +153,18 @@ def _validate_code_patterns(code: str, uses: List[str]) -> Optional[str]:
         m = re.search(pattern, code, re.IGNORECASE)
         if m:
             func_name = m.group(0)
-            # SysUtils 中的 DeleteFile/RemoveDir 是正常的 RTL 函数
-            # 但如果 code 显式调用了它们，仍然危险
-            return f"代码中检测到危险函数调用 '{func_name}'：已禁止执行"
+            # DeleteFile/RemoveDir in SysUtils are normal RTL functions
+            # But if code explicitly calls them, it is still dangerous
+            return f"Dangerous function call detected in code '{func_name}': execution is blocked"
     return None
 
 
 def _validate_code_sandbox(code: str, uses: Optional[List[str]]) -> Optional[str]:
-    """沙箱入口：静态分析代码，阻止危险操作。
+    """Sandbox entry point: statically analyze the code and block dangerous operations.
 
     Returns:
-        None = 通过检查
-        str = 拒绝原因
+        None = passes the check
+        str = rejection reason
     """
     safe_uses = uses or []
     err = _validate_code_uses(safe_uses)
@@ -177,17 +177,17 @@ def _validate_code_sandbox(code: str, uses: Optional[List[str]]) -> Optional[str
 
 
 # ============================================================
-# Windows Job Object 沙箱（Layer 2）
+# Windows Job Object sandbox (Layer 2)
 # ============================================================
 
 class _JobObjectSandbox:
-    """Windows Job Object 进程沙箱。
+    """Windows Job Object process sandbox.
 
-    通过 ctypes 直接调用 kernel32 API，无需 pywin32 依赖。
-    限制:
-      - 进程/子进程总 CPU 时间 ≤ 15 秒
-      - Job 句柄关闭时自动终止所有子进程
-      - 最大活动进程数 5（防 fork 炸弹）
+    Calls kernel32 API directly through ctypes, with no pywin32 dependency.
+    Limits:
+      - Process/child process total CPU time ≤ 15 seconds
+      - Automatically terminates all child processes when the Job handle is closed
+      - Maximum active process count 5 (prevents fork bombs)
     """
 
     def __init__(self):
@@ -195,20 +195,20 @@ class _JobObjectSandbox:
         self._kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
     def create(self) -> bool:
-        """创建 Job Object。"""
+        """Create a Job Object."""
         # CreateJobObjectW(NULL, NULL)
         self._kernel32.CreateJobObjectW.argtypes = [wintypes.LPVOID, wintypes.LPCWSTR]
         self._kernel32.CreateJobObjectW.restype = wintypes.HANDLE
         self._handle = self._kernel32.CreateJobObjectW(None, None)
         if not self._handle:
-            logger.warning("CreateJobObject 失败，跳过 Job Object 沙箱")
+            logger.warning("CreateJobObject failed; skipping Job Object sandbox")
             return False
         return self._set_limits()
 
     def _set_limits(self) -> bool:
-        """设置 Job Object 限制。"""
-        # 构造 JOBOBJECT_EXTENDED_LIMIT_INFORMATION
-        # 使用 bytearray 手动布局（避免定义完整 struct）
+        """Set Job Object limits."""
+        # Construct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+        # Use bytearray for manual layout (avoid defining the full struct)
         class JOBOBJECT_BASIC_LIMIT_INFORMATION(ctypes.Structure):
             _fields_ = [
                 ("PerProcessUserTimeLimit", wintypes.LARGE_INTEGER),
@@ -222,7 +222,7 @@ class _JobObjectSandbox:
                 ("SchedulingClass", wintypes.DWORD),
             ]
 
-        # 15 秒 CPU 时间，以 100ns 为单位
+        # 15 seconds of CPU time, in 100ns units
         TIME_15S = 15 * 10_000_000
 
         basic = JOBOBJECT_BASIC_LIMIT_INFORMATION()
@@ -249,7 +249,7 @@ class _JobObjectSandbox:
 
         ext = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
         ext.BasicLimitInformation = basic
-        ext.JobMemoryLimit = 256 * 1024 * 1024  # 256 MB 总内存上限
+        ext.JobMemoryLimit = 256 * 1024 * 1024  # 256 MB total memory limit
 
         self._kernel32.SetInformationJobObject.argtypes = [
             wintypes.HANDLE, wintypes.DWORD,
@@ -263,34 +263,34 @@ class _JobObjectSandbox:
             ctypes.byref(ext), ctypes.sizeof(ext),
         )
         if not ok:
-            logger.warning("SetInformationJobObject 失败，仅使用 kill-on-close")
+            logger.warning("SetInformationJobObject failed; using kill-on-close only")
         return True
 
     def assign(self, pid: int) -> bool:
-        """将进程加入 Job Object。"""
+        """Add the process to the Job Object."""
         if not self._handle:
             return False
         self._kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
         self._kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
         ph = self._kernel32.OpenProcess(0x1000 | 0x0010, False, pid)  # PROCESS_SET_QUOTA | PROCESS_TERMINATE
         if not ph:
-            logger.warning("OpenProcess(%d) 失败，无法加入 Job Object", pid)
+            logger.warning("OpenProcess(%d) failed; cannot add to Job Object", pid)
             return False
         ok = self._kernel32.AssignProcessToJobObject(self._handle, ph)
         self._kernel32.CloseHandle(ph)
         if not ok:
-            logger.warning("AssignProcessToJobObject(%d) 失败", pid)
+            logger.warning("AssignProcessToJobObject(%d) failed", pid)
         return ok
 
     def close(self):
-        """关闭 Job Object 句柄（自动终止其中所有进程）。"""
+        """Close the Job Object handle (automatically terminates all processes in it)."""
         if self._handle:
             self._kernel32.CloseHandle(self._handle)
             self._handle = None
 
 # ============================================================
-# 模板 — 最小 dpr，无 VCL/FMX 耦合
-# 所有框架代码（Form 声明、事件桩等）由 AI 在 code 参数中提供
+# Template — minimal dpr, no VCL/FMX coupling
+# All framework code (Form declarations, event stubs, etc.) is provided by AI in the code parameter
 # ============================================================
 
 _TEMPLATE = r"""program dfmgen;
@@ -347,22 +347,22 @@ begin
 end.
 """
 
-# 编译器路径缓存（共享 dfm_utils 的查找逻辑）
+# Compiler path cache (shares dfm_utils lookup logic)
 _compiler_dcc32_path: Optional[str] = None
 
 
 # ============================================================
-# 编译器查找（与 dfm_utils 保持一致）
+# Compiler lookup (kept consistent with dfm_utils)
 # ============================================================
 
 def set_compiler_path(path: str):
-    """设置 dcc32.exe 路径"""
+    """Set the dcc32.exe path"""
     global _compiler_dcc32_path
     _compiler_dcc32_path = path
 
 
 def _find_dcc32() -> Optional[str]:
-    """查找可用的 dcc32.exe（与 dfm_utils._find_dcc32 逻辑一致）"""
+    """Find an available dcc32.exe (same logic as dfm_utils._find_dcc32)"""
     if _compiler_dcc32_path and os.path.isfile(_compiler_dcc32_path):
         return _compiler_dcc32_path
 
@@ -378,19 +378,19 @@ def _find_dcc32() -> Optional[str]:
             if path and os.path.isfile(path):
                 return path
     except Exception:
-        logger.debug("通过 where/which 查找 dcc32 失败", exc_info=True)
+        logger.debug("Failed to find dcc32 via where/which", exc_info=True)
     return None
 
 
 def _find_library_path(dcc32: str) -> Optional[str]:
     """
-    根据 dcc32 路径推导 RTL 库路径。
+    Derive the RTL library path from the dcc32 path.
 
     Args:
-        dcc32: dcc32.exe 完整路径
+        dcc32: Full path to dcc32.exe
 
     Returns:
-        库路径，未找到返回 None
+        Library path, or None if not found
     """
     dcc_dir = os.path.dirname(os.path.abspath(dcc32))
     root = os.path.dirname(dcc_dir)
@@ -406,7 +406,7 @@ def _find_library_path(dcc32: str) -> Optional[str]:
 
 
 # ============================================================
-# 模板代码生成
+# Template code generation
 # ============================================================
 
 def _generate_dpr(
@@ -416,21 +416,21 @@ def _generate_dpr(
     init_code: str = "",
 ) -> str:
     """
-    生成 dfmgen 项目 .dpr 源码。
+    Generate the dfmgen project .dpr source.
 
     Args:
-        uses: AI 额外指定的 uses 单元列表（不含 System.SysUtils 等基础单元）
-        code: 实现代码段（必须包含 CreateComponent 函数定义）
-        type_decl: 类型声明段（Form 类、事件桩等）
-        init_code: 初始化代码段（在 CreateComponent 之前执行），
-                   用于 RegisterClass 等全局初始化
+        uses: Additional uses unit list specified by AI (excluding base units such as System.SysUtils)
+        code: Implementation code section (must contain the CreateComponent function definition)
+        type_decl: Type declaration section (Form classes, event stubs, etc.)
+        init_code: Initialization code section (executed before CreateComponent),
+                   used for global initialization such as RegisterClass
 
     Returns:
-        完整 .dpr 内容
+        Complete .dpr content
     """
-    # 格式化 uses 子句
-    # 模板格式: "System.Classes{USER_UNITS};"
-    # {USER_UNITS} 需以 ",\n  <unit>" 开头（非空时）
+    # Format the uses clause
+    # Template format: "System.Classes{USER_UNITS};"
+    # {USER_UNITS} must start with ",\n  <unit>" (when non-empty)
     cleaned = [u.strip() for u in uses if u.strip()]
     if cleaned:
         items = ",\n  ".join(cleaned)
@@ -448,13 +448,13 @@ def _generate_dpr(
 
 def _extract_component_name(dfm_text: str) -> Optional[str]:
     """
-    从 DFM 文本中提取组件名称。
+    Extract the component name from DFM text.
 
     Args:
-        dfm_text: 文本格式 DFM 内容
+        dfm_text: Text-format DFM content
 
     Returns:
-        组件 Name 值，未找到返回 None
+        Component Name value, or None if not found
     """
     m = re.search(r'^\s*(?:object|inherited)\s+(\w+)\s*:\s*\w+', dfm_text, re.MULTILINE)
     if m:
@@ -464,48 +464,48 @@ def _extract_component_name(dfm_text: str) -> Optional[str]:
 
 def _unwrap_form_dfm(dfm_text: str) -> Optional[str]:
     """
-    如果 DFM 根节点是一个 Form（视觉容器），提取其内部的第一个子组件 DFM。
-    如果根节点不是 Form，返回 None（表示直接使用原始文本）。
+    If the DFM root node is a Form (visual container), extract the first child component DFM inside it.
+    If the root node is not a Form, return None (indicating the original text should be used directly).
 
-    Form 检测：根节点类名包含 "Form" 且有嵌套 object/inherited。
+    Form detection: the root node class name contains "Form" and has nested object/inherited.
 
     Args:
-        dfm_text: 文本格式 DFM 内容
+        dfm_text: Text-format DFM content
 
     Returns:
-        子组件 DFM 文本，或 None（不需要解包）
+        Child component DFM text, or None (no unwrapping needed)
     """
     text = dfm_text.strip()
     if not text:
         return None
 
-    # 提取根对象声明和类名
+    # Extract root object declaration and class name
     m = re.search(r'^(object|inherited)\s+(\w+)\s*:\s*(\w+)', text, re.MULTILINE)
     if not m:
         return None
 
-    root_class = m.group(3)  # 如 TForm1, TForm, TGenForm
+    root_class = m.group(3)  # e.g. TForm1, TForm, TGenForm
     has_form = 'Form' in root_class
 
     if not has_form:
-        return None  # 不是 Form 容器，不解包
+        return None  # Not a Form container; do not unwrap
 
-    # 找第一个嵌套的 object/inherited（子组件）
-    # 从根对象声明之后开始搜索
+    # Find the first nested object/inherited (child component)
+    # Start searching after the root object declaration
     start_pos = m.end()
     remaining = text[start_pos:]
 
     child_m = re.search(r'^[ \t]+(object|inherited)\s+(\w+)\s*:\s*(\w+)', remaining, re.MULTILINE)
     if not child_m:
-        return None  # Form 但没有子组件
+        return None  # Form but no child components
 
-    # 找到子组件的缩进级别（支持空格或 tab）
+    # Find the child component indentation level (supports spaces or tabs)
     raw_indent = child_m.group().rstrip()
     indent_text = raw_indent[:len(raw_indent) - len(raw_indent.lstrip())]
     child_start = start_pos + child_m.start()
 
-    # 提取子组件文本：从子组件声明开始，到对应的 end 结束
-    # 子组件的 end 在同样缩进级别（空格/tab 均可）
+    # Extract child component text: start at the child declaration and end at the matching end
+    # The child's end is at the same indentation level (spaces/tabs both work)
     escaped_indent = re.escape(indent_text)
     end_pattern = re.compile(r'^' + escaped_indent + r'end\b', re.MULTILINE)
     end_m = end_pattern.search(text, child_start)
@@ -518,26 +518,26 @@ def _unwrap_form_dfm(dfm_text: str) -> Optional[str]:
 
 def _read_dfm_output(out_file: str) -> Dict[str, Any]:
     """
-    读取并处理 DFM 输出文件。
-    如果 DFM 被 Form 包裹，自动解包提取子组件。
+    Read and process the DFM output file.
+    If the DFM is wrapped in a Form, automatically unwrap and extract the child component.
 
     Args:
-        out_file: DFM 文件路径
+        out_file: DFM file path
 
     Returns:
         {"success": True, "dfm_text": "...", "component_name": "..."}
         or {"success": False, "error": "...", "stage": "output"}
     """
     if not os.path.isfile(out_file):
-        return {"success": False, "error": "执行成功但未生成输出文件", "stage": "output"}
+        return {"success": False, "error": "Execution succeeded but no output file was generated", "stage": "output"}
 
     with open(out_file, "r", encoding="utf-8", errors="replace") as f:
         raw_text = f.read().strip()
 
     if not raw_text:
-        return {"success": False, "error": "输出 DFM 文件为空", "stage": "output"}
+        return {"success": False, "error": "Output DFM file is empty", "stage": "output"}
 
-    # 尝试解包 Form 容器
+    # Try to unwrap the Form container
     unwrapped = _unwrap_form_dfm(raw_text)
     if unwrapped:
         dfm_text = unwrapped
@@ -553,7 +553,7 @@ def _read_dfm_output(out_file: str) -> Dict[str, Any]:
 
 
 # ============================================================
-# 编译 & 执行
+# Compile & execute
 # ============================================================
 
 def _compile_project(
@@ -561,10 +561,10 @@ def _compile_project(
     timeout: int = TIMEOUT_DELPHI_COMPONENT_COMPILE,
 ) -> Tuple[bool, str]:
     """
-    编译 dfmgen 项目。
+    Compile the dfmgen project.
 
     Args:
-        tmp_dir: 临时目录（含 dfmgen.dpr）
+        tmp_dir: Temporary directory (contains dfmgen.dpr)
 
     Returns:
         (success: bool, message: str)
@@ -574,14 +574,14 @@ def _compile_project(
 
     dcc32 = _find_dcc32()
     if not dcc32:
-        return False, "未找到 dcc32.exe，请检查 Delphi 编译器安装"
+        return False, "dcc32.exe not found; check the Delphi compiler installation"
 
     try:
         lib_path = _find_library_path(dcc32)
 
-        # 尝试无 -U 参数编译
+        # Try compiling without the -U parameter
         cmd = [dcc32, dpr_path, f"-E{tmp_dir}", "-Q", "-B"]
-        logger.info(f"编译 DFM 生成器: {' '.join(cmd)}")
+        logger.info(f"Compiling DFM generator: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -590,10 +590,10 @@ def _compile_project(
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
         )
 
-        # 如果失败且有库路径，重试带 -U
+        # If it fails and a library path exists, retry with -U
         if result.returncode != 0 and lib_path:
             cmd2 = [dcc32, dpr_path, f"-E{tmp_dir}", "-Q", "-B", f"-U{lib_path}"]
-            logger.info(f"重试编译(带-U): {' '.join(cmd2)}")
+            logger.info(f"Retrying compile (with -U): {' '.join(cmd2)}")
             result = subprocess.run(
                 cmd2,
                 capture_output=True,
@@ -605,19 +605,19 @@ def _compile_project(
         if result.returncode != 0:
             stderr = (result.stderr or "").strip()
             stdout = (result.stdout or "").strip()
-            detail = stderr or stdout or f"退出码 {result.returncode}"
-            return False, f"编译失败:\n{detail}"
+            detail = stderr or stdout or f"Exit code {result.returncode}"
+            return False, f"Compilation failed:\n{detail}"
 
         if not os.path.isfile(exe_path):
-            return False, f"编译后未找到 exe: {exe_path}"
+            return False, f"Executable not found after compilation: {exe_path}"
 
         return True, exe_path
 
     except subprocess.TimeoutExpired:
-        return False, f"编译超时({timeout}s)"
+        return False, f"Compilation timed out ({timeout}s)"
     except Exception as e:
-        logger.error(f"编译异常: {e}", exc_info=True)
-        return False, f"编译异常: {e}"
+        logger.error(f"Compilation exception: {e}", exc_info=True)
+        return False, f"Compilation exception: {e}"
 
 
 def _execute_gen(
@@ -626,23 +626,23 @@ def _execute_gen(
     timeout: int = TIMEOUT_COMPONENT_CREATION_EXEC,
 ) -> Tuple[bool, str]:
     """
-    执行编译好的 dfmgen.exe（沙箱环境）。
+    Execute the compiled dfmgen.exe (sandbox environment).
 
     Args:
-        exe_path: dfmgen.exe 路径
-        out_file: 输出 DFM 文件路径
-        timeout: 执行超时秒数
+        exe_path: dfmgen.exe path
+        out_file: Output DFM file path
+        timeout: Execution timeout in seconds
 
     Returns:
         (success: bool, message: str)
-        成功时 message 为空；失败时 message 为错误信息
+        On success, message is empty; on failure, message is the error information
     """
-    # [沙箱] Layer 2: Windows Job Object — 超时自动杀进程 + kill-on-close
+    # [Sandbox] Layer 2: Windows Job Object — automatically kill process on timeout + kill-on-close
     job = _JobObjectSandbox()
     job_created = job.create()
 
     try:
-        # 启动进程，然后立即加入 Job Object
+        # Start the process, then immediately add it to the Job Object
         proc = subprocess.Popen(
             [exe_path, out_file],
             stdout=subprocess.PIPE,
@@ -651,11 +651,11 @@ def _execute_gen(
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
         )
 
-        # 加入 Job Object（即使失败也继续执行，降级但不阻断）
+        # Add to the Job Object (continue even if this fails; degrade but do not block)
         if job_created:
             job.assign(proc.pid)
 
-        # 等待完成
+        # Wait for completion
         try:
             stdout, stderr = proc.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -663,32 +663,32 @@ def _execute_gen(
             proc.wait()
             raise
 
-        # 检查运行时错误（模板输出 ERROR: 前缀到 stdout）
+        # Check runtime errors (the template writes an ERROR: prefix to stdout)
         out_text = (stdout or "").strip()
         if out_text.startswith("ERROR:"):
             return False, out_text[len("ERROR:"):].strip()
 
         if proc.returncode != 0:
             err_text = (stderr or "").strip()
-            return False, err_text or f"进程退出码 {proc.returncode}"
+            return False, err_text or f"Process exit code {proc.returncode}"
 
-        # 验证输出文件存在
+        # Validate that the output file exists
         if not os.path.isfile(out_file):
-            return False, "未生成输出文件"
+            return False, "No output file was generated"
 
         return True, ""
 
     except subprocess.TimeoutExpired:
-        return False, f"执行超时({timeout}s) — 组件创建代码可能陷入死循环"
+        return False, f"Execution timed out ({timeout}s) — the component creation code may be stuck in an infinite loop"
     except Exception as e:
-        logger.error(f"执行异常: {e}", exc_info=True)
-        return False, f"执行异常: {e}"
+        logger.error(f"Execution exception: {e}", exc_info=True)
+        return False, f"Execution exception: {e}"
     finally:
         job.close()
 
 
 # ============================================================
-# 主入口
+# Main entry
 # ============================================================
 
 async def generate_component_dfm(
@@ -700,27 +700,27 @@ async def generate_component_dfm(
     exec_timeout: int = TIMEOUT_COMPONENT_CREATION_EXEC,
 ) -> Dict[str, Any]:
     """
-    编译+运行 Delphi 代码，通过 WriteComponent 序列化生成 DFM 文本。
+    Compile and run Delphi code, then generate DFM text through WriteComponent serialization.
 
     Args:
-        code: AI 写的 Pascal 实现代码。
-              必须包含 function CreateComponent(AOwner: TComponent): TComponent; 定义。
-              可包含辅助类型/过程/函数。
-        uses: AI 指定需要引用的单元列表，如 ["Vcl.Forms", "Vcl.StdCtrls"]
-        type_decl: 类型声明段（可选），用于声明 Form 类、事件桩等
-        init_code: 初始化代码段（可选），在 CreateComponent 之前执行。
-                   用于 RegisterClass 等全局注册，如 "RegisterClass(TGenForm);"
-        compile_timeout: 编译超时秒数（默认 60）
-        exec_timeout: 执行超时秒数（默认 15）
+        code: Pascal implementation code written by AI.
+              Must contain the definition of function CreateComponent(AOwner: TComponent): TComponent.
+              May contain helper types/procedures/functions.
+        uses: Unit list that AI specifies for reference, e.g. ["Vcl.Forms", "Vcl.StdCtrls"]
+        type_decl: Type declaration section (optional), used to declare Form classes, event stubs, etc.
+        init_code: Initialization code section (optional), executed before CreateComponent.
+                   Used for global registration such as "RegisterClass(TGenForm);"
+        compile_timeout: Compilation timeout in seconds (default 60)
+        exec_timeout: Execution timeout in seconds (default 15)
 
     Returns:
-        success=True 时:
+        When success=True:
           {
             "success": True,
             "dfm_text": "...DFM text...",
             "component_name": "Button1"
           }
-        success=False 时:
+        When success=False:
           {
             "success": False,
             "error": "...error description...",
@@ -728,40 +728,40 @@ async def generate_component_dfm(
           }
 
     Usage (AI Agent):
-      # 1. 查 KB 确认组件类名、单元、VCL/FMX 归属
-      # 2. 写 CreateComponent 函数（含容器 Form + 事件桩）
-      #    自定义 Form 类需 RegisterClass: init_code="RegisterClass(TGenForm);"
-      # 3. 调此工具 → 获得 DFM 文本
-      # 4. dfm_merge 合并到目标 / 事件桩写入 .pas
+      # 1. Check the KB to confirm the component class name, unit, and VCL/FMX ownership
+      # 2. Write the CreateComponent function (including container Form + event stubs)
+      #    A custom Form class needs RegisterClass: init_code="RegisterClass(TGenForm);"
+      # 3. Call this tool → obtain DFM text
+      # 4. Use dfm_merge to merge into the target / write event stubs to .pas
     """
     code = (code or "").strip()
     if not code:
-        return {"success": False, "error": "code 参数不能为空", "stage": "input"}
+        return {"success": False, "error": "The code parameter cannot be empty", "stage": "input"}
 
     uses = uses or []
     type_decl = (type_decl or "").strip()
     init_code = (init_code or "").strip()
 
-    # 验证 code 中包含 CreateComponent 函数
+    # Verify that code contains the CreateComponent function
     if "CreateComponent" not in code:
         return {
             "success": False,
-            "error": "code 中必须定义 CreateComponent(AOwner: TComponent): TComponent 函数",
+            "error": "code must define a CreateComponent(AOwner: TComponent): TComponent function",
             "stage": "input",
         }
 
-    # [沙箱] 静态分析：阻断危险单元和函数调用
+    # [Sandbox] Static analysis: block dangerous units and function calls
     sandbox_err = _validate_code_sandbox(code, uses)
     if sandbox_err:
-        logger.warning("沙箱阻断: %s", sandbox_err)
-        return {"success": False, "error": f"代码被沙箱拒绝: {sandbox_err}", "stage": "sandbox"}
+        logger.warning("Sandbox blocked: %s", sandbox_err)
+        return {"success": False, "error": f"Code rejected by sandbox: {sandbox_err}", "stage": "sandbox"}
 
-    # 创建临时工作目录
+    # Create temporary working directory
     tmp_dir = tempfile.mkdtemp(prefix="dfmgen_")
     out_file = os.path.join(tmp_dir, "output.dfm")
 
     try:
-        # 1. 生成 .dpr
+        # 1. Generate .dpr
         dpr_content = _generate_dpr(
             uses=uses,
             code=code,
@@ -772,29 +772,30 @@ async def generate_component_dfm(
         with open(dpr_path, "w", encoding="utf-8") as f:
             f.write(dpr_content)
 
-        # 2. 编译
+        # 2. Compile
         ok, msg = _compile_project(tmp_dir, timeout=compile_timeout)
         if not ok:
             return {"success": False, "error": msg, "stage": "compile"}
 
-        exe_path = msg  # _compile_project 成功时 msg 返回 exe_path
+        exe_path = msg  # _compile_project returns exe_path in msg on success
 
-        # 3. 执行
+        # 3. Execute
         ok, err_msg = _execute_gen(exe_path, out_file, timeout=exec_timeout)
         if not ok:
             return {"success": False, "error": err_msg, "stage": "execute"}
 
-        # 4. 读取输出 DFM（自动解包 Form 容器）
+        # 4. Read output DFM (automatically unwraps Form containers)
         result = _read_dfm_output(out_file)
         if not result["success"]:
             return result
 
-        # 5. 写一份解析后的 DFM 返回
+        # 5. Write a parsed DFM and return it
         return result
 
     finally:
-        # 清理临时文件
+        # Clean up temporary files
         try:
             shutil.rmtree(tmp_dir, ignore_errors=True)
         except Exception:
-            logger.debug("清理临时目录失败: %s", tmp_dir, exc_info=True)
+            logger.debug("Failed to clean temporary directory: %s", tmp_dir, exc_info=True)
+

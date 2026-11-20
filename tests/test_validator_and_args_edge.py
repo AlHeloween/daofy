@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-补充 Validator 和 ArgsGenerator 边界测试
+Supplementary boundary tests for Validator and ArgsGenerator
 
-新增覆盖:
+New coverage:
   Validator:
-    - validate_file_path: 空路径/路径遍历/不存在/非文件/非 .pas 扩展名
-    - validate_compiler_path: 非文件路径(目录)/非可执行扩展名
-    - validate_output_path: 空路径(允许)/非目录/路径遍历
-    - validate_search_paths: None 列表/含不存在路径(仅警告)/路径遍历
-    - validate_timeout: 负数/边界 1 和 3600/超过 3600
-    - validate_warning_level: 负数/5
+    - validate_file_path: empty path / path traversal / nonexistent / not a file / non-.pas extension
+    - validate_compiler_path: non-file path (directory) / non-executable extension
+    - validate_output_path: empty path (allowed) / not a directory / path traversal
+    - validate_search_paths: None list / list containing a nonexistent path (warning only) / path traversal
+    - validate_timeout: negative / boundaries 1 and 3600 / over 3600
+    - validate_warning_level: negative / 5
 
   ArgsGenerator:
-    - generate: 无条件编译/无搜索路径/DLL 输出类型/静态运行时
-    - validate_args: 含 $ 的非法参数/含 ; 的非法参数/带引号参数
-    - format_command: 路径含空格/路径无空格
-    - generate_for_file: 默认命名空间/include 路径/output_dir/disabled_warnings
+    - generate: no conditional defines / no search paths / DLL output type / static runtime
+    - validate_args: illegal argument containing $ / illegal argument containing ; / quoted argument
+    - format_command: path with spaces / path without spaces
+    - generate_for_file: default namespaces / include paths / output_dir / disabled_warnings
 """
 
 import sys
@@ -47,7 +47,7 @@ class TestValidateFilePath:
     def test_empty_path(self):
         ok, msg = Validator.validate_file_path("")
         assert not ok
-        assert "空" in msg or "不能为空" in msg
+        assert "must not be empty" in msg
 
     def test_path_traversal(self):
         ok, msg = Validator.validate_file_path(r"C:\..\secret.pas")
@@ -73,7 +73,7 @@ class TestValidateFilePath:
         try:
             ok, msg = Validator.validate_file_path(tmpdir)
             assert not ok
-            assert "文件" in msg
+            assert "not a file" in msg
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -88,7 +88,7 @@ class TestValidateFilePath:
 
 
 # ============================================================
-# Validator — validate_compiler_path 补充
+# Validator — validate_compiler_path (supplementary)
 # ============================================================
 
 class TestValidateCompilerPathExtra:
@@ -98,7 +98,7 @@ class TestValidateCompilerPathExtra:
         try:
             ok, msg = Validator.validate_compiler_path(tmpdir)
             assert not ok
-            assert "文件" in msg
+            assert "not a file" in msg
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -108,13 +108,13 @@ class TestValidateCompilerPathExtra:
         try:
             ok, msg = Validator.validate_compiler_path(path)
             assert not ok
-            assert "可执行" in msg
+            assert "executable" in msg
         finally:
             os.unlink(path)
 
 
 # ============================================================
-# Validator — validate_output_path 补充
+# Validator — validate_output_path (supplementary)
 # ============================================================
 
 class TestValidateOutputPathExtra:
@@ -133,13 +133,13 @@ class TestValidateOutputPathExtra:
         try:
             ok, msg = Validator.validate_output_path(path)
             assert not ok
-            assert "目录" in msg
+            assert "not a directory" in msg
         finally:
             os.unlink(path)
 
 
 # ============================================================
-# Validator — validate_search_paths 补充
+# Validator — validate_search_paths (supplementary)
 # ============================================================
 
 class TestValidateSearchPathsExtra:
@@ -162,7 +162,7 @@ class TestValidateSearchPathsExtra:
 
 
 # ============================================================
-# Validator — validate_timeout 边界
+# Validator — validate_timeout boundaries
 # ============================================================
 
 class TestValidateTimeoutBoundary:
@@ -185,7 +185,7 @@ class TestValidateTimeoutBoundary:
 
 
 # ============================================================
-# Validator — validate_warning_level 边界
+# Validator — validate_warning_level boundaries
 # ============================================================
 
 class TestValidateWarningLevelBoundary:
@@ -204,7 +204,7 @@ class TestValidateWarningLevelBoundary:
 
 
 # ============================================================
-# ArgsGenerator — generate 补充
+# ArgsGenerator — generate (supplementary)
 # ============================================================
 
 class TestArgsGeneratorGenerate:
@@ -254,7 +254,7 @@ class TestArgsGeneratorGenerate:
 
 
 # ============================================================
-# ArgsGenerator — validate_args 边界
+# ArgsGenerator — validate_args boundaries
 # ============================================================
 
 class TestArgsGeneratorValidateArgs:
@@ -268,7 +268,7 @@ class TestArgsGeneratorValidateArgs:
         assert not gen.validate_args(["Project.dpr", "evil;rm -rf"])
 
     def test_quoted_arg_with_pipe_passes(self):
-        """引号内的管道符视为安全（引号隔离 shell 注入）"""
+        """A pipe inside quotes is treated as safe (quotes isolate shell injection)"""
         gen = ArgsGenerator()
         assert gen.validate_args(['-U"C:\\Lib|evil"'])
 
@@ -321,7 +321,7 @@ class TestArgsGeneratorFormatCommand:
 
 
 # ============================================================
-# ArgsGenerator — generate_for_file 补充
+# ArgsGenerator — generate_for_file (supplementary)
 # ============================================================
 
 class TestArgsGeneratorGenerateForFile:

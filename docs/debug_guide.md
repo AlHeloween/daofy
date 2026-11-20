@@ -1,167 +1,167 @@
-# Delphi 程序调试指南 — AI 调试工作流
+# Delphi Program Debugging Guide — AI Debugging Workflow
 
-> 版本：v1.1 | 最后更新：2026-06-26
-> 适用对象：使用 Daofy MCP Server 调试 Delphi 程序的大模型 AI
-
----
-
-## 目录
-
-1. [核心原则](#1-核心原则)
-2. [调试前的环境确认](#2-调试前的环境确认)
-3. [编译错误调试](#3-编译错误调试)
-4. [运行时崩溃/异常调试](#4-运行时崩溃异常调试)
-5. [逻辑错误调试](#5-逻辑错误调试)
-6. [GUI/界面问题调试](#6-gui界面问题调试)
-7. [运行时数据探查（RTTI）](#7-运行时数据探查rtti)
-8. [内存泄漏/资源泄漏调试](#8-内存泄漏资源泄漏调试)
-9. [常见 AI 误判模式](#9-常见-ai-误判模式)
-10. [调试工作流速查表](#10-调试工作流速查表)
-11. [控制台程序调试](#11-控制台程序调试)
-12. [性能问题初诊](#12-性能问题初诊)
-13. [工具调用异常恢复](#13-工具调用异常恢复)
+> Version: v1.1 | Last updated: 2026-06-26
+> Audience: Large language model AIs using Daofy MCP Server to debug Delphi programs
 
 ---
 
-## 1. 核心原则
+## Table of Contents
 
-### 1.1 先取证，后定论
+1. [Core Principles](#1-core-principles)
+2. [Environment Confirmation Before Debugging](#2-environment-confirmation-before-debugging)
+3. [Compile Error Debugging](#3-compile-error-debugging)
+4. [Runtime Crash/Exception Debugging](#4-runtime-crashexception-debugging)
+5. [Logic Error Debugging](#5-logic-error-debugging)
+6. [GUI/Interface Issue Debugging](#6-guiinterface-issue-debugging)
+7. [Runtime Data Inspection (RTTI)](#7-runtime-data-inspection-rtti)
+8. [Memory/Resource Leak Debugging](#8-memoryresource-leak-debugging)
+9. [Common AI Misjudgment Patterns](#9-common-ai-misjudgment-patterns)
+10. [Debugging Workflow Quick Reference](#10-debugging-workflow-quick-reference)
+11. [Console Application Debugging](#11-console-application-debugging)
+12. [Performance Issue Triage](#12-performance-issue-triage)
+13. [Tool Call Exception Recovery](#13-tool-call-exception-recovery)
 
-**不要**凭经验或代码扫一眼就断言原因。Delphi 程序的错误可能来自：
+---
 
-| 错误来源 | 典型特征 | AI 易犯错误 |
-|---------|---------|------------|
-| 编译器版本/路径 | 编译失败，找不到 .dcu | 直接改代码 |
-| 搜索路径缺失 | 找不到单元文件 | 判断为"缺少单元"→ 实际是路径配置问题 |
-| 条件编译符号 | 特定配置下才出错 | 误判为代码逻辑错误 |
-| DFM 资源问题 | 启动即崩溃 | 误判为代码空指针 |
-| 运行时 DLL 缺失 | exe 启动失败 | 误判为代码问题 |
-| 三方库版本不匹配 | 链接错误或访问违例 | 误判为 API 使用错误 |
-| 编译器优化 bug | Release 才出现 | 误判为代码逻辑 |
-| 线程同步 | 偶发崩溃、界面卡死 | 误判为死循环 |
+## 1. Core Principles
 
-**调试第一原则**：先收集证据链，再下结论。
+### 1.1 Gather Evidence First, Conclude Later
 
-### 1.2 证据链优先级
+**Do not** assert the cause based on experience or a quick scan of the code. Errors in Delphi programs can originate from:
+
+| Error Source | Typical Characteristics | Common AI Mistake |
+|-------------|------------------------|-------------------|
+| Compiler version/path | Compile fails, .dcu not found | Directly modify code |
+| Missing search path | Unit file not found | Judged as "missing unit" → actually a path config issue |
+| Conditional compilation symbols | Only fails under specific configurations | Misjudged as code logic error |
+| DFM resource issues | Crashes immediately on startup | Misjudged as code null pointer |
+| Missing runtime DLL | exe fails to start | Misjudged as code issue |
+| Third-party library version mismatch | Link errors or access violations | Misjudged as API misuse |
+| Compiler optimization bug | Only occurs in Release | Misjudged as code logic |
+| Thread synchronization | Intermittent crashes, UI freezes | Misjudged as infinite loop |
+
+**First principle of debugging**: Collect the evidence chain first, then draw conclusions.
+
+### 1.2 Evidence Chain Priority
 
 ```
-编译错误 → 先看编译器输出，再用 delphi_project(info) 查配置
-运行时崩溃 → 先读 exception.log，再用自动化工具复现
-逻辑错误 → 先用 RTTI/rget 探查运行时状态，再读源码
-界面问题 → 先 capture 截图，再用 dumpstate 看控件树
+Compile error → First check compiler output, then use delphi_project(info) to check configuration
+Runtime crash → First read exception.log, then use automation tools to reproduce
+Logic error → First use RTTI/rget to inspect runtime state, then read source code
+UI issue → First capture a screenshot, then use dumpstate to view the control tree
 ```
 
-### 1.3 逐步缩小范围
+### 1.3 Narrow the Scope Step by Step
 
-不要试图一步定位。每步应该排除一类可能性：
+Do not try to pinpoint the issue in one step. Each step should eliminate a category of possibilities:
 
 ```
-① 环境问题？    → check_environment
-② 配置问题？    → delphi_project(action="info")
-③ 编译问题？    → delphi_project(action="compile")
-④ 代码逻辑？    → delphi_file(read) + delphi_kb(search)
-⑤ 运行时状态？  → automate_delphi(rget) / delphi_rtti(discover)
+① Environment problem?    → check_environment
+② Configuration problem?  → delphi_project(action="info")
+③ Compile problem?        → delphi_project(action="compile")
+④ Code logic?             → delphi_file(read) + delphi_kb(search)
+⑤ Runtime state?          → automate_delphi(rget) / delphi_rtti(discover)
 ```
 
 ---
 
-## 2. 调试前的环境确认
+## 2. Environment Confirmation Before Debugging
 
-在开始任何调试之前，先确认编译环境是健康的。
+Before starting any debugging, first confirm the compilation environment is healthy.
 
-### 2.1 检查编译器状态
+### 2.1 Check Compiler Status
 
 ```python
 check_environment(action="check")
 ```
 
-返回信息包含：
-- 可用编译器列表（名称、版本、路径）
-- 默认编译器
-- pasfmt 是否安装
+Returned information includes:
+- List of available compilers (name, version, path)
+- Default compiler
+- Whether pasfmt is installed
 
-### 2.2 检查项目配置
+### 2.2 Check Project Configuration
 
 ```python
-# 获取完整项目配置
+# Get full project configuration
 delphi_project(action="info", project_path="Project.dproj")
 ```
 
-关键检查项：
-- `DCC_UnitSearchPath` — 单元搜索路径是否完整
-- `DCC_Define` — 条件编译符号是否正确（Debug/Release）
-- `OutputType` — 输出类型（GUI/Console/DLL）
-- `RuntimeLibrary` — 运行时链接方式（static/dynamic）
-- `TargetPlatform` — 目标平台
-- 源文件列表是否完整
+Key check items:
+- `DCC_UnitSearchPath` — Whether the unit search path is complete
+- `DCC_Define` — Whether conditional compilation symbols are correct (Debug/Release)
+- `OutputType` — Output type (GUI/Console/DLL)
+- `RuntimeLibrary` — Runtime linking method (static/dynamic)
+- `TargetPlatform` — Target platform
+- Whether the source file list is complete
 
-### 2.3 检查注册表运行时环境
+### 2.3 Check Registry Runtime Environment
 
 ```python
 delphi_project(action="runtime", base_dir="src")
 ```
 
-扫描 `.pas`/`.dfm` 中的组件类名，检测是否遗漏必需的 uses 单元。
+Scans component class names in `.pas`/`.dfm`, detecting whether required uses units are missing.
 
 ---
 
-## 3. 编译错误调试
+## 3. Compile Error Debugging
 
-### 3.1 标准调试流程
+### 3.1 Standard Debugging Workflow
 
 ```
-编译失败
+Compile fails
   │
-  ├─ check_environment(action="check")          → ① 编译器可用？
-  │     ↓ 不可用
-  │   check_environment(action="detect")         → 重新检测
+  ├─ check_environment(action="check")          → ① Compiler available?
+  │     ↓ Not available
+  │   check_environment(action="detect")         → Re-detect
   │
-  ├─ delphi_project(action="info")              → ② 项目配置正确？
+  ├─ delphi_project(action="info")              → ② Project config correct?
   │     ↓
-  │   检查 DCC_UnitSearchPath, DCC_Define 等
+  │   Check DCC_UnitSearchPath, DCC_Define, etc.
   │
-  ├─ delphi_project(action="compile")           → ③ 重新编译，看完整输出
+  ├─ delphi_project(action="compile")           → ③ Recompile and see full output
   │     ↓
-  │   记录第一个 error 的位置和描述
+  │   Record the location and description of the first error
   │
-  ├─ delphi_file(action="read", file_path=...)  → ④ 读报错文件
+  ├─ delphi_file(action="read", file_path=...)  → ④ Read the file that reported the error
   │
-  ├─ delphi_kb(query="...", kb_type="delphi")   → ⑤ 查 API 定义
+  ├─ delphi_kb(query="...", kb_type="delphi")   → ⑤ Look up API definitions
   │
-  └─ 修复后重新编译验证
+  └─ Recompile to verify after fixing
 ```
 
-### 3.2 常见编译错误对照
+### 3.2 Common Compile Error Reference
 
-| 编译器输出 | 可能原因 | 首选排查手段 |
-|-----------|---------|-------------|
-| `Fatal: Unable to execute file` | 编译器路径错误 | `check_environment(action="detect")` |
-| `Fatal: File not found: xxx.dcu` | 缺少搜索路径 | `delphi_project(action="info")` 检查 `DCC_UnitSearchPath` |
-| `E1026 File not found: xxx.dproj` | 项目路径错误 | 确认 `project_path` 指向正确的 `.dproj` |
-| `E2003 Undeclared identifier: xxx` | 缺少 uses / 拼写错误 | `delphi_file(read)` 读文件，检查 uses 子句 |
-| `E2010 Incompatible types` | 类型不匹配 | `delphi_kb(search_type="function")` 查函数签名 |
-| `E2029 ')' expected but ',' found` | 泛型语法错误 | 检查 Delphi 版本是否支持泛型语法 |
-| `E2037 Record type 'xxx' not found` | 类型未定义 | 检查 record 定义位置和作用域 |
-| `E2064 Left side cannot be assigned to` | 赋值给只读属性 | `delphi_kb` 查该属性是否有 setter |
-| `E2198 XE7+ 不支持此语法` | 编译器版本不匹配 | 检查 `.dproj` 中的编译器版本配置 |
-| Exit code 2 | 编译事件失败或语法错误 | 查看详细输出定位 |
-| `W1000 Symbol 'xxx' is deprecated` | 使用了废弃 API | `delphi_kb` 查替代方案 |
-| `H2443 Inline function 'xxx' has not been expanded` | 内联函数未展开 | 加 `{$INLINE ON}` 或忽略 |
-| `dcc32 不存在` | 未检测到编译器 | `check_environment(action="detect")` |
+| Compiler Output | Possible Cause | First Troubleshooting Step |
+|-----------------|---------------|---------------------------|
+| `Fatal: Unable to execute file` | Compiler path error | `check_environment(action="detect")` |
+| `Fatal: File not found: xxx.dcu` | Missing search path | `delphi_project(action="info")` to check `DCC_UnitSearchPath` |
+| `E1026 File not found: xxx.dproj` | Project path error | Confirm `project_path` points to the correct `.dproj` |
+| `E2003 Undeclared identifier: xxx` | Missing uses / typo | `delphi_file(read)` to read the file, check the uses clause |
+| `E2010 Incompatible types` | Type mismatch | `delphi_kb(search_type="function")` to look up the function signature |
+| `E2029 ')' expected but ',' found` | Generic syntax error | Check whether the Delphi version supports generic syntax |
+| `E2037 Record type 'xxx' not found` | Type undefined | Check the record definition location and scope |
+| `E2064 Left side cannot be assigned to` | Assigning to a read-only property | `delphi_kb` to check whether the property has a setter |
+| `E2198 XE7+ does not support this syntax` | Compiler version mismatch | Check the compiler version configuration in `.dproj` |
+| Exit code 2 | Compile event failed or syntax error | Check detailed output to pinpoint |
+| `W1000 Symbol 'xxx' is deprecated` | Deprecated API used | `delphi_kb` to look up alternatives |
+| `H2443 Inline function 'xxx' has not been expanded` | Inline function not expanded | Add `{$INLINE ON}` or ignore |
+| `dcc32 not found` | Compiler not detected | `check_environment(action="detect")` |
 
-### 3.3 搜索路径问题排查
+### 3.3 Search Path Issue Troubleshooting
 
-当编译器报告找不到 `.dcu` 或 `.pas` 时：
+When the compiler reports that it cannot find a `.dcu` or `.pas`:
 
 ```python
-# 1. 查看当前搜索路径
+# 1. View the current search path
 delphi_project(action="info", project_path="Project.dproj")
 
-# 2. 确认三方库路径
-# 使用 delphi_kb 搜索该单元所属的知识库
+# 2. Confirm the third-party library path
+# Use delphi_kb to search the knowledge base that the unit belongs to
 delphi_kb(query="xxx.pas", kb_type="thirdparty")
 
-# 3. 在搜索路径中添加缺失的目录
+# 3. Add the missing directory to the search path
 delphi_project(action="set",
     project_path="Project.dproj",
     property_name="DCC_UnitSearchPath",
@@ -170,112 +170,112 @@ delphi_project(action="set",
     platform="Win32")
 ```
 
-**⚠️ 注意**：`DCC_UnitSearchPath` 中包含 `$(BDS)`、`$(BDSLIB)`、`$(PLATFORM)` 等 MSBuild 宏变量，不要把它们当作普通路径。
+**⚠️ Note**: `DCC_UnitSearchPath` contains MSBuild macro variables such as `$(BDS)`, `$(BDSLIB)`, `$(PLATFORM)`. Do not treat them as ordinary paths.
 
-### 3.4 条件编译问题调试
+### 3.4 Conditional Compilation Issue Debugging
 
-当代码在 Debug 下正常、Release 下出错时：
+When code works fine under Debug but fails under Release:
 
 ```python
-# 对比两个配置的编译符号
+# Compare the compile symbols of the two configurations
 delphi_project(action="info", project_path="Project.dproj")
-# 检查 DCC_Define 在不同配置中的差异
+# Check the differences in DCC_Define across configurations
 
-# 查看条件编译块的代码
+# View the code inside conditional compilation blocks
 delphi_file(action="read", file_path="Unit1.pas", start_line=line_no)
 ```
 
-常见的原因：
-- `{$IFDEF DEBUG}` 块中的辅助代码在 Release 下被跳过
-- Release 下启用了优化导致时序问题
-- `{$IFDEF RELEASE}` 中的代码有隐藏 bug
+Common causes:
+- Auxiliary code in `{$IFDEF DEBUG}` blocks is skipped in Release
+- Optimization enabled in Release causes timing issues
+- Code in `{$IFDEF RELEASE}` has hidden bugs
 
-### 3.5 三方库/组件包编译失败
+### 3.5 Third-Party Library/Component Package Compile Failure
 
 ```python
-# 1. 确认三方库知识库已构建
+# 1. Confirm the third-party library knowledge base has been built
 delphi_kb(action="stats")
 
-# 2. 搜索三方库中的相关 API
+# 2. Search for relevant APIs in the third-party library
 delphi_kb(query="TComponentName", kb_type="thirdparty")
 
-# 3. 检查组件包安装状态
+# 3. Check the component package installation status
 delphi_project(action="info", project_path="Package.dproj")
 ```
 
-### 3.6 文件编码相关问题
+### 3.6 File Encoding Issues
 
-中文本地化环境下，源文件编码不一致会导致编译错误（非法字符、乱码）。
+In Chinese localization environments, inconsistent source file encodings can cause compile errors (illegal characters, garbled text).
 
-**常见场景**：
-- 文件保存为 GBK 但编译器期望 UTF-8（或反之）
-- BOM 头缺失导致编译器误判编码
-- 多人协作时不同编辑器使用不同编码保存
+**Common scenarios**:
+- File saved as GBK but compiler expects UTF-8 (or vice versa)
+- Missing BOM header causes compiler to misjudge encoding
+- Different editors save with different encodings during multi-person collaboration
 
-**排查方法**：
+**Troubleshooting method**:
 ```python
-# 用不同编码读取文件，确认文件实际编码
+# Read the file with different encodings to confirm the actual encoding
 delphi_file(action="read", file_path="Unit1.pas", encoding="gbk")
 delphi_file(action="read", file_path="Unit1.pas", encoding="utf-8")
 
-# 确认编码后可以转换编码
+# Once the encoding is confirmed, it can be converted
 delphi_file(action="encode", file_path="Unit1.pas",
-    to_encoding="utf-8-sig")  # 推荐统一转 UTF-8 with BOM
+    to_encoding="utf-8-sig")  # Recommended to uniformly convert to UTF-8 with BOM
 ```
 
-**预防**：项目统一使用 UTF-8 with BOM（`utf-8-sig`）编码保存所有 `.pas`/`.dfm` 文件。
+**Prevention**: The project should uniformly use UTF-8 with BOM (`utf-8-sig`) encoding to save all `.pas`/`.dfm` files.
 
 ---
 
-## 4. 运行时崩溃/异常调试
+## 4. Runtime Crash/Exception Debugging
 
-### 4.1 标准流程
+### 4.1 Standard Workflow
 
 ```
-程序崩溃
+Program crashes
   │
-  ├─ 检查 exception.log / 错误对话框
+  ├─ Check exception.log / error dialog
   │     ↓
-  │   记录异常类名、消息、地址
+  │   Record the exception class name, message, address
   │
-  ├─ delphi_project(action="compile", run_verify=true)  → 复现崩溃
-  │     ↓ run_verify 自动捕获崩溃
+  ├─ delphi_project(action="compile", run_verify=true)  → Reproduce the crash
+  │     ↓ run_verify automatically captures the crash
   │
-  ├─ 分析异常类型：
-  │     ├─ EAccessViolation    → 空指针 / 悬挂引用
-  │     ├─ EInvalidPointer     → 重复 Free / 野指针
-  │     ├─ EOutOfMemory        → 内存泄漏 / 大对象分配
-  │     ├─ EAssertionFailed    → Assert 检查失败
-  │     ├─ EConvertError       → 类型转换失败
-  │     ├─ EExternalException  → 外部异常（DLL/COM）
-  │     └─ EOSError            → Windows API 错误
+  ├─ Analyze the exception type:
+  │     ├─ EAccessViolation    → Null pointer / dangling reference
+  │     ├─ EInvalidPointer     → Double Free / wild pointer
+  │     ├─ EOutOfMemory        → Memory leak / large object allocation
+  │     ├─ EAssertionFailed    → Assert check failed
+  │     ├─ EConvertError       → Type conversion failed
+  │     ├─ EExternalException  → External exception (DLL/COM)
+  │     └─ EOSError            → Windows API error
   │
-  ├─ automate_delphi(gui) 启动程序并探查状态
+  ├─ automate_delphi(gui) start the program and inspect state
   │
-  └─ 定位到具体代码行后修复
+  └─ After locating the specific code line, fix it
 ```
 
-### 4.2 使用 run_verify 自动检测崩溃
+### 4.2 Using run_verify to Automatically Detect Crashes
 
 ```python
-# 编译后自动运行 3 秒，检测是否启动即崩溃
+# Automatically run for 3 seconds after compiling to detect if it crashes on startup
 delphi_project(action="compile",
     project_path="App.dproj",
     build_configuration="Debug",
-    run_verify=True)  # ← 关键参数
+    run_verify=True)  # ← Key parameter
 ```
 
-`run_verify` 会自动：
-1. 启动编译后的 exe
-2. 等待 3 秒观察进程是否存活
-3. 若崩溃，自动读取 `exception.log` 嵌入响应
+`run_verify` automatically:
+1. Starts the compiled exe
+2. Waits 3 seconds to observe whether the process is alive
+3. If it crashes, automatically reads `exception.log` and embeds it in the response
 
-### 4.3 使用自动化工具复现崩溃
+### 4.3 Using Automation Tools to Reproduce Crashes
 
-对于复杂的运行时崩溃，使用 `automate_delphi` 复现：
+For complex runtime crashes, use `automate_delphi` to reproduce:
 
 ```python
-# 启动程序并执行操作复现崩溃
+# Start the program and perform operations to reproduce the crash
 automate_delphi(
     action="gui",
     app_path="Win32/Debug/App.exe",
@@ -284,227 +284,227 @@ automate_delphi(
         {"cmd": "goto", "target": "TMainForm"},
         {"cmd": "type", "target": "EditName", "value": "test"},
         {"cmd": "click", "target": "BtnSubmit"},
-        # 等 5 秒看是否崩溃
+        # Wait 5 seconds to see if it crashes
         {"cmd": "wait", "ms": "5000"},
-        {"cmd": "dumpstate"},  # 如果没崩溃，获取状态
+        {"cmd": "dumpstate"},  # If it hasn't crashed, get state
     ])
 ```
 
-**⚠️ 关于 run_verify 和 automate_delphi 的关系：**
+**⚠️ Relationship between run_verify and automate_delphi:**
 
-| 场景 | 使用工具 | 说明 |
-|------|---------|------|
-| 编译后快速验证是否启动崩溃 | `compile(run_verify=true)` | 轻量，只等 3 秒 |
-| 特定操作触发的崩溃 | `automate_delphi` | 可执行具体操作复现 |
-| 长时间运行后的崩溃 | `automate_delphi` + `keep_alive` | 保持进程运行，逐步操作 |
-| 偶发崩溃 | 多次 `automate_delphi` | 循环操作提高复现概率 |
+| Scenario | Tool to Use | Description |
+|----------|------------|-------------|
+| Quick verification of startup crash after compiling | `compile(run_verify=true)` | Lightweight, only waits 3 seconds |
+| Crash triggered by specific operations | `automate_delphi` | Can perform specific operations to reproduce |
+| Crash after long-running operation | `automate_delphi` + `keep_alive` | Keep process running, operate step by step |
+| Intermittent crash | Multiple `automate_delphi` | Loop operations to increase reproduction probability |
 
-### 4.4 常见运行时异常分析
+### 4.4 Common Runtime Exception Analysis
 
-#### EAccessViolation（访问违例）
+#### EAccessViolation (Access Violation)
 
 ```
-可能原因：
-  ├─ 对象已释放仍访问         → 检查 FreeAndNil 使用
-  ├─ 字符串/数组越界          → 检查 Length 和索引
-  ├─ 窗口句柄未创建           → 检查 HandleAllocated()
-  ├─ 线程同步问题              → 检查 TThread.Synchronize / TMonitor
-  ├─ DLL 导入函数签名不匹配    → 检查 external 声明
-  └─ 接口引用计数错误          → 检查 _AddRef / _Release 平衡
+Possible causes:
+  ├─ Object used after being freed     → Check FreeAndNil usage
+  ├─ String/array out of bounds        → Check Length and indices
+  ├─ Window handle not created         → Check HandleAllocated()
+  ├─ Thread synchronization issue      → Check TThread.Synchronize / TMonitor
+  ├─ DLL imported function signature mismatch → Check external declaration
+  └─ Interface reference counting error → Check _AddRef / _Release balance
 ```
 
-**排查步骤**：
+**Troubleshooting steps**:
 
 ```python
-# 1. 定位出错的代码区域
-# 从异常地址或错误描述中找到相关单元和行号
+# 1. Locate the code region where the error occurs
+# Find the relevant unit and line number from the exception address or error description
 
-# 2. 读取相关源码
+# 2. Read the relevant source code
 delphi_file(action="read", file_path="Unit1.pas", start_line=line_no-20, end_line=line_no+10)
 
-# 3. 检查涉及的对象创建和释放
-# 搜索对象的 Free/Destroy 调用
-# 搜索 FreeAndNil / Free 的使用
+# 3. Check the creation and release of involved objects
+# Search for Free/Destroy calls on the object
+# Search for FreeAndNil / Free usage
 
-# 4. 查 API 确认对象创建方式
+# 4. Look up the API to confirm the object creation method
 delphi_kb(query="TStringList", kb_type="delphi")
 ```
 
-#### EInvalidPointer（无效指针）
+#### EInvalidPointer (Invalid Pointer)
 
 ```
-几乎总是同一个原因：重复释放（Double Free）。
-排查方向：
-  ├─ 是否手动 Free 后又触发自动析构（Ownership 混淆）
-  ├─ TObjectList 的 OwnsObjects 是否正确设置
-  ├─ TComponent.FreeNotification 回调中重复释放
-  ├─ 接口引用计数 + 手动 Free 混合使用
-  └─ 多线程中同时释放同一对象
+Almost always the same cause: Double Free.
+Troubleshooting directions:
+  ├─ Whether manually Free'd then auto-destructor triggered (Ownership confusion)
+  ├─ Whether TObjectList's OwnsObjects is correctly set
+  ├─ Repeated release in TComponent.FreeNotification callback
+  ├─ Mixed use of interface reference counting + manual Free
+  └─ Releasing the same object simultaneously in multiple threads
 ```
 
-#### EOutOfMemory（内存不足）
+#### EOutOfMemory (Out of Memory)
 
 ```
-排查方向：
-  ├─ 内存泄漏累积 → 长时间运行后出现
-  ├─ 大文件/图片一次性加载 → 流式处理
-  ├─ 递归无终止条件 → 检查递归函数
-  ├─ 字符串拼接导致内存碎片 → 用 StringBuilder
-  └─ 三方库内存泄漏
+Troubleshooting directions:
+  ├─ Memory leak accumulation → Occurs after long-running operation
+  ├─ Large file/image loaded all at once → Stream processing
+  ├─ Recursion without termination condition → Check recursive functions
+  ├─ String concatenation causing memory fragmentation → Use StringBuilder
+  └─ Third-party library memory leak
 ```
 
-### 4.5 运行时库/包缺失排查
+### 4.5 Runtime Library/Package Missing Troubleshooting
 
-当程序启动时提示"无法找到 xxx.bpl"或"无法定位程序输入点"：
+When the program shows "cannot find xxx.bpl" or "cannot locate program input point" at startup:
 
 ```python
-# 检查编译链接方式
+# Check the compile linking method
 delphi_project(action="info", project_path="Project.dproj")
-# 检查 RuntimeLibrary 属性: static / dynamic
+# Check the RuntimeLibrary property: static / dynamic
 ```
 
-| 现象 | 原因 | 解决 |
-|------|------|------|
-| 找不到 `xxx.bpl` | 动态链接但 BPL 不在 PATH | 静态链接或分发 BPL |
-| "无法定位程序输入点" | DLL 版本不匹配 | 检查三方库版本 |
-| 启动后立即退出无提示 | FMX 运行时 DLL 缺失 | 静态链接 FMX 或准备运行环境 |
-| `XXX.dll 丢失` | Windows 系统 DLL 缺失 | 安装 VC++ 运行库或 DirectX |
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| Cannot find `xxx.bpl` | Dynamic linking but BPL not in PATH | Static linking or distribute BPL |
+| "Cannot locate program input point" | DLL version mismatch | Check third-party library version |
+| Exits immediately after startup with no prompt | Missing FMX runtime DLL | Static link FMX or prepare runtime environment |
+| `XXX.dll missing` | Missing Windows system DLL | Install VC++ runtime or DirectX |
 
-### 4.6 线程相关问题调试
+### 4.6 Thread-Related Issue Debugging
 
-偶发崩溃/随机行为往往指向线程同步问题。**这类调试与单线程完全不同**。
+Intermittent crashes/random behavior often point to thread synchronization issues. **This type of debugging is completely different from single-threaded debugging.**
 
-**特征识别**：
-- 仅在高负载/多次操作后复现
-- 每次崩溃位置不同
-- Debug 模式下不出现，Release 出现（优化暴露了竞态条件）
-- 加 Sleep/MessageBox 后崩溃消失 → 经典竞态条件标志
+**Characteristic identification**:
+- Only reproduces under high load/after many operations
+- Crash location differs each time
+- Does not occur in Debug mode, occurs in Release (optimization exposes race conditions)
+- Crash disappears after adding Sleep/MessageBox → Classic race condition indicator
 
-**排查方向**：
+**Troubleshooting directions**:
 
 ```python
-# 1. 代码审查：检查共享变量的保护机制
-# 2. 检查 TThread 的 terminated 标志是否被检查
-# 3. 检查线程退出时资源是否清理
-# 4. 检查 TThread.Synchronize/Queue 回调是否访问了已释放的对象
+# 1. Code review: check protection mechanisms for shared variables
+# 2. Check whether TThread's terminated flag is checked
+# 3. Check whether resources are cleaned up when the thread exits
+# 4. Check whether TThread.Synchronize/Queue callbacks access already-freed objects
 
-# 静态分析可检测部分线程安全问题
+# Static analysis can detect some thread safety issues
 delphi_project(action="audit", base_dir="src")
 ```
 
-**⚠️ 关键点**：`TThread.Synchronize` 和 `TThread.Queue` 的回调在*主线程*执行，
-因此回调中访问的组件可能已在析构中——需要检查 `csDestroying` 标志。
+**⚠️ Key point**: `TThread.Synchronize` and `TThread.Queue` callbacks execute on the *main thread*,
+so components accessed in the callback may already be in the process of being destructed—need to check the `csDestroying` flag.
 
 ---
 
-## 5. 逻辑错误调试
+## 5. Logic Error Debugging
 
-### 5.1 代码骨架分析
+### 5.1 Code Skeleton Analysis
 
-先了解整体代码结构，避免盲目深入细节：
+First understand the overall code structure to avoid blindly diving into details:
 
 ```python
-# 获取项目代码骨架（最省 token 的方式）
+# Get the project code skeleton (most token-efficient approach)
 delphi_project(action="ast", base_dir="src")
 
-# 或查看单个文件的骨架
+# Or view the skeleton of a single file
 delphi_project(action="ast", file_path="Unit1.pas")
 ```
 
-`ast` 返回所有类、方法、字段的概要，让你快速定位到相关代码区域。
+`ast` returns a summary of all classes, methods, and fields, allowing you to quickly locate the relevant code region.
 
-### 5.2 代码审计
+### 5.2 Code Audit
 
 ```python
-# 运行静态分析
+# Run static analysis
 delphi_project(action="audit", base_dir="src")
 ```
 
-50+ 静态分析规则覆盖：
-- 空指针风险
-- 资源泄漏（File/Handle/GDI/内存）
-- 线程安全问题
-- 类型转换风险
-- 异常安全
-- 代码质量（过长方法、过深嵌套）
+50+ static analysis rules cover:
+- Null pointer risks
+- Resource leaks (File/Handle/GDI/memory)
+- Thread safety issues
+- Type conversion risks
+- Exception safety
+- Code quality (methods too long, nesting too deep)
 
-### 5.3 读取源码定位
+### 5.3 Reading Source Code to Locate
 
 ```python
-# 按类名定位和读取
+# Locate and read by class name
 delphi_file(action="read", search_type="class",
     type_name="TMainForm",
     search_in="project",
     project_path="Project.dproj")
 
-# 按函数名定位
+# Locate by function name
 delphi_file(action="read", search_type="function",
     function_name="Button1Click",
     search_in="project",
     project_path="Project.dproj")
 
-# 读取特定行范围
+# Read a specific line range
 delphi_file(action="read", file_path="Unit1.pas",
     start_line=50, end_line=100, show_line_numbers=True)
 ```
 
-### 5.4 API 用法验证
+### 5.4 API Usage Verification
 
-AI 经常编造 Delphi API 签名。**在假设 API 用法错误之前，必须查知识库确认**：
+AIs frequently fabricate Delphi API signatures. **Before assuming an API is being used incorrectly, you must verify with the knowledge base**:
 
 ```python
-# 查 Delphi 官方 API
+# Look up official Delphi APIs
 delphi_kb(query="TStringList.Create", kb_type="delphi")
 
-# 查项目代码中的 API
+# Look up APIs in the project code
 delphi_kb(query="TMainForm", kb_type="project", project_path="Project.dproj")
 
-# 查函数签名（精确匹配）
+# Look up function signatures (exact match)
 delphi_kb(query="TStringList.LoadFromFile", search_type="function")
 
-# 查引用（评估修改影响）
+# Look up references (assess modification impact)
 delphi_kb(query="TStringList", search_type="reference", kb_type="project")
 ```
 
-**⚠️ 重要**：当 AI 对某个 Delphi API 的用法不确信时，必须通过 `delphi_kb` 或 `delphi_file(action="read", search_type="class")` 确认官方定义。不要凭大模型训练数据中的记忆编造。
+**⚠️ Important**: When the AI is uncertain about the usage of a Delphi API, it must confirm the official definition through `delphi_kb` or `delphi_file(action="read", search_type="class")`. Do not fabricate from the large model's training data memory.
 
-### 5.5 Git 历史回溯
+### 5.5 Git History Backtracking
 
 ```python
-# 查看最近提交
+# View recent commits
 code_hosting(action="git_log", dir=".", limit=20)
 
-# 查看特定文件的修改历史
+# View modification history of a specific file
 code_hosting(action="git_log", dir=".", files=["src/Unit1.pas"], limit=10)
 
-# 查看具体提交的改动
+# View changes in a specific commit
 code_hosting(action="git_show", dir=".", ref="abc1234")
 
-# 比较当前和之前的差异
+# Compare current and previous differences
 code_hosting(action="git_diff", dir=".", ref="HEAD~1..HEAD")
 ```
 
-### 5.6 经验库复用
+### 5.6 Experience Library Reuse
 
-如果之前解决过类似问题，先查经验库：
+If a similar problem has been solved before, check the experience library first:
 
 ```python
 experience(action="search", query="EAccessViolation TStringList")
-experience(action="search", query="列表项删除报错")
+experience(action="search", query="error on list item deletion")
 ```
 
 ---
 
-## 6. GUI/界面问题调试
+## 6. GUI/Interface Issue Debugging
 
-### 6.1 启动自动化环境
+### 6.1 Launching the Automation Environment
 
-使用 `automate_delphi` 的 GUI 模式与运行中的 Delphi 程序交互。
+Use the GUI mode of `automate_delphi` to interact with a running Delphi program.
 
-**前提**：目标程序已链接 `DaofyAutomation` 单元。
+**Prerequisite**: The target program has linked the `DaofyAutomation` unit.
 
 ```python
-# 启动程序并获取界面截图
+# Start the program and capture the UI screenshot
 automate_delphi(
     action="gui",
     app_path="App.exe",
@@ -515,33 +515,33 @@ automate_delphi(
     ])
 ```
 
-### 6.2 探查界面结构
+### 6.2 Inspecting the Interface Structure
 
 ```python
-# 获取全部控件树（最全面的状态）
+# Get the full control tree (most comprehensive state)
 automate_delphi(
     action="gui",
     app_path="App.exe",
     script=[
         {"cmd": "goto", "target": "TMainForm"},
-        {"cmd": "dumpstate"},  # ← 返回完整控件树 JSON
+        {"cmd": "dumpstate"},  # ← Returns complete control tree JSON
     ])
 
-# 列出所有窗口
+# List all windows
 automate_delphi(
     app_path="App.exe",
     script=[{"cmd": "listwnd"}])
 
-# 检视单个控件
+# Inspect a single control
 automate_delphi(
     app_path="App.exe",
     script=[{"cmd": "rinspect", "target": "EditName"}])
 ```
 
-### 6.3 获取运行时属性值
+### 6.3 Getting Runtime Property Values
 
 ```python
-# 读取控件属性
+# Read control properties
 automate_delphi(
     app_path="App.exe",
     script=[
@@ -552,10 +552,10 @@ automate_delphi(
     ])
 ```
 
-### 6.4 截图对比验证
+### 6.4 Screenshot Comparison Verification
 
 ```python
-# 操作前截图
+# Screenshot before operation
 automate_delphi(
     app_path="App.exe",
     script=[
@@ -568,53 +568,53 @@ automate_delphi(
     ])
 ```
 
-### 6.5 对话框/弹窗处理
+### 6.5 Dialog/Popup Handling
 
 ```python
-# 扫描所有弹窗
+# Scan all popups
 automate_delphi(
     app_path="App.exe",
     script=[{"cmd": "msgscan"}])
 
-# 关闭弹窗
+# Close the popup
 automate_delphi(
     app_path="App.exe",
     script=[
         {"cmd": "msgclick", "target": "ok"},
     ])
 
-# 弹出菜单
+# Context menu
 automate_delphi(
     app_path="App.exe",
     script=[
         {"cmd": "rclick", "target": "Grid1"},
         {"cmd": "dlgscan"},
-        {"cmd": "dlgclick", "target": "复制"},
+        {"cmd": "dlgclick", "target": "Copy"},
     ])
 ```
 
-### 6.6 进程复用与状态保持
+### 6.6 Process Reuse and State Preservation
 
 ```python
-# 第一次：启动并保持
+# First time: start and keep alive
 automate_delphi(app_path="App.exe",
     script=[{"cmd": "goto", "target": "TMainForm"}, {"cmd": "capture", "target": "img1"}],
     keep_alive=True)
 
-# 后续操作：复用已有进程
+# Subsequent operations: reuse the existing process
 automate_delphi(app_path="App.exe",
     script=[{"cmd": "rget", "target": "EditName", "prop": "Text"}])
 
-# 清理：发送 exit
+# Cleanup: send exit
 automate_delphi(app_path="App.exe",
     script=[{"cmd": "exit"}])
 ```
 
-**⚠️ 注意**：进程 5 分钟无调用会自动 kill，需要长时间保持时注意调用的频率。
+**⚠️ Note**: The process will be automatically killed after 5 minutes of no calls. When you need to keep it alive for a long time, pay attention to the frequency of calls.
 
-### 6.7 控件数量统计（formsum）
+### 6.7 Control Count Statistics (formsum)
 
-快速评估窗体和 Frame 的复杂度，定位性能热点：
+Quickly assess the complexity of forms and frames to locate performance hotspots:
 
 ```python
 automate_delphi(
@@ -623,19 +623,19 @@ automate_delphi(
     script=[{"cmd": "formsum"}])
 ```
 
-返回信息包含每个 Form/Frame 的控件总数。**当控件数 > 100 时**，该窗体的循环/遍历操作可能是性能瓶颈。
+Returned information includes the total number of controls for each Form/Frame. **When the control count > 100**, loop/iteration operations on that form may be a performance bottleneck.
 
-**典型场景**：
-- 大数据量 ListView/TreeView 的遍历操作
-- 多重嵌套 Panel/Frame 导致的递归渲染
-- 动态创建的控件未及时释放
+**Typical scenarios**:
+- Iteration operations on large ListView/TreeView
+- Recursive rendering caused by deeply nested Panel/Frame
+- Dynamically created controls not released in a timely manner
 
-### 6.8 截图文字识别（OCR）
+### 6.8 Screenshot Text Recognition (OCR)
 
-当截图中有文字信息但无法通过 rget 获取时，使用 OCR 识别：
+When the screenshot contains text information but it cannot be obtained via rget, use OCR recognition:
 
 ```python
-# 先截图
+# First take a screenshot
 automate_delphi(
     action="gui",
     app_path="App.exe",
@@ -644,36 +644,36 @@ automate_delphi(
         {"cmd": "capture", "target": "debug_screen"},
     ])
 
-# 再 OCR 识别截图中的文字
+# Then OCR-recognize the text in the screenshot
 ocr(action="recognize", image_path="docs/copyright/snapshots/debug_screen.png")
 ```
 
-**OCR 与 automate_delphi 的配合方式**：
-- `capture` → OCR：适用于错误对话框、提示信息等文本内容
-- `capture` before/after → `ocr(diff)`：对比两次截图，自动标注差异区域
-- OCR 是 GUI 调试的辅助手段，当 `rget` / `dumpstate` 无法获取文本内容时使用
+**How OCR works with automate_delphi**:
+- `capture` → OCR: Suitable for text content in error dialogs, prompts, etc.
+- `capture` before/after → `ocr(diff)`: Compare two screenshots and automatically annotate the difference regions
+- OCR is an auxiliary means for GUI debugging; use it when `rget` / `dumpstate` cannot obtain the text content
 
-**不适用场景**（优先用 rget/dumpstate 替代）：
-- 控件 Caption/Text 属性 → `rget`
-- 控件树结构 → `dumpstate`
-- 列表数据 → `rcall` 调用业务方法获取
+**Not-suitable scenarios** (prefer rget/dumpstate instead):
+- Control Caption/Text properties → `rget`
+- Control tree structure → `dumpstate`
+- List data → `rcall` to call business methods to get
 
 ---
 
-## 7. 运行时数据探查（RTTI）
+## 7. Runtime Data Inspection (RTTI)
 
-### 7.1 使用 delphi_rtti 发现和调用
+### 7.1 Using delphi_rtti to Discover and Call
 
-当程序已运行且链接了 DaofyAutomation 单元时，可以通过 RTTI 直接探查运行时状态。
+When the program is running and has linked the DaofyAutomation unit, you can directly inspect runtime state via RTTI.
 
 ```python
-# 第一步：发现能力
+# Step 1: Discover capabilities
 delphi_rtti(action="discover", app_path="App.exe")
 
-# 第二步：查看特定类的方法和属性
+# Step 2: View methods and properties of a specific class
 delphi_rtti(action="discover", app_path="App.exe", class_name="TMainForm")
 
-# 第三步：调用业务方法获取数据
+# Step 3: Call business methods to get data
 delphi_rtti(action="call",
     app_path="App.exe",
     class_name="TMainForm",
@@ -681,277 +681,277 @@ delphi_rtti(action="call",
     params={"status": "active"})
 ```
 
-### 7.2 RTTI vs 自动化脚本
+### 7.2 RTTI vs Automation Scripts
 
-| 场景 | 推荐方式 | 原因 |
-|------|---------|------|
-| 读取控件属性 | `automate_delphi(rget)` | 更轻量，直接返回属性值 |
-| 调用业务方法 | `delphi_rtti(call)` | 自动参数 Schema 校验 |
-| 了解可用方法 | `delphi_rtti(discover)` | 返回完整方法清单+参数 |
-| 复杂交互操作 | `automate_delphi(click/type)` | 模拟真实用户操作 |
-| 控件树全量状态 | `automate_delphi(dumpstate)` | 完整的 DFM 控件树 |
+| Scenario | Recommended Method | Reason |
+|----------|-------------------|--------|
+| Read control properties | `automate_delphi(rget)` | Lighter, returns property value directly |
+| Call business methods | `delphi_rtti(call)` | Automatic parameter schema validation |
+| Understand available methods | `delphi_rtti(discover)` | Returns complete method list + parameters |
+| Complex interaction operations | `automate_delphi(click/type)` | Simulates real user operations |
+| Full control tree state | `automate_delphi(dumpstate)` | Complete DFM control tree |
 
 ---
 
-## 8. 内存泄漏/资源泄漏调试
+## 8. Memory/Resource Leak Debugging
 
-### 8.1 静态分析检测
+### 8.1 Static Analysis Detection
 
 ```python
-# 运行 P0 级审计规则
+# Run P0-level audit rules
 delphi_project(action="audit", base_dir="src", rules="P0")
 ```
 
-静态分析可检测：
-- TObject.Create 后缺少 Free
-- GetWindowDC 后缺少 ReleaseDC
-- 文件打开后未关闭
-- 接口引用未释放
+Static analysis can detect:
+- Missing Free after TObject.Create
+- Missing ReleaseDC after GetWindowDC
+- Files not closed after opening
+- Interface references not released
 
-### 8.2 常见资源泄漏模式
+### 8.2 Common Resource Leak Patterns
 
 ```pascal
-// ❌ 异常路径泄漏
+// ❌ Exception path leak
 procedure TForm1.LoadFile;
 var
   SL: TStringList;
 begin
   SL := TStringList.Create;
-  SL.LoadFromFile('data.txt');  // 如果这句抛异常，SL 泄漏
-  // 处理数据
-  SL.Free;  // ← 只有正常路径才执行
+  SL.LoadFromFile('data.txt');  // If this line throws an exception, SL leaks
+  // Process data
+  SL.Free;  // ← Only executed on the normal path
 end;
 
-// ✅ 正确写法
+// ✅ Correct approach
 SL := TStringList.Create;
 try
   SL.LoadFromFile('data.txt');
-  // 处理数据
+  // Process data
 finally
   SL.Free;
 end;
 ```
 
 ```pascal
-// ❌ GDI 资源泄漏
-Canvas.Font.Name := 'Arial';  // 每次设置创建 GDI 对象
-// 频繁调用且不释放 → GDI 对象耗尽
+// ❌ GDI resource leak
+Canvas.Font.Name := 'Arial';  // Creates GDI object each time it is set
+// Called frequently without release → GDI objects exhausted
 
-// ✅ 减少 GDI 创建
-// 在 FormCreate 设置字体，不要在 Paint 中反复设置
+// ✅ Reduce GDI creation
+// Set the font in FormCreate, don't repeatedly set it in Paint
 ```
 
-### 8.3 代码审计后的误报排除
+### 8.3 False Positive Exclusion After Code Audit
 
-静态分析会产生误报，AI 需要逐条判断：
+Static analysis produces false positives; the AI needs to judge each one:
 
-| 误报模式 | 判断方法 |
-|---------|---------|
-| 对象由 Owner 管理 | 检查是否设置了 Owner（`TComponent.Create(AOwner)`） |
-| 接口引用计数释放 | Delphi 接口默认有引用计数，除非手动干扰 |
-| 全局/单例对象 | 检查对象是否在 initialization/finalization 中管理 |
-| 消息/事件中释放 | 检查 PostMessage 延迟释放模式 |
+| False Positive Pattern | Judgment Method |
+|------------------------|-----------------|
+| Object managed by Owner | Check whether an Owner is set (`TComponent.Create(AOwner)`) |
+| Interface reference counting release | Delphi interfaces default to reference counting unless manually interfered |
+| Global/singleton objects | Check whether the object is managed in initialization/finalization |
+| Released in message/event | Check the PostMessage delayed release pattern |
 
 ---
 
-## 9. 常见 AI 误判模式
+## 9. Common AI Misjudgment Patterns
 
-以下是 AI 调试 Delphi 程序时最容易犯的错误，**必须主动避免**：
+The following are the most common mistakes AIs make when debugging Delphi programs and **must be actively avoided**:
 
-### 误判 1：跳过环境检查，直接改代码
-
-```
-❌ 错误做法：
-  "编译失败了，缺少 TStringList 单元 → 加 uses System.Classes"
-
-✅ 正确做法：
-  1. check_environment(action="check") → 确认编译器正常
-  2. delphi_project(action="info") → 查搜索路径
-  3. 定位到真正的错误原因
-```
-
-### 误判 2：凭记忆编造 API 签名
+### Misjudgment 1: Skipping environment check and directly modifying code
 
 ```
-❌ 错误做法：
-  "我记得 TStringList.LoadFromFile 接受一个 TEncoding 参数…"
+❌ Wrong approach:
+  "Compilation failed, missing TStringList unit → add uses System.Classes"
 
-✅ 正确做法：
+✅ Correct approach:
+  1. check_environment(action="check") → Confirm the compiler is normal
+  2. delphi_project(action="info") → Check the search path
+  3. Locate the real cause of the error
+```
+
+### Misjudgment 2: Fabricating API signatures from memory
+
+```
+❌ Wrong approach:
+  "I recall that TStringList.LoadFromFile accepts a TEncoding parameter…"
+
+✅ Correct approach:
   delphi_kb(query="TStringList.LoadFromFile", search_type="function")
-  → 看实际签名再用
+  → Look at the actual signature before using it
 ```
 
-### 误判 3：把运行时错误当作代码错误
+### Misjudgment 3: Treating runtime errors as code errors
 
 ```
-❌ 错误做法：
-  看到 EAccessViolation → 立即判断是"某处空指针"→ 开始改代码
+❌ Wrong approach:
+  Seeing EAccessViolation → Immediately conclude "somewhere has a null pointer" → Start modifying code
 
-✅ 正确做法：
-  1. 用 automate_delphi + dumpstate/rget 探查运行时状态
-  2. 确认对象在崩溃时是否存活
-  3. 再定位到代码
+✅ Correct approach:
+  1. Use automate_delphi + dumpstate/rget to inspect runtime state
+  2. Confirm whether the object is alive at the time of the crash
+  3. Then locate the code
 ```
 
-### 误判 4：忽略 DFM 资源问题
+### Misjudgment 4: Ignoring DFM resource issues
 
 ```
-❌ 错误做法：
-  程序启动崩溃 → 找 FormCreate / OnCreate 事件代码
+❌ Wrong approach:
+  Crash on startup → Look for FormCreate / OnCreate event code
 
-✅ 正确做法：
-  先排查 DFM 资源：
-  - 检查 DFM 中引用的组件类是否存在
-  - 检查 DFM 是否有二进制格式兼容问题
-  - 检查 .res 资源文件是否存在
+✅ Correct approach:
+  First troubleshoot DFM resources:
+  - Check whether the component classes referenced in the DFM exist
+  - Check whether there are binary format compatibility issues in the DFM
+  - Check whether the .res resource file exists
 ```
 
-### 误判 5：条件编译/平台差异忽略
+### Misjudgment 5: Ignoring conditional compilation/platform differences
 
 ```
-❌ 错误做法：
-  "Debug 正常 Release 崩溃 → 肯定是代码有 bug"
+❌ Wrong approach:
+  "Debug works fine, Release crashes → Must be a bug in the code"
 
-✅ 正确做法：
-  对比 Debug/Release 的编译设置差异：
-  - 优化级别（优化可能暴露时序 bug）
-  - 条件编译符号
-  - 运行时检查（范围检查、溢出检查）
+✅ Correct approach:
+  Compare the compile setting differences between Debug/Release:
+  - Optimization level (optimization may expose timing bugs)
+  - Conditional compilation symbols
+  - Runtime checks (range checking, overflow checking)
 ```
 
-### 误判 6：三方库版本问题当作代码问题
+### Misjudgment 6: Treating third-party library version issues as code issues
 
 ```
-❌ 错误做法：
-  编译报找不到 xxx.dcu → "删掉这个单元的引用"
+❌ Wrong approach:
+  Compile error cannot find xxx.dcu → "Remove the reference to this unit"
 
-✅ 正确做法：
-  1. delphi_kb(kb_type="thirdparty") → 搜三方库
-  2. 检查三方库路径配置
-  3. 可能需要构建三方库知识库
+✅ Correct approach:
+  1. delphi_kb(kb_type="thirdparty") → Search the third-party library
+  2. Check the third-party library path configuration
+  3. May need to build the third-party library knowledge base
 ```
 
-### 误判 7：无根据地修改 .dproj 配置
+### Misjudgment 7: Modifying .dproj configuration without basis
 
 ```
-❌ 错误做法：
-  "加一个搜索路径试试" → 直接修改配置
+❌ Wrong approach:
+  "Try adding a search path" → Directly modify the configuration
 
-✅ 正确做法：
-  delphi_project(action="info") 先查看当前配置
-  → 确认修改前和修改后的影响
-  → 用 delphi_project(action="set") 修改
+✅ Correct approach:
+  delphi_project(action="info") first view the current configuration
+  → Confirm the impact before and after the modification
+  → Use delphi_project(action="set") to modify
 ```
 
-### 误判 8：一次修改多处代码
+### Misjudgment 8: Modifying multiple code locations at once
 
 ```
-❌ 错误做法：
-  看到一个问题 → 顺手改了 5 个地方 → 编译失败 → 不知哪个改错了
+❌ Wrong approach:
+  See one problem → Change 5 places along the way → Compile fails → Don't know which change was wrong
 
-✅ 正确做法：
-  Git 提交或备份：
-  1. 改一处 → 编译验证
-  2. 改二处 → 编译验证
-  3. 出错时 git diff 或 delphi_file(backup/restore) 回退
+✅ Correct approach:
+  Git commit or backup:
+  1. Change one place → Compile and verify
+  2. Change a second place → Compile and verify
+  3. On error, use git diff or delphi_file(backup/restore) to roll back
 ```
 
 ---
 
-## 10. 调试工作流速查表
+## 10. Debugging Workflow Quick Reference
 
-### 速查：工具选择
+### Quick Reference: Tool Selection
 
-| 调试需求 | 使用的工具 | action |
-|---------|-----------|--------|
-| 编译器是否可用 | `check_environment` | check/detect |
-| 项目配置详情 | `delphi_project` | info |
-| 重新编译 | `delphi_project` | compile |
-| 编译后验证是否崩溃 | `delphi_project` | compile + run_verify |
-| 代码静态分析 | `delphi_project` | audit |
-| 代码骨架概览 | `delphi_project` | ast |
-| 读源代码 | `delphi_file` | read |
-| 改源代码 | `delphi_file` | replace/insert/delete |
-| API 定义查询 | `delphi_kb` | search |
-| API 引用分析 | `delphi_kb` | search(search_type="reference") |
-| 编码规范 | `get_coding_rules` | (section) |
-| 启动程序并截图 | `automate_delphi` | gui |
-| 控件树全貌 | `automate_delphi` | gui(dumpstate) |
-| 读运行时属性 | `automate_delphi` | gui(rget) |
-| 写运行时属性 | `automate_delphi` | gui(rset) |
-| 调用方法 | `automate_delphi` | gui(rcall) |
-| 运行时能力发现 | `delphi_rtti` | discover |
-| 运行时方法调用 | `delphi_rtti` | call |
-| 查看 Git 历史 | `code_hosting` | git_log/git_show |
-| 复用经验 | `experience` | search |
-| 控制台程序交互 | `automate_delphi` | console |
-| 截图文字识别 | `ocr` | recognize |
-| 截图对比 | `ocr` | diff |
-| 视图控件树统计 | `automate_delphi` | gui(formsum) |
-| 文件编码检测/转换 | `delphi_file` | encode |
-| 版本回退 | `delphi_file` | backup/restore |
-| 格式代码 | `delphi_file` | format |
+| Debugging Need | Tool to Use | action |
+|----------------|-------------|--------|
+| Whether the compiler is available | `check_environment` | check/detect |
+| Project configuration details | `delphi_project` | info |
+| Recompile | `delphi_project` | compile |
+| Verify crash after compiling | `delphi_project` | compile + run_verify |
+| Code static analysis | `delphi_project` | audit |
+| Code skeleton overview | `delphi_project` | ast |
+| Read source code | `delphi_file` | read |
+| Modify source code | `delphi_file` | replace/insert/delete |
+| API definition lookup | `delphi_kb` | search |
+| API reference analysis | `delphi_kb` | search(search_type="reference") |
+| Coding rules | `get_coding_rules` | (section) |
+| Start the program and screenshot | `automate_delphi` | gui |
+| Full control tree | `automate_delphi` | gui(dumpstate) |
+| Read runtime property | `automate_delphi` | gui(rget) |
+| Write runtime property | `automate_delphi` | gui(rset) |
+| Call method | `automate_delphi` | gui(rcall) |
+| Runtime capability discovery | `delphi_rtti` | discover |
+| Runtime method call | `delphi_rtti` | call |
+| View Git history | `code_hosting` | git_log/git_show |
+| Reuse experience | `experience` | search |
+| Console program interaction | `automate_delphi` | console |
+| Screenshot text recognition | `ocr` | recognize |
+| Screenshot comparison | `ocr` | diff |
+| View control tree statistics | `automate_delphi` | gui(formsum) |
+| File encoding detection/conversion | `delphi_file` | encode |
+| Version rollback | `delphi_file` | backup/restore |
+| Format code | `delphi_file` | format |
 
-### 速查：症状 → 首选动作
+### Quick Reference: Symptom → First Action
 
-| 症状 | 第一步 | 第二步 |
-|------|-------|--------|
-| 编译失败，提示找不到文件 | `delphi_project(action="info")` 查搜索路径 | `check_environment(action="check")` 确认编译器 |
-| 编译失败，语法错误 | `delphi_file(action="read")` 读报错文件 | `delphi_kb` 查 API 用法 |
-| 程序启动即崩溃 | `compile(run_verify=true)` 捕获异常 | `automate_delphi(gui)` 探查状态 |
-| 特定操作触发崩溃 | `automate_delphi(gui)` 复现崩溃 | `dumpstate` + `rget` 探查运行中状态 |
-| 界面显示不正确 | `automate_delphi(capture)` 截图 | `dumpstate` 看控件属性 |
-| 计算结果错误 | `delphi_project(action="ast")` 骨架分析 | `delphi_file(read)` 读关键代码 |
-| 长时间运行后异常 | `delphi_project(action="audit")` 静态分析 | 检查资源泄漏/线程安全 |
-| 提示找不到 BPL/DLL | `delphi_project(action="info")` 查链接方式 | 静态链接或准备运行环境 |
-| Debug 正常 Release 崩溃 | 对比两个配置的编译设置 | 检查优化级别和条件编译 |
-| 三方库编译失败 | `delphi_kb(action="stats")` 查 KB 状态 | 重新构建三方库 KB |
-| 控制台输出异常 | `automate_delphi(console)` 交互测试 | 检查 stdin/stdout 处理 |
-| 界面响应缓慢 | `automate_delphi(formsum)` 查控件数 | AST 分析主线程耗时操作 |
-| 中文乱码/编码问题 | `delphi_file(encode)` 检测编码 | 统一 UTF-8 with BOM 保存 |
-| 工具调用超时/失败 | 分类错误类型(§13.1) | 切换探查方式或重启 |
+| Symptom | First Step | Second Step |
+|---------|-----------|-------------|
+| Compile fails, reports missing file | `delphi_project(action="info")` to check search path | `check_environment(action="check")` to confirm compiler |
+| Compile fails, syntax error | `delphi_file(action="read")` to read the file that reported the error | `delphi_kb` to look up API usage |
+| Program crashes immediately on startup | `compile(run_verify=true)` to capture the exception | `automate_delphi(gui)` to inspect state |
+| Specific operation triggers crash | `automate_delphi(gui)` to reproduce the crash | `dumpstate` + `rget` to inspect running state |
+| Interface display incorrect | `automate_delphi(capture)` screenshot | `dumpstate` to view control properties |
+| Calculation result incorrect | `delphi_project(action="ast")` skeleton analysis | `delphi_file(read)` to read key code |
+| Exception after long-running operation | `delphi_project(action="audit")` static analysis | Check resource leaks/thread safety |
+| Reports BPL/DLL not found | `delphi_project(action="info")` to check linking method | Static link or prepare runtime environment |
+| Debug works fine Release crashes | Compare compile settings of the two configurations | Check optimization level and conditional compilation |
+| Third-party library compile failure | `delphi_kb(action="stats")` to check KB status | Rebuild the third-party library KB |
+| Console output abnormal | `automate_delphi(console)` interactive testing | Check stdin/stdout handling |
+| Interface responds slowly | `automate_delphi(formsum)` to check control count | AST analysis of main-thread time-consuming operations |
+| Chinese garbled text/encoding issues | `delphi_file(encode)` to detect encoding | Uniformly save as UTF-8 with BOM |
+| Tool call times out/fails | Classify the error type (§13.1) | Switch inspection method or restart |
 
-### 速查：每个调试阶段的输出产物
+### Quick Reference: Output Artifacts for Each Debugging Stage
 
-| 阶段 | 应产出的内容 |
-|------|------------|
-| 问题确认 | 异常信息 / 错误描述 / 复现步骤 |
-| 环境确认 | 编译器状态 / 项目配置摘要 |
-| 证据收集 | 代码片段 / 控件树 / 属性值 / 截图 |
-| 根因分析 | 根因类型（配置/代码/环境/三方库）+ 证据链 |
-| 修复方案 | 具体修改内容 + 预期效果 |
-| 验证 | 编译通过 / run_verify 通过 / 截图确认 |
+| Stage | Content that should be produced |
+|-------|--------------------------------|
+| Problem confirmation | Exception information / error description / reproduction steps |
+| Environment confirmation | Compiler status / project configuration summary |
+| Evidence collection | Code snippets / control tree / property values / screenshots |
+| Root cause analysis | Root cause type (configuration/code/environment/third-party library) + evidence chain |
+| Fix plan | Specific modification content + expected effect |
+| Verification | Compile passes / run_verify passes / screenshot confirmation |
 
 ---
 
-## 11. 控制台程序调试
+## 11. Console Application Debugging
 
-### 11.1 自动化模式选择
+### 11.1 Automation Mode Selection
 
-控制台程序没有 VCL/FMX 窗口，使用 `automate_delphi` 的 `console` 模式而非 `gui` 模式：
+Console programs have no VCL/FMX window, so use the `console` mode of `automate_delphi` rather than `gui` mode:
 
 ```python
-# 控制台交互：发送命令 + 等待指定输出
+# Console interaction: send command + wait for specific output
 automate_delphi(
     action="console",
     app_path="Win32/Debug/ConsoleApp.exe",
-    input="--help\n",              # 发送到 stdin
-    expect="Usage:",                # 等待 stdout 中出现此模式
+    input="--help\n",              # Send to stdin
+    expect="Usage:",                # Wait for this pattern in stdout
     timeout=15)
 ```
 
-### 11.2 stdin/stdout 交互
+### 11.2 stdin/stdout Interaction
 
 ```python
-# 连续交互（仅最后一个 expect 作为返回条件）
+# Continuous interaction (only the last expect serves as the return condition)
 automate_delphi(
     action="console",
     app_path="App.exe",
-    input="user\npass123\n",       # 模拟登录输入
+    input="user\npass123\n",       # Simulate login input
     expect="login successful",
     timeout=10)
 
-# 无 expect：直接运行到退出，返回全部 stdout+stderr
+# No expect: run until exit and return all stdout+stderr
 automate_delphi(
     action="console",
     app_path="BackupTool.exe",
@@ -959,42 +959,42 @@ automate_delphi(
     timeout=30)
 ```
 
-### 11.3 进程复用（keep_alive）
+### 11.3 Process Reuse (keep_alive)
 
 ```python
-# 启动保持
+# Start and keep alive
 automate_delphi(action="console", app_path="App.exe",
     keep_alive=True, expect="prompt>")
 
-# 后续复用（app_path 匹配上一条的路径）
+# Subsequent reuse (app_path matches the path of the previous call)
 automate_delphi(action="console", app_path="App.exe",
     input="process file.txt\n", expect="OK")
 
-# 退出清理
+# Exit cleanup
 automate_delphi(action="console", app_path="App.exe",
     input="exit\n", keep_alive=False)
 ```
 
-**⚠️**：控制台调试的 `keep_alive` 超时为 5 分钟，GUI 模式和 console 模式的 keep_alive 各自独立。
+**⚠️**: The `keep_alive` timeout for console debugging is 5 minutes; the keep_alive of GUI mode and console mode are independent.
 
-### 11.4 控制台 vs GUI 模式选择
+### 11.4 Console vs GUI Mode Selection
 
-| 判断依据 | 用 console | 用 gui |
-|---------|-----------|--------|
-| 有窗口界面 | — | ✅ |
-| 纯命令行工具 | ✅ | — |
-| 需要截图验证 | — | ✅ |
-| 需要读控件属性 | — | ✅ (rget/dumpstate) |
-| 只需 stdin/stdout | ✅ | — |
-| 不确定 | (auto 模式自动检测 PE 头) |
+| Judgment Basis | Use console | Use gui |
+|----------------|-------------|---------|
+| Has a window interface | — | ✅ |
+| Pure command-line tool | ✅ | — |
+| Needs screenshot verification | — | ✅ |
+| Needs to read control properties | — | ✅ (rget/dumpstate) |
+| Only needs stdin/stdout | ✅ | — |
+| Not sure | (auto mode automatically detects the PE header) | |
 
 ---
 
-## 12. 性能问题初诊
+## 12. Performance Issue Triage
 
-### 12.1 GUI 性能（formsum）
+### 12.1 GUI Performance (formsum)
 
-编译时计算所有 Form/Frame 的控件总量，预判 DFM 性能风险：
+Calculate the total control count of all Forms/Frames at compile time to predict DFM performance risks:
 
 ```python
 automate_delphi(
@@ -1005,171 +1005,171 @@ automate_delphi(
     ])
 ```
 
-返回每个 Form/Frame 的控件数量，**优先排查控件数 > 100 的窗体中循环/遍历操作**。
+Returns the control count of each Form/Frame. **Prioritize checking loop/iteration operations in forms with control count > 100**.
 
-### 12.2 响应延迟诊断
+### 12.2 Response Delay Diagnosis
 
 ```python
-# 1. AST 骨架快速了解整体架构
+# 1. AST skeleton to quickly understand the overall architecture
 delphi_project(action="ast", base_dir="src")
 
-# 2. 检查是否有耗时操作在主线程（文件/网络/数据库）
-# 用 delphi_kb 搜索 TThread.CreateAnonymousThread 用法
+# 2. Check whether there are time-consuming operations on the main thread (file/network/database)
+# Use delphi_kb to search for TThread.CreateAnonymousThread usage
 delphi_kb(query="TThread", search_type="class", kb_type="project")
 
-# 3. 检查是否缺少必要的异步处理模式
-# 大数据量加载 → 分页 / 虚拟列表
-# 文件操作 → TTask / TThread
-# 数据库查询 → 异步查询 + 回调更新 UI
+# 3. Check whether the necessary asynchronous processing pattern is missing
+# Large data loading → Pagination / virtual list
+# File operations → TTask / TThread
+# Database queries → Asynchronous query + callback to update UI
 ```
 
-### 12.3 启动速度慢
+### 12.3 Slow Startup
 
 ```python
-# 1. 检查 DFM 中是否有大量设计时将图片/数据嵌入
-# 2. 检查 FormCreate / OnCreate 中的初始化逻辑
-# 3. 检查是否有 DLL/BPL 延迟加载
+# 1. Check whether the DFM has a large amount of images/data embedded at design time
+# 2. Check the initialization logic in FormCreate / OnCreate
+# 3. Check whether there are delayed loads of DLL/BPL
 delphi_project(action="info", project_path="Project.dproj")
-# 检查 RuntimeLibrary 链接方式
+# Check the RuntimeLibrary linking method
 ```
 
-### 12.4 工具选择速查
+### 12.4 Tool Selection Quick Reference
 
-| 需求 | 工具/命令 |
-|------|----------|
-| 统计控件数量 | `automate_delphi(formsum)` |
-| 代码骨架 | `delphi_project(ast)` |
-| 静态分析（含性能模式） | `delphi_project(audit)` |
-| 配置查看 | `delphi_project(info)` |
+| Need | Tool/Command |
+|------|-------------|
+| Count controls | `automate_delphi(formsum)` |
+| Code skeleton | `delphi_project(ast)` |
+| Static analysis (including performance mode) | `delphi_project(audit)` |
+| Configuration view | `delphi_project(info)` |
 
 ---
 
-## 13. 工具调用异常恢复
+## 13. Tool Call Exception Recovery
 
-### 13.1 异常分类与处理
+### 13.1 Exception Classification and Handling
 
-工具调用失败时，不要立即重试或绕过——先分类：
+When a tool call fails, do not retry or bypass immediately—classify first:
 
-| 错误现象 | 可能原因 | 处理方式 |
-|---------|---------|---------|
-| `File not found: xxx.dproj` | 项目路径错误 | 用 `delphi_kb` 或 `Glob` 搜索正确的 `.dproj` 位置 |
-| `Timeout` (30s+) | 编译超时/进程卡死 | 增大 timeout 或检查 DCC 是否存在死循环编译 |
-| `Access Denied` | 文件被占用 | 检查 IDE 是否打开该文件 |
-| `Invalid JSON response` | 管道通信异常 | 重启程序（exit → 重新 launch） |
-| `Connection lost` | 目标程序已退出 | 用 `compile(run_verify=true)` 检查是否启动即崩溃 |
-| `RTTI discovery failed` | 程序未链接 DaofyAutomation | 改用 `automate_delphi(gui)` |
-| `Unknown command: xxx` | 命令拼写错误 | `automate_delphi(gui)` 中 async 命令执行后返回 ACK 立即返回，需等待后续命令验证 |
-| exit code 2 | 预/后编译事件失败 | 查看详细输出；检查 git hooks / 事件脚本 |
+| Error Symptom | Possible Cause | Handling Method |
+|--------------|---------------|-----------------|
+| `File not found: xxx.dproj` | Wrong project path | Use `delphi_kb` or `Glob` to search for the correct `.dproj` location |
+| `Timeout` (30s+) | Compile timeout/process stuck | Increase timeout or check DCC for infinite loop compilation |
+| `Access Denied` | File in use | Check whether the IDE has the file open |
+| `Invalid JSON response` | Pipe communication exception | Restart the program (exit → relaunch) |
+| `Connection lost` | Target program has exited | Use `compile(run_verify=true)` to check whether it crashes on startup |
+| `RTTI discovery failed` | Program has not linked DaofyAutomation | Switch to `automate_delphi(gui)` |
+| `Unknown command: xxx` | Command spelling error | Async commands in `automate_delphi(gui)` return ACK immediately after execution and return immediately; you need to wait for subsequent commands to verify |
+| exit code 2 | Pre/post build event failed | Check detailed output; check git hooks / event scripts |
 
-### 13.2 异步命令等待策略
+### 13.2 Asynchronous Command Waiting Strategy
 
-`automate_delphi(gui)` 脚本中的命令分为 async 和 sync。async 命令（click/type/key/rcall/rset/move/drag/dlgclick/msgclick）发出后立即返回 ACK，不等待副作用完成。
+Commands in the `automate_delphi(gui)` script are divided into async and sync. Async commands (click/type/key/rcall/rset/move/drag/dlgclick/msgclick) return ACK immediately after being issued, without waiting for side effects to complete.
 
-**陷阱**：async 命令后立即执行依赖其副作用的 sync 命令，可能读到过时状态。
+**Pitfall**: Immediately executing a sync command that depends on the side effects of an async command may read stale state.
 
 ```
-❌ 错误：点击后立即截图
-  click → capture  → 可能截图时界面尚未更新
+❌ Wrong: Screenshot immediately after clicking
+  click → capture  → May capture the screen before the UI has updated
 
-✅ 正确：点击后等待
+✅ Correct: Wait after clicking
   click → wait(ms=500) → capture
-  或 click → waitfor(target=..., prop=..., value=...) → capture
+  or click → waitfor(target=..., prop=..., value=...) → capture
 ```
 
-### 13.3 回退与重试策略
+### 13.3 Rollback and Retry Strategy
 
 ```python
-# 第一层：增加超时重试
-# 第二层：切换探查方式
-#    automate_delphi(gui) 失败 → 尝试 delphi_rtti 或反之
-# 第三层：使用经验库查之前是否解决过同类异常
-experience(action="search", query="工具调用异常 管道 超时")
+# First layer: Increase timeout and retry
+# Second layer: Switch inspection method
+#    automate_delphi(gui) fails → try delphi_rtti or vice versa
+# Third layer: Use the experience library to check whether a similar exception has been solved before
+experience(action="search", query="tool call exception pipe timeout")
 ```
 
-### 13.4 并发写入保护
+### 13.4 Concurrent Write Protection
 
-多个工具调用同时修改同一文件会导致冲突。`delphi_file(action="write")` 使用脏标记检测——未被读取就尝试写入的文件会被标记为"脏"并报错。
+Multiple tool calls modifying the same file simultaneously will cause conflicts. `delphi_file(action="write")` uses dirty mark detection—files that are attempted to be written without being read will be marked as "dirty" and report an error.
 
-**安全做法**：
-1. `delphi_file(action="read")` 读文件
-2. 分析并确定修改方案
-3. `delphi_file(action="write", edits=[...])` 提交编辑
-4. 每次修改前确保已 read 最新版本
+**Safe approach**:
+1. `delphi_file(action="read")` to read the file
+2. Analyze and determine the modification plan
+3. `delphi_file(action="write", edits=[...])` to submit edits
+4. Ensure the latest version has been read before each modification
 
 ---
 
-## 附录：调试信息速查
+## Appendix: Debugging Information Quick Reference
 
-### Delphi 异常类层级
+### Delphi Exception Class Hierarchy
 
 ```
 Exception
-  ├─ EAbort                  不显示错误对话框的 silent 异常
-  ├─ EAccessViolation        访问违例（空指针/悬挂引用）
-  ├─ EAssertionFailed        Assert 失败
-  ├─ EArgumentException      参数错误
+  ├─ EAbort                  Silent exception that does not display an error dialog
+  ├─ EAccessViolation        Access violation (null pointer/dangling reference)
+  ├─ EAssertionFailed        Assert failed
+  ├─ EArgumentException      Argument error
   │    ├─ EArgumentOutOfRangeException
   │    └─ EArgumentNilException
-  ├─ EConvertError          类型转换失败（StrToInt 等）
-  ├─ EDatabaseError          数据库错误
-  ├─ EDivByZero              整数除零
-  │    └─ EZeroDivide        浮点除零
-  ├─ EExternalException      Windows 结构化异常包装
-  ├─ EInvalidCast            类型转换无效（as 操作符）
-  ├─ EInvalidOperation       组件操作无效（没有 Handle 时操作）
-  ├─ EInvalidPointer         无效指针（通常双重释放）
-  ├─ EOSError                Windows API 错误
-  ├─ EOutOfMemory            内存不足
-  ├─ EOverflow               整数溢出
-  ├─ ERangeError             范围检查失败（{$R+} 时）
-  ├─ EStackOverflow          栈溢出（通常无限递归）
-  └─ EStringListError        TStringList 操作错误
+  ├─ EConvertError           Type conversion failure (StrToInt, etc.)
+  ├─ EDatabaseError          Database error
+  ├─ EDivByZero              Integer division by zero
+  │    └─ EZeroDivide        Floating point division by zero
+  ├─ EExternalException      Windows structured exception wrapper
+  ├─ EInvalidCast            Invalid type cast (as operator)
+  ├─ EInvalidOperation       Invalid component operation (operating without a Handle)
+  ├─ EInvalidPointer         Invalid pointer (usually double free)
+  ├─ EOSError                Windows API error
+  ├─ EOutOfMemory            Out of memory
+  ├─ EOverflow               Integer overflow
+  ├─ ERangeError             Range check failure (when {$R+})
+  ├─ EStackOverflow          Stack overflow (usually infinite recursion)
+  └─ EStringListError        TStringList operation error
 ```
 
-### .dproj 关键属性
+### Key .dproj Properties
 
-| 属性名 | 意义 | 调试中查看的原因 |
-|--------|------|----------------|
-| `DCC_UnitSearchPath` | 单元搜索路径 | 找不到 .dcu 时 |
-| `DCC_Define` | 条件编译符号 | Debug/Release 行为差异 |
-| `DCC_Optimize` | 是否优化 | Release 崩溃 |
-| `DCC_AssertionsAtRuntime` | 运行时 Assert | AssertionFailed 异常排查 |
-| `DCC_RangeChecking` | 范围检查 | ERangeError 排查 |
-| `DCC_OverflowChecking` | 溢出检查 | EOverflow 排查 |
-| `RuntimeLibrary` | 运行时库链接方式 | 找不到 BPL 时 |
-| `OutputType` | 输出类型 | exe/dll 相关配置 |
-| `Base` | 基础输出目录 | 产物路径 |
+| Property Name | Meaning | Reason to Check During Debugging |
+|--------------|---------|----------------------------------|
+| `DCC_UnitSearchPath` | Unit search path | When .dcu cannot be found |
+| `DCC_Define` | Conditional compilation symbols | Debug/Release behavior differences |
+| `DCC_Optimize` | Whether to optimize | Release crashes |
+| `DCC_AssertionsAtRuntime` | Runtime Assert | AssertionFailed exception troubleshooting |
+| `DCC_RangeChecking` | Range checking | ERangeError troubleshooting |
+| `DCC_OverflowChecking` | Overflow checking | EOverflow troubleshooting |
+| `RuntimeLibrary` | Runtime library linking method | When BPL cannot be found |
+| `OutputType` | Output type | exe/dll related configuration |
+| `Base` | Base output directory | Artifact path |
 
-### 调试相关命令行（仅用于参考，不得直接使用 dcc32/msbuild）
+### Debugging-Related Command Lines (For reference only; do not directly use dcc32/msbuild)
 
-| 概念 | MSBuild 属性 | dcc32 参数 |
-|------|-------------|-----------|
-| 搜索路径 | `DCC_UnitSearchPath` | `-U` |
-| 条件编译 | `DCC_Define` | `-D` |
-| 输出路径 | `DCC_ExeOutput` | `-E` |
-| 调试信息 | `DCC_DebugInfoInExe` | `-$D+` |
-| 优化 | `DCC_Optimize` | `-$O+` |
-| 范围检查 | `DCC_RangeChecking` | `-$R+` |
+| Concept | MSBuild Property | dcc32 Parameter |
+|---------|-----------------|-----------------|
+| Search path | `DCC_UnitSearchPath` | `-U` |
+| Conditional compilation | `DCC_Define` | `-D` |
+| Output path | `DCC_ExeOutput` | `-E` |
+| Debug information | `DCC_DebugInfoInExe` | `-$D+` |
+| Optimization | `DCC_Optimize` | `-$O+` |
+| Range checking | `DCC_RangeChecking` | `-$R+` |
 
-### 调试修改安全机制
+### Debug Modification Safety Mechanisms
 
-`delphi_file` 在修改文件时有以下安全机制，AI 需理解并与工作流配合：
+`delphi_file` has the following safety mechanisms when modifying files. The AI needs to understand and cooperate with the workflow:
 
-| 机制 | 触发条件 | AI 应对 |
-|------|---------|--------|
-| **重复检测** | 写入的内容与文件内容相同 | 无需处理，操作被跳过 |
-| **脏标记** | 文件被读取后又被其他操作修改，未经重新读取就尝试写入 | 重新 `read` 获取最新内容后再提交编辑 |
-| **自动备份** | 每次 write/replace/insert/delete 前自动创建备份并存于 `__history` | 无需手动操作，可在误修改后用 `backup/restore` 恢复 |
-| **预览模式** | `preview=true` | 预览 diff 后再决定是否实际写入 |
+| Mechanism | Trigger Condition | AI Response |
+|-----------|------------------|-------------|
+| **Duplicate detection** | The content being written is the same as the file content | No action needed, operation is skipped |
+| **Dirty mark** | The file was read and then modified by another operation, and a write is attempted without re-reading | Re-`read` to get the latest content before submitting edits |
+| **Automatic backup** | Automatically creates a backup in `__history` before each write/replace/insert/delete | No manual operation needed; can be recovered with `backup/restore` after a mistaken modification |
+| **Preview mode** | `preview=true` | Preview the diff before deciding whether to actually write |
 
 ```python
-# 回退到上一个版本
+# Roll back to the previous version
 delphi_file(action="backup", backup_action="restore",
     file_path="Unit1.pas")
 
-# 列出所有备份版本
+# List all backup versions
 delphi_file(action="backup", backup_action="list",
     file_path="Unit1.pas")
 ```
 
-**原则**：为防止 AI 一次修改多处导致难以回溯，应在每次修改后编译验证。出现意外时使用 `backup/restore` 回退。
+**Principle**: To prevent the AI from making multiple modifications at once and making backtracking difficult, compile and verify after each modification. When unexpected situations occur, use `backup/restore` to roll back.

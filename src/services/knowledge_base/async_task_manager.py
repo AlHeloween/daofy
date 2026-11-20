@@ -1,11 +1,11 @@
 """
-异步任务管理器
+Asynchronous task manager
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) Jilin Left-Right Software Development Co., Ltd.
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
-Update & Mod By Crystalxp (黑夜杀手 QQ:281309196)
+Update & Mod By Crystalxp (Dark Night Killer QQ:281309196)
 
-管理长时间运行的后台任务
+Manages long-running background tasks
 """
 
 import asyncio
@@ -22,12 +22,12 @@ logger = get_logger(__name__)
 
 
 class CancelledError(Exception):
-    """任务取消异常——由 _cancellation_check 抛出，被 run_task 捕获"""
+    """Task cancellation exception—thrown by _cancellation_check and caught by run_task"""
     pass
 
 
 class TaskStatus(Enum):
-    """任务状态"""
+    """Task status"""
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -37,7 +37,7 @@ class TaskStatus(Enum):
 
 @dataclass
 class TaskInfo:
-    """任务信息"""
+    """Task information"""
     task_id: str
     name: str
     status: TaskStatus
@@ -48,16 +48,16 @@ class TaskInfo:
     message: str = ""
     result: Any = None
     error: Optional[str] = None
-    # 新增：去重键（可选）
+    # Added: deduplication key (optional)
     _dedup_key: Optional[str] = None
-    # 新增：步骤信息
-    current_step: str = ""  # 当前步骤名称
-    total_steps: int = 0    # 总步骤数
-    step_index: int = 0     # 当前步骤索引（从1开始）
+    # Added: step information
+    current_step: str = ""  # Current step name
+    total_steps: int = 0    # Total number of steps
+    step_index: int = 0     # Current step index (starting from 1)
 
 
 class AsyncTaskManager:
-    """异步任务管理器"""
+    """Asynchronous task manager"""
 
     def __init__(self):
         self._tasks: Dict[str, TaskInfo] = {}
@@ -67,20 +67,20 @@ class AsyncTaskManager:
         self._task_counter = 0
 
     def _generate_task_id(self) -> str:
-        """生成任务ID"""
+        """Generate task ID"""
         with self._lock:
             self._task_counter += 1
             return f"task_{int(time.time())}_{self._task_counter}"
 
     def find_running_task_by_key(self, dedup_key: str) -> Optional[str]:
         """
-        查找是否有正在运行或待处理的 dedup 任务
+        Find whether a running or pending dedup task exists
 
         Args:
-            dedup_key: 去重键
+            dedup_key: Deduplication key
 
         Returns:
-            已有任务的 task_id，或 None
+            task_id of the existing task, or None
         """
         with self._lock:
             for tid, info in self._tasks.items():
@@ -96,24 +96,24 @@ class AsyncTaskManager:
                     on_complete: Optional[Callable[..., None]] = None,
                     **kwargs) -> str:
         """
-        提交后台任务
+        Submit a background task
 
         Args:
-            name: 任务名称
-            func: 任务函数
-            *args: 任务函数位置参数
-            progress_callback: 进度回调函数
-            dedup_key: 去重键。同一 key 的任务已在运行/待处理时，返回已有 task_id
-            **kwargs: 任务函数关键字参数
+            name: Task name
+            func: Task function
+            *args: Positional arguments for the task function
+            progress_callback: Progress callback function
+            dedup_key: Deduplication key. When a task with the same key is already running/pending, return the existing task_id
+            **kwargs: Keyword arguments for the task function
 
         Returns:
-            任务ID
+            Task ID
         """
-        # 防重入检查：同一 dedup_key 的任务已在运行则复用 task_id
+        # Re-entry check: if a task with the same dedup_key is already running, reuse task_id
         if dedup_key is not None:
             existing = self.find_running_task_by_key(dedup_key)
             if existing is not None:
-                logger.info(f"复用已有任务 task_id={existing} (dedup_key={dedup_key})")
+                logger.info(f"Reusing existing task task_id={existing} (dedup_key={dedup_key})")
                 return existing
 
         task_id = self._generate_task_id()
@@ -134,11 +134,11 @@ class AsyncTaskManager:
                 with self._lock:
                     task_info.status = TaskStatus.RUNNING
                     task_info.started_at = datetime.now()
-                    task_info.message = "任务执行中..."
+                    task_info.message = "Task is running..."
 
-                logger.info(f"任务 {task_id} ({name}) 开始执行")
+                logger.info(f"Task {task_id} ({name}) started")
 
-                # 创建进度更新函数——在回调中嵌入取消检查，下游无需修改
+                # Create a progress update function—embed cancellation check in the callback so downstream code needs no changes
                 def update_progress(*args, **kwargs):
                     # Handle different callback signatures:
                     # 1. ProgressInfo object (from ProgressTracker) — has .percentage
@@ -156,20 +156,20 @@ class AsyncTaskManager:
                         pct = 0
                         msg = str(args) if args else ''
                     
-                    # 在每次进度回调中嵌入取消检查
+                    # Embed cancellation check in every progress callback
                     if self.is_task_cancelled(task_id):
-                        raise CancelledError(f"任务 {task_id} ({name}) 已取消")
+                        raise CancelledError(f"Task {task_id} ({name}) cancelled")
                     
                     logger.debug(f"Progress update: {pct}% - {msg}")
                     self.update_task_progress(task_id, pct, msg)
 
-                # 创建取消检查函数——任务函数在循环边界调用它来响应取消
+                # Create cancellation check function—task function calls it at loop boundaries to respond to cancellation
                 def _cancellation_check():
-                    """检查任务是否被取消，取消时抛出 CancelledError"""
+                    """Check whether the task is cancelled; throw CancelledError when cancelled"""
                     if self.is_task_cancelled(task_id):
-                        raise CancelledError(f"任务 {task_id} ({name}) 已取消")
+                        raise CancelledError(f"Task {task_id} ({name}) cancelled")
 
-                # 将进度回调、取消检查和任务ID传递给任务函数
+                # Pass progress callback, cancellation check, and task ID to the task function
                 kwargs['_progress_callback'] = update_progress
                 kwargs['_cancellation_check'] = _cancellation_check
                 kwargs['_task_id'] = task_id
@@ -180,20 +180,20 @@ class AsyncTaskManager:
                     task_info.status = TaskStatus.COMPLETED
                     task_info.completed_at = datetime.now()
                     task_info.progress = 100.0
-                    task_info.message = "任务完成"
+                    task_info.message = "Task completed"
                     task_info.result = result
 
-                logger.info(f"任务 {task_id} ({name}) 完成")
+                logger.info(f"Task {task_id} ({name}) completed")
 
-                # 触发完成回调（用于 MCP 推送通知）
+                # Trigger completion callback (for MCP push notifications)
                 if on_complete:
                     try:
                         on_complete(task_info)
                     except Exception as cb_err:
-                        logger.error(f"任务 {task_id} 完成回调失败: {cb_err}")
+                        logger.error(f"Task {task_id} completion callback failed: {cb_err}")
 
             except CancelledError as e:
-                logger.info(f"任务 {task_id} ({name}) 已取消")
+                logger.info(f"Task {task_id} ({name}) cancelled")
                 with self._lock:
                     task_info.status = TaskStatus.CANCELLED
                     task_info.completed_at = datetime.now()
@@ -202,53 +202,53 @@ class AsyncTaskManager:
                     try:
                         on_complete(task_info)
                     except Exception as cb_err:
-                        logger.error(f"任务 {task_id} 取消回调失败: {cb_err}")
+                        logger.error(f"Task {task_id} cancellation callback failed: {cb_err}")
 
             except Exception as e:
-                logger.error(f"任务 {task_id} ({name}) 失败: {e}", exc_info=True)
+                logger.error(f"Task {task_id} ({name}) failed: {e}", exc_info=True)
                 with self._lock:
                     task_info.status = TaskStatus.FAILED
                     task_info.completed_at = datetime.now()
                     task_info.error = str(e)
-                    task_info.message = f"任务失败: {str(e)}"
+                    task_info.message = f"Task failed: {str(e)}"
                 if on_complete:
                     try:
                         on_complete(task_info)
                     except Exception as cb_err:
-                        logger.error(f"任务 {task_id} 失败回调失败: {cb_err}")
+                        logger.error(f"Task {task_id} failure callback failed: {cb_err}")
 
             finally:
-                # 清理线程引用
+                # Clean up thread reference
                 with self._lock:
                     if task_id in self._task_threads:
                         del self._task_threads[task_id]
 
-        # 启动后台线程
+        # Start background thread
         thread = threading.Thread(target=run_task, daemon=True)
         with self._lock:
             self._task_threads[task_id] = thread
 
         thread.start()
-        logger.info(f"任务 {task_id} ({name}) 已提交到后台")
+        logger.info(f"Task {task_id} ({name}) submitted to background")
 
         return task_id
 
     def get_task_info(self, task_id: str) -> Optional[TaskInfo]:
-        """获取任务信息"""
+        """Get task information"""
         with self._lock:
             return self._tasks.get(task_id)
 
     def wait_for_progress_change(self, task_id: str, timeout_seconds: float = 120) -> Optional[TaskInfo]:
-        """长轮询等待任务进度变化
+        """Long-poll until task progress changes
         
-        阻塞等待直到进度变化、任务完成/失败/取消、或超时。
+        Block until progress changes, the task completes/fails/is cancelled, or timeout.
         
         Args:
-            task_id: 任务ID
-            timeout_seconds: 最大等待秒数（默认 120）
+            task_id: Task ID
+            timeout_seconds: Maximum wait seconds (default 120)
         
         Returns:
-            变化后的 TaskInfo，或 None（任务不存在）
+            Changed TaskInfo, or None (task does not exist)
         """
         deadline = time.time() + timeout_seconds
         with self._progress_condition:
@@ -265,17 +265,17 @@ class AsyncTaskManager:
                 self._progress_condition.wait(timeout=min(30.0, remaining))
                 task = self._tasks.get(task_id)
                 if task and task.progress != old_progress:
-                    return task  # 进度有变化，立即返回
-            return self._tasks.get(task_id)  # 超时返回当前状态
+                    return task  # Progress changed, return immediately
+            return self._tasks.get(task_id)  # Timeout: return current status
 
     def get_all_tasks(self) -> Dict[str, TaskInfo]:
-        """获取所有任务"""
+        """Get all tasks"""
         with self._lock:
             return dict(self._tasks)
 
     def update_task_progress(self, task_id: str, progress: float, message: str = "",
                             current_step: str = "", step_index: int = 0, total_steps: int = 0):
-        """更新任务进度（通知所有等待的长轮询）"""
+        """Update task progress (notify all waiting long polls)"""
         with self._lock:
             if task_id in self._tasks:
                 old_progress = self._tasks[task_id].progress
@@ -289,12 +289,12 @@ class AsyncTaskManager:
                     self._tasks[task_id].step_index = step_index
                 if total_steps > 0:
                     self._tasks[task_id].total_steps = total_steps
-                # 进度有变化则通知等待的长轮询
+                # Notify waiting long polls when progress changes
                 if progress != old_progress:
                     self._progress_condition.notify_all()
 
     def cancel_task(self, task_id: str) -> bool:
-        """取消任务（仅对支持取消的任务有效）"""
+        """Cancel task (only effective for tasks that support cancellation)"""
         with self._lock:
             if task_id not in self._tasks:
                 return False
@@ -304,24 +304,24 @@ class AsyncTaskManager:
                 return False
 
             task_info.status = TaskStatus.CANCELLED
-            task_info.message = "任务已取消"
+            task_info.message = "Task cancelled"
             task_info.completed_at = datetime.now()
 
-            # 通知长轮询的 wait_for_progress_change 立即返回
+            # Notify wait_for_progress_change long polls to return immediately
             self._progress_condition.notify_all()
 
-            # 注意：线程无法强制终止，由 _cancellation_check 在任务函数中响应
+            # Note: threads cannot be forcibly terminated; _cancellation_check responds within the task function
             return True
 
     def is_task_cancelled(self, task_id: str) -> bool:
-        """检查任务是否已被取消"""
+        """Check whether the task has been cancelled"""
         with self._lock:
             if task_id in self._tasks:
                 return self._tasks[task_id].status == TaskStatus.CANCELLED
             return False
 
     def cleanup_old_tasks(self, max_age_hours: int = 24):
-        """清理旧任务"""
+        """Clean up old tasks"""
         cutoff = datetime.now().timestamp() - (max_age_hours * 3600)
 
         with self._lock:
@@ -332,16 +332,17 @@ class AsyncTaskManager:
 
             for task_id in to_remove:
                 del self._tasks[task_id]
-                logger.debug(f"清理旧任务: {task_id}")
+                logger.debug(f"Cleaning up old task: {task_id}")
 
 
-# 全局任务管理器实例
+# Global task manager instance
 _task_manager: Optional[AsyncTaskManager] = None
 
 
 def get_task_manager() -> AsyncTaskManager:
-    """获取全局任务管理器实例"""
+    """Get the global task manager instance"""
     global _task_manager
     if _task_manager is None:
         _task_manager = AsyncTaskManager()
     return _task_manager
+

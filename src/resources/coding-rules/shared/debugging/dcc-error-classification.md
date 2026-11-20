@@ -1,53 +1,55 @@
-<!-- @when: DCC 编译报错，需定位错误原因和修复方案 -->
+<!-- @when: DCC compile error; need to locate the cause and fix -->
 <!-- @chain: before=binary-search-isolation.md, after=hypothesis-driven-debugging.md -->
 
-### 8.8 DCC 编译错误分类与解码
+### 8.8 DCC Compile Error Classification and Decoding
 
-#### 8.8.1 文档知识库搜索（首选）
-Delphi CHM 文档包含 1278 个 DCC 错误/警告 HTML 文件（875 EXXXX + 20 FXXXX + W/H 系列）。
+#### 8.8.1 Documentation Knowledge Base Search (Preferred)
+The Delphi CHM documentation contains 1,278 DCC error/warning HTML files (875 EXXXX + 20 FXXXX + W/H series).
 ```python
-# 构建一次后即可搜索
+# Build once, then you can search
 delphi_kb(action="build", kb_type="document", async_mode=true)
 
-# 查具体错误号
+# Look up a specific error number
 delphi_kb(query="E2003", kb_type="document", search_type="semantic")
 delphi_kb(query="F2613 unit not found", kb_type="document", search_type="semantic")
 ```
 
-#### 8.8.2 错误级别速查
-| 级别 | 前缀 | 策略 |
+#### 8.8.2 Error Level Quick Reference
+| Level | Prefix | Strategy |
 |------|------|------|
-| Fatal | Fxxxx | 先修复路径/配置 |
-| Error | Exxxx | 读错误行 → 查文档 KB → 修复 |
-| Warning | Wxxxx | 评估影响；已知可忽略 |
-| Hint | Hxxxx | 整理时处理，调试跳过 |
+| Fatal | Fxxxx | Fix path/config first |
+| Error | Exxxx | Read error line → query documentation KB → fix |
+| Warning | Wxxxx | Assess impact; known ones can be ignored |
+| Hint | Hxxxx | Handle during cleanup; skip during debugging |
 
-#### 8.8.3 常见 DCC 错误速查表
-| 错误号 | 常见原因 | 解决方向 |
+#### 8.8.3 Common DCC Error Quick-Reference Table
+| Error No. | Common cause | Solution direction |
 |--------|---------|---------|
-| E2003 | 缺 uses / 拼写错误 | 检查 uses + 大小写 |
-| E2010 | 类型不匹配 | 检查赋值/参数类型 |
-| E2029 | 语法结构错误 | 检查括号/分号/begin..end |
-| E2037 | 非对象类型用 '.' | 检查变量类型声明 |
-| E2066 | 前一行漏分号 | 回溯前一行末尾 |
-| E2251 | 重载匹配歧义 | 显式类型转换 |
-| E2506 | DCU 缓存过期 | 全量编译或删 .dcu |
-| F2613 | 搜索路径不含目标单元 | 检查 DCC_UnitSearchPath |
+| E2003 | Missing uses / spelling error | Check uses + case |
+| E2010 | Type mismatch | Check assignment/parameter types |
+| E2029 | Syntax structure error | Check parentheses/semicolons/begin..end |
+| E2037 | Using '.' on a non-object type | Check variable type declaration |
+| E2066 | Missing semicolon on previous line | Trace back to end of previous line |
+| E2251 | Ambiguous overload match | Explicit type cast |
+| E2506 | Stale DCU cache | Full rebuild or delete .dcu |
+| F2613 | Search path does not contain target unit | Check DCC_UnitSearchPath |
 
-#### 8.8.4 处理流程
+#### 8.8.4 Handling Flow
 ```
-失败
- ├─ ① 分类级别: Fatal先→Error主→Warning暂缓
- ├─ ② 单文件/全量: 增量出错先clean再全量；少量→compile_file；大量→首个Error
- ├─ ③ Error定位:
- │   1. delphi_kb(query="{错误号}", kb_type="document")
- │   2. delphi_kb(query="{关键词}", kb_type="document")
- │   3. 对照速查表 + 读源码上下文
- │   4. delphi_kb(search_type="function") 查API
- └─ ④ 疑难: 二分法隔离 → 查经验库 → 3次失败介入
+Failure
+ ├─ ① Classify severity: Fatal first → Errors main → Warnings deferred
+ ├─ ② Single-file/full build: if an incremental build errors, clean first then full build; few → compile_file; many → first Error
+ ├─ ③ Error localization:
+ │   1. delphi_kb(query="{error number}", kb_type="document")
+ │   2. delphi_kb(query="{keyword}", kb_type="document")
+ │   3. Compare with quick-reference table + read source context
+ │   4. delphi_kb(search_type="function") to look up API
+ └─ ④ Difficult cases: binary-search isolation → search experience base → intervene after 3 failures
 ```
 
-#### 8.8.5 增量缓存问题
-- `.dcu`/`.map`/`.dres` 缓存损坏导致幽灵错误
-- 症状：修复仍报相同错，或指向已删代码
-- 解决：清缓存全量编译（Windows 上先关 IDE）
+#### 8.8.5 Incremental Cache Issues
+- `.dcu`/`.map`/`.dres` cache corruption causes ghost errors
+- Symptoms: still reports the same error after a fix, or points to deleted code
+- Solution: clear cache and full rebuild (close IDE first on Windows)
+
+

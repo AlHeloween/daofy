@@ -1,23 +1,23 @@
 """
-delphi_file — Delphi 文件专用操作工具（MCP 注册名 delphi_file，原 file_tool）
+delphi_file — Delphi file-specific operation tool (MCP registration name delphi_file, formerly file_tool)
 
-整合读取/写入/格式化/备份管理，覆盖 Delphi 文件操作完整生命周期。
-MCP 客户端以 delphi_file 名注册，旧名 file_tool 仍作为别名兼容。
+Integrates read/write/format/backup management, covering the complete lifecycle of Delphi file operations.
+MCP clients register it as delphi_file; the old name file_tool remains compatible as an alias.
 
-Action 模式:
-  read        读取文件内容（继承 read_source_file，支持按路径/类名/函数名搜索）
-  write       兼容写入入口（自动备份到 __history，支持 DFM 透明转换）
-  replace     按行范围替换（现有文件要求 old_content 校验）
-  insert      按锚点插入（现有文件要求 old_content 校验，支持 before/after）
-  delete      按行范围删除（现有文件要求 old_content 校验）
-  format      格式化 Delphi 源码（继承 format_delphi，pasfmt 驱动）
-  backup      备份管理（创建/恢复/列表/对比）
-  encode      文件编码转换（自动检测源编码，支持 BOM 处理，自动备份）
-  uses        增删 uses 子句中的单元（命名空间冲突检测 + 自动排序）
-  fix_garbled 修复中文乱码（自动检测 U+FFFD、缺失 BOM、编码误检测等模式并修复）
-  count_lines 统计代码行数（支持排除空白行和注释行）
+Action modes:
+  read        Read file content (inherits read_source_file; supports searching by path/class name/function name)
+  write       Compatible write entry (auto-backup to __history, supports transparent DFM conversion)
+  replace     Replace by line range (existing files require old_content validation)
+  insert      Insert at anchor (existing files require old_content validation, supports before/after)
+  delete      Delete by line range (existing files require old_content validation)
+  format      Format Delphi source code (inherits format_delphi, driven by pasfmt)
+  backup      Backup management (create/restore/list/compare)
+  encode      File encoding conversion (auto-detect source encoding, supports BOM handling, auto-backup)
+  uses        Add/remove units in uses clause (namespace conflict detection + auto-sort)
+  fix_garbled Fix Chinese garbled text (auto-detect U+FFFD, missing BOM, encoding misdetection, etc. and repair)
+  count_lines Count code lines (supports excluding blank lines and comment lines)
 
-返回值统一为 dict，遵循项目规范:
+Return values are uniformly dict, following project conventions:
   success: {"status": "success", "message": "...", ...}
   error:   {"status": "failed", "message": "..."}
 """
@@ -54,26 +54,26 @@ MAX_GREP_TARGETS = 5000
 
 _SYSTEM_SENSITIVE_DIRS: List[str] = []
 
-# ── AI Agent 工作区根目录缓存 ──────────────────────────────
-# 由 server.py 在 MCP 初始化后通过 session.list_roots() 获取并设置，
-# delphi_file 各 action 在 project_path 参数未提供时回退到此路径。
+# ── AI Agent workspace root cache ──────────────────────────────
+# Set by server.py after MCP initialization via session.list_roots();
+# delphi_file actions fall back to this path when project_path is not provided.
 _workspace_root: Optional[str] = None
 _workspace_root_lock = threading.Lock()
 
 
 def set_workspace_root(root: Optional[str]) -> None:
-    """设置 AI Agent 工作区根目录（由 server.py 初始化时调用）。"""
+    """Set the AI Agent workspace root (called by server.py during initialization)."""
     global _workspace_root
     with _workspace_root_lock:
         _workspace_root = root
         if root:
-            logger.info("工作区根目录已设置: %s", root)
+            logger.info("Workspace root set: %s", root)
         else:
-            logger.info("工作区根目录已清除")
+            logger.info("Workspace root cleared")
 
 
 def get_workspace_root() -> Optional[str]:
-    """获取已缓存的工作区根目录，未设置时返回 None。"""
+    """Get the cached workspace root; return None if not set."""
     with _workspace_root_lock:
         return _workspace_root
 if os.name == 'nt':
@@ -87,43 +87,43 @@ else:
 
 
 def _resolve_project_path(arguments: Dict[str, Any]) -> Optional[str]:
-    """返回 project_path，未提供时回退到 AI Agent 工作区根目录。
+    """Return project_path, falling back to the AI Agent workspace root when not provided.
 
-    优先级:
-      1. 参数中显式传入的 project_path
-      2. get_workspace_root() 缓存的工作区根目录
+    Priority:
+      1. project_path explicitly passed in arguments
+      2. Workspace root cached by get_workspace_root()
     """
     explicit = arguments.get("project_path")
     if explicit:
         return explicit
     fallback = get_workspace_root()
     if fallback:
-        logger.debug("project_path 未提供，回退到工作区根目录: %s", fallback)
+        logger.debug("project_path not provided, falling back to workspace root: %s", fallback)
     return fallback
 
 
 def _resolve_relative_path(file_path: str, project_path: Optional[str] = None) -> str:
-    """解析相对路径，优先基于 project_path 或 _workspace_root 解析。
+    """Resolve a relative path, preferably based on project_path or _workspace_root.
 
-    当 file_path 是相对路径时，按以下优先级尝试解析：
-      1. 基于 project_path 解析（显式传入的项目根目录）
-      2. 基于 _workspace_root 解析（AI Agent 工作区根目录）
-      3. 基于当前工作目录解析（保持原有行为）
+    When file_path is relative, try to resolve it in the following priority order:
+      1. Resolve based on project_path (explicitly passed project root)
+      2. Resolve based on _workspace_root (AI Agent workspace root)
+      3. Resolve based on current working directory (preserve original behavior)
 
-    当 file_path 已经是绝对路径或解析后文件不存在时，返回原始路径。
+    When file_path is already absolute or the resolved file does not exist, return the original path.
 
     Args:
-        file_path: 文件路径（可能是相对或绝对路径）
-        project_path: 项目根目录（可选）
+        file_path: File path (may be relative or absolute)
+        project_path: Project root directory (optional)
 
     Returns:
-        解析后的路径（优先返回存在文件的路径）
+        Resolved path (prefer the path where the file exists)
     """
-    # 绝对路径直接返回
+    # Return absolute paths directly
     if os.path.isabs(file_path):
         return file_path
 
-    # 相对路径，按优先级尝试解析
+    # Relative path: try resolution in priority order
     candidates = []
     if project_path:
         candidates.append(os.path.join(project_path, file_path))
@@ -133,10 +133,10 @@ def _resolve_relative_path(file_path: str, project_path: Optional[str] = None) -
 
     for candidate in candidates:
         if os.path.isfile(candidate):
-            logger.debug("相对路径已解析: %s -> %s", file_path, candidate)
+            logger.debug("Relative path resolved: %s -> %s", file_path, candidate)
             return candidate
 
-    # 未找到，返回原始路径（由调用方决定后续行为）
+    # Not found: return original path (caller decides subsequent behavior)
     return file_path
 
 
@@ -145,66 +145,66 @@ def _coerce_positive_int(value: Any, default: int, name: str) -> tuple[Optional[
     if value is None:
         value = default
     if not isinstance(value, int):
-        return None, f"{name} 必须是整数"
+        return None, f"{name} must be an integer"
     if value < 1:
-        return None, f"{name} 不能小于 1（实际值: {value}）"
+        return None, f"{name} cannot be less than 1 (actual value: {value})"
     return value, None
 
 
 def _validate_path(file_path: str, project_path: Optional[str] = None) -> Optional[str]:
-    """校验文件路径安全性，返回 None 表示安全，否则返回错误信息
+    """Validate file path safety. Return None if safe, otherwise return an error message.
 
     Args:
-        file_path: 待校验的文件路径
-        project_path: 项目路径（可选，提供时限制 file_path 必须在项目目录内）。
-                       未提供时回退到 get_workspace_root()。
+        file_path: File path to validate
+        project_path: Project path (optional; when provided, restricts file_path to within the project directory).
+                       When not provided, falls back to get_workspace_root().
     """
-    # Null 字节注入检查
+    # Null byte injection check
     if '\0' in file_path:
-        return "路径包含 null 字节"
+        return "Path contains null byte"
     try:
         resolved = os.path.abspath(os.path.realpath(file_path))
     except (OSError, ValueError) as e:
-        return "路径解析失败: %s" % str(e)
+        return "Path resolution failed: %s" % str(e)
 
-    # 系统敏感目录保护
+    # Protect system-sensitive directories
     for sensitive_dir in _SYSTEM_SENSITIVE_DIRS:
         try:
             resolved_relative = os.path.relpath(resolved, sensitive_dir)
             if not resolved_relative.startswith('..'):
-                return "路径位于系统敏感目录中: %s" % sensitive_dir
+                return "Path is inside a system-sensitive directory: %s" % sensitive_dir
         except ValueError:
             pass
 
-    # 项目目录检查：允许项目目录及其子目录，也允许项目配置的输出目录
-    # （DCC_ExeOutput / DCC_DcuOutput），即使输出目录在项目目录之外
+    # Project directory check: allow the project directory and its subdirectories, and also allow output directories configured by the project
+    # (DCC_ExeOutput / DCC_DcuOutput), even if the output directory is outside the project directory
     effective_project = project_path or get_workspace_root()
     if effective_project:
         try:
             proj_resolved = os.path.abspath(os.path.realpath(effective_project))
-            # project_path 可能是 .dproj 文件，取其目录作为项目根
+            # project_path may be a .dproj file; use its directory as the project root
             proj_dir = proj_resolved if os.path.isdir(proj_resolved) else os.path.dirname(proj_resolved)
 
-            # 1. 在项目目录内 → 安全
+            # 1. Inside the project directory -> safe
             rel = os.path.relpath(resolved, proj_dir)
             if not rel.startswith('..'):
                 return None
 
-            # 2. 在项目配置的输出目录内 → 安全
-            #    从项目 .dproj 解析 DCC_ExeOutput / DCC_DcuOutput 等输出路径
+            # 2. Inside an output directory configured by the project -> safe
+            #    Parse output paths such as DCC_ExeOutput / DCC_DcuOutput from the project .dproj
             allowed_dirs = _get_project_output_dirs(proj_resolved)
             for allowed in allowed_dirs:
                 try:
                     allowed_resolved = os.path.abspath(os.path.realpath(allowed))
                     rel_allowed = os.path.relpath(resolved, allowed_resolved)
                     if not rel_allowed.startswith('..'):
-                        return None  # 位于项目输出目录内，安全
+                        return None  # Inside project output directory; safe
                 except (OSError, ValueError):
                     continue
 
-            return "路径不在项目目录内: %s (项目: %s)" % (file_path, effective_project)
+            return "Path is not inside the project directory: %s (project: %s)" % (file_path, effective_project)
         except (OSError, ValueError):
-            # project_path 解析失败时不阻断，由调用方处理
+            # Do not block when project_path resolution fails; let caller handle it
             pass
 
     return None
@@ -212,16 +212,16 @@ def _validate_path(file_path: str, project_path: Optional[str] = None) -> Option
 
 def _get_project_output_dirs(project_path: str) -> List[str]:
     """
-    从项目文件 (.dproj/.dpr) 解析配置的输出目录（DCC_ExeOutput / DCC_DcuOutput）。
+    Parse the output directories configured by the project file (.dproj/.dpr) (DCC_ExeOutput / DCC_DcuOutput).
 
-    输出目录可能位于项目目录之外，_validate_path 需放行这些路径，
-    以支持"输出目录不在项目目录时也能读写"的场景。
+    Output directories may be outside the project directory; _validate_path must allow these paths
+    to support the scenario "read/write is also possible when the output directory is not in the project directory".
 
     Args:
-        project_path: 项目根目录或 .dproj/.dpr 文件路径
+        project_path: Project root directory or .dproj/.dpr file path
 
     Returns:
-        输出目录绝对路径列表（可能为空）
+        List of absolute output directory paths (may be empty)
     """
     result: List[str] = []
     if not project_path:
@@ -229,7 +229,7 @@ def _get_project_output_dirs(project_path: str) -> List[str]:
 
     proj_path = project_path
     if os.path.isdir(project_path):
-        # 项目根目录：查找 .dproj 文件
+        # Project root directory: find .dproj file
         for ext in ('.dproj', '.dpr', '.dpk'):
             candidates = list(glob.glob(os.path.join(project_path, '*' + ext)))
             if candidates:
@@ -239,7 +239,7 @@ def _get_project_output_dirs(project_path: str) -> List[str]:
             return result
 
     dproj_file = proj_path
-    # 如果是 .dpr/.dpk，优先找同名 .dproj（其中才有 DCC_ExeOutput）
+    # If .dpr/.dpk, prefer the same-named .dproj (which contains DCC_ExeOutput)
     base, ext = os.path.splitext(proj_path)
     if ext.lower() in ('.dpr', '.dpk'):
         dproj_candidate = base + '.dproj'
@@ -254,7 +254,7 @@ def _get_project_output_dirs(project_path: str) -> List[str]:
         parser = DprojParser(dproj_file)
         if not parser.parse():
             return result
-        # 遍历所有配置组合的 ExeOutput / DcuOutput
+        # Iterate over ExeOutput / DcuOutput for all configuration combinations
         for output_tag in ('get_output_path', 'get_dcu_output_path'):
             for config in (None, 'Debug', 'Release', 'Dev'):
                 for platform in (None, 'Win32', 'Win64'):
@@ -267,25 +267,25 @@ def _get_project_output_dirs(project_path: str) -> List[str]:
                     except Exception:
                         continue
     except Exception:
-        logger.debug("解析项目输出目录失败: %s", proj_path, exc_info=True)
+        logger.debug("Failed to parse project output directories: %s", proj_path, exc_info=True)
 
     return result
 
 
 def _is_delphi_file(file_path: str) -> bool:
-    """判断是否是 Delphi 源文件"""
+    """Determine whether this is a Delphi source file"""
     ext = os.path.splitext(file_path)[1].lower()
     return ext in _DELPHI_EXTENSIONS
 
 
 def _is_dfm_file(file_path: str) -> bool:
-    """判断是否是 DFM/FMX 表单文件（Delphi VCL/FireMonkey 表单，可能为二进制或文本格式）"""
+    """Determine whether this is a DFM/FMX form file (Delphi VCL/FireMonkey form, may be binary or text format)"""
     ext = os.path.splitext(file_path)[1].lower()
     return ext in {'.dfm', '.fmx'}
 
 
 def _wrap_error(msg: str) -> Dict[str, Any]:
-    """构造错误 dict"""
+    """Build error dict"""
     return {"status": "failed", "message": msg}
 
 
@@ -311,15 +311,15 @@ def _append_word_boundary_if_needed(result: List[str], next_ch: str) -> None:
 def _normalize_code_for_compare(text: str) -> str:
     """Ignore whitespace outside Pascal string literals for old_content checks.
 
-    规则:
-      - 代码区: 删除空白词，只在需要防止 token 粘连时加单空格
-      - 注释区: 连续空白折叠为单空格，不全部删除
-      - 字符串区: 原样保留
+    Rules:
+      - Code area: remove whitespace tokens, adding a single space only when needed to prevent token concatenation
+      - Comment area: collapse consecutive whitespace to a single space, do not remove all
+      - String area: preserve as-is
     """
     result: List[str] = []
     i = 0
     state = "code"
-    # 注释区内跟踪上个字符是否为空白（用于折叠）
+    # Within comment area, track whether previous char was whitespace (for collapsing)
     prev_was_space = False
 
     while i < len(text):
@@ -335,7 +335,7 @@ def _normalize_code_for_compare(text: str) -> str:
                 else:
                     state = "code"
         elif state in ("line_comment", "brace_comment", "paren_comment"):
-            # ── 注释内: 空白折叠为单空格 ──
+            # ── Inside comment: collapse whitespace to single space ──
             if state == "line_comment" and ch in "\r\n":
                 state = "code"
                 prev_was_space = False
@@ -360,7 +360,7 @@ def _normalize_code_for_compare(text: str) -> str:
                 result.append(ch)
                 prev_was_space = False
         else:
-            # ── 代码区: 原逻辑不变 ──
+            # ── Code area: original logic unchanged ──
             if ch == "'":
                 state = "string"
                 result.append(ch)
@@ -391,7 +391,7 @@ def _normalize_code_for_compare(text: str) -> str:
 def _get_old_content(edit: Dict[str, Any]) -> Optional[str]:
     """Read the old_content guard from an edit.
 
-    自动 strip 尾部 \\r\\n，避免 AI 从 read 输出复制时带入行尾换行符导致校验失败。
+    Automatically strip trailing \\r\\n to avoid validation failure when AI copies from read output with line-ending newlines.
     """
     value = edit.get("old_content")
     if isinstance(value, str):
@@ -444,7 +444,7 @@ async def _read_structured_anchor_lines(file_path: str) -> tuple[List[str], Opti
                 conv_result = await dfm_utils.convert_dfm(file_path, read_path, to_text=True)
                 if not conv_result.get("success"):
                     raise RuntimeError(
-                        f"二进制 DFM 转换失败: {conv_result.get('message', '未知错误')}"
+                        f"Binary DFM conversion failed: {conv_result.get('message', 'unknown error')}"
                     )
 
         read_enc = detect_encoding(read_path)
@@ -514,7 +514,7 @@ async def _apply_auto_format_atomically(
         uses_style=uses_style,
     )
     if fmt_result.get("status") == "failed":
-        raise RuntimeError(fmt_result.get("message", "pasfmt 格式化失败"))
+        raise RuntimeError(fmt_result.get("message", "pasfmt formatting failed"))
     if not fmt_result.get("formatted") or not isinstance(fmt_result.get("content"), str):
         return False, encoding, False, None
 
@@ -533,14 +533,14 @@ async def _apply_auto_format_atomically(
         try:
             _write_text_temp(temp_write_path, formatted_text, encoding)
         except UnicodeEncodeError:
-            logger.warning(f"编码 {encoding} 写出格式化结果失败，回退到 utf-8")
+            logger.warning(f"Writing formatted result with encoding {encoding} failed, falling back to utf-8")
             _write_text_temp(temp_write_path, formatted_text, "utf-8")
             encoding = "utf-8"
             encoding_fallback = True
         if backup:
             backup_path = create_backup(file_path)
             if not backup_path:
-                raise RuntimeError("创建备份失败，已取消格式化")
+                raise RuntimeError("Failed to create backup; formatting canceled")
         record_authorized_write(
             file_path,
             tool="delphi_file",
@@ -572,16 +572,16 @@ def _warn_if_old_content_too_short(old_content: str) -> Optional[str]:
         "except",
     }
     if len(normalized) < 12 or (line_count <= 1 and normalized.lower() in common_tokens):
-        return "old_content 很短，若行号偏移到相同短片段仍可能误命中；建议包含更多上下文行"
+        return "old_content is very short; if line numbers shift to the same short snippet it may still match incorrectly; including more context lines is recommended"
     return None
 
 
 def _normalize_encoding_name(enc: str) -> str:
     """
-    归一化编码名：去除 BOM 后缀、-/_ 变体，统一小写。
+    Normalize encoding name: remove BOM suffix, -/_ variants, and lowercase.
 
-    utf-8-sig 在归一化层面视为 utf-8（BOM 在打开时自动剥离/添加），
-    用于编码兼容性比较。
+    utf-8-sig is treated as utf-8 at normalization level (BOM is automatically stripped/added when opening),
+    for encoding compatibility comparison.
     """
     if not enc:
         return ""
@@ -593,19 +593,19 @@ def _normalize_encoding_name(enc: str) -> str:
 
 def _is_encoding_compatible(user_enc: str, detected_enc: str) -> bool:
     """
-    检查用户指定的 encoding 与文件实际编码是否兼容。
+    Check whether the user-specified encoding is compatible with the file's actual encoding.
 
-    兼容规则:
-      - 完全相等（归一化后）
-      - utf-8 ↔ utf-8-sig 互相兼容
-      - utf-16 系列（utf-16/utf-16-le/utf-16-be）只在同子系列内兼容
+    Compatibility rules:
+      - Exactly equal (after normalization)
+      - utf-8 <-> utf-8-sig compatible with each other
+      - utf-16 family (utf-16/utf-16-le/utf-16-be) only compatible within the same subfamily
 
     Args:
-        user_enc: 用户显式指定的 encoding 参数
-        detected_enc: detect_encoding 实际检测结果
+        user_enc: encoding parameter explicitly specified by user
+        detected_enc: actual result detected by detect_encoding
 
     Returns:
-        True 表示兼容可继续；False 表示编码不匹配需拒绝
+        True means compatible and can continue; False means encoding mismatch and must reject
     """
     u = _normalize_encoding_name(user_enc)
     d = _normalize_encoding_name(detected_enc)
@@ -613,12 +613,12 @@ def _is_encoding_compatible(user_enc: str, detected_enc: str) -> bool:
     if u == d:
         return True
 
-    # utf-8 家族内部互兼（utf-8 / utf-8-sig）
+    # Mutually compatible within utf-8 family (utf-8 / utf-8-sig)
     utf8_family = {"utf-8", "utf-8-sig"}
     if u in utf8_family and d in utf8_family:
         return True
 
-    # utf-16 家族内部互兼（仅在两边都是 utf-16 系列时）
+    # Mutually compatible within utf-16 family (only when both sides are utf-16 series)
     utf16_family = {"utf-16", "utf-16-le", "utf-16-be"}
     if u in utf16_family and d in utf16_family:
         return True
@@ -637,50 +637,50 @@ async def _read_content(
     encoding: str = "auto",
 ) -> Dict[str, Any]:
     """
-    读取文件内容的内部实现。
+    Internal implementation for reading file content.
 
-    如果文件在本地直接存在，检测编码后直接读取（支持 UTF-8/GBK/UTF-16 等）。
-    否则委托给 read_source_file 走知识库搜索路径。
+    If the file exists locally, detect encoding and read directly (supports UTF-8/GBK/UTF-16, etc.).
+    Otherwise delegate to read_source_file to go through the knowledge base search path.
 
-    start_line/end_line 为 1-indexed 左闭右闭区间：
-      - start_line=1 表示从文件第 1 行开始
-      - end_line 不传时等价于「读到 start_line + limit - 1 行为止」
+    start_line/end_line are 1-indexed inclusive intervals:
+      - start_line=1 means start from line 1 of the file
+      - when end_line is not passed, it is equivalent to "read until start_line + limit - 1"
 
-    show_line_numbers: 为 True 时每行前面添加行号前缀（如 "     1: unit Unit1;"），
-                       行号为 1-indexed 绝对行号。
+    show_line_numbers: when True, add a line-number prefix to each line (e.g. "     1: unit Unit1;"),
+                       line numbers are 1-indexed absolute line numbers.
     """
-    # 解析相对路径：基于 project_path 或 _workspace_root
+    # Resolve relative path: based on project_path or _workspace_root
     file_path = _resolve_relative_path(file_path, project_path)
 
-    # 直接文件读取（支持编码检测 + 降级链）
+    # Direct file read (supports encoding detection + fallback chain)
     if os.path.isfile(file_path):
         effective_start = max(1, start_line)
         target_end = end_line if end_line is not None else (effective_start + limit - 1)
 
-        # 构建编码降级链
+        # Build encoding fallback chain
         detected = detect_encoding(file_path)
 
         if encoding != "auto":
-            # 用户显式指定编码 → 作为首选，自动检测结果作为回退
+            # User explicitly specified encoding -> use as first choice, auto-detected result as fallback
             fallback_encodings = [encoding]
             if encoding.lower() != detected.lower():
                 fallback_encodings.append(detected)
         else:
             fallback_encodings = [detected]
 
-        # UTF-8 无 BOM（与检测编码不同时补充）
+        # UTF-8 without BOM (add if different from detected encoding)
         if 'utf-8' not in (e.lower() for e in fallback_encodings) and 'utf-8-sig' not in (e.lower() for e in fallback_encodings):
             fallback_encodings.append('utf-8')
 
-        # CP_ACP — 系统 ANSI 代码页
+        # CP_ACP — system ANSI code page
         try:
             ansi = locale.getpreferredencoding()
             if ansi.lower() not in (e.lower() for e in fallback_encodings):
                 fallback_encodings.append(ansi)
         except Exception:
-            logger.debug("获取系统默认编码失败，跳过ANSI回退")
+            logger.debug("Failed to get system default encoding; skipping ANSI fallback")
 
-        # CJK 编码回退（无论系统 locale 如何，都尝试通用 CJK 编码）
+        # CJK encoding fallback (try common CJK encodings regardless of system locale)
         cjk_fallbacks = ['gbk', 'gb18030', 'big5', 'shift_jis', 'euc-kr', 'euc-jp']
         for cjk_enc in cjk_fallbacks:
             if cjk_enc not in (e.lower() for e in fallback_encodings):
@@ -699,13 +699,13 @@ async def _read_content(
                         "range": [effective_start, target_end],
                     }
 
-                # 流式读取：只读取需要的行，避免大文件全量读入内存
-                # 对于读取开头 N 行或指定行范围的场景，线性扫描比 readlines() 更省内存
-                # target_start/target_end 是内部 1-indexed inclusive 表示
+                # Streaming read: read only the needed lines, avoiding loading entire large files into memory
+                # For scenarios reading the first N lines or a specified line range, linear scanning saves more memory than readlines()
+                # target_start/target_end are internal 1-indexed inclusive representations
                 target_start = effective_start
                 selected = []
-                reached_eof = True  # 跟踪是否读到文件末尾
-                line_no = 0  # 空文件时 for 循环体不会执行，需初始化
+                reached_eof = True  # Track whether EOF was reached
+                line_no = 0  # For empty files the for loop body does not execute; initialize
                 with open(file_path, 'r', encoding=enc, newline='',
                           buffering=BUFFER_SIZE_1MB) as f:
                     for line_no, line in enumerate(f, 1):
@@ -716,19 +716,19 @@ async def _read_content(
                             selected.append(line)
 
                 if reached_eof:
-                    total_lines = line_no  # 循环正常结束，line_no 即文件实际总行数
+                    total_lines = line_no  # Loop ended normally; line_no is the actual total line count
                 else:
-                    total_lines = None  # 被 target_end 截断，未知实际总行数
+                    total_lines = None  # Truncated by target_end; actual total line count unknown
 
                 raw_selected_text = ''.join(selected)
                 text = raw_selected_text
 
-                # show_line_numbers: 为每行添加 1-indexed 绝对行号前缀
+                # show_line_numbers: add 1-indexed absolute line-number prefix to each line
                 if show_line_numbers and selected:
                     line_offset = target_start  # 1-indexed start
                     numbered_lines = []
                     for i, line in enumerate(selected):
-                        lineno = line_offset + i  # 1-indexed 绝对行号
+                        lineno = line_offset + i  # 1-indexed absolute line number
                         numbered_lines.append(f"{lineno:>6}: {line}")
                     text = ''.join(numbered_lines)
 
@@ -738,9 +738,9 @@ async def _read_content(
                 lines_shown = len(selected)
                 actual_end_line = target_start + lines_shown - 1  # 1-indexed inclusive end
 
-                # 单行 meta: 编码 + 1-indexed 行号范围
-                # 所有行号都是 1-indexed，可直接用于 write 的 start_line/edits。
-                # 截断时仅追加 (truncated) 标记。
+                # Single-line meta: encoding + 1-indexed line number range
+                # All line numbers are 1-indexed and can be used directly in write's start_line/edits.
+                # When truncated, append only the (truncated) marker.
                 if lines_shown == 0:
                     total_hint = f", total_lines: {total_lines}" if total_lines is not None else ""
                     meta = (
@@ -760,21 +760,21 @@ async def _read_content(
                     "encoding": enc,
                 }
             except UnicodeDecodeError:
-                last_error = f"编码 {enc} 解码失败"
+                last_error = f"Encoding {enc} decode failed"
                 continue
             except Exception as e:
                 last_error = str(e)
                 continue
 
-        # 所有编码尝试均失败，返回错误（不降级到 KB — 文件在本地，KB 会读空）
-        logger.warning(f"读取文件 {file_path} 失败，尝试编码 {fallback_encodings} 均无效: {last_error}")
-        return _wrap_error(f"无法读取文件（编码检测失败）: {last_error}")
+        # All encoding attempts failed; return error (do not fall back to KB — file is local, KB would read empty)
+        logger.warning(f"Failed to read file {file_path}; attempts with encodings {fallback_encodings} all failed: {last_error}")
+        return _wrap_error(f"Unable to read file (encoding detection failed): {last_error}")
 
-    # 文件不在本地（可能是知识库中的路径） — 委托给 read_source_file
+    # File not local (may be a knowledge-base path) — delegate to read_source_file
     args = {
         "file_path": file_path,
         "start_line": start_line,
-        "max_lines": limit,  # read_source_file 内部仍用 max_lines
+        "max_lines": limit,  # read_source_file internally still uses max_lines
         "search_in": search_in,
         "project_path": project_path,
     }
@@ -782,7 +782,7 @@ async def _read_content(
         args["end_line"] = end_line
     result = await _read_file(args)
     if result.isError:
-        return {"status": "failed", "message": result.content[0].text if result.content else "读取失败"}
+        return {"status": "failed", "message": result.content[0].text if result.content else "read failed"}
     return {"status": "success", "message": result.content[0].text if result.content else ""}
 
 
@@ -797,7 +797,7 @@ async def _search_and_read(
     limit: int = 100,
     project_path: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """按类名/函数名搜索并读取文件"""
+    """Search by class name/function name and read file"""
     args = {
         "file_path": file_path,
         "type_name": type_name,
@@ -805,24 +805,24 @@ async def _search_and_read(
         "function_name": function_name,
         "search_in": search_in,
         "start_line": start_line,
-        "max_lines": limit,  # read_source_file 内部仍用 max_lines
+        "max_lines": limit,  # read_source_file internally still uses max_lines
         "project_path": project_path,
     }
     result = await _search_read_file(args)
     if result.isError:
-        return {"status": "failed", "message": result.content[0].text if result.content else "搜索失败"}
+        return {"status": "failed", "message": result.content[0].text if result.content else "search failed"}
     return {"status": "success", "message": result.content[0].text if result.content else ""}
 
 
 async def handle_read(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    处理 read action。
+    Handle read action.
 
-    支持两种模式:
-      1. 按路径读取: file_path 参数
-      2. 按搜索读取: search_type + type_name/function_name
+    Supports two modes:
+      1. Read by path: file_path parameter
+      2. Read by search: search_type + type_name/function_name
 
-    DFM 文件透明处理：二进制 DFM 自动转换为文本再读取。
+    Transparent DFM handling: binary DFM is automatically converted to text before reading.
     """
     file_path = arguments.get("file_path")
     search_type = arguments.get("search_type", "path")
@@ -831,20 +831,20 @@ async def handle_read(arguments: Dict[str, Any]) -> Dict[str, Any]:
         return _wrap_error(start_err)
     end_line = arguments.get("end_line")
     if end_line is not None and not isinstance(end_line, int):
-        return _wrap_error("end_line 必须是整数")
+        return _wrap_error("end_line must be an integer")
     if end_line is not None:
         limit = min(end_line - start_line + 1, 1000)
     else:
         limit_value = arguments.get("limit", 500)
         if not isinstance(limit_value, int):
-            return _wrap_error("limit 必须是整数")
+            return _wrap_error("limit must be an integer")
         limit = min(max(1, limit_value), 1000)
     search_in = arguments.get("search_in", "all")
     project_path = arguments.get("project_path")
     show_line_numbers = arguments.get("show_line_numbers", False)
     encoding = arguments.get("encoding", "auto")
 
-    # --- 搜索模式 ---
+    # --- Search mode ---
     if search_type != "path":
         return await _search_and_read(
             search_type=search_type,
@@ -858,30 +858,30 @@ async def handle_read(arguments: Dict[str, Any]) -> Dict[str, Any]:
             project_path=project_path,
         )
 
-    # --- 路径模式 ---
+    # --- Path mode ---
     if not file_path:
-        return _wrap_error("请提供 file_path 参数")
+        return _wrap_error("Please provide file_path parameter")
 
     path_err = _validate_path(file_path, project_path)
     if path_err:
-        return _wrap_error("路径安全校验失败: %s" % path_err)
+        return _wrap_error("Path safety validation failed: %s" % path_err)
 
-    # 获取读取许可（多读单写：多个读取可并发，写入时不可读）
-    # 必须在 DFM 检测/转换之前获取，防止并发写入干扰
+    # Acquire read permission (multi-reader single-writer: multiple reads can run concurrently, no reads during writes)
+    # Must be acquired before DFM detection/conversion to prevent interference from concurrent writes
     read_lock_err = _acquire_read_lock(file_path)
     if read_lock_err:
         return _wrap_error(read_lock_err)
 
     tmp_cleanup = None
-    lock_file_path = file_path  # 保存原始路径，用于锁释放（DFM 转换会改写 file_path）
+    lock_file_path = file_path  # Save original path for lock release (DFM conversion will overwrite file_path)
     try:
         if _is_dfm_file(file_path):
             try:
                 fmt = dfm_utils._detect_dfm_format(file_path)
             except FileNotFoundError:
-                return _wrap_error(f"DFM 文件不存在: {file_path}")
+                return _wrap_error(f"DFM file does not exist: {file_path}")
             except PermissionError:
-                return _wrap_error(f"无权限读取 DFM 文件: {file_path}")
+                return _wrap_error(f"No permission to read DFM file: {file_path}")
             if fmt == "binary":
                 tmp_dir = tempfile.mkdtemp(prefix="filetool_")
                 tmp_text = os.path.join(tmp_dir, os.path.basename(file_path) + ".txt")
@@ -890,11 +890,11 @@ async def handle_read(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     file_path = tmp_text
                     tmp_cleanup = tmp_dir
                 else:
-                    # 转换失败时返回明确错误，不尝试读二进制文件
+                    # Return a clear error on conversion failure; do not attempt to read the binary file
                     shutil.rmtree(tmp_dir, ignore_errors=True)
                     return _wrap_error(
-                        f"二进制 DFM 转换失败: {result.get('message', '未知错误')}。"
-                        "请检查 Delphi 编译器(dcc32)是否可用"
+                        f"Binary DFM conversion failed: {result.get('message', 'unknown error')}. "
+                        "Please check whether the Delphi compiler (dcc32) is available"
                     )
 
         result = await _read_content(
@@ -909,7 +909,7 @@ async def handle_read(arguments: Dict[str, Any]) -> Dict[str, Any]:
         )
         if result.get("status") == "success":
             _clear_dirty(lock_file_path)
-            # DFM: 将 #XXXX 转义序列还原为可见字符（与写入时的 escape_dfm_chinese 互为逆操作）
+            # DFM: restore #XXXX escape sequences to visible characters (inverse operation of escape_dfm_chinese during write)
             if _is_dfm_file(lock_file_path) and "message" in result:
                 result["message"] = dfm_utils.unescape_dfm_chinese(result["message"])
         return result
@@ -920,17 +920,17 @@ async def handle_read(arguments: Dict[str, Any]) -> Dict[str, Any]:
 
 
 
-# ── 文件级写入锁：防止对同一个文件并行写入 ──────────────────────────────
-# 同一个文件同时被多个 agent write 会导致内容错乱。
-# 用 in-process dict 做简单互斥：第二个并发写直接拒绝，让 agent 合并后重试。
-# 多读单写 (RWLock) — 每个文件路径一个锁条目
-# 结构: { normalized_path: {"lock": threading.Lock(), "readers": int, "writer": bool} }
+# ── File-level write lock: prevent parallel writes to the same file ──────────────────────────────
+# Multiple agents writing the same file concurrently will cause content corruption.
+# Use an in-process dict for simple mutual exclusion: reject the second concurrent write directly, letting the agent merge and retry.
+# Multi-reader single-writer (RWLock) — one lock entry per file path
+# Structure: { normalized_path: {"lock": threading.Lock(), "readers": int, "writer": bool} }
 _file_rw_locks: Dict[str, Dict] = {}
-_file_rw_dict_lock = threading.Lock()  # 保护 _file_rw_locks 字典本身的并发访问
+_file_rw_dict_lock = threading.Lock()  # Protects the _file_rw_locks dictionary itself from concurrent access
 
 
 def _get_rw_entry(file_path: str) -> Dict:
-    """获取或创建路径对应的 RWLock 条目（线程安全）"""
+    """Get or create the RWLock entry for a path (thread-safe)"""
     normalized = os.path.abspath(file_path)
     with _file_rw_dict_lock:
         entry = _file_rw_locks.get(normalized)
@@ -946,27 +946,27 @@ def _get_rw_entry(file_path: str) -> Dict:
 
 def _acquire_read_lock(file_path: str) -> Optional[str]:
     """
-    获取文件的读取许可。
-    多个读取可并发进行，但写入进行时不允许读取。
+    Acquire read permission for a file.
+    Multiple reads can run concurrently, but reading is not allowed while a write is in progress.
     
     Returns:
-        None 表示成功，可以读取
-        str  表示冲突，返回错误消息
+        None means success and reading is allowed
+        str  means conflict, returns error message
     """
     normalized = os.path.abspath(file_path)
     entry = _get_rw_entry(file_path)
     with entry["lock"]:
         if entry["writer"]:
             return (
-                f"文件 {os.path.basename(normalized)} 正在被写入操作占用，无法读取。"
-                "请等待写入完成后再试。"
+                f"File {os.path.basename(normalized)} is occupied by a write operation and cannot be read. "
+                "Please wait for the write to finish and try again."
             )
         entry["readers"] += 1
     return None
 
 
 def _release_read_lock(file_path: str) -> None:
-    """释放文件的读取许可"""
+    """Release the file's read permission"""
     entry = _get_rw_entry(file_path)
     with entry["lock"]:
         entry["readers"] = max(0, entry["readers"] - 1)
@@ -974,51 +974,51 @@ def _release_read_lock(file_path: str) -> None:
 
 def _acquire_write_lock(file_path: str) -> Optional[str]:
     """
-    获取文件的写入许可。
-    写入时不允许其他读取或写入同时进行。
+    Acquire write permission for a file.
+    Writing does not allow other reads or writes to run concurrently.
     
     Returns:
-        None 表示成功，可以写入
-        str  表示冲突，返回错误消息
+        None means success and writing is allowed
+        str  means conflict, returns error message
     """
     normalized = os.path.abspath(file_path)
     entry = _get_rw_entry(file_path)
     with entry["lock"]:
         if entry["writer"] or entry["readers"] > 0:
             rc = entry["readers"]
-            wc = "是" if entry["writer"] else "否"
+            wc = "yes" if entry["writer"] else "no"
             return (
-                f"文件 {os.path.basename(normalized)} 正在被其他操作占用"
-                f"（读取中: {rc}, 写入中: {wc}）。"
-                "同一个文件的所有修改必须合并为一次 write(edits=[...]) 完成，"
-                "请重新 read 文件后规划全部 edits，再一次性写入。"
+                f"File {os.path.basename(normalized)} is occupied by another operation "
+                f"(readers: {rc}, writer: {wc}). "
+                "All modifications to the same file must be merged into a single write(edits=[...]) call. "
+                "Please re-read the file, plan all edits, then write once."
             )
         entry["writer"] = True
     return None
 
 
 def _release_write_lock(file_path: str) -> None:
-    """释放文件的写入许可"""
+    """Release the file's write permission"""
     entry = _get_rw_entry(file_path)
     with entry["lock"]:
         entry["writer"] = False
 
 
-# ── 脏写入标记：防止 AI 未重读/预览就再次写入同一文件 ──────────────────
-# 文件修改后（write/format/uses）行号变化，AI 必须 re-read 或用 old_content 校验后才能再次写入。
+# ── Dirty-write marker: prevent AI from writing the same file again without re-reading/previewing ──────────────────
+# After a file is modified (write/format/uses), line numbers change; AI must re-read or validate with old_content before writing again.
 _dirty_files: Set[str] = set()
 _dirty_lock = threading.Lock()
 
 
 def _mark_dirty(file_path: str) -> None:
-    """标记文件已修改，下次写入前需预览或重读。"""
+    """Mark file as modified; preview or re-read is required before the next write."""
     normalized = os.path.abspath(file_path)
     with _dirty_lock:
         _dirty_files.add(normalized)
 
 
 def _clear_dirty(file_path: str) -> None:
-    """清除脏标记（成功 read 后标记清除）。"""
+    """Clear dirty marker (cleared after a successful read)."""
     normalized = os.path.abspath(file_path)
     with _dirty_lock:
         _dirty_files.discard(normalized)
@@ -1027,14 +1027,14 @@ def _clear_dirty(file_path: str) -> None:
 def _reject_removed_preview_argument(arguments: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Reject the removed delphi_file preview parameter before it can imply a write."""
     if "preview" in arguments:
-        return _wrap_error("preview 参数已删除，请使用 dry_run=true 预览，或 dry_run=false 执行实际修改")
+        return _wrap_error("The preview parameter has been removed; use dry_run=true to preview, or dry_run=false to perform actual modification")
     return None
 
 
 def _check_dirty(file_path: str, dry_run: bool = False) -> None:
     """
-    检查文件是否脏（上次修改后未重读/预览）。
-    如果 dirty 且不是 dry_run 模式，抛异常阻止写入。
+    Check whether the file is dirty (not re-read/previewed since last modification).
+    If dirty and not dry_run mode, raise exception to block write.
     """
     if dry_run:
         return
@@ -1042,44 +1042,44 @@ def _check_dirty(file_path: str, dry_run: bool = False) -> None:
     with _dirty_lock:
         if normalized in _dirty_files:
             raise RuntimeError(
-                f"文件 {os.path.basename(normalized)} 上次写入后行号可能已变化。"
-                "请先调用 read 获取最新行号，或为每个 edit 提供 old_content 原文校验，"
-                "或使用 dry_run=true 预览本次修改。"
-                "基于最新行号规划 edits 后重新发起 write。"
+                f"Line numbers in file {os.path.basename(normalized)} may have changed since the last write. "
+                "Please call read first to get the latest line numbers, or provide old_content original-text validation for each edit, "
+                "or use dry_run=true to preview this modification. "
+                "Plan edits based on the latest line numbers, then initiate write again."
             )
 
 
 async def handle_write(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    处理 write action。
+    Handle write action.
 
-    统一使用 edits 参数：
-      - 全量替换：edits=[{start_line:1, content:"完整文件内容"}]
-      - 部分替换：edits=[{start_line:5, end_line:10, content:"替换内容"}]
-      - 多段替换：edits=[{start_line:5, end_line:10, content:"..."},
+    Uniformly use edits parameter:
+      - Full replacement: edits=[{start_line:1, content:"complete file content"}]
+      - Partial replacement: edits=[{start_line:5, end_line:10, content:"replacement content"}]
+      - Multi-segment replacement: edits=[{start_line:5, end_line:10, content:"..."},
                        {start_line:20, end_line:22, content:"..."}]
-      - 删除行：  edits=[{start_line:10, end_line:15, content:""}]
+      - Delete lines:  edits=[{start_line:10, end_line:15, content:""}]
 
-    核心特性:
-      - 自动备份原文件到 __history（backup=True 默认）
-      - 自动检测并保持原始编码
-      - DFM 文件自动处理：二进制 DFM 自动转文本→编辑→转回二进制
-      - 支持 auto_format 写入后自动格式化代码
-      - 支持 dry_run 预览 diff 不写盘
+    Core features:
+      - Auto-backup original file to __history (backup=True by default)
+      - Auto-detect and preserve original encoding
+      - Automatic DFM file handling: binary DFM auto-converted to text -> edit -> convert back to binary
+      - Supports auto_format to automatically format code after write
+      - Supports dry_run to preview diff without writing to disk
 
-    行号均为 1-indexed 左闭右闭:
-      edits=[{start_line:5, end_line:10}]  → 替换第 5~10 行
-      edits=[{start_line:5}]               → 从第 5 行替换到文件末尾
-      edits=[{end_line:10}]                → 从第 1 行替换到第 10 行
+    Line numbers are all 1-indexed inclusive:
+      edits=[{start_line:5, end_line:10}]  -> replace lines 5~10
+      edits=[{start_line:5}]               -> replace from line 5 to end of file
+      edits=[{end_line:10}]                -> replace from line 1 to line 10
 
-    ⚠️ 脏标记保护:
-       每次写入（含 auto_format）后文件行号会变化。
-       在重新 read 文件或 dry_run 确认前，不允许对同一文件再次写入，
-       防止 AI 使用过期行号导致错位改写。
-       续重行检测已降级为警告，不再阻断写入。
+    ⚠️ Dirty-marker protection:
+       After every write (including auto_format), file line numbers change.
+       Before re-reading the file or confirming with dry_run, writing to the same file again is not allowed,
+       preventing AI from using stale line numbers and causing misaligned overwrites.
+       Duplicate-line detection has been downgraded to a warning and no longer blocks writes.
 
-       old_content + 每个 edit 的原文校验通过时，可安全跳过脏标记。
-       allow_dirty=true 可绕过脏标记检查（风险自负）。
+       When old_content + each edit's original-text validation passes, the dirty marker can be safely skipped.
+       allow_dirty=true can bypass the dirty-marker check (at your own risk).
     """
     removed_preview = _reject_removed_preview_argument(arguments)
     if removed_preview:
@@ -1094,27 +1094,27 @@ async def handle_write(arguments: Dict[str, Any]) -> Dict[str, Any]:
     force = arguments.get("force", False)
     allow_dirty = arguments.get("allow_dirty", False)
     if not file_path:
-        return _wrap_error("请提供 file_path 参数")
+        return _wrap_error("Please provide file_path parameter")
     if not edits:
-        return _wrap_error("请提供 edits 参数（全量替换: [{start_line:1, content:'...'}]）")
+        return _wrap_error("Please provide edits parameter (full replacement: [{start_line:1, content:'...'}])")
 
     path_err = _validate_path(file_path, arguments.get("project_path"))
     if path_err:
-        return _wrap_error("路径安全校验失败: %s" % path_err)
+        return _wrap_error("Path safety validation failed: %s" % path_err)
 
     # Normalize insert-type edits (those with position="before"/"after") into
     # single-line replacements before passing to _handle_write_edits.
     # Without this, an insert edit without end_line is treated as "to end of file"
-    # by the overlap detection, causing false-positive "覆盖到文件末尾" errors
+    # by the overlap detection, causing false-positive "covers to end of file" errors
     # when mixed with later range replacements.
     if edits and any(edit.get("position") is not None for edit in edits):
         if not os.path.isfile(file_path):
-            return _wrap_error("新文件不支持含 position 字段的 insert 类型 edits")
+            return _wrap_error("New files do not support insert-type edits containing a position field")
         result = await _normalize_insert_edits_for_write(
             file_path, edits, dry_run=dry_run
         )
         if result is None:
-            return _wrap_error("插入编辑预处理失败")
+            return _wrap_error("Insert edit preprocessing failed")
         err, normalized_edits, cleanup_dir = result
         if err:
             if cleanup_dir:
@@ -1172,7 +1172,7 @@ async def _normalize_insert_edits_for_write(
                 read_path = os.path.join(tmp_cleanup, os.path.basename(file_path) + ".txt")
                 conv_result = await dfm_utils.convert_dfm(file_path, read_path, to_text=True)
                 if not conv_result.get("success"):
-                    return (f"二进制 DFM 转换失败: {conv_result.get('message', '未知错误')}", edits, tmp_cleanup)
+                    return (f"Binary DFM conversion failed: {conv_result.get('message', 'unknown error')}", edits, tmp_cleanup)
         with open(read_path, 'r', encoding=detected_encoding, newline='', buffering=BUFFER_SIZE_1MB) as f:
             lines = f.readlines()
     except Exception as e:
@@ -1191,17 +1191,17 @@ async def _normalize_insert_edits_for_write(
             old_content = _get_old_content(edit)
 
             if s_1 is None or not isinstance(s_1, int):
-                return (f"edits[{i}] ({desc}): start_line 必须是整数", normalized, tmp_cleanup)
+                return (f"edits[{i}] ({desc}): start_line must be an integer", normalized, tmp_cleanup)
             if s_1 < 1:
-                return (f"edits[{i}] ({desc}): start_line ({s_1}) 不能小于 1", normalized, tmp_cleanup)
+                return (f"edits[{i}] ({desc}): start_line ({s_1}) cannot be less than 1", normalized, tmp_cleanup)
             if content is None:
-                return (f"edits[{i}] ({desc}): 缺少必需的 content", normalized, tmp_cleanup)
+                return (f"edits[{i}] ({desc}): missing required content", normalized, tmp_cleanup)
             if position not in ("before", "after"):
-                return (f"edits[{i}] ({desc}): position 必须是 before 或 after", normalized, tmp_cleanup)
+                return (f"edits[{i}] ({desc}): position must be before or after", normalized, tmp_cleanup)
 
             anchor_idx = s_1 - 1
             if anchor_idx < 0 or anchor_idx >= total_lines:
-                return (f"edits[{i}] ({desc}): start_line {s_1} 超出当前总行数 {total_lines}", normalized, tmp_cleanup)
+                return (f"edits[{i}] ({desc}): start_line {s_1} exceeds current total line count {total_lines}", normalized, tmp_cleanup)
 
             anchor_text = lines[anchor_idx]
 
@@ -1235,8 +1235,6 @@ async def _normalize_insert_edits_for_write(
             normalized.append(edit)
 
     return (None, normalized, tmp_cleanup)
-
-
 async def handle_replace(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """Handle action=replace with mandatory old_content for existing files."""
     return await _handle_structured_write_action(arguments, "replace")
@@ -1268,15 +1266,15 @@ async def _handle_structured_write_action(arguments: Dict[str, Any], action: str
     allow_dirty = arguments.get("allow_dirty", False)
 
     if not file_path:
-        return _wrap_error("请提供 file_path 参数")
+        return _wrap_error("Please provide file_path parameter")
     if not edits:
-        return _wrap_error(f"请提供 edits 参数（action={action}）")
+        return _wrap_error(f"Please provide edits parameter (action={action})")
     if not isinstance(edits, (list, tuple)):
-        return _wrap_error("edits 必须是一个列表")
+        return _wrap_error("edits must be a list")
 
     path_err = _validate_path(file_path, arguments.get("project_path"))
     if path_err:
-        return _wrap_error("路径安全校验失败: %s" % path_err)
+        return _wrap_error("Path safety validation failed: %s" % path_err)
 
     if dry_run:
         lock_err = _acquire_read_lock(file_path)
@@ -1290,7 +1288,7 @@ async def _handle_structured_write_action(arguments: Dict[str, Any], action: str
         file_exists = os.path.isfile(file_path)
         if not file_exists:
             if action != "replace":
-                return _wrap_error(f"新文件不支持 action={action}，请使用 action=replace 或兼容 action=write 创建完整文件")
+                return _wrap_error(f"New files do not support action={action}, please use action=replace or compatible action=write to create a complete file")
             return await _handle_write_edits(
                 file_path=file_path,
                 edits=edits,
@@ -1321,7 +1319,7 @@ async def _handle_structured_write_action(arguments: Dict[str, Any], action: str
         normalized_edits: List[Dict[str, Any]] = []
         for i, edit in enumerate(edits):
             if not isinstance(edit, dict):
-                return _wrap_error(f"edits[{i}] 必须是 dict")
+                return _wrap_error(f"edits[{i}] must be a dict")
             desc = edit.get("description", f"{action} #{i}")
             s_1 = edit.get("start_line")
             e_1 = edit.get("end_line")
@@ -1329,40 +1327,40 @@ async def _handle_structured_write_action(arguments: Dict[str, Any], action: str
             old_content = _get_old_content(edit)
 
             if s_1 is None:
-                return _wrap_error(f"edits[{i}] ({desc}): 缺少必需的 start_line")
+                return _wrap_error(f"edits[{i}] ({desc}): missing required start_line")
             if not isinstance(s_1, int):
-                return _wrap_error(f"edits[{i}] ({desc}): start_line 必须是整数")
+                return _wrap_error(f"edits[{i}] ({desc}): start_line must be an integer")
             if s_1 < 1:
-                return _wrap_error(f"edits[{i}] ({desc}): start_line ({s_1}) 不能小于 1")
+                return _wrap_error(f"edits[{i}] ({desc}): start_line ({s_1}) cannot be less than 1")
             if e_1 is not None and not isinstance(e_1, int):
-                return _wrap_error(f"edits[{i}] ({desc}): end_line 必须是整数")
+                return _wrap_error(f"edits[{i}] ({desc}): end_line must be an integer")
             if action in ("replace", "delete") and e_1 is not None and s_1 > e_1:
-                return _wrap_error(f"edits[{i}] ({desc}): start_line ({s_1}) > end_line ({e_1})，需满足 start_line ≤ end_line")
+                return _wrap_error(f"edits[{i}] ({desc}): start_line ({s_1}) > end_line ({e_1}), must satisfy start_line ≤ end_line")
             if not _edit_has_non_empty_old_content(edit):
-                return _wrap_error(f"edits[{i}] ({desc}): action={action} 必须提供非空 old_content")
+                return _wrap_error(f"edits[{i}] ({desc}): action={action} must provide non-empty old_content")
 
             if action == "replace":
                 if content is None:
-                    return _wrap_error(f"edits[{i}] ({desc}): action=replace 必须提供 content")
+                    return _wrap_error(f"edits[{i}] ({desc}): action=replace must provide content")
                 new_edit = dict(edit)
             elif action == "delete":
                 if content not in (None, ""):
-                    return _wrap_error(f"edits[{i}] ({desc}): action=delete 不接受非空 content")
+                    return _wrap_error(f"edits[{i}] ({desc}): action=delete does not accept non-empty content")
                 new_edit = dict(edit)
                 new_edit["content"] = ""
             else:
                 if content is None:
-                    return _wrap_error(f"edits[{i}] ({desc}): action=insert 必须提供 content")
+                    return _wrap_error(f"edits[{i}] ({desc}): action=insert must provide content")
                 if content == "":
-                    return _wrap_error(f"edits[{i}] ({desc}): action=insert 的 content 不能为空")
+                    return _wrap_error(f"edits[{i}] ({desc}): action=insert content cannot be empty")
                 if e_1 is not None and e_1 != s_1:
-                    return _wrap_error(f"edits[{i}] ({desc}): action=insert 不支持 end_line 跨行，锚点只能是 start_line")
+                    return _wrap_error(f"edits[{i}] ({desc}): action=insert does not support end_line spanning multiple lines, the anchor can only be start_line")
                 position = edit.get("position", "before")
                 if position not in ("before", "after"):
-                    return _wrap_error(f"edits[{i}] ({desc}): position 必须是 before 或 after")
+                    return _wrap_error(f"edits[{i}] ({desc}): position must be before or after")
                 anchor_idx = s_1 - 1
                 if anchor_idx < 0 or anchor_idx >= len(lines):
-                    return _wrap_error(f"edits[{i}] ({desc}): start_line {s_1} 超出当前总行数 {len(lines)}")
+                    return _wrap_error(f"edits[{i}] ({desc}): start_line {s_1} exceeds current total line count {len(lines)}")
                 anchor_text = lines[anchor_idx]
                 if _normalize_code_for_compare(old_content or "") != _normalize_code_for_compare(anchor_text):
                     expected_lines = (old_content or "").splitlines(keepends=True)
@@ -1399,7 +1397,7 @@ async def _handle_structured_write_action(arguments: Dict[str, Any], action: str
             auto_format=auto_format,
             dry_run=dry_run,
             force=force,
-            allow_dirty=True,  # 安全: old_content 校验已保障行号正确性，无需脏标记
+            allow_dirty=True,  # Safety: old_content validation already ensures line number correctness, no dirty marker needed
             lock_already_held=True,
         )
     finally:
@@ -1412,40 +1410,41 @@ async def _handle_structured_write_action(arguments: Dict[str, Any], action: str
 
 
 def _format_unchanged_ranges(edit_results: List[Dict[str, Any]], total_lines_before: int) -> str:
-    """从 edit 结果列表推导未变区域并格式化为文本
+    """Derive unchanged ranges from the edit result list and format them as text
 
-    每个 edit 之间和末尾的区域都是"未变"的，
-    标注该区间在最终文件中的偏移量，方便 AI 查表而不需要自己算。
+    The regions between each edit and at the end are all "unchanged";
+    label the offset of that range in the final file, so the AI can look it up without calculating it itself.
 
     Args:
-        edit_results: 每个 edit 记录，含 actual_start(1-indexed), inserted, delta
-        total_lines_before: 编辑前文件总行数
+        edit_results: Record for each edit, containing actual_start (1-indexed), inserted, delta
+        total_lines_before: Total line count of the file before editing
 
     Returns:
-        格式如 "  未变: [1, 4] 不变, [14, 150] +3"
-        所有 edit 覆盖了全文时返回空字符串
+        Format such as "  Unchanged: [1, 4] unchanged, [14, 150] +3"
+        Returns an empty string when all edits cover the entire text
     """
     parts: List[str] = []
-    cursor = 1  # 1-indexed 当前位置
+    cursor = 1  # 1-indexed current position
     offset = 0
     for er in edit_results:
         start = er["actual_start"]
         if start > cursor:
-            off_str = "不变" if offset == 0 else f"{offset:+d}"
+            off_str = "unchanged" if offset == 0 else f"{offset:+d}"
             parts.append(f"[{cursor}, {start - 1}] {off_str}")
-        # 跳过被 edit 覆盖的区域
+        # Skip the region covered by the edit
         if er["inserted"] > 0:
             cursor = start + er["inserted"]
-        # 删除操作不推进 cursor（没有新增内容占据位置）
+        # Delete operations do not advance cursor (no new content occupies the position)
         offset += er["delta"]
-    # 末尾未变区域
+    # Trailing unchanged region
     if cursor <= total_lines_before:
-        off_str = "不变" if offset == 0 else f"{offset:+d}"
+        off_str = "unchanged" if offset == 0 else f"{offset:+d}"
         parts.append(f"[{cursor}, {total_lines_before}] {off_str}")
 
     if not parts:
         return ""
-    return f"  未变: {', '.join(parts)}"
+    return f"  Unchanged: {', '.join(parts)}"
+
 
 
 async def _handle_write_edits(
@@ -1459,11 +1458,11 @@ async def _handle_write_edits(
     allow_dirty: bool = False,
     lock_already_held: bool = False,
 ) -> Dict[str, Any]:
-    """批量写入内部实现（edits 数组，以原始文件为参照系）。"""
+    """Batch write internal implementation (edits array, using the original file as reference)."""
     if not edits:
-        return _wrap_error("请提供 edits 列表")
+        return _wrap_error("Please provide edits list")
     if not isinstance(edits, (list, tuple)):
-        return _wrap_error("edits 必须是一个列表")
+        return _wrap_error("edits must be a list")
 
     if not lock_already_held:
         if dry_run:
@@ -1486,20 +1485,20 @@ async def _handle_write_edits(
         file_exists = os.path.isfile(file_path)
         if not file_exists:
             if len(edits) != 1:
-                return _wrap_error("新文件只能有一个 edit")
+                return _wrap_error("New files can only have one edit")
             e0 = edits[0]
             if e0.get("start_line", 0) != 1:
-                return _wrap_error("新文件必须从 start_line=1 开始")
+                return _wrap_error("New files must start from start_line=1")
             if not e0.get("content"):
-                return _wrap_error("新文件必须提供 content")
-            # 直接走全量写入
+                return _wrap_error("New files must provide content")
+            # Go directly to full write
             content = e0["content"]
-            # 如果是新建 DFM 文件，自动将中文转为 #XXXX 转义序列
+            # If creating a new DFM file, automatically convert Chinese to #XXXX escape sequences
             if _is_dfm_file(file_path):
                 content = dfm_utils.escape_dfm_chinese(content)
             original_encoding = encoding if encoding != "auto" else "utf-8-sig"
 
-            # 预览模式
+            # Preview mode
             if dry_run:
                 return {
                     "status": "success",
@@ -1509,7 +1508,7 @@ async def _handle_write_edits(
                     ),
                 }
 
-            # 写入新文件：先写同卷临时文件，成功后再替换目标。
+            # Write new file: first write a temporary file on the same volume, then replace the target after success.
             temp_write_path = _make_temp_write_path(file_path)
             try:
                 _write_text_temp(temp_write_path, content, original_encoding)
@@ -1525,7 +1524,7 @@ async def _handle_write_edits(
                         os.remove(temp_write_path)
                     except OSError:
                         pass
-                return _wrap_error(f"创建文件失败: {e}")
+                return _wrap_error(f"Failed to create file: {e}")
 
             _mark_dirty(file_path)
             return {
@@ -1557,24 +1556,24 @@ async def _handle_write_edits(
         validated_edits = []
         for i, edit in enumerate(edits):
             if not isinstance(edit, dict):
-                return _wrap_error(f"edits[{i}] 必须是 dict")
+                return _wrap_error(f"edits[{i}] must be a dict")
             s_1 = edit.get("start_line")
             e_1 = edit.get("end_line")
             c = edit.get("content")
             desc = edit.get("description", f"edit #{i}")
             old_content = _get_old_content(edit)
             if s_1 is None:
-                return _wrap_error(f"edits[{i}] ({desc}): 缺少必需的 start_line")
+                return _wrap_error(f"edits[{i}] ({desc}): missing required start_line")
             if c is None:
-                return _wrap_error(f"edits[{i}] ({desc}): 缺少必需的 content")
+                return _wrap_error(f"edits[{i}] ({desc}): missing required content")
             if not isinstance(s_1, int):
-                return _wrap_error(f"edits[{i}] ({desc}): start_line 必须是整数")
+                return _wrap_error(f"edits[{i}] ({desc}): start_line must be an integer")
             if e_1 is not None and not isinstance(e_1, int):
-                return _wrap_error(f"edits[{i}] ({desc}): end_line 必须是整数")
+                return _wrap_error(f"edits[{i}] ({desc}): end_line must be an integer")
             if s_1 < 1:
-                return _wrap_error(f"edits[{i}] ({desc}): start_line ({s_1}) 不能小于 1")
+                return _wrap_error(f"edits[{i}] ({desc}): start_line ({s_1}) cannot be less than 1")
             if e_1 is not None and s_1 > e_1:
-                return _wrap_error(f"edits[{i}] ({desc}): start_line ({s_1}) > end_line ({e_1})，需满足 start_line ≤ end_line")
+                return _wrap_error(f"edits[{i}] ({desc}): start_line ({s_1}) > end_line ({e_1}), must satisfy start_line ≤ end_line")
             validated_edits.append((s_1 - 1, e_1, c, desc, s_1, e_1, old_content))
 
         validated_edits.sort(key=lambda x: x[0])
@@ -1584,13 +1583,13 @@ async def _handle_write_edits(
             next_s_0, _, _, _, _, _, _ = validated_edits[i + 1]
             if curr_e_0 is None:
                 return _wrap_error(
-                    f"edits 区间重叠: \"{validated_edits[i][3]}\" (start={validated_edits[i][4]}) 覆盖到文件末尾，"
-                    f"与 \"{validated_edits[i+1][3]}\" (start={validated_edits[i+1][4]}) 重叠"
+                    f"edits interval overlap: \"{validated_edits[i][3]}\" (start={validated_edits[i][4]}) covers to end of file, "
+                    f"overlaps with \"{validated_edits[i+1][3]}\" (start={validated_edits[i+1][4]})"
                 )
             if next_s_0 < curr_e_0:
                 return _wrap_error(
-                    f"edits 区间重叠: \"{validated_edits[i][3]}\" [{validated_edits[i][4]},{validated_edits[i][5]}] "
-                    f"与 \"{validated_edits[i+1][3]}\" [{validated_edits[i+1][4]},...) 重叠"
+                    f"edits interval overlap: \"{validated_edits[i][3]}\" [{validated_edits[i][4]},{validated_edits[i][5]}] "
+                    f"overlaps with \"{validated_edits[i+1][3]}\" [{validated_edits[i+1][4]},...)"
                 )
 
         if is_dfm_binary:
@@ -1599,7 +1598,7 @@ async def _handle_write_edits(
             conv_result = await dfm_utils.convert_dfm(file_path, text_path, to_text=True)
             if not conv_result.get("success"):
                 shutil.rmtree(tmp_dir, ignore_errors=True)
-                return _wrap_error(f"二进制 DFM 转换失败: {conv_result.get('message', '未知错误')}")
+                return _wrap_error(f"Binary DFM conversion failed: {conv_result.get('message', 'Unknown error')}")
             read_path = text_path
             read_enc = detect_encoding(read_path)
             tmp_cleanup = tmp_dir
@@ -1620,15 +1619,15 @@ async def _handle_write_edits(
             adj_e = (e_0 + cumulative_offset) if e_0 is not None else len(lines)
 
             if adj_s < 0 or adj_s > len(lines):
-                results.append(f"  ❌ {desc}: start_line {s_1}（调整后 {adj_s}）超出当前范围")
+                results.append(f"  ❌ {desc}: start_line {s_1} (after adjustment {adj_s}) is out of current range")
                 all_success = False
                 continue
             if adj_e > len(lines):
-                results.append(f"  ❌ {desc}: end_line {e_1 or total}（调整后 {adj_e}）超出当前总行数 {len(lines)}")
+                results.append(f"  ❌ {desc}: end_line {e_1 or total} (after adjustment {adj_e}) exceeds current total line count {len(lines)}")
                 all_success = False
                 continue
             if adj_s >= adj_e:
-                results.append(f"  ❌ {desc}: 调整后范围为空 [{adj_s}, {adj_e})")
+                results.append(f"  ❌ {desc}: adjusted range is empty [{adj_s}, {adj_e})")
                 all_success = False
                 continue
 
@@ -1654,7 +1653,7 @@ async def _handle_write_edits(
             removed = adj_e - adj_s
             removed_lines_dry_run = []
 
-            before_len = len(lines)  # 编辑前行数（含此前 edits 累计）
+            before_len = len(lines)  # Line count before this edit (including previous edits)
             if c == '':
                 if removed > 0 and removed <= 5:
                     actual_lineno = adj_s + 1
@@ -1677,7 +1676,7 @@ async def _handle_write_edits(
                 inserted = len(c_lines)
 
                 if removed > 0 and removed <= 5:
-                    actual_lineno = adj_s + 1  # 实际 1-indexed 起始行号
+                    actual_lineno = adj_s + 1  # Actual 1-indexed starting line number
                     removed_lines_dry_run = [
                         (actual_lineno + i, lines[adj_s + i].rstrip('\n\r'))
                         for i in range(removed)
@@ -1686,13 +1685,13 @@ async def _handle_write_edits(
                 lines[adj_s:adj_e] = c_lines
 
             delta = inserted - removed
-            prev_cumulative_offset = cumulative_offset  # 此 edit 发生前的累计偏移
+            prev_cumulative_offset = cumulative_offset  # Cumulative offset before this edit
             cumulative_offset += delta
 
-            # 显示实际行号区间（指定行号不同时加括号标注）
+            # Display actual line number range (add parenthetical note when different from specified line number)
             adj_s_display = adj_s + 1
             adj_e_display = adj_e  # 0-indexed exclusive → 1-indexed inclusive
-            range_suffix = "" if adj_s_display == s_1 else f" (指定 {s_1})"
+            range_suffix = "" if adj_s_display == s_1 else f" (specified {s_1})"
             if inserted == 0:
                 results.append(
                     f"  [{adj_s_display}, {adj_e_display}] → deleted before line {adj_s_display} "
@@ -1704,7 +1703,7 @@ async def _handle_write_edits(
                     f"(offset: {delta:+d}){range_suffix}  {desc}"
                 )
 
-            # Per-edit diff 预览（1-indexed 行号）
+            # Per-edit diff preview (1-indexed line numbers)
             if removed_lines_dry_run:
                 for orig_lineno, rl in removed_lines_dry_run:
                     display = rl if len(rl) <= 80 else rl[:77] + "..."
@@ -1716,16 +1715,16 @@ async def _handle_write_edits(
                     display = display if len(display) <= 80 else display[:77] + "..."
                     results.append(f"    + {display}")
                 if len(c_lines) > max_show:
-                    results.append(f"    + ...（共 {len(c_lines)} 行）")
+                    results.append(f"    + ... (total {len(c_lines)} lines)")
 
-            # 此前编辑导致累积偏移时，通知 AI 实际行号偏移量
+            # Notify AI of actual line number offset when previous edits caused cumulative offset
             if prev_cumulative_offset != 0:
                 results.append(
-                    f"    ℹ 偏移: 此前 {prev_cumulative_offset:+d} 行偏移, "
-                    f"实际行号 = 指定行号{prev_cumulative_offset:+d}"
+                    f"    ℹ Offset: previous {prev_cumulative_offset:+d} line offset, "
+                    f"actual line number = specified line number{prev_cumulative_offset:+d}"
                 )
 
-            # 收集 edit 结果，用于生成"未变区域"提示
+            # Collect edit results for generating "unchanged ranges" hint
             edit_results.append({
                 "actual_start": adj_s_display,
                 "inserted": inserted,
@@ -1733,20 +1732,20 @@ async def _handle_write_edits(
             })
 
         new_text = ''.join(lines)
-        # 对于 DFM 文件，自动将单引号内的非 ASCII 字符（中文）转为 #XXXX 转义序列
+        # For DFM files, automatically convert non-ASCII characters (Chinese) inside single quotes to #XXXX escape sequences
         if _is_dfm_file(file_path):
             new_text = dfm_utils.escape_dfm_chinese(new_text)
         encoding_fallback = False
         fmt_msg = ""
 
-        # 累计偏移一致性自检
+        # Cumulative offset consistency self-check
         expected_total = total + cumulative_offset
         actual_total = len(lines)
         if actual_total != expected_total:
             results.append(
-                f"  ❌ 内部错误: 编辑应用后行数 {actual_total} ≠ "
-                f"原始 {total} + 累计偏移 {cumulative_offset} = {expected_total}，"
-                f"请上报此问题"
+                f"  ❌ Internal error: line count after applying edits {actual_total} ≠ "
+                f"original {total} + cumulative offset {cumulative_offset} = {expected_total}, "
+                f"please report this issue"
             )
             all_success = False
 
@@ -1757,14 +1756,14 @@ async def _handle_write_edits(
                 except OSError:
                     pass
             summary = [
-                "部分 edit 执行失败，已取消写入磁盘",
+                "Some edits failed; write to disk cancelled",
                 f"failed: {len(validated_edits)} edits, {os.path.basename(file_path)}, encoding: {write_enc}",
                 "",
             ]
             summary.extend(results)
             return {"status": "failed", "message": "\n".join(summary)}
 
-        # AI 偏移错误检测
+        # AI offset error detection
         if not force:
             orig_dup_contents = set()
             for i in range(1, len(original_lines)):
@@ -1781,20 +1780,20 @@ async def _handle_write_edits(
                     new_dup_lines.append((i + 1, prev))
 
             if new_dup_lines:
-                dup_msgs = [f"    第 {i} 行: {txt}" for i, txt in new_dup_lines[:10]]
+                dup_msgs = [f"    Line {i}: {txt}" for i, txt in new_dup_lines[:10]]
                 if len(new_dup_lines) > 10:
-                    dup_msgs.append(f"    ... 还有 {len(new_dup_lines) - 10} 处")
+                    dup_msgs.append(f"    ... {len(new_dup_lines) - 10} more")
                 warn = (
-                    "⚠️ 写入完成，但检测到连续重复行，请 verify 结果。\n"
-                    f"共 {len(new_dup_lines)} 处新增重复：\n" + "\n".join(dup_msgs)
+                    "⚠️ Write completed, but consecutive duplicate lines were detected; please verify the result.\n"
+                    f"Total {len(new_dup_lines)} new duplicates:\n" + "\n".join(dup_msgs)
                 )
                 results.append(warn)
                 logger.warning(
-                    f"续重行警告 ({os.path.basename(file_path)}): "
-                    f"{len(new_dup_lines)} 处"
+                    f"Consecutive duplicate line warning ({os.path.basename(file_path)}): "
+                    f"{len(new_dup_lines)} occurrences"
                 )
 
-        # 写入磁盘
+        # Write to disk
         if not dry_run:
             temp_write_path = _make_temp_write_path(file_path)
             text_tmp = None
@@ -1809,12 +1808,12 @@ async def _handle_write_edits(
                                 os.remove(bak_path)
                             except OSError:
                                 pass
-                        return _wrap_error(f"二进制 DFM 转换失败，已取消写入: {conv_result.get('message', '未知错误')}")
+                        return _wrap_error(f"Binary DFM conversion failed; write cancelled: {conv_result.get('message', 'Unknown error')}")
                 else:
                     try:
                         _write_text_temp(temp_write_path, new_text, write_enc)
                     except UnicodeEncodeError:
-                        logger.warning(f"编码 {write_enc} 写出失败，回退到 utf-8")
+                        logger.warning(f"Encoding {write_enc} write failed, falling back to utf-8")
                         _write_text_temp(temp_write_path, new_text, "utf-8")
                         write_enc = "utf-8"
                         encoding_fallback = True
@@ -1822,7 +1821,7 @@ async def _handle_write_edits(
                 if backup:
                     bak_path = create_backup(file_path)
                     if not bak_path:
-                        return _wrap_error("创建备份失败，已取消写入")
+                        return _wrap_error("Failed to create backup; write cancelled")
 
                 record_authorized_write(
                     file_path,
@@ -1831,7 +1830,7 @@ async def _handle_write_edits(
                 )
                 _replace_with_temp(temp_write_path, file_path)
             except Exception as ex:
-                return _wrap_error(f"写入文件失败，已取消写入: {ex}")
+                return _wrap_error(f"Failed to write file; write cancelled: {ex}")
             finally:
                 for cleanup_path in (text_tmp, temp_write_path):
                     if cleanup_path and os.path.exists(cleanup_path):
@@ -1840,21 +1839,21 @@ async def _handle_write_edits(
                         except OSError:
                             pass
 
-            # 写入后自动格式化
+            # Auto-format after writing
             if auto_format and _is_delphi_file(file_path):
                 try:
                     formatted, write_enc, fmt_encoding_fallback, _ = await _apply_auto_format_atomically(
                         file_path, write_enc, has_crlf
                     )
                     if formatted:
-                        fmt_msg = "，写入后已格式化"
+                        fmt_msg = ", formatted after write"
                     if fmt_encoding_fallback:
                         encoding_fallback = True
                 except Exception as ex:
-                    logger.warning(f"写入后自动格式化失败: {ex}")
+                    logger.warning(f"Auto-format after writing failed: {ex}")
                     results.append(f"  ⚠ auto_format failed: {ex}")
 
-            # auto_format 可能额外改变行数（展开 uses、调整空行等），重算真实偏移
+            # auto_format may additionally change line count (expand uses, adjust blank lines, etc.); recalculate the actual offset
             fmt_diff = 0
             if auto_format and not dry_run and os.path.isfile(file_path) and fmt_msg:
                 try:
@@ -1866,24 +1865,24 @@ async def _handle_write_edits(
                         fmt_diff = new_total - expected_total
                         cumulative_offset += fmt_diff
                 except Exception as ex:
-                    logger.debug(f"auto_format 后重读行数失败: {ex}")
+                    logger.debug(f"Failed to re-read line count after auto_format: {ex}")
             if fmt_diff:
                 results.append(
-                    f"  ⚠ auto_format 额外偏移: {fmt_diff:+d}，累计总偏移: {cumulative_offset:+d}"
+                    f"  ⚠ auto_format extra offset: {fmt_diff:+d}, cumulative total offset: {cumulative_offset:+d}"
                 )
 
-            # 标记脏
+            # Mark dirty
             _mark_dirty(file_path)
         elif all_success:
-            results.append("  ℹ dry_run 不清除脏标记；后续 write 仍需 read 或 old_content 校验")
+            results.append("  ℹ dry_run does not clear the dirty marker; subsequent write still requires read or old_content validation")
 
-        # 追加"未变区域"提示（失败时不输出，因为行号已被污染）
+        # Append "unchanged ranges" hint (not output on failure because line numbers have been polluted)
         if all_success and not dry_run:
             unchanged = _format_unchanged_ranges(edit_results, total)
             if unchanged:
                 results.append(unchanged)
 
-        # 汇总输出
+        # Summary output
         summary = []
         basename = os.path.basename(file_path)
         action_label = "dry_run" if dry_run else "wrote"
@@ -1892,11 +1891,11 @@ async def _handle_write_edits(
             f"encoding: {write_enc}",
         ]
         if allow_dirty:
-            header_parts.append("⚠ allow_dirty: 脏标记绕过（请确保行号准确）")
+            header_parts.append("⚠ allow_dirty: dirty marker bypassed (please ensure line numbers are accurate)")
         if dry_run:
-            header_parts.append("dry_run: true（未写入磁盘）")
+            header_parts.append("dry_run: true (not written to disk)")
             if auto_format:
-                header_parts.append("⚠ dry_run 不含 auto_format 偏移")
+                header_parts.append("⚠ dry_run does not include auto_format offset")
         if encoding_transcoded:
             header_parts.append(f"ℹ transcoded: {detected_encoding} → {write_enc}")
         if encoding_fallback:
@@ -1918,7 +1917,7 @@ async def _handle_write_edits(
                 "message": "\n".join(summary),
             }
         else:
-            summary.insert(0, "部分 edit 执行失败，请检查上述结果")
+            summary.insert(0, "Some edits failed; please check the results above")
             return {"status": "failed", "message": "\n".join(summary)}
 
     finally:
@@ -1930,10 +1929,9 @@ async def _handle_write_edits(
         if tmp_cleanup:
             shutil.rmtree(tmp_cleanup, ignore_errors=True)
 
-
 async def handle_format(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    处理 format action — 委托给 pasfmt.format_file / format_code。
+    Handle format action — delegates to pasfmt.format_file / format_code.
     """
     file_path = arguments.get("file_path")
     action = arguments.get("mode", "file")
@@ -1944,18 +1942,18 @@ async def handle_format(arguments: Dict[str, Any]) -> Dict[str, Any]:
     if action != "code" and file_path:
         path_err = _validate_path(file_path, arguments.get("project_path"))
         if path_err:
-            return _wrap_error("路径安全校验失败: %s" % path_err)
+            return _wrap_error("Path security validation failed: %s" % path_err)
 
     if action == "code":
         code = arguments.get("code", "")
         if not code:
-            return _wrap_error("请提供 code 参数")
+            return _wrap_error("Please provide the code parameter")
         raw_result = await pasfmt.format_code(
             code=code,
             config_path=arguments.get("config_path"),
             uses_style=uses_style,
         )
-        # format_code 返回 CallToolResult，统一转为 dict
+        # format_code returns CallToolResult; convert uniformly to dict
         if isinstance(raw_result, CallToolResult):
             text = raw_result.content[0].text if raw_result.content else ""
             if raw_result.isError:
@@ -1966,7 +1964,7 @@ async def handle_format(arguments: Dict[str, Any]) -> Dict[str, Any]:
             result = raw_result
     else:
         if not file_path:
-            return _wrap_error("请提供 file_path 参数")
+            return _wrap_error("Please provide the file_path parameter")
         if action == "check":
             lock_err = _acquire_read_lock(file_path)
             if lock_err:
@@ -2011,39 +2009,39 @@ async def handle_format(arguments: Dict[str, Any]) -> Dict[str, Any]:
                         result = {
                             "status": "success",
                             "formatted": formatted,
-                            "message": "代码格式化成功" if formatted else "代码已是格式化状态",
+                            "message": "Code formatted successfully" if formatted else "Code is already formatted",
                             "backup_file": backup_path,
                         }
                         if encoding_fallback:
-                            result["message"] += f"，编码回退: {detected_enc} → {write_enc}"
+                            result["message"] += f", encoding fallback: {detected_enc} → {write_enc}"
                     except Exception as ex:
-                        result = _wrap_error(f"格式化失败: {ex}")
+                        result = _wrap_error(f"Formatting failed: {ex}")
                     else:
-                        # 格式化成功 → 标记脏（行号已变，强制 re-read）
-                        # ⚠ 不计算偏移量：pasfmt 可能重构代码结构（展开 uses、调整 begin/end 等），
-                        #   格式化前后的行号无线性对应关系。AI 须通过 dirty flag 触发 re-read。
+                        # Formatting succeeded → mark dirty (line numbers changed, force re-read)
+                        # ⚠ Do not compute offsets: pasfmt may restructure code (expand uses, adjust begin/end, etc.),
+                        #   line numbers before and after formatting have no linear correspondence. AI must trigger re-read via the dirty flag.
                         if result.get("status") == "success" and result.get("formatted"):
                             _mark_dirty(file_path)
                 finally:
                     _release_write_lock(file_path)
 
-    # pasfmt.format_file / format_code 结果已统一为 dict
+    # pasfmt.format_file / format_code results are already unified as dict
     return result
 
 
 async def handle_encode(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    处理 encode action — 文件编码转换。
+    Handle encode action — file encoding conversion.
 
-    将文件从一种编码转换为另一种编码。
-    自动检测源编码（from_encoding="auto"），写入目标编码（to_encoding 必需）。
+    Convert a file from one encoding to another.
+    Auto-detects the source encoding (from_encoding="auto"), writes to the target encoding (to_encoding required).
 
-    参数:
-      file_path: 文件路径
-      from_encoding: 源编码（"auto"=自动检测，默认 "auto"）
-      to_encoding: 目标编码（必需），如 utf-8/utf-8-sig/gbk/utf-16/utf-16-le/utf-16-be
-      backup: 转换前是否备份到 __history（默认 true）
-      dry_run: 预览模式（默认 false）
+    Parameters:
+      file_path: file path
+      from_encoding: source encoding ("auto"=auto-detect, default "auto")
+      to_encoding: target encoding (required), e.g. utf-8/utf-8-sig/gbk/utf-16/utf-16-le/utf-16-be
+      backup: whether to back up to __history before conversion (default true)
+      dry_run: preview mode (default false)
     """
     removed_preview = _reject_removed_preview_argument(arguments)
     if removed_preview:
@@ -2056,22 +2054,22 @@ async def handle_encode(arguments: Dict[str, Any]) -> Dict[str, Any]:
     dry_run = arguments.get("dry_run", False)
 
     if not file_path:
-        return _wrap_error("请提供 file_path 参数")
+        return _wrap_error("Please provide the file_path parameter")
     if not to_encoding:
-        return _wrap_error("请提供 to_encoding 参数（目标编码）")
+        return _wrap_error("Please provide the to_encoding parameter (target encoding)")
 
     path_err = _validate_path(file_path, arguments.get("project_path"))
     if path_err:
-        return _wrap_error("路径安全校验失败: %s" % path_err)
+        return _wrap_error("Path security validation failed: %s" % path_err)
 
     if not os.path.isfile(file_path):
-        return _wrap_error(f"文件不存在: {file_path}")
+        return _wrap_error(f"File not found: {file_path}")
 
     ext = os.path.splitext(file_path)[1].lower()
     if ext not in _DELPHI_EXTENSIONS:
-        return _wrap_error(f"不支持的文件类型: {ext}，仅支持 Delphi 源文件")
+        return _wrap_error(f"Unsupported file type: {ext}, only Delphi source files are supported")
 
-    # 获取写入锁（读+写互斥），预览模式下用读锁
+    # Acquire write lock (read+write mutual exclusion); use read lock in preview mode
     if dry_run:
         lock_err = _acquire_read_lock(file_path)
     else:
@@ -2080,11 +2078,11 @@ async def handle_encode(arguments: Dict[str, Any]) -> Dict[str, Any]:
         return _wrap_error(lock_err)
 
     try:
-        # 检测源编码
+        # Detect source encoding
         detected_enc = detect_encoding(file_path)
         read_enc = detected_enc if from_encoding == "auto" else from_encoding
 
-        # 解析目标编码（支持 "ansi" 别名 → 系统 ANSI 代码页）
+        # Resolve target encoding (supports "ansi" alias → system ANSI code page)
         target_enc = to_encoding.lower()
         if target_enc == "ansi":
             try:
@@ -2094,38 +2092,38 @@ async def handle_encode(arguments: Dict[str, Any]) -> Dict[str, Any]:
         else:
             target_enc = to_encoding
 
-        # 校验编码合法性
+        # Validate encoding validity
         try:
             codecs.lookup(read_enc)
         except LookupError:
-            return _wrap_error(f"源编码 '{read_enc}' 不可识别")
+            return _wrap_error(f"Source encoding '{read_enc}' is not recognized")
         try:
             codecs.lookup(target_enc)
         except LookupError:
-            return _wrap_error(f"目标编码 '{target_enc}' 不可识别")
+            return _wrap_error(f"Target encoding '{target_enc}' is not recognized")
 
-        # 预览模式
+        # Preview mode
         if dry_run:
             read_size = os.path.getsize(file_path)
             return {
                 "status": "success",
                 "message": (
                     f"[dry_run] would convert: {os.path.basename(file_path)}\n"
-                    f"  from: {detected_enc} (检测) / {read_enc} (指定)\n"
+                    f"  from: {detected_enc} (detected) / {read_enc} (specified)\n"
                     f"  to:   {target_enc}\n"
                     f"  size: {read_size} bytes"
                 ),
             }
 
-        # 读取文件内容
+        # Read file content
         try:
             with open(file_path, 'r', encoding=read_enc, newline='', buffering=BUFFER_SIZE_1MB) as f:
                 text = f.read()
         except UnicodeDecodeError:
-            # 用户显式指定 from_encoding 解码失败时，自动回退到自动检测结果
+            # When user explicitly specified from_encoding fails to decode, fall back automatically to auto-detected result
             if from_encoding != "auto":
                 logger.warning(
-                    f"用户指定编码 '{read_enc}' 解码失败，回退到自动检测 '{detected_enc}'"
+                    f"User-specified encoding '{read_enc}' failed to decode, falling back to auto-detected '{detected_enc}'"
                 )
                 try:
                     with open(file_path, 'r', encoding=detected_enc, newline='', buffering=BUFFER_SIZE_1MB) as f:
@@ -2133,37 +2131,37 @@ async def handle_encode(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     read_enc = detected_enc
                 except UnicodeDecodeError:
                     return _wrap_error(
-                        f"指定编码 '{from_encoding}' 与自动检测 '{detected_enc}' 均无法解码。"
-                        "请确认文件编码后显式指定正确的 from_encoding"
+                        f"Neither the specified encoding '{from_encoding}' nor the auto-detected '{detected_enc}' could decode the file. "
+                        "Please verify the file encoding and explicitly specify the correct from_encoding"
                     )
             else:
-                return _wrap_error(f"自动检测编码 '{detected_enc}' 解码失败。请尝试显式指定 from_encoding")
+                return _wrap_error(f"Auto-detected encoding '{detected_enc}' failed to decode. Please try explicitly specifying from_encoding")
         except Exception as e:
-            return _wrap_error(f"读取文件失败: {e}")
+            return _wrap_error(f"Failed to read file: {e}")
 
         original_size = len(text.encode(read_enc, errors='replace'))
         new_size = len(text.encode(target_enc, errors='replace'))
 
-        # BOM 处理：读入时剥离现有 BOM，由输出编码决定是否重新添加
+        # BOM handling: strip existing BOM on read; output encoding decides whether to re-add it
         text_stripped = text.lstrip('\ufeff')
 
-        # 校验：先用目标编码回读，确保转换可逆
+        # Validate: read back with target encoding first, ensuring conversion is reversible
         try:
             encoded_bytes = text_stripped.encode(target_enc, errors='strict')
             decoded_back = encoded_bytes.decode(target_enc)
             if decoded_back != text_stripped:
-                logger.warning(f"编码转换存在不可逆字符")
+                logger.warning(f"Encoding conversion contains irreversible characters")
         except (UnicodeEncodeError, UnicodeDecodeError) as e:
-            return _wrap_error(f"编码转换失败：目标编码 '{target_enc}' 无法表示文件中的某些字符: {e}")
+            return _wrap_error(f"Encoding conversion failed: target encoding '{target_enc}' cannot represent some characters in the file: {e}")
 
-        # 创建备份
+        # Create backup
         bak_path = None
         if backup:
             bak_path = create_backup(file_path)
             if not bak_path:
-                return _wrap_error("创建备份失败，已取消转换")
+                return _wrap_error("Failed to create backup, conversion cancelled")
 
-        # 写入新编码（使用已剥离 BOM 的文本，输出编码决定是否加 BOM）
+        # Write new encoding (using BOM-stripped text, output encoding decides whether to add BOM)
         temp_write_path = _make_temp_write_path(file_path)
         try:
             _write_text_temp(temp_write_path, text_stripped, target_enc)
@@ -2179,13 +2177,13 @@ async def handle_encode(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     os.remove(temp_write_path)
                 except OSError:
                     pass
-            # 回退备份取消转换
+            # Roll back backup and cancel conversion
             if bak_path:
                 try:
                     os.remove(bak_path)
                 except OSError:
                     pass
-            return _wrap_error(f"写入编码 '{target_enc}' 失败：存在无法编码的字符")
+            return _wrap_error(f"Failed to write encoding '{target_enc}': there are characters that cannot be encoded")
         except Exception as e:
             if os.path.exists(temp_write_path):
                 try:
@@ -2197,7 +2195,7 @@ async def handle_encode(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     os.remove(bak_path)
                 except OSError:
                     pass
-            return _wrap_error(f"写入文件失败: {e}")
+            return _wrap_error(f"Failed to write file: {e}")
         finally:
             if os.path.exists(temp_write_path):
                 try:
@@ -2205,10 +2203,10 @@ async def handle_encode(arguments: Dict[str, Any]) -> Dict[str, Any]:
                 except OSError:
                     pass
 
-        # 标记脏（行号无变化但内容字节已变，防止 AI 基于旧内容继续操作）
+        # Mark dirty (line numbers unchanged but content bytes changed, prevents AI from continuing based on stale content)
         _mark_dirty(file_path)
 
-        # 构造返回消息
+        # Build return message
         is_bom = target_enc == "utf-8-sig" or "utf-16" in target_enc
         parts = [
             f"converted: {os.path.basename(file_path)}",
@@ -2239,23 +2237,23 @@ async def handle_encode(arguments: Dict[str, Any]) -> Dict[str, Any]:
 
 async def handle_backup(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    处理 backup action — 备份管理。
+    Handle backup action — backup management.
 
-    子 action:
-      create  创建备份（默认）
-      list    列出所有备份版本
-      restore 恢复指定版本
+    Sub-actions:
+      create  create backup (default)
+      list    list all backup versions
+      restore restore a specified version
     """
     file_path = arguments.get("file_path")
     backup_action = arguments.get("backup_action", "create")
     version = arguments.get("version")
 
     if not file_path:
-        return _wrap_error("请提供 file_path 参数")
+        return _wrap_error("Please provide the file_path parameter")
 
     path_err = _validate_path(file_path, arguments.get("project_path"))
     if path_err:
-        return _wrap_error("路径安全校验失败: %s" % path_err)
+        return _wrap_error("Path security validation failed: %s" % path_err)
 
     if backup_action == "create":
         lock_err = _acquire_read_lock(file_path)
@@ -2266,14 +2264,14 @@ async def handle_backup(arguments: Dict[str, Any]) -> Dict[str, Any]:
         finally:
             _release_read_lock(file_path)
         if bp:
-            return {"status": "success", "message": f"备份已创建: {bp}"}
-        return _wrap_error(f"备份失败: {file_path}")
+            return {"status": "success", "message": f"Backup created: {bp}"}
+        return _wrap_error(f"Backup failed: {file_path}")
 
     elif backup_action == "list":
         backups = list_backups(file_path)
         if not backups:
-            return {"status": "success", "message": f"没有找到 {file_path} 的备份文件"}
-        lines = [f"文件: {file_path}", f"备份数: {len(backups)}", ""]
+            return {"status": "success", "message": f"No backup files found for {file_path}"}
+        lines = [f"File: {file_path}", f"Backup count: {len(backups)}", ""]
         for b in backups:
             from datetime import datetime
             ts = datetime.fromtimestamp(b["mtime"]).strftime("%Y-%m-%d %H:%M:%S")
@@ -2295,60 +2293,60 @@ async def handle_backup(arguments: Dict[str, Any]) -> Dict[str, Any]:
         finally:
             _release_write_lock(file_path)
         if bp:
-            ver_str = f"v{version}" if version else "最新版本"
-            return {"status": "success", "message": f"已从 {ver_str} 恢复: {bp}"}
-        return _wrap_error(f"恢复失败: {file_path}")
+            ver_str = f"v{version}" if version else "latest version"
+            return {"status": "success", "message": f"Restored from {ver_str}: {bp}"}
+        return _wrap_error(f"Restore failed: {file_path}")
 
     else:
-        return _wrap_error(f"未知 backup_action: {backup_action}")
+        return _wrap_error(f"Unknown backup_action: {backup_action}")
 
 
 # ============================================================
-# uses 子句操作
+# uses clause operations
 # ============================================================
 
-# 匹配 uses 子句的正则：uses Unit1, Unit2; 可以跨多行
-# 先剥离 Pascal 注释（花括号 { } + 星号括号 (* *)），避免注释内的 ; 干扰匹配
-# 捕获组: (1)uses关键字 (2)整个单元列表 (3)分号
+# Regex matching the uses clause: uses Unit1, Unit2; may span multiple lines
+# Strip Pascal comments first (braces { } + paren-star (* *)), to avoid ';' inside comments interfering with matching
+# Capture groups: (1) uses keyword (2) entire unit list (3) semicolon
 _USES_RE = re.compile(
     r'\b(uses)\b\s+(.*?)\s*(;)',
     re.DOTALL | re.IGNORECASE,
 )
 
-# 匹配 Pascal 注释的正则：花括号 { ... }（含 $ 条件编译指令）和星号括号 (* ... *)
+# Regex matching Pascal comments: braces { ... } (including $ conditional compilation directives) and paren-star (* ... *)
 _PASCAL_COMMENTS_RE = re.compile(r'\{[^}]*\}|\(\*.*?\*\)', re.DOTALL)
 
 
 def _strip_comments_with_offset_map(text: str) -> tuple:
-    """剥离 Pascal 注释（花括号 + 星号括号），构建 stripped→original 偏移映射。
+    """Strip Pascal comments (braces + paren-star), building a stripped→original offset map.
 
-    返回 (stripped_text, offset_map):
-      - stripped_text: 剥离注释后的文本
-      - offset_map: 列表，长度 = len(stripped_text) + 1（含 exclusive end sentinel)
-        offset_map[i] = 原始文本中对应字符的位置
+    Returns (stripped_text, offset_map):
+      - stripped_text: text with comments stripped
+      - offset_map: list, length = len(stripped_text) + 1 (including exclusive end sentinel)
+        offset_map[i] = position of the corresponding character in the original text
 
-    偏移映射用于将 stripped 文本中搜索到的位置映射回原始文本位置，
-    避免 uses 子句前存在注释/编译指令时切片错位导致文件破坏。
+    The offset map maps positions found in stripped text back to original text positions,
+    preventing slice misalignment that could corrupt the file when comments/compiler directives precede the uses clause.
     """
     offset_map = []
     stripped_segments = []
-    pos = 0  # 当前在原始文本中的位置
+    pos = 0  # current position in the original text
 
     for match in _PASCAL_COMMENTS_RE.finditer(text):
-        # 保留注释之前的文本段，记录每个字符的原始位置
+        # Keep the text segment before the comment, recording the original position of each character
         segment = text[pos:match.start()]
         if segment:
             offset_map.extend(range(pos, pos + len(segment)))
             stripped_segments.append(segment)
         pos = match.end()
 
-    # 保留最后一段文本
+    # Keep the final text segment
     segment = text[pos:]
     if segment:
         offset_map.extend(range(pos, pos + len(segment)))
         stripped_segments.append(segment)
 
-    # Sentinel: exclusive end 位置映射到原始文本末尾
+    # Sentinel: exclusive end position maps to the end of the original text
     offset_map.append(len(text))
 
     stripped_text = ''.join(stripped_segments)
@@ -2356,17 +2354,17 @@ def _strip_comments_with_offset_map(text: str) -> tuple:
 
 
 def _find_uses_section(text: str, section: str) -> Optional[tuple]:
-    """在指定区域(interface/implementation)查找 uses 子句。
+    """Find the uses clause in the specified section (interface/implementation).
 
-    搜索前剥离 Pascal 注释（花括号 + 星号括号），避免注释内的 ';' 干扰匹配。
-    返回的偏移量通过 offset_map 映射回原始 text，确保切片正确。
+    Strip Pascal comments (braces + paren-star) before searching, to avoid ';' inside comments interfering with matching.
+    Returned offsets are mapped back to the original text via offset_map, ensuring correct slicing.
 
-    返回 (uses_start, uses_end, units_text) 元组，或 None。
-    uses_start/uses_end 是基于原始 text 的偏移（已从 stripped 映射回 original）。
+    Returns a (uses_start, uses_end, units_text) tuple, or None.
+    uses_start/uses_end are offsets based on the original text (mapped back from stripped to original).
     """
     section_lower = section.lower()
 
-    # 剥离注释，构建偏移映射（stripped 位置 → 原始位置）
+    # Strip comments, build offset map (stripped position → original position)
     stripped, offset_map = _strip_comments_with_offset_map(text)
 
     if section_lower == "interface":
@@ -2379,7 +2377,7 @@ def _find_uses_section(text: str, section: str) -> Optional[tuple]:
         if match:
             s_stripped = match.start() + start
             e_stripped = match.end() + start
-            # 通过 offset_map 映射回原始文本位置
+            # Map back to original text positions via offset_map
             s_original = offset_map[s_stripped]
             e_original = offset_map[e_stripped]
             return (s_original, e_original, match.group(2))
@@ -2395,7 +2393,7 @@ def _find_uses_section(text: str, section: str) -> Optional[tuple]:
         if match:
             s_stripped = match.start() + start
             e_stripped = match.end() + start
-            # 通过 offset_map 映射回原始文本位置
+            # Map back to original text positions via offset_map
             s_original = offset_map[s_stripped]
             e_original = offset_map[e_stripped]
             return (s_original, e_original, match.group(2))
@@ -2405,9 +2403,9 @@ def _find_uses_section(text: str, section: str) -> Optional[tuple]:
 
 
 def _parse_units_from_uses(units_text: str) -> List[str]:
-    """从 uses 子句的单元列表文本中解析出各个单元条目。
+    """Parse individual unit entries from the unit list text of a uses clause.
 
-    每个条目保留 'in ...' 部分，如 "Unit1 in 'Unit1.pas'"。
+    Each entry retains the 'in ...' part, e.g. "Unit1 in 'Unit1.pas'".
     """
     flat = units_text.replace('\r\n', ' ').replace('\n', ' ')
     parts = [p.strip() for p in flat.split(',') if p.strip()]
@@ -2415,13 +2413,13 @@ def _parse_units_from_uses(units_text: str) -> List[str]:
 
 
 def _build_uses_text(unit_names: List[str], original_text: str) -> str:
-    """从单元名列表重建 uses 子句文本，保持原始换行风格。
-    如果原始是单行，保持单行；如果跨多行，每行一个单元。"""
+    """Rebuild uses clause text from a list of unit names, preserving the original line-ending style.
+    If the original was a single line, keep it a single line; if it spans multiple lines, one unit per line."""
     line_ending = '\r\n' if '\r\n' in original_text else '\n'
     has_multiline = '\n' in original_text.strip()
 
     if has_multiline and len(unit_names) > 1:
-        # 多行格式：每行一个单元，缩进 2 空格，逗号在行尾
+        # Multi-line format: one unit per line, 2-space indent, comma at end of line
         lines = []
         for i, name in enumerate(unit_names):
             if i < len(unit_names) - 1:
@@ -2430,36 +2428,36 @@ def _build_uses_text(unit_names: List[str], original_text: str) -> str:
                 lines.append(f"  {name}")
         return ''.join(lines)
     else:
-        # 单行格式
+        # Single-line format
         return ', '.join(unit_names)
 
 
 def _is_comment_line(line: str, in_block_comment: bool) -> tuple[bool, bool]:
-    """检测一行是否是注释行，返回 (is_comment, still_in_block)。
+    """Detect whether a line is a comment line, returning (is_comment, still_in_block).
     
-    支持 Delphi 注释格式：
-    - // 行注释
-    - { } 块注释
-    - (* *) 块注释
+    Supports Delphi comment formats:
+    - // line comments
+    - { } block comments
+    - (* *) block comments
     
-    判断规则：
-    - 行完全在块注释中 → 注释行
-    - 行以 // 开头 → 注释行
-    - 行以 { 或 (* 开头（且非编译指令），且剩余部分也是注释或空 → 注释行
-    - 代码行中包含注释 → 代码行
+    Rules:
+    - Line entirely inside a block comment → comment line
+    - Line starts with // → comment line
+    - Line starts with { or (* (and is not a compiler directive), and the remainder is also comment or empty → comment line
+    - Code line containing a comment → code line
     """
     stripped = line.strip()
     
-    # 如果当前在块注释中
+    # If currently inside a block comment
     if in_block_comment:
-        # 检查是否结束块注释
+        # Check whether the block comment ends
         if '*)' in stripped:
             idx = stripped.find('*)')
             before = stripped[:idx].strip()
             after = stripped[idx + 2:].strip()
             if before:
                 return False, False
-            # 检查剩余部分是否也是注释或空
+            # Check whether the remainder is also a comment or empty
             if after and not after.startswith('//'):
                 return False, False
             return True, False
@@ -2469,29 +2467,29 @@ def _is_comment_line(line: str, in_block_comment: bool) -> tuple[bool, bool]:
             after = stripped[idx + 1:].strip()
             if before:
                 return False, False
-            # 检查剩余部分是否也是注释或空
+            # Check whether the remainder is also a comment or empty
             if after and not after.startswith('//'):
                 return False, False
             return True, False
         return True, True
     
-    # 检查行注释
+    # Check for line comment
     if stripped.startswith('//'):
         return True, False
     
-    # 检查块注释开始
+    # Check for block comment start
     in_block = False
     if stripped.startswith('{'):
-        # 检查是否是编译指令（如 {$IFDEF}）
+        # Check whether it is a compiler directive (e.g. {$IFDEF})
         if len(stripped) > 1 and stripped[1] == '$':
             return False, False
         in_block = True
-        # 检查是否在同一行结束
+        # Check whether it ends on the same line
         if '}' in stripped[1:]:
             in_block = False
             idx = stripped.find('}', 1)
             after = stripped[idx + 1:].strip()
-            # 检查剩余部分是否也是注释或空
+            # Check whether the remainder is also a comment or empty
             if after and not after.startswith('//'):
                 return False, False
             return True, False
@@ -2499,12 +2497,12 @@ def _is_comment_line(line: str, in_block_comment: bool) -> tuple[bool, bool]:
     
     if stripped.startswith('(*'):
         in_block = True
-        # 检查是否在同一行结束
+        # Check whether it ends on the same line
         if '*)' in stripped[2:]:
             in_block = False
             idx = stripped.find('*)', 2)
             after = stripped[idx + 2:].strip()
-            # 检查剩余部分是否也是注释或空
+            # Check whether the remainder is also a comment or empty
             if after and not after.startswith('//'):
                 return False, False
             return True, False
@@ -2517,15 +2515,15 @@ def _is_comment_line(line: str, in_block_comment: bool) -> tuple[bool, bool]:
 
 
 def _count_lines(content: str, exclude_blank: bool = False, exclude_comments: bool = False) -> Dict[str, int]:
-    """统计代码行数。
+    """Count code lines.
     
     Args:
-        content: 文件内容
-        exclude_blank: 是否排除空白行
-        exclude_comments: 是否排除注释行
+        content: file content
+        exclude_blank: whether to exclude blank lines
+        exclude_comments: whether to exclude comment lines
     
     Returns:
-        包含统计结果的字典
+        Dictionary containing the statistics
     """
     lines = content.splitlines()
     total = len(lines)
@@ -2545,7 +2543,7 @@ def _count_lines(content: str, exclude_blank: bool = False, exclude_comments: bo
         else:
             code += 1
     
-    # 计算实际行数
+    # Compute actual line count
     actual = total
     if exclude_blank:
         actual -= blank
@@ -2646,15 +2644,15 @@ def _uses_insert_position(existing: List[str], new_unit: str) -> int:
         if _uses_group(unit) > new_group:
             return i
     return len(existing)
-    """从单元名列表重建 uses 子句文本，保持原始换行风格。
+    """Rebuild uses clause text from a list of unit names, preserving the original line-ending style.
 
-    如果原始是单行，保持单行；如果跨多行，每行一个单元。
+    If the original was a single line, keep it a single line; if it spans multiple lines, one unit per line.
     """
     line_ending = '\r\n' if '\r\n' in original_text else '\n'
     has_multiline = '\n' in original_text.strip()
 
     if has_multiline and len(unit_names) > 1:
-        # 多行格式：每行一个单元，缩进 2 空格，逗号在行尾
+        # Multi-line format: one unit per line, 2-space indent, comma at end of line
         lines = []
         for i, name in enumerate(unit_names):
             if i < len(unit_names) - 1:
@@ -2663,19 +2661,18 @@ def _uses_insert_position(existing: List[str], new_unit: str) -> int:
                 lines.append(f"  {name}")
         return ''.join(lines)
     else:
-        # 单行格式
+        # Single-line format
         return ', '.join(unit_names)
-
 
 async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    处理 uses action — 增加/删除 uses 子句中的单元。
+    Handle the uses action — add/remove units in the uses clause.
 
-    参数:
-      file_path: 文件路径(.pas/.dpr/.dpk)
-      uses_action: "add" 或 "remove"
-      unit_name: 单元名(如 "Vcl.Dialogs")，可含命名空间
-      uses_section: "interface" 或 "implementation" (默认 "interface")
+    Parameters:
+      file_path: file path (.pas/.dpr/.dpk)
+      uses_action: "add" or "remove"
+      unit_name: unit name (e.g. "Vcl.Dialogs"), may include namespace
+      uses_section: "interface" or "implementation" (default "interface")
     """
     file_path = arguments.get("file_path")
     uses_action = arguments.get("uses_action", "add")
@@ -2683,29 +2680,29 @@ async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
     uses_section = arguments.get("uses_section", "interface")
 
     if not file_path:
-        return _wrap_error("请提供 file_path 参数")
+        return _wrap_error("Please provide the file_path parameter")
     if not unit_name:
-        return _wrap_error("请提供 unit_name 参数")
+        return _wrap_error("Please provide the unit_name parameter")
 
     path_err = _validate_path(file_path, arguments.get("project_path"))
     if path_err:
-        return _wrap_error("路径安全校验失败: %s" % path_err)
+        return _wrap_error("Path security validation failed: %s" % path_err)
     if uses_action not in ("add", "remove"):
-        return _wrap_error("uses_action 必须是 'add' 或 'remove'")
+        return _wrap_error("uses_action must be 'add' or 'remove'")
 
     if not os.path.isfile(file_path):
-        return _wrap_error(f"文件不存在: {file_path}")
+        return _wrap_error(f"File does not exist: {file_path}")
 
     ext = os.path.splitext(file_path)[1].lower()
     if ext not in ('.pas', '.dpr', '.dpk', '.inc'):
-        return _wrap_error(f"uses 操作仅支持 .pas/.dpr/.dpk/.inc 文件，不支持 {ext}")
+        return _wrap_error(f"uses operation only supports .pas/.dpr/.dpk/.inc files, {ext} is not supported")
 
-    # 获取写入许可（读+写互斥）
+    # Acquire write permission (read+write mutually exclusive)
     lock_err = _acquire_write_lock(file_path)
     if lock_err:
         return _wrap_error(lock_err)
     try:
-        # 读取文件（始终用实际检测编码读取，避免乱码；写出按 encoding 参数决定）
+        # Read the file (always read with the actually detected encoding to avoid garbling; the write encoding is decided by the encoding parameter)
         encoding = arguments.get("encoding", "auto")
         detected_enc = detect_encoding(file_path)
         if encoding == "auto":
@@ -2722,28 +2719,28 @@ async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
                   buffering=BUFFER_SIZE_1MB) as f:
             text = f.read()
 
-        # 查找 uses 子句
+        # Find the uses clause
         result = _find_uses_section(text, uses_section)
         if not result:
-            section_hint = f"{uses_section} 区域"
+            section_hint = f"{uses_section} section"
             return _wrap_error(
-                f"在 {section_hint} 中未找到 uses 子句。"
-                "如果文件是新单元，请先用 write action 写入完整单元结构"
+                f"No uses clause found in {section_hint}. "
+                "If the file is a new unit, use the write action to write the complete unit structure first"
             )
 
         uses_start, uses_end, units_text = result
         existing_units = _parse_units_from_uses(units_text)
 
-        # 检查单元是否已存在/不存在
+        # Check whether the unit already exists / does not exist
         unit_name_stripped = unit_name.strip()
 
-        # 提取单元名（不含 'in' 子句）用于比较
+        # Extract unit name (without the 'in' clause) for comparison
         def _get_unit_name(entry: str) -> str:
             in_match = re.match(r"(\S+)\s+in\s+", entry, re.IGNORECASE)
             return in_match.group(1) if in_match else entry
 
         def _get_short_name(name: str) -> str:
-            """提取短名（去掉命名空间前缀），如 'Vcl.Forms' → 'Forms'"""
+            """Extract the short name (strip the namespace prefix), e.g. 'Vcl.Forms' → 'Forms'"""
             return name.rsplit('.', 1)[-1]
 
         existing_names = [_get_unit_name(e) for e in existing_units]
@@ -2752,46 +2749,46 @@ async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
 
         if uses_action == "add":
             if unit_name_lower in existing_names_lower:
-                return {"status": "success", "message": f"{unit_name_stripped} 已在 {uses_section} uses 中，无需添加"}
-            # 检查命名空间前缀冲突：短名相同且至少一方无命名空间时才视为冲突
-            # Forms ↔ Vcl.Forms 冲突，Vcl.Forms ↔ FMX.Forms 不冲突（不同单元）
+                return {"status": "success", "message": f"{unit_name_stripped} is already in {uses_section} uses, no need to add"}
+            # Check namespace prefix conflict: only treat as a conflict when the short names match and at least one side has no namespace
+            # Forms ↔ Vcl.Forms conflict, Vcl.Forms ↔ FMX.Forms do not (different units)
             new_short = _get_short_name(unit_name_stripped).lower()
             collision_idx = None
             for i, existing in enumerate(existing_names):
                 if existing.lower() != unit_name_lower and _get_short_name(existing).lower() == new_short:
-                    # 至少一方是短名（无命名空间）才算冲突
+                    # Only a conflict when at least one side is a short name (no namespace)
                     if '.' not in unit_name_stripped or '.' not in existing:
                         collision_idx = i
                         break
             if collision_idx is not None:
                 if '.' in unit_name_stripped and '.' not in existing_names[collision_idx]:
-                    # 长名替换短名：Vcl.Forms 替换 Forms，保持原位置
+                    # Long name replaces short name: Vcl.Forms replaces Forms, keeping the original position
                     new_units = existing_units.copy()
                     new_units[collision_idx] = unit_name_stripped
                 else:
-                    # 短名冲突长名，已有长名则跳过
-                    return {"status": "success", "message": f"{unit_name_stripped} 与已有单元 {existing_names[collision_idx]} 短名相同，视为同一单元，跳过"}
+                    # Short name conflicts with a long name; if the long name already exists, skip
+                    return {"status": "success", "message": f"{unit_name_stripped} has the same short name as existing unit {existing_names[collision_idx]}, treated as the same unit, skipping"}
             else:
-                # 无冲突，按 namespace group 插入（不重排已有单元顺序）
+                # No conflict, insert by namespace group (do not reorder existing units)
                 insert_at = _uses_insert_position(existing_units, unit_name_stripped)
                 new_units = existing_units.copy()
                 new_units.insert(insert_at, unit_name_stripped)
         else:  # remove
             if unit_name_lower not in existing_names_lower:
-                return {"status": "success", "message": f"{unit_name_stripped} 不在 {uses_section} uses 中，无需删除"}
+                return {"status": "success", "message": f"{unit_name_stripped} is not in {uses_section} uses, no need to remove"}
             new_units = [e for e in existing_units if _get_unit_name(e).lower() != unit_name_lower]
 
         if not new_units:
-            return _wrap_error(f"删除 {unit_name_stripped} 后 uses 子句将为空，请改用 write action 重写文件")
+            return _wrap_error(f"Removing {unit_name_stripped} would leave the uses clause empty, please use the write action to rewrite the file")
 
-        # 重建 uses 文本
+        # Rebuild the uses text
         new_units_text = _build_uses_text(new_units, units_text)
         new_uses_clause = f"uses {new_units_text};"
 
-        # 替换原 uses 子句
+        # Replace the original uses clause
         new_text = text[:uses_start] + new_uses_clause + text[uses_end:]
 
-        # 写出（用 write_enc 编码，与读取编码可能不同 = 透明转码）
+        # Write out (using write_enc, may differ from the read encoding = transparent transcoding)
         encoding_fallback = False
         backup_path = None
         backup = arguments.get("backup", True)
@@ -2800,7 +2797,7 @@ async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
             try:
                 _write_text_temp(temp_write_path, new_text, write_enc)
             except UnicodeEncodeError:
-                logger.warning(f"编码 {write_enc} 写出失败，回退到 utf-8")
+                logger.warning(f"Writing with encoding {write_enc} failed, falling back to utf-8")
                 _write_text_temp(temp_write_path, new_text, "utf-8")
                 write_enc = "utf-8"
                 encoding_fallback = True
@@ -2808,7 +2805,7 @@ async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
             if backup:
                 backup_path = create_backup(file_path)
                 if not backup_path:
-                    return _wrap_error("创建备份失败，已取消写入")
+                    return _wrap_error("Failed to create backup, write cancelled")
 
             record_authorized_write(
                 file_path,
@@ -2817,9 +2814,9 @@ async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
             )
             _replace_with_temp(temp_write_path, file_path)
         except UnicodeEncodeError:
-            return _wrap_error("写入文件失败，已取消写入: 编码转换失败")
+            return _wrap_error("Failed to write file, write cancelled: encoding conversion failed")
         except Exception as ex:
-            return _wrap_error(f"写入文件失败，已取消写入: {ex}")
+            return _wrap_error(f"Failed to write file, write cancelled: {ex}")
         finally:
             if os.path.exists(temp_write_path):
                 try:
@@ -2827,7 +2824,7 @@ async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
                 except OSError:
                     pass
 
-        # 自动格式化
+        # Auto format
         fmt_msg = ""
         fmt_warning = ""
         if arguments.get("auto_format", False):
@@ -2836,24 +2833,24 @@ async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     file_path, write_enc, '\r\n' in text
                 )
                 if formatted:
-                    fmt_msg = "，已格式化"
+                    fmt_msg = ", formatted"
                 if fmt_encoding_fallback:
                     encoding_fallback = True
             except Exception as ex:
-                logger.warning(f"uses 操作后格式化失败: {ex}")
+                logger.warning(f"Formatting after uses operation failed: {ex}")
                 fmt_warning = f"⚠ auto_format failed: {ex}"
 
-        # 计算偏移量（uses 修改也会影响行号）
-        s_0 = text[:uses_start].count('\n')          # 0-indexed: uses 关键字所在行
+        # Compute the offset (uses modifications also affect line numbers)
+        s_0 = text[:uses_start].count('\n')          # 0-indexed: the line where the uses keyword is located
         uses_old_text = text[uses_start:uses_end]
-        removed = uses_old_text.count('\n')           # 旧 uses 子句占用的行数
-        inserted = new_uses_clause.count('\n')        # 新 uses 子句占用的行数
+        removed = uses_old_text.count('\n')           # number of lines occupied by the old uses clause
+        inserted = new_uses_clause.count('\n')        # number of lines occupied by the new uses clause
         offset = inserted - removed
-        # 计算 exclusive end: uses_end 所在行的下一行
+        # compute exclusive end: the line after the line containing uses_end
         e_0 = text[:uses_end].count('\n') + 1
 
         action_desc = "added" if uses_action == "add" else "removed"
-        # 单行 meta (与 read/write 对齐，1-indexed)
+        # single-line meta (aligned with read/write, 1-indexed)
         basename = os.path.basename(file_path)
         new_e = e_0 + offset
         parts = [
@@ -2874,7 +2871,7 @@ async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
         if write_enc != detected_enc and not encoding_fallback:
             parts.append(f"ℹ transcoded: {detected_enc} → {write_enc}")
 
-        # uses 操作修改了文件 → 标记脏
+        # uses operation modified the file → mark dirty
         _mark_dirty(file_path)
 
         return {"status": "success", "message": ", ".join(parts)}
@@ -2884,50 +2881,50 @@ async def handle_uses(arguments: Dict[str, Any]) -> Dict[str, Any]:
 
 async def handle_count_lines(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    统计 Delphi 文件的行数。
+    Count the number of lines in a Delphi file.
 
-    参数:
-      file_path: 文件路径(.pas/.dpr/.dpk/.inc)
-      exclude_blank: 是否排除空白行 (默认 false)
-      exclude_comments: 是否排除注释行 (默认 false)
+    Parameters:
+      file_path: file path (.pas/.dpr/.dpk/.inc)
+      exclude_blank: whether to exclude blank lines (default false)
+      exclude_comments: whether to exclude comment lines (default false)
 
-    返回:
-      包含统计结果的字典:
-      - total: 总行数
-      - blank: 空白行数
-      - comment: 注释行数
-      - code: 代码行数（排除空白和注释）
-      - actual: 实际行数（根据排除选项计算）
+    Returns:
+      A dictionary containing the statistics:
+      - total: total line count
+      - blank: blank line count
+      - comment: comment line count
+      - code: code line count (excluding blank and comment lines)
+      - actual: actual line count (computed based on the exclusion options)
     """
     file_path = arguments.get("file_path")
     exclude_blank = arguments.get("exclude_blank", False)
     exclude_comments = arguments.get("exclude_comments", False)
 
     if not file_path:
-        return _wrap_error("请提供 file_path 参数")
+        return _wrap_error("Please provide the file_path parameter")
 
     path_err = _validate_path(file_path, arguments.get("project_path"))
     if path_err:
-        return _wrap_error("路径安全校验失败: %s" % path_err)
+        return _wrap_error("Path security validation failed: %s" % path_err)
 
     if not os.path.isfile(file_path):
-        return _wrap_error(f"文件不存在: {file_path}")
+        return _wrap_error(f"File does not exist: {file_path}")
 
     ext = os.path.splitext(file_path)[1].lower()
     if ext not in ('.pas', '.dpr', '.dpk', '.inc'):
-        return _wrap_error(f"count_lines 仅支持 .pas/.dpr/.dpk/.inc 文件，不支持 {ext}")
+        return _wrap_error(f"count_lines only supports .pas/.dpr/.dpk/.inc files, {ext} is not supported")
 
     try:
-        # 读取文件
+        # Read the file
         detected_enc = detect_encoding(file_path)
         with open(file_path, 'r', encoding=detected_enc, newline='',
                   buffering=BUFFER_SIZE_1MB) as f:
             content = f.read()
 
-        # 统计行数
+        # Count lines
         stats = _count_lines(content, exclude_blank, exclude_comments)
 
-        # 构建消息
+        # Build message
         basename = os.path.basename(file_path)
         parts = [
             f"file: {basename}",
@@ -2946,141 +2943,142 @@ async def handle_count_lines(arguments: Dict[str, Any]) -> Dict[str, Any]:
 
         return {"status": "success", "message": ", ".join(parts), "stats": stats}
     except Exception as ex:
-        return _wrap_error(f"统计行数失败: {ex}")
+        return _wrap_error(f"Failed to count lines: {ex}")
 
 
 # ============================================================
-# 主入口
+# Main entry point
 # ============================================================
+
 
 async def handle_fix_garbled(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    修复 Delphi 文件中的中文乱码。
+    Fix Chinese garbled text in Delphi files.
 
-    Delphi 在无 BOM 时按 ANSI/GBK 解读 UTF-8 中文字节，导致编译后乱码。
-    本动作自动检测以下乱码模式并修复：
+    Without a BOM, Delphi interprets UTF-8 Chinese bytes as ANSI/GBK, causing garbled text after compilation.
+    This action automatically detects the following garbled patterns and fixes them:
 
-    1. 无 BOM 的 UTF-8（Delphi 误读为 GBK）→ 添加 UTF-8 BOM
-    2. U+FFFD 替换字符（�）→ 尝试从残留 GBK 字节恢复原文
-    3. UTF-8 字节被存储为 GBK（双重编码）→ 反向恢复
+    1. UTF-8 without BOM (Delphi misreads as GBK) → add UTF-8 BOM
+    2. U+FFFD replacement character (�) → try to recover the original text from residual GBK bytes
+    3. UTF-8 bytes stored as GBK (double encoding) → reverse recovery
 
-    修复步骤:
-      1. 创建备份到 __history
-      2. 扫描文件的乱码模式和位置
-      3. 根据模式应用对应修复
-      4. 返回修复汇总
+    Fix steps:
+      1. Create a backup in __history
+      2. Scan the file for garbled patterns and locations
+      3. Apply the corresponding fix based on the pattern
+      4. Return a fix summary
 
     Args:
-        file_path: 目标文件路径
-        backup: 是否创建备份（默认 True）
-        target_encoding: 目标编码（默认 utf-8-sig，即带 BOM 的 UTF-8）
+        file_path: target file path
+        backup: whether to create a backup (default True)
+        target_encoding: target encoding (default utf-8-sig, i.e. UTF-8 with BOM)
     """
     import chardet
 
     file_path = arguments.get("file_path")
     if not file_path:
-        return _wrap_error("请提供 file_path 参数")
+        return _wrap_error("Please provide the file_path parameter")
     path_err = _validate_path(file_path, arguments.get("project_path"))
     if path_err:
-        return _wrap_error("路径安全校验失败: %s" % path_err)
+        return _wrap_error("Path security validation failed: %s" % path_err)
     backup = arguments.get("backup", True)
     target_enc = arguments.get("target_encoding", "utf-8-sig")
 
-    # 读取原始字节
+    # Read the raw bytes
     try:
         with open(file_path, 'rb') as f:
             raw = f.read()
     except FileNotFoundError:
-        return _wrap_error(f"文件不存在: {file_path}")
+        return _wrap_error(f"File does not exist: {file_path}")
     except PermissionError:
-        return _wrap_error(f"无权限读取: {file_path}")
+        return _wrap_error(f"No permission to read: {file_path}")
 
     fixes_applied = []
     original_size = len(raw)
 
-    # ── 检查 1: 是否有 U+FFFD 替换字符（\xef\xbf\xbd）──
+    # ── Check 1: are there U+FFFD replacement characters (\xef\xbf\xbd) ──
     fffd_count = raw.count(b'\xef\xbf\xbd')
     if fffd_count > 0:
-        fixes_applied.append(f"发现 {fffd_count} 处 U+FFFD 替换字符（�），尝试恢复…")
+        fixes_applied.append(f"Found {fffd_count} U+FFFD replacement characters (�), attempting recovery…")
 
-        # 策略: 移除 FFFD 序列，将残留字节尝试按 GBK 解码
-        # U+FFFD 通常出现在「GBK→UTF-8 误读」时失效的字节被替换
+        # Strategy: remove the FFFD sequences and try to decode the residual bytes as GBK
+        # U+FFFD usually appears when invalid bytes are replaced during a "GBK→UTF-8 misread"
         cleaned = raw.replace(b'\xef\xbf\xbd', b'')
         recovered_text = None
         for enc in ['gbk', 'gb18030', 'gb2312']:
             try:
                 decoded = cleaned.decode(enc)
-                # 检查解码结果是否含有意义的中文（4E00-9FFF 范围的字符占比）
+                # Check whether the decoded result contains meaningful Chinese (ratio of characters in the 4E00-9FFF range)
                 cjk_count = sum(1 for c in decoded if '\u4e00' <= c <= '\u9fff')
                 total_cjk = sum(1 for c in decoded if ord(c) > 127)
                 if cjk_count > 0 and (total_cjk == 0 or cjk_count / total_cjk > 0.3):
                     recovered_text = decoded
-                    fixes_applied.append(f"  通过 {enc} 恢复 {cjk_count} 个中文字符")
+                    fixes_applied.append(f"  Recovered {cjk_count} Chinese characters via {enc}")
                     break
             except:
                 continue
 
         if recovered_text:
-            # 重新编码为目标编码
+            # Re-encode to the target encoding
             raw = recovered_text.encode(target_enc)
-            fixes_applied.append(f"  已修复并重新编码为 {target_enc}")
+            fixes_applied.append(f"  Fixed and re-encoded to {target_enc}")
         else:
-            fixes_applied.append(f"  无法自动恢复 U+FFFD 内容，已跳过")
+            fixes_applied.append(f"  Cannot automatically recover U+FFFD content, skipped")
 
-    # ── 检查 2: 是否为 UTF-8 无 BOM（Delphi 可能误读为 ANSI）──
+    # ── Check 2: is it UTF-8 without BOM (Delphi may misread as ANSI) ──
     has_bom = raw[:3] == b'\xef\xbb\xbf'
     is_utf16 = raw[:2] in (b'\xff\xfe', b'\xfe\xff')
 
     if not has_bom and not is_utf16:
-        # 检测编码
+        # Detect encoding
         enc_result = chardet.detect(raw)
         detected_enc = enc_result.get('encoding', '').lower()
         confidence = enc_result.get('confidence', 0)
 
         if 'utf-8' in detected_enc and confidence > 0.8:
-            # 检查文件中是否有中文
+            # Check whether the file contains Chinese
             try:
                 text = raw.decode('utf-8')
                 has_cjk = any('\u4e00' <= c <= '\u9fff' for c in text)
                 if has_cjk:
                     raw = b'\xef\xbb\xbf' + raw
                     fixes_applied.append(
-                        f"  编码检测为 UTF-8（置信度 {confidence:.0%})，包含中文，无 BOM → 已添加 UTF-8 BOM"
+                        f"  Encoding detected as UTF-8 (confidence {confidence:.0%}), contains Chinese, no BOM → added UTF-8 BOM"
                     )
             except UnicodeDecodeError:
                 pass
 
-    # ── 检查 3: 编码检测为 GBK 但实际是 UTF-8（Delphi 以 ANSI 保存了 UTF-8 字节）──
+    # ── Check 3: encoding detected as GBK but actually UTF-8 (Delphi saved UTF-8 bytes as ANSI) ──
     if not has_bom and not is_utf16:
         enc_result = chardet.detect(raw)
         detected_enc = enc_result.get('encoding', '').lower()
         confidence = enc_result.get('confidence', 0)
 
         if detected_enc in ('gbk', 'gb2312', 'gb18030') and confidence > 0.6:
-            # 尝试用 UTF-8 解码，如果有意义的中文，说明是 UTF-8 被误存为 GBK
+            # Try decoding as UTF-8; if there is meaningful Chinese, it means UTF-8 was mistakenly saved as GBK
             try:
                 text_utf8 = raw.decode('utf-8')
                 cjk_utf8 = sum(1 for c in text_utf8 if '\u4e00' <= c <= '\u9fff')
                 if cjk_utf8 > 0:
-                    # 已经是有效 UTF-8，只是编码被误检测
+                    # Already valid UTF-8, just misdetected as another encoding
                     raw = b'\xef\xbb\xbf' + raw
                     fixes_applied.append(
-                        f"  文件被检测为 {detected_enc} 但其实是 UTF-8（含 {cjk_utf8} 个中文），"
-                        f"已添加 UTF-8 BOM 防止 Delphi 误读"
+                        f"  File detected as {detected_enc} but is actually UTF-8 (contains {cjk_utf8} Chinese characters), "
+                        f"added UTF-8 BOM to prevent Delphi misreading"
                     )
             except UnicodeDecodeError:
-                # 尝试反向恢复: 如果 UTF-8 字节被当作 GBK 存储，需要反向修复
-                # 即: 把当前文件按 GBK 读出的字符转回其原始 UTF-8 编码
+                # Try reverse recovery: if UTF-8 bytes were stored as GBK, a reverse fix is needed
+                # i.e. convert the characters read from the current file as GBK back to their original UTF-8 encoding
                 pass
 
-    # ── 写入修复结果 ──
+    # ── Write the fix result ──
     if not fixes_applied:
         return {
             "status": "success",
-            "message": f"未发现乱码问题: {os.path.basename(file_path)}（{original_size} 字节）"
+            "message": f"No garbled text found: {os.path.basename(file_path)} ({original_size} bytes)"
         }
 
-    # 创建备份
+    # Create backup
     bak_path = None
     if backup:
         lock_err = _acquire_read_lock(file_path)
@@ -3090,7 +3088,7 @@ async def handle_fix_garbled(arguments: Dict[str, Any]) -> Dict[str, Any]:
             finally:
                 _release_read_lock(file_path)
 
-    # 写回过修复后内容
+    # Write back the fixed content
     lock_err = _acquire_write_lock(file_path)
     if lock_err:
         return _wrap_error(lock_err)
@@ -3107,7 +3105,7 @@ async def handle_fix_garbled(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     os.remove(temp_path)
                 except OSError:
                     pass
-            return _wrap_error(f"写入文件失败: {e}")
+            return _wrap_error(f"Failed to write file: {e}")
         finally:
             if os.path.exists(temp_path):
                 try:
@@ -3123,8 +3121,8 @@ async def handle_fix_garbled(arguments: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "status": "success",
         "message": (
-            f"修复完成: {os.path.basename(file_path)}\n"
-            f"大小: {original_size} → {len(raw)} 字节\n"
+            f"Fix complete: {os.path.basename(file_path)}\n"
+            f"Size: {original_size} → {len(raw)} bytes\n"
             f"{summary}"
         ),
         "fixes": fixes_applied,
@@ -3132,25 +3130,25 @@ async def handle_fix_garbled(arguments: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ============================================================
-# Grep — 正则搜索/替换
+# Grep — regex search/replace
 # ============================================================
 
-# /pattern/flags 格式中单字符 → re 常量
+# single character in /pattern/flags format → re constant
 _CHAR_FLAG_MAP: Dict[str, int] = {
     "i": re.IGNORECASE,
     "m": re.MULTILINE,
     "s": re.DOTALL,
 }
 
-# 匹配 /pattern/flags 格式（如 /TMyClass/i、/^procedure/m）
+# Match /pattern/flags format (e.g. /TMyClass/i, /^procedure/m)
 _PATTERN_FLAGS_RE = re.compile(r'^/(.+)/([a-z]*)$')
 
 
 def _parse_inline_flags(pattern_str: str) -> tuple[str, int]:
-    """解析 /pattern/flags 行内语法。
+    """Parse the /pattern/flags inline syntax.
 
-    返回 (实际正则, 解析出的 flags)。
-    如果不以 / 开头，原样返回 pattern_str，flags=0。
+    Returns (actual regex, parsed flags).
+    If it does not start with /, return pattern_str unchanged, flags=0.
     """
     m = _PATTERN_FLAGS_RE.match(pattern_str)
     if not m:
@@ -3161,7 +3159,7 @@ def _parse_inline_flags(pattern_str: str) -> tuple[str, int]:
         mapped = _CHAR_FLAG_MAP.get(ch)
         if mapped is None:
             if ch != 'g':
-                raise ValueError(f"不支持的 flag 字符: '{ch}'（支持: i/m/s/g）")
+                raise ValueError(f"Unsupported flag character: '{ch}' (supported: i/m/s/g)")
             continue
         flags |= mapped
     return inner, flags
@@ -3254,47 +3252,47 @@ def _glob_files(
 
 
 def _resolve_grep_targets(arguments: Dict[str, Any]) -> tuple[Optional[List[str]], Optional[str]]:
-    """解析 grep 的 file_path 参数，确定搜索目标文件列表。
+    """Parse the grep file_path argument and determine the list of target files to search.
 
-    file_path 支持两种形式:
-      - 字符串: 自动检测是文件还是目录，决定搜索方式
-      - 字符串数组: 逐项解析（每项可以是文件或目录路径）
+    file_path supports two forms:
+      - string: automatically detect whether it is a file or a directory and decide the search mode
+      - string array: parse each item (each item may be a file or directory path)
 
-    相对路径解析:
-      - file_path 是相对路径时，先尝试 project_path/workspace_root 作为基目录
-      - 找不到基目录时回退到 os.path.abspath（服务器 CWD）
+    Relative path resolution:
+      - when file_path is relative, first try project_path/workspace_root as the base directory
+      - if no base directory is found, fall back to os.path.abspath (server CWD)
 
-    include/exclude 仅在目录模式有效（字符串形式且是目录，或数组中含有目录）。
+    include/exclude only take effect in directory mode (string form that is a directory, or an array containing directories).
 
     Returns:
-        (targets_list, None) 或 (None, error_message)
+        (targets_list, None) or (None, error_message)
     """
     raw = arguments.get("file_path")
 
     if raw is None:
-        # 未指定 file_path 时，自动回退到项目根目录
+        # When file_path is not specified, automatically fall back to the project root directory
         base = _resolve_project_path(arguments)
         if base and os.path.isdir(base):
             raw = base
         else:
-            return None, "请提供 file_path 参数（文件路径、目录路径或路径数组）"
+            return None, "Please provide the file_path parameter (file path, directory path, or path array)"
 
-    # 统一转为列表处理
+    # Normalize to a list for processing
     if isinstance(raw, str):
         items = [raw]
     elif isinstance(raw, list):
         if len(raw) == 0:
-            return None, "file_path 数组不能为空"
+            return None, "file_path array cannot be empty"
         items = raw
     else:
-        return None, "file_path 必须是字符串或字符串数组"
+        return None, "file_path must be a string or a string array"
 
-    # 确定基目录：用于解析相对路径
+    # Determine the base directory: used to resolve relative paths
     base_dir = _resolve_project_path(arguments)
     if base_dir:
         base_dir = os.path.abspath(base_dir)
         if not os.path.isdir(base_dir):
-            base_dir = None  # 基目录不可用时回退到 CWD
+            base_dir = None  # fall back to CWD when the base directory is unavailable
 
     include = arguments.get("include")
     exclude = arguments.get("exclude")
@@ -3303,11 +3301,11 @@ def _resolve_grep_targets(arguments: Dict[str, Any]) -> tuple[Optional[List[str]
 
     for item in items:
         if not isinstance(item, str) or not item.strip():
-            errors.append(f"无效路径: {item!r}")
+            errors.append(f"Invalid path: {item!r}")
             continue
 
         item_stripped = item.strip()
-        # 相对路径 → 优先相对 project_path/workspace_root 解析
+        # Relative path → preferentially resolve relative to project_path/workspace_root
         if not os.path.isabs(item_stripped) and base_dir:
             abs_path = os.path.normpath(os.path.join(base_dir, item_stripped))
         else:
@@ -3330,14 +3328,14 @@ def _resolve_grep_targets(arguments: Dict[str, Any]) -> tuple[Optional[List[str]
                         "use fewer paths or narrower include/exclude patterns"
                     )
             else:
-                errors.append(f"目录 '{item}' 下没有匹配的文件")
+                errors.append(f"No files match under directory '{item}'")
         else:
-            errors.append(f"路径 '{item}' 不存在或既不是文件也不是目录")
+            errors.append(f"Path '{item}' does not exist or is neither a file nor a directory")
 
     if errors and not resolved:
-        return None, "所有路径均无效: " + "; ".join(errors)
+        return None, "All paths are invalid: " + "; ".join(errors)
 
-    # 去重（保留首次出现的顺序）
+    # Deduplicate (preserve order of first occurrence)
     seen: Set[str] = set()
     deduped: List[str] = []
     for p in resolved:
@@ -3347,7 +3345,7 @@ def _resolve_grep_targets(arguments: Dict[str, Any]) -> tuple[Optional[List[str]
 
     result = deduped
     if errors:
-        logger.warning(f"grep 部分路径无效: {'; '.join(errors)}")
+        logger.warning(f"grep: some paths are invalid: {'; '.join(errors)}")
 
     return result, None
 
@@ -3363,16 +3361,16 @@ def _grep_search_fulltext(
     enc: str,
 ) -> Dict[str, Any]:
     """
-    全文搜索 — 使用 re.finditer 在全部内容上批量匹配。
+    Full-text search — use re.finditer to match in bulk over the entire content.
 
-    支持跨行匹配（通过 pattern 编译时的 DOTALL/MULTILINE flag 实现）。
-    匹配结果按行号区间呈现。
+    Supports cross-line matching (implemented via the DOTALL/MULTILINE flags when the pattern is compiled).
+    Match results are presented by line-number ranges.
 
-    filter/exclude 作用于整个匹配文本。
+    filter/exclude apply to the entire matched text.
 
     Returns:
-        matches: [{L<N> 或 L<N>*: line_content, ...}, ...] 每项为一个 match group
-        output:  人类可读文本
+        matches: [{L<N> or L<N>*: line_content, ...}, ...] each item is a match group
+        output:  human-readable text
     """
     filename = os.path.basename(file_path)
     total = 0
@@ -3383,7 +3381,7 @@ def _grep_search_fulltext(
     for m in re.finditer(compiled, content):
         matched_text = m.group()
 
-        # filter/exclude 在整个匹配文本上检查
+        # filter/exclude are checked against the entire matched text
         if filter_compiled and not filter_compiled.search(matched_text):
             continue
         if exclude_compiled and exclude_compiled.search(matched_text):
@@ -3408,27 +3406,25 @@ def _grep_search_fulltext(
             group[key] = lines[ci].rstrip('\r\n')
         match_groups.append(group)
 
-    # output: 人类可读格式
-    output_parts = [f"文件: {filename}（编码: {enc}，共 {total} 处匹配）"]
+    # output: human-readable format
+    output_parts = [f"File: {filename} (encoding: {enc}, {total} matches total)"]
     for g in match_groups:
         for k, v in g.items():
             output_parts.append(f"  {k}:{v}")
         output_parts.append("")
 
     if total == 0:
-        output_parts.append("  （无匹配）")
+        output_parts.append("  (no matches)")
 
     output = "\n".join(output_parts)
 
     return {
         "status": "success",
-        "message": f"{filename}: {total} 处匹配",
+        "message": f"{filename}: {total} matches",
         "total": total,
         "matches": match_groups,
         "output": output,
     }
-
-
 def _grep_search(
     file_path: str,
     compiled: re.Pattern,
@@ -3440,21 +3436,21 @@ def _grep_search(
     enc: str,
 ) -> Dict[str, Any]:
     """
-    对 lines 逐行执行多级正则搜索。
+    Performs multi-level regex search line by line on lines.
 
     Args:
-        file_path: 文件路径（仅用于输出）
-        compiled: 主 pattern 编译对象
-        lines: 文件各行（带换行符保留）
-        filter_compiled: 二级过滤 pattern（可选，行必须也匹配）
-        exclude_compiled: 排除 pattern（可选，行必须不匹配）
-        context: 上下文行数（前后各 N 行）
-        count: 最大返回结果数
-        enc: 文件编码
+        file_path: File path (used only for output)
+        compiled: Compiled main pattern object
+        lines: Lines of the file (line endings preserved)
+        filter_compiled: Secondary filter pattern (optional; line must also match)
+        exclude_compiled: Exclude pattern (optional; line must not match)
+        context: Number of context lines (N lines before and after)
+        count: Maximum number of results to return
+        enc: File encoding
 
     Returns:
-        matches: [{L<N> 或 L<N>*: line_content, ...}, ...] 每项为一个 match group
-        output:  人类可读文本
+        matches: [{L<N> or L<N>*: line_content, ...}, ...] each item is a match group
+        output:  Human-readable text
     """
     filename = os.path.basename(file_path)
     total = 0
@@ -3472,7 +3468,7 @@ def _grep_search(
 
         total += 1
         if total > count:
-            total -= 1  # 超出 limit 的匹配计数去掉
+            total -= 1  # Remove the match count that exceeds limit
             break
 
         ctx_start = max(0, i - context)
@@ -3483,21 +3479,21 @@ def _grep_search(
             group[key] = lines[ci].rstrip('\r\n')
         match_groups.append(group)
 
-    # output: 人类可读格式
-    output_parts = [f"文件: {filename}（编码: {enc}，共 {total} 处匹配）"]
+    # output: Human-readable format
+    output_parts = [f"File: {filename} (encoding: {enc}, total {total} matches)"]
     for g in match_groups:
         for k, v in g.items():
             output_parts.append(f"  {k}:{v}")
         output_parts.append("")
 
     if total == 0:
-        output_parts.append("  （无匹配）")
+        output_parts.append("  (no matches)")
 
     output = "\n".join(output_parts)
 
     return {
         "status": "success",
-        "message": f"{filename}: {total} 处匹配",
+        "message": f"{filename}: {total} matches",
         "total": total,
         "matches": match_groups,
         "output": output,
@@ -3514,29 +3510,29 @@ def _grep_replace(
     use_fulltext: bool = False,
 ) -> Dict[str, Any]:
     """
-    对文件内容执行正则替换。
+    Performs regex replacement on file content.
 
     Args:
-        file_path: 文件路径
-        compiled: 编译后的 pattern
-        replace: 替换文本
-        content: 原文件内容
-        enc: 文件编码
-        dry_run: True=仅预览不写盘
-        use_fulltext: True=全文替换（支持跨行），False=逐行替换
+        file_path: File path
+        compiled: Compiled pattern
+        replace: Replacement text
+        content: Original file content
+        enc: File encoding
+        dry_run: True=preview only, do not write to disk
+        use_fulltext: True=full-text replacement (supports cross-line), False=line-by-line replacement
 
     Returns:
         dry_run=True: {"status": "success", "dry_run": True, "diff": [...], ...}
         dry_run=False: {"status": "success", "replaced": int, ...}
     """
     if use_fulltext:
-        # ── 全文替换（支持跨行匹配）──
+        # ── Full-text replacement (supports cross-line matching)──
         new_content, replaced_count = compiled.subn(replace, content)
 
         if replaced_count == 0:
-            return {"status": "success", "message": "无匹配，未做任何替换", "replaced": 0}
+            return {"status": "success", "message": "No matches, no replacements made", "replaced": 0}
 
-        # 收集每条匹配的位置信息
+        # Collect position info for each match
         change_list = []
         for m in re.finditer(compiled, content):
             start_line = content[:m.start()].count('\n') + 1
@@ -3549,26 +3545,26 @@ def _grep_replace(
 
         if dry_run:
             output_parts = [
-                f"文件: {os.path.basename(file_path)}（编码: {enc}）",
-                f"预览替换: {replaced_count} 处",
+                f"File: {os.path.basename(file_path)} (encoding: {enc})",
+                f"Preview replacement: {replaced_count} occurrences",
             ]
             for c in change_list:
                 if c["start_lineno"] == c["end_lineno"]:
-                    output_parts.append(f"  行 {c['start_lineno']}: {c['matched']}")
+                    output_parts.append(f"  Line {c['start_lineno']}: {c['matched']}")
                 else:
-                    output_parts.append(f"  行 {c['start_lineno']}-{c['end_lineno']}: {c['matched']}")
-            output_parts.append("（预览模式，文件未修改。设 dry_run=False 执行实际替换）")
+                    output_parts.append(f"  Line {c['start_lineno']}-{c['end_lineno']}: {c['matched']}")
+            output_parts.append("(Preview mode, file not modified. Set dry_run=False to perform actual replacement)")
 
             return {
                 "status": "success",
-                "message": f"预览：将替换 {replaced_count} 处",
+                "message": f"Preview: will replace {replaced_count} occurrences",
                 "dry_run": True,
                 "replaced": replaced_count,
                 "changes": change_list,
                 "output": "\n".join(output_parts),
             }
 
-        # 实际写入
+        # Actual write
         bak_path = None
         lock_err = _acquire_read_lock(file_path)
         if not lock_err:
@@ -3592,7 +3588,7 @@ def _grep_replace(
                         os.remove(temp_path)
                     except OSError:
                         pass
-                return _wrap_error(f"写入文件失败: {e}")
+                return _wrap_error(f"Failed to write file: {e}")
             finally:
                 if os.path.exists(temp_path):
                     try:
@@ -3606,16 +3602,16 @@ def _grep_replace(
         return {
             "status": "success",
             "message": (
-                f"替换完成: {os.path.basename(file_path)}\n"
-                f"共替换 {replaced_count} 处\n"
-                f"编码: {enc}"
-                + (f"\n备份: {os.path.basename(bak_path)}" if bak_path else "")
+                f"Replacement complete: {os.path.basename(file_path)}\n"
+                f"Replaced {replaced_count} occurrences in total\n"
+                f"Encoding: {enc}"
+                + (f"\nBackup: {os.path.basename(bak_path)}" if bak_path else "")
             ),
             "replaced": replaced_count,
             "changes": change_list,
         }
 
-    # ── 逐行替换（向后兼容）──
+    # ── Line-by-line replacement (backward compatible)──
     lines = content.splitlines(keepends=True)
     replaced_count = 0
     change_list: List[Dict[str, Any]] = []
@@ -3635,36 +3631,36 @@ def _grep_replace(
     if replaced_count == 0:
         return {
             "status": "success",
-            "message": "无匹配，未做任何替换",
+            "message": "No matches, no replacements made",
             "replaced": 0,
         }
 
     if dry_run:
-        # 仅预览
+        # Preview only
         diff_lines = []
         for ch in change_list:
-            diff_lines.append(f"  行 {ch['lineno']}: {ch['old']}")
+            diff_lines.append(f"  Line {ch['lineno']}: {ch['old']}")
             diff_lines.append(f"       → {ch['new']}")
             diff_lines.append("")
         output = (
-            f"文件: {os.path.basename(file_path)}（编码: {enc}）\n"
-            f"预览替换: {replaced_count} 处\n"
+            f"File: {os.path.basename(file_path)} (encoding: {enc})\n"
+            f"Preview replacement: {replaced_count} occurrences\n"
         )
         if diff_lines:
             output += "\n".join(diff_lines)
-        output += "\n（预览模式，文件未修改。设 dry_run=False 执行实际替换）"
+        output += "\n(Preview mode, file not modified. Set dry_run=False to perform actual replacement)"
 
         return {
             "status": "success",
-            "message": f"预览：将替换 {replaced_count} 处",
+            "message": f"Preview: will replace {replaced_count} occurrences",
             "dry_run": True,
             "replaced": replaced_count,
             "changes": change_list,
             "output": output,
         }
 
-    # ── 实际写入 ──
-    # 备份
+    # ── Actual write ──
+    # Backup
     bak_path = None
     lock_err = _acquire_read_lock(file_path)
     if not lock_err:
@@ -3673,7 +3669,7 @@ def _grep_replace(
         finally:
             _release_read_lock(file_path)
 
-    # 写入
+    # Write
     new_content = "".join(lines)
     lock_err = _acquire_write_lock(file_path)
     if lock_err:
@@ -3690,7 +3686,7 @@ def _grep_replace(
                     os.remove(temp_path)
                 except OSError:
                     pass
-            return _wrap_error(f"写入文件失败: {e}")
+            return _wrap_error(f"Failed to write file: {e}")
         finally:
             if os.path.exists(temp_path):
                 try:
@@ -3706,10 +3702,10 @@ def _grep_replace(
     return {
         "status": "success",
         "message": (
-            f"替换完成: {os.path.basename(file_path)}\n"
-            f"共替换 {replaced_count} 处（{changed_lines} 行）\n"
-            f"编码: {enc}"
-            + (f"\n备份: {os.path.basename(bak_path)}" if bak_path else "")
+            f"Replacement complete: {os.path.basename(file_path)}\n"
+            f"Replaced {replaced_count} occurrences in total ({changed_lines} lines)\n"
+            f"Encoding: {enc}"
+            + (f"\nBackup: {os.path.basename(bak_path)}" if bak_path else "")
         ),
         "replaced": replaced_count,
         "changed_lines": changed_lines,
@@ -3723,20 +3719,20 @@ def _format_batch_output(
     file_count: int,
     replace: Optional[str] = None,
 ) -> str:
-    """格式化批量 grep 的人类可读输出。"""
+    """Formats human-readable output for batch grep."""
     if replace is not None:
-        parts = [f"批量替换: 在 {file_count} 个文件中完成替换，共 {total_matches} 处" if file_count > 0
-                 else "批量替换: 无匹配，未做任何替换"]
+        parts = [f"Batch replace: replaced {total_matches} occurrences in {file_count} files" if file_count > 0
+                 else "Batch replace: no matches, no replacements made"]
     else:
-        parts = [f"批量搜索: 在 {file_count} 个文件中找到 {total_matches} 处匹配" if file_count > 0
-                 else "批量搜索: 无匹配"]
+        parts = [f"Batch search: found {total_matches} matches in {file_count} files" if file_count > 0
+                 else "Batch search: no matches"]
     for fname, fresult in files_result.items():
         parts.append(f"")
-        parts.append(f"文件: {fname}")
+        parts.append(f"File: {fname}")
         if replace is not None:
-            parts.append(f"  替换: {fresult.get('replaced', 0)} 处")
+            parts.append(f"  Replaced: {fresult.get('replaced', 0)} occurrences")
         else:
-            parts.append(f"  匹配: {fresult.get('total', 0)} 处")
+            parts.append(f"  Matches: {fresult.get('total', 0)} occurrences")
             for g in fresult.get("matches", []):
                 for k, v in g.items():
                     if k == "_pattern":
@@ -3758,20 +3754,20 @@ def _grep_single_file(
     use_fulltext: bool,
     project_path: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """对单个文件执行 grep 搜索或替换。
+    """Performs grep search or replacement on a single file.
 
-    单 pattern 时行为与旧版完全一致（向后兼容）。
-    多 pattern 时 OR 逻辑组合搜索，匹配标注 _pattern 字段。
+    With a single pattern, behavior is fully identical to the old version (backward compatible).
+    With multiple patterns, searches are combined with OR logic, and matches are tagged with the _pattern field.
     """
-    # ── 检查 .dfm / .fmx ──
+    # ── Check .dfm / .fmx ──
     if _is_dfm_file(file_path):
-        return {"status": "skipped", "message": f"grep 不支持 DFM/FMX 文件: {file_path}"}
+        return {"status": "skipped", "message": f"grep does not support DFM/FMX files: {file_path}"}
 
     path_err = _validate_path(file_path, project_path)
     if path_err:
-        return _wrap_error(f"路径安全校验失败: {path_err}")
+        return _wrap_error(f"Path safety validation failed: {path_err}")
 
-    # ── 读取文件 ──
+    # ── Read file ──
     enc = detect_encoding(file_path)
     if not enc:
         enc = "utf-8"
@@ -3779,13 +3775,13 @@ def _grep_single_file(
         with open(file_path, 'r', encoding=enc, errors='replace') as f:
             content = f.read()
     except FileNotFoundError:
-        return _wrap_error(f"文件不存在: {file_path}")
+        return _wrap_error(f"File does not exist: {file_path}")
     except PermissionError:
-        return _wrap_error(f"无权限读取: {file_path}")
+        return _wrap_error(f"No permission to read: {file_path}")
     except Exception as e:
-        return _wrap_error(f"读取文件失败: {e}")
+        return _wrap_error(f"Failed to read file: {e}")
 
-    # ── 单 pattern — 原路径（完全向后兼容） ──
+    # ── Single pattern — original path (fully backward compatible) ──
     if len(compiled_patterns) == 1:
         compiled = compiled_patterns[0]
         if replace is not None:
@@ -3799,10 +3795,10 @@ def _grep_single_file(
             return _grep_search(file_path, compiled, lines,
                                 filter_compiled, exclude_compiled, context, count, enc)
 
-    # ── 多 pattern 替换 ──
+    # ── Multi-pattern replacement ──
     if replace is not None:
         if dry_run:
-            # 预览：所有 pattern 在原始内容上模拟替换
+            # Preview: simulate replacement for all patterns on the original content
             preview_content = content
             total_replaced = 0
             all_changes = []
@@ -3821,13 +3817,13 @@ def _grep_single_file(
             filename = os.path.basename(file_path)
             return {
                 "status": "success",
-                "message": f"{filename}: 预览替换 {total_replaced} 处（{len(compiled_patterns)} 个 pattern）",
+                "message": f"{filename}: preview replace {total_replaced} occurrences ({len(compiled_patterns)} patterns)",
                 "replaced": total_replaced,
                 "dry_run": True,
                 "changes": all_changes,
             }
         else:
-            # 实修：逐 pattern 写盘
+            # Actual replace: write to disk pattern by pattern
             total_replaced = 0
             all_changes = []
             for compiled in compiled_patterns:
@@ -3849,12 +3845,12 @@ def _grep_single_file(
             filename = os.path.basename(file_path)
             return {
                 "status": "success",
-                "message": f"{filename}: 替换完成，共 {total_replaced} 处（{len(compiled_patterns)} 个 pattern）",
+                "message": f"{filename}: replacement complete, {total_replaced} occurrences total ({len(compiled_patterns)} patterns)",
                 "replaced": total_replaced,
                 "changes": all_changes,
             }
 
-    # ── 多 pattern 搜索 ──
+    # ── Multi-pattern search ──
     all_matches: List[Dict[str, str]] = []
     total = 0
 
@@ -3875,7 +3871,7 @@ def _grep_single_file(
             all_matches.extend(result.get("matches", []))
             total += n
 
-    # 按首个行号排序
+    # Sort by first line number
     def _sort_key(match_group: Dict[str, str]) -> int:
         for k in match_group:
             if k.startswith("L") and not k.endswith("*"):
@@ -3885,7 +3881,7 @@ def _grep_single_file(
 
     filename = os.path.basename(file_path)
     pattern_count = len(compiled_patterns)
-    output_parts = [f"文件: {filename}（编码: {enc}，共 {total} 处匹配，{pattern_count} 个 pattern）"]
+    output_parts = [f"File: {filename} (encoding: {enc}, {total} matches, {pattern_count} patterns)"]
     for g in all_matches:
         for k, v in g.items():
             if k == "_pattern":
@@ -3893,11 +3889,11 @@ def _grep_single_file(
             output_parts.append(f"  {k}:{v}")
         output_parts.append("")
     if total == 0:
-        output_parts.append("  （无匹配）")
+        output_parts.append("  (no matches)")
 
     return {
         "status": "success",
-        "message": f"{filename}: {total} 处匹配",
+        "message": f"{filename}: {total} matches",
         "total": total,
         "matches": all_matches,
         "output": "\n".join(output_parts),
@@ -3916,7 +3912,7 @@ def _grep_batch(
     use_fulltext: bool,
     project_path: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """对多个文件批量执行 grep 搜索或替换。"""
+    """Performs grep search or replacement in batch on multiple files."""
     files_result: Dict[str, Dict[str, Any]] = {}
     total_matches = 0
     file_count = 0
@@ -3933,7 +3929,7 @@ def _grep_batch(
             errors.append(f"{file_path}: {result['message']}")
             continue
         elif status == "skipped":
-            continue  # DFM/FMX 文件静默跳过
+            continue  # DFM/FMX files silently skipped
 
         rel_path = os.path.relpath(file_path)
 
@@ -3962,13 +3958,13 @@ def _grep_batch(
     message_parts = []
     if replace is not None:
         if total_matches > 0:
-            message_parts.append(f"在 {file_count} 个文件中完成替换，共 {total_matches} 处")
+            message_parts.append(f"Replaced {total_matches} occurrences in {file_count} files")
         else:
-            message_parts.append("无匹配，未做任何替换")
+            message_parts.append("No matches, no replacements made")
     else:
-        message_parts.append(f"在 {file_count} 个文件中找到 {total_matches} 处匹配")
+        message_parts.append(f"Found {total_matches} matches in {file_count} files")
     if errors:
-        message_parts.append(f"\n{len(errors)} 个文件读取失败")
+        message_parts.append(f"\n{len(errors)} files failed to read")
 
     return {
         "status": "success" if not errors or file_count > 0 else "error",
@@ -3983,81 +3979,81 @@ def _grep_batch(
 
 async def handle_grep(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    处理 grep action — 正则搜索 + 多级过滤 + 替换（支持单文件/目录/路径数组）。
+    Handles the grep action — regex search + multi-level filtering + replacement (supports single file/directory/path array).
 
-    file_path 支持三种形式：
-      - 文件路径 → 单文件搜索
-      - 目录路径 → 递归搜索目录下 Delphi 文件（可配合 include/exclude）
-      - 路径数组 → 逐项解析，每项可以是文件或目录，结果去重
+    file_path supports three forms:
+      - File path → single-file search
+      - Directory path → recursively search Delphi files under the directory (can be combined with include/exclude)
+      - Path array → resolve each item individually; each item can be a file or directory, with deduplicated results
 
-    == 单文件搜索 ==
+    == Single-file search ==
         delphi_file(
             action="grep",
             file_path="Unit1.pas",
-            pattern="/TMyClass\b/i",       # 主搜索模式（/表达式/flags）
-            filter_pattern="TForm",         # 二级过滤（可选，AND）
-            exclude_pattern="deprecated",   # 排除模式（可选，NOT）
-            context=2,                      # 上下文行数（默认 0）
-            count=200,                      # 最大返回结果数（默认 200）
+            pattern="/TMyClass\b/i",       # Main search pattern (/expression/flags)
+            filter_pattern="TForm",         # Secondary filter (optional, AND)
+            exclude_pattern="deprecated",   # Exclude pattern (optional, NOT)
+            context=2,                      # Number of context lines (default 0)
+            count=200,                      # Maximum number of results to return (default 200)
         )
 
-    == 单文件替换 ==
+    == Single-file replacement ==
         delphi_file(
             action="grep",
             file_path="Unit1.pas",
             pattern="/TMyClass\b/i",
             replace="TNewClass",
-            dry_run=True,                   # 默认 True，预览不写盘
+            dry_run=True,                   # Default True, preview without writing to disk
         )
 
-    == 目录递归搜索 ==
+    == Recursive directory search ==
         delphi_file(
             action="grep",
             file_path="src/",
-            include="**/*.pas",   # glob 包含模式（可选，默认所有 Delphi 文件）
+            include="**/*.pas",   # glob include pattern (optional, defaults to all Delphi files)
             pattern="/TMyClass/i",
             context=1,
         )
 
-    == 多 pattern 搜索 ==
+    == Multi-pattern search ==
         delphi_file(
             action="grep",
             file_path="Unit1.pas",
             patterns=["/TMyClass/i", "/TSomeClass/"],
         )
 
-    == 路径数组搜索 ==
+    == Path array search ==
         delphi_file(
             action="grep",
             file_path=["Unit1.pas", "src/"],
             pattern="/TMyClass/i",
         )
 
-    flags 行内语法:
-        pattern="/TMyClass/im" → /表达式/flag字符
-        flag 字符: i=ignore_case, m=multiline, s=dot_all, g=忽略（Python 默认全局）
-        multiline/dot_all 启用全文搜索模式，匹配可跨行。
-        无 flags 字符时保持逐行搜索（向后兼容）。
-        filter_pattern/exclude_pattern 继承主 pattern 的 flags，也可单独写行内语法覆盖。
+    flags inline syntax:
+        pattern="/TMyClass/im" → /expression/flag characters
+        flag characters: i=ignore_case, m=multiline, s=dot_all, g=ignored (Python global by default)
+        multiline/dot_all enable full-text search mode, matches can span lines.
+        Without flag characters, line-by-line search is kept (backward compatible).
+        filter_pattern/exclude_pattern inherit the main pattern's flags, and can also override them with their own inline syntax.
 
-    多级过滤说明:
-        逐行模式: pattern + filter_pattern + exclude_pattern 作用于同一行
-        全文模式: pattern + filter_pattern + exclude_pattern 作用于整个匹配文本
+    Multi-level filtering notes:
+        Line-by-line mode: pattern + filter_pattern + exclude_pattern apply to the same line
+        Full-text mode: pattern + filter_pattern + exclude_pattern apply to the entire matched text
     """
     removed_preview = _reject_removed_preview_argument(arguments)
     if removed_preview:
         return removed_preview
 
-    # ── 解析 pattern / patterns ──
+    # ── Parse pattern / patterns ──
     pattern_str = arguments.get("pattern")
     patterns = arguments.get("patterns")
 
     if not pattern_str and not patterns:
-        return _wrap_error("请提供 pattern（单模式）或 patterns（多模式）参数")
+        return _wrap_error("Please provide the pattern (single pattern) or patterns (multiple patterns) argument")
     if pattern_str and patterns:
-        return _wrap_error("pattern 和 patterns 不能同时提供，请选其一")
+        return _wrap_error("pattern and patterns cannot be provided at the same time; please choose one")
 
-    # ── 编译 patterns ──
+    # ── Compile patterns ──
     pattern_strings = [pattern_str] if pattern_str else patterns
     compiled_patterns: List[re.Pattern] = []
     inline_flags = 0
@@ -4069,14 +4065,14 @@ async def handle_grep(arguments: Dict[str, Any]) -> Dict[str, Any]:
         try:
             compiled = re.compile(inner_pattern, flags)
         except re.error as e:
-            return _wrap_error(f"pattern 正则编译失败: {e}")
+            return _wrap_error(f"pattern regex compilation failed: {e}")
         compiled_patterns.append(compiled)
         inline_flags |= flags
 
     use_fulltext = bool(inline_flags & (re.MULTILINE | re.DOTALL))
 
-    # ── 编译 filter / exclude ──
-    # 继承所有 pattern 的 flags 并集
+    # ── Compile filter / exclude ──
+    # Inherit the union of all pattern flags
     filter_str = arguments.get("filter_pattern")
     filter_compiled: Optional[re.Pattern] = None
     if filter_str:
@@ -4084,7 +4080,7 @@ async def handle_grep(arguments: Dict[str, Any]) -> Dict[str, Any]:
             inner_filter, filter_inline = _parse_inline_flags(filter_str)
             filter_compiled = re.compile(inner_filter, inline_flags | filter_inline)
         except re.error as e:
-            return _wrap_error(f"filter_pattern 正则编译失败: {e}")
+            return _wrap_error(f"filter_pattern regex compilation failed: {e}")
 
     exclude_str = arguments.get("exclude_pattern")
     exclude_compiled: Optional[re.Pattern] = None
@@ -4093,27 +4089,27 @@ async def handle_grep(arguments: Dict[str, Any]) -> Dict[str, Any]:
             inner_exclude, exclude_inline = _parse_inline_flags(exclude_str)
             exclude_compiled = re.compile(inner_exclude, inline_flags | exclude_inline)
         except re.error as e:
-            return _wrap_error(f"exclude_pattern 正则编译失败: {e}")
+            return _wrap_error(f"exclude_pattern regex compilation failed: {e}")
 
     replace = arguments.get("replace")
     dry_run = arguments.get("dry_run", True)
     if not isinstance(dry_run, bool):
-        return _wrap_error("dry_run 必须是布尔值")
+        return _wrap_error("dry_run must be a boolean value")
     context = arguments.get("context", 0)
     if not isinstance(context, int) or context < 0:
-        return _wrap_error("context 必须是非负整数")
+        return _wrap_error("context must be a non-negative integer")
     count = arguments.get("count", 200)
     if not isinstance(count, int) or count < 1:
         count = 200
     project_path = arguments.get("project_path")
 
-    # ── 解析目标文件列表 ──
+    # ── Resolve target file list ──
     targets, err = await asyncio.to_thread(_resolve_grep_targets, arguments)
     if err:
         return _wrap_error(err)
 
-    # ── 路由：单文件 + 单 pattern → 快速路径 ──
-    # 判断原始输入而不是展开后的 targets；目录只匹配一个文件时仍须返回批量结果契约。
+    # ── Routing: single file + single pattern → fast path ──
+    # Determine from the original input rather than expanded targets; a directory matching only one file must still return the batch-result contract.
     raw_file_path = arguments.get("file_path")
     resolved_input_path: Optional[str] = None
     if isinstance(raw_file_path, str) and raw_file_path.strip():
@@ -4136,14 +4132,14 @@ async def handle_grep(arguments: Dict[str, Any]) -> Dict[str, Any]:
     )
     if is_single_file and len(compiled_patterns) == 1 and pattern_str:
         if _is_dfm_file(targets[0]):
-            return _wrap_error("grep 不支持 DFM/FMX 文件（可能为二进制格式），请使用 read action 读取")
+            return _wrap_error("grep does not support DFM/FMX files (possibly binary format); please use the read action to read them")
         return await asyncio.to_thread(
             _grep_single_file,
             targets[0], compiled_patterns, filter_compiled, exclude_compiled,
             replace, dry_run, context, count, use_fulltext, project_path,
         )
 
-    # ── 批量模式（多文件、目录递归 或 多 pattern） ──
+    # ── Batch mode (multiple files, recursive directory, or multiple patterns) ──
     return await asyncio.to_thread(
         _grep_batch,
         targets, compiled_patterns, filter_compiled, exclude_compiled,
@@ -4152,7 +4148,7 @@ async def handle_grep(arguments: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _record_file_write_to_tracker(arguments: dict, result: dict) -> None:
-    """将文件写操作记录到经验追踪器。"""
+    """Records file write operations to the experience tracker."""
     try:
         from ..services.experience_tracker import get_tracker
         action = arguments.get("action", "")
@@ -4167,13 +4163,13 @@ def _record_file_write_to_tracker(arguments: dict, result: dict) -> None:
             result_text=str(result_text) if result_text else "",
         )
     except Exception as e:
-        logger.debug("记录文件写入到追踪器失败（不影响写入）: %s", e)
+        logger.debug("Failed to record file write to tracker (does not affect writing): %s", e)
 
 
 async def handle_file_tool(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    file_tool 主入口。
-    write 使用 edits 数组处理单处或多处修改。
+    Main entry point for file_tool.
+    write uses the edits array to handle single or multiple modifications.
     """
     removed_preview = _reject_removed_preview_argument(arguments)
     if removed_preview:
@@ -4215,6 +4211,6 @@ async def handle_file_tool(arguments: Dict[str, Any]) -> Dict[str, Any]:
         elif action == "count_lines":
             return await handle_count_lines(arguments)
         else:
-            return _wrap_error(f"未知 action: {action}。支持的 action: read, write, replace, insert, delete, format, backup, encode, uses, fix_garbled, grep, count_lines")
+            return _wrap_error(f"Unknown action: {action}. Supported actions: read, write, replace, insert, delete, format, backup, encode, uses, fix_garbled, grep, count_lines")
     finally:
         pass  # ensure clean exit even if recording raises

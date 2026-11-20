@@ -483,7 +483,7 @@ class CompatibleServer:
             )
             kwargs.setdefault(
                 "description",
-                "Daofy for Delphi MCP Server，提供 Delphi 项目编译、知识库搜索、安全文件读写、自动化测试和审计工具。",
+                "Daofy for Delphi MCP Server: Delphi project compilation, knowledge base search, safe file read/write, automation testing and audit tools.",
             )
             self._server = _V2Server(self._name, **kwargs)
         else:
@@ -631,7 +631,7 @@ if not MCP2:
                                         version=self._init_options.server_version,
                                         websiteUrl=self._init_options.website_url,
                                         icons=self._init_options.icons,
-                                        description="Daofy for Delphi MCP Server，提供 Delphi 项目编译、知识库搜索、安全文件读写、自动化测试和审计工具。",
+                                        description="Daofy for Delphi MCP Server: Delphi project compilation, knowledge base search, safe file read/write, automation testing and audit tools.",
                                     ),
                                     instructions=self._init_options.instructions,
                                 )

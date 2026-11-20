@@ -1,24 +1,24 @@
-<!-- @when: AI 生成或修改 VCL/FMX 窗体、Frame、Dialog 后，需要检查 UI 布局质量 -->
+<!-- @when: After AI generates or modifies VCL/FMX forms, frames, or dialogs, UI layout quality needs to be checked -->
 <!-- @chain: before=testing/ui.md, after=review-table.md -->
 
-## UI 布局规范与审计
+## UI Layout Specification and Audit
 
-AI 生成 Delphi GUI 后，必须把布局质量当作代码质量的一部分审计。编译通过只说明代码可运行，不说明界面舒适、整齐、可读。
+After AI generates Delphi GUI, layout quality must be audited as part of code quality. Compilation passing only means the code can run; it does not mean the interface is comfortable, neat, and readable.
 
-### 目标
+### Goals
 
-| 维度 | 要求 |
+| Dimension | Requirement |
 |------|------|
-| 对齐 | 同一列内容控件 Left 一致，按钮组 Top/Height 一致，文本标签与字段中心线对齐 |
-| 间距 | 使用 8px 基准网格；文本标签到字段建议 4~16px；同类控件垂直间距保持一致 |
-| 层次 | 表单内容按区域组织，优先用 Panel/GroupBox/PageControl 分区，不让控件散落 |
-| 边界 | 控件不得超出父容器；不同 DPI 下不得截断、压缩、重叠 |
-| Resize | 可调整大小的窗口优先用 Align 和容器分区；必须使用绝对坐标时，为父容器设置足够的最小尺寸 |
-| TabOrder | Tab 顺序与视觉阅读顺序一致：从上到下、从左到右 |
+| Alignment | Controls with content in the same column have consistent Left; button groups have consistent Top/Height; text labels are aligned with the center line of fields |
+| Spacing | Use an 8px baseline grid; 4~16px is recommended between text labels and fields; vertical spacing between controls of the same type remains consistent |
+| Hierarchy | Form content is organized by area; prefer Panel/GroupBox/PageControl for partitioning so controls are not scattered |
+| Boundaries | Controls must not exceed the parent container; under different DPI they must not be truncated, compressed, or overlapped |
+| Resize | Resizable windows should preferentially use Align and container partitioning; when absolute coordinates must be used, set a sufficient minimum size for the parent container |
+| TabOrder | Tab order matches the visual reading order: top to bottom, left to right |
 
-### 静态审计
+### Static Audit
 
-AI 生成或修改 DFM 后，先运行静态布局审计：
+After AI generates or modifies DFM, first run the static layout audit:
 
 ```python
 delphi_project(action="layout", base_dir="src")
@@ -26,35 +26,35 @@ delphi_project(action="layout", file_path="MainForm.dfm")
 delphi_project(action="layout", file_path="MainForm.dfm", output_format="json")
 ```
 
-`layout` 会读取文本 DFM，二进制 DFM 会尽量临时转换为文本；不修改原文件。审计依据是 DFM 属性和几何关系，不依赖固定控件类型名单。当前检查项：
+`layout` reads text DFM; binary DFM will be temporarily converted to text as much as possible; it does not modify the original file. The audit is based on DFM properties and geometric relationships, and does not depend on a fixed list of control types. Current check items:
 
-| 规则 | 检查内容 | 典型修复 |
+| Rule | Check content | Typical fix |
 |------|----------|----------|
-| LAYOUT-001 | 同一父容器内手工布局控件重叠 | 调整位置/尺寸，或用容器分区 |
-| LAYOUT-002 | 控件超出父容器边界 | 修正 Width/Height/Left/Top，或引入 ScrollBox |
-| LAYOUT-003 | 同列内容控件 Left 不一致 | 统一同列 Left |
-| LAYOUT-004 | 同列内容控件垂直间距不一致 | 统一行高和行间距 |
-| LAYOUT-005 | 文本标签与字段垂直中心未对齐 | 调整文本标签 Top 或字段 Top |
-| LAYOUT-006 | 文本标签与字段水平间距过大或过小 | 统一文本标签右边缘到字段左边缘间距 |
-| LAYOUT-007 | TabOrder 与视觉顺序不一致 | 重新设置 TabOrder |
-| LAYOUT-008 | 可调整大小的父容器使用绝对坐标，且最小尺寸不足 | 优先改用 Align；否则设置足够的 Constraints.MinWidth/MinHeight |
+| LAYOUT-001 | Manually laid out controls within the same parent container overlap | Adjust position/size, or use container partitioning |
+| LAYOUT-002 | Controls exceed the parent container boundary | Correct Width/Height/Left/Top, or introduce ScrollBox |
+| LAYOUT-003 | Controls with content in the same column have inconsistent Left | Unify Left in the same column |
+| LAYOUT-004 | Controls with content in the same column have inconsistent vertical spacing | Unify row height and row spacing |
+| LAYOUT-005 | Text labels are not vertically centered with fields | Adjust text label Top or field Top |
+| LAYOUT-006 | Horizontal spacing between text label and field is too large or too small | Unify the spacing from the right edge of the text label to the left edge of the field |
+| LAYOUT-007 | TabOrder is inconsistent with visual order | Reset TabOrder |
+| LAYOUT-008 | Resizable parent container uses absolute coordinates and the minimum size is insufficient | Prefer Align; otherwise set sufficient Constraints.MinWidth/MinHeight |
 
-### 生成规范
+### Generation Specification
 
-创建窗体时按以下顺序布局：
+When creating a form, lay out in the following order:
 
-1. 先确定内容区域：标题区、输入区、列表区、操作区、状态区。
-2. 每个区域使用独立容器，容器内部再放控件。
-3. 输入表单使用两列结构：文本标签列右对齐，字段列左对齐。
-4. 不用微调随机坐标；同一组控件的 Left、Top、Width、Height 使用统一数列。
-5. 表格、Memo、TreeView、ListView 这类主内容区域优先使用 `Align=alClient` 或 `Anchors=[akLeft, akTop, akRight, akBottom]`。
-6. 底部按钮区域保持固定高度，按钮按主次顺序排列，间距一致。
-7. 中文 Caption 预留足够宽度，不依赖 AutoSize 挤压相邻控件。
-8. 可调整大小的窗口中，元素优先通过 `Align` 和嵌套容器排布；若必须保留 `Left/Top` 绝对坐标，父容器的 `Constraints.MinWidth/MinHeight` 必须覆盖手工布局内容边界。
+1. First determine the content areas: title area, input area, list area, action area, status area.
+2. Use an independent container for each area, and place controls inside the container.
+3. Input forms use a two-column structure: the text label column is right-aligned, and the field column is left-aligned.
+4. Do not use randomly fine-tuned coordinates; use a unified set of numbers for Left, Top, Width, and Height of controls in the same group.
+5. For main content areas such as tables, Memo, TreeView, and ListView, prefer `Align=alClient` or `Anchors=[akLeft, akTop, akRight, akBottom]`.
+6. Keep the bottom button area at a fixed height; arrange buttons in primary/secondary order with consistent spacing.
+7. Reserve enough width for Chinese Caption; do not rely on AutoSize squeezing adjacent controls.
+8. In resizable windows, arrange elements preferentially through `Align` and nested containers; if `Left/Top` absolute coordinates must be retained, the parent container's `Constraints.MinWidth/MinHeight` must cover the manually laid out content boundaries.
 
-### 运行时验证
+### Runtime Verification
 
-静态审计通过后，再做真实运行时验证：
+After the static audit passes, perform real runtime verification:
 
 ```python
 automate_delphi(action="gui", app_path="App.exe", script=[
@@ -65,13 +65,14 @@ automate_delphi(action="gui", app_path="App.exe", script=[
 ])
 ```
 
-运行时重点验证：
+Key runtime verification points:
 
-- 100% / 125% / 150% DPI 下无重叠、截断、文字省略。
-- 主窗体缩放后，内容区域能伸缩，按钮和状态区不漂移。
-- 弹窗、向导页、TabSheet 内部也要单独审计，不能只看主窗体。
-- 自绘、WebView、ActiveX 等非 VCL 控件使用 `ocr(action="detect")` 检查文本框位置和截断。
+- No overlap, truncation, or text ellipsis under 100% / 125% / 150% DPI.
+- After the main form is resized, the content area can stretch, and buttons and status area do not drift.
+- Popups, wizard pages, and TabSheet interiors must also be audited separately; do not look only at the main form.
+- For non-VCL controls such as custom-drawn, WebView, and ActiveX, use `ocr(action="detect")` to check text box positions and truncation.
 
-### 审计结论
+### Audit Conclusion
 
-布局审计发现严重项时，不应继续交付界面。先修复重叠、越界、明显错位，再进行编译和自动化 UI 验证。
+When severe issues are found in the layout audit, delivery of the interface should not continue. First fix overlaps, out-of-bounds, and obvious misalignment, then proceed with compilation and automated UI verification.
+

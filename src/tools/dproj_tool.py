@@ -1,8 +1,8 @@
 """
-.dproj 项目文件管理工具
+.dproj project file management tool
 
-支持创建、查看、修改 .dproj 文件配置和源文件引用。
-自动备份到 __history 目录。
+Supports creating, viewing, and modifying .dproj file configurations and source file references.
+Automatically backs up to the __history directory.
 """
 
 import os
@@ -23,18 +23,18 @@ logger = get_logger(__name__)
 
 # MSBuild 命名空间
 MSBUILD_NS = "http://schemas.microsoft.com/developer/msbuild/2003"
-ET.register_namespace('', MSBUILD_NS)  # 防止写回时元素变成 ns0: 前缀（MSBuild 不认）
+ET.register_namespace('', MSBUILD_NS)  # Prevent elements from becoming ns0:-prefixed when written back (MSBuild does not accept it)
 
 
 def _ns(tag: str) -> str:
-    """给标签添加 MSBuild 命名空间前缀"""
+    """Add the MSBuild namespace prefix to a tag"""
     if tag.startswith("{"):
         return tag
     return f"{{{MSBUILD_NS}}}{tag}"
 
 
 def _require(val: Optional[str], name: str = "param") -> str:
-    """将 Optional[str] 断言为非 None，用于 entry 到 handler 的类型窄化"""
+    """Assert an Optional[str] is not None, used for type narrowing from entry to handler"""
     if val is None:
         raise ValueError(f"{name} is required")
     return val
@@ -111,7 +111,7 @@ def _coerce_platforms(platforms: Any) -> Optional[List[str]]:
 
 
 def _backup_file(file_path: str) -> Optional[str]:
-    """备份文件到 __history 目录，返回备份路径"""
+    """Back up a file to the __history directory, returning the backup path"""
     src = Path(file_path)
     if not src.exists():
         return None
@@ -125,44 +125,44 @@ def _backup_file(file_path: str) -> Optional[str]:
 
     try:
         shutil.copy2(str(src), str(backup_path))
-        logger.info(f"已备份 {file_path} → {backup_path}")
+        logger.info(f"Backed up {file_path} → {backup_path}")
         return str(backup_path)
     except Exception as e:
-        logger.error(f"备份失败: {e}")
+        logger.error(f"Backup failed: {e}")
         return None
 
 
 def _parse(file_path: str) -> Any:
-    """解析 .dproj 文件，返回 ElementTree 或 None"""
+    """Parse a .dproj file, returning an ElementTree or None"""
     try:
         tree = ET.parse(file_path)
         root = tree.getroot()
         if root is None:
-            logger.error(f"XML 根元素为空: {file_path}")
+            logger.error(f"XML root element is empty: {file_path}")
             return None
         if root.tag != _ns("Project"):
-            logger.error(f"根标签不是 Project: {root.tag}")
+            logger.error(f"Root tag is not Project: {root.tag}")
             return None
         return tree
     except ET.ParseError as e:
-        logger.error(f"解析 .dproj XML 失败: {e}")
+        logger.error(f"Failed to parse .dproj XML: {e}")
         return None
     except FileNotFoundError:
-        logger.error(f".dproj 文件不存在: {file_path}")
+        logger.error(f".dproj file does not exist: {file_path}")
         return None
     except PermissionError:
-        logger.error(f"无权限读取 .dproj 文件: {file_path}")
+        logger.error(f"No permission to read .dproj file: {file_path}")
         return None
     except OSError as e:
-        logger.error(f"读取 .dproj 文件 I/O 错误: {e}")
+        logger.error(f"I/O error reading .dproj file: {e}")
         return None
     except Exception as e:
-        logger.error(f"解析 .dproj 文件时发生意外错误: {e}")
+        logger.error(f"Unexpected error while parsing .dproj file: {e}")
         return None
 
 
 def _parse_tree(file_path: str) -> Any:
-    """解析 .dproj 文件，返回 (tree, root) 或 None"""
+    """Parse a .dproj file, returning (tree, root) or None"""
     tree = _parse(file_path)
     if tree is None:
         return None
@@ -173,10 +173,10 @@ def _parse_tree(file_path: str) -> Any:
 
 
 def _find_pg(root: ET.Element, config: Optional[str] = None, platform: Optional[str] = None) -> List[ET.Element]:
-    """查找匹配条件的 PropertyGroup。config/platform=None 时返回无条件组。"""
+    """Find PropertyGroups matching the criteria. When config/platform=None, returns unconditional groups."""
     groups = root.findall(_ns("PropertyGroup"))
     if config is None and platform is None:
-        # 返回第一个无条件 PropertyGroup
+        # Return the first unconditional PropertyGroup
         return [g for g in groups if not g.get("Condition")]
 
     result = []
@@ -193,7 +193,7 @@ def _find_pg(root: ET.Element, config: Optional[str] = None, platform: Optional[
 
 
 def _find_or_create(parent: ET.Element, tag: str) -> ET.Element:
-    """查找子元素，不存在则创建"""
+    """Find a child element, creating it if it does not exist"""
     full = _ns(tag)
     elem = parent.find(full)
     if elem is None:
@@ -202,17 +202,17 @@ def _find_or_create(parent: ET.Element, tag: str) -> ET.Element:
 
 
 def _find_or_create_item_group(root: ET.Element) -> ET.Element:
-    """查找第一个 ItemGroup，不存在则追加"""
+    """Find the first ItemGroup, appending one if it does not exist"""
     groups = root.findall(_ns("ItemGroup"))
     if groups:
         return groups[0]
-    # 追加到 Project 末尾（Import 之前）
+    # Append at the end of Project (before Import)
     elem = ET.SubElement(root, _ns("ItemGroup"))
     return elem
 
 
 def _find_dcc_ref(item_group: ET.Element, file_name: str) -> Optional[ET.Element]:
-    """在 ItemGroup 中按文件名查找 DCCReference"""
+    """Find a DCCReference in an ItemGroup by file name"""
     target = file_name.lower()
     for ref in item_group.findall(_ns("DCCReference")):
         inc = ref.get("Include", "")
@@ -222,21 +222,21 @@ def _find_dcc_ref(item_group: ET.Element, file_name: str) -> Optional[ET.Element
 
 
 # ──────────────────────────────────────────────
-# .dpk 同步工具（contains / requires）
+# .dpk sync utilities (contains / requires)
 # ──────────────────────────────────────────────
 
 def _get_dpk_path_from_dproj(dproj_path: str) -> Optional[str]:
-    """从 .dproj 文件获取对应的 .dpk 文件路径（仅 Package 项目）"""
+    """Get the corresponding .dpk file path from a .dproj file (Package projects only)"""
     try:
         tree = ET.parse(dproj_path)
         root = tree.getroot()
     except Exception:
         return None
 
-    # 检查 AppType 是否为 Package
+    # Check whether AppType is Package
     for pg in root.findall(_ns("PropertyGroup")):
         cond = pg.get("Condition", "")
-        if cond:  # 跳过有条件 PropertyGroup
+        if cond:  # Skip conditional PropertyGroups
             continue
         app = pg.find(_ns("AppType"))
         if app is not None and app.text and app.text.lower() == "package":
@@ -249,25 +249,25 @@ def _get_dpk_path_from_dproj(dproj_path: str) -> Optional[str]:
 
 
 def _dpk_parse_entries(dpk_path: str, section: str = "contains") -> List[str]:
-    """解析 .dpk 中 contains/requires 节的每一条文本
+    """Parse each text line of the contains/requires section in a .dpk
 
     Args:
-        dpk_path: .dpk 文件路径
-        section: 节名 "contains" 或 "requires"
+        dpk_path: .dpk file path
+        section: section name "contains" or "requires"
 
     Returns:
-        原始文本行列表（保留原始缩进），不含节头、节尾、注释、空行
+        List of raw text lines (preserving original indentation), excluding section headers, section terminators, comments, and blank lines
 
     Note:
-        停止条件因 section 不同而异：
-        - section="requires" 时遇到 "contains" 或 "end" 停止
-        - section="contains" 时遇到 "requires"（不会出现）或 "end" 停止
-        两种情况下空行也会触发停止判断（仅当上一条以 ";" 结束时真正 break）
+        The stop condition differs per section:
+        - section="requires" stops on "contains" or "end"
+        - section="contains" stops on "requires" (never occurs) or "end"
+        In both cases a blank line also triggers the stop check (it only really breaks when the previous entry ends with ";")
     """
     try:
         content = Path(dpk_path).read_text(encoding="utf-8-sig")
     except (FileNotFoundError, OSError):
-        logger.warning(f".dpk 文件不存在或无法读取: {dpk_path}")
+        logger.warning(f".dpk file does not exist or cannot be read: {dpk_path}")
         return []
     lines = content.splitlines()
     section_lower = section.lower()
@@ -280,14 +280,14 @@ def _dpk_parse_entries(dpk_path: str, section: str = "contains") -> List[str]:
         lower = stripped.lower()
 
         if in_section:
-            # 遇到 requires / end / 空行时尝试终止
-            # section="contains" 时 requires 不会出现（contains 在 requires 之后），
-            # 但通用解析器保留此条件以应对逆向排列的罕见情况
+            # Try to terminate on requires / end / blank line
+            # When section="contains", requires never appears (contains comes after requires),
+            # but the generic parser keeps this condition to handle rare reversed orderings
             if lower.startswith("requires") or lower.startswith("end") or lower == "":
                 if entries and entries[-1].rstrip().endswith(";"):
-                    break  # 完整条目结束
+                    break  # Complete entry finished
                 continue
-            # 跳过纯注释
+            # Skip pure comments
             if lower.startswith("{"):
                 continue
             entries.append(line)
@@ -299,14 +299,14 @@ def _dpk_parse_entries(dpk_path: str, section: str = "contains") -> List[str]:
 
 
 def _dpk_contains_entries(dpk_path: str) -> List[Tuple[str, str, str]]:
-    """解析 .dpk contains 条目
+    """Parse .dpk contains entries
 
     Args:
-        dpk_path: .dpk 文件路径
+        dpk_path: .dpk file path
 
     Returns:
-        列表，每项为 (原始行, 单元名, 文件路径)
-        文件路径中的 "/" 被统一替换为 "\\"
+        List where each item is (raw line, unit name, file path)
+        "/" in the file path is uniformly replaced with "\\"
     """
     raw = _dpk_parse_entries(dpk_path, "contains")
     pattern = re.compile(r"^\s*(\w+)\s+in\s+'([^']+)'\s*,?\s*;?\s*$", re.IGNORECASE)
@@ -319,13 +319,13 @@ def _dpk_contains_entries(dpk_path: str) -> List[Tuple[str, str, str]]:
 
 
 def _dpk_requires_entries(dpk_path: str) -> List[Tuple[str, str]]:
-    """解析 .dpk requires 条目
+    """Parse .dpk requires entries
 
     Args:
-        dpk_path: .dpk 文件路径
+        dpk_path: .dpk file path
 
     Returns:
-        列表，每项为 (原始行, 包名)
+        List where each item is (raw line, package name)
     """
     raw = _dpk_parse_entries(dpk_path, "requires")
     pattern = re.compile(r"^\s*(\w[\w.]*)\s*,?\s*;?\s*$")
@@ -338,19 +338,19 @@ def _dpk_requires_entries(dpk_path: str) -> List[Tuple[str, str]]:
 
 
 def _dpk_add_contains(dpk_path: str, source_file: str, unit_name: str) -> Optional[str]:
-    """向 .dpk contains 添加一条 '单元名 in '源文件路径',''
+    """Add an entry 'UnitName in 'SourceFilePath',' to .dpk contains
 
-    如果已存在（路径匹配）则返回 None。新条目始终到最后。
+    Returns None if it already exists (path match). New entries always go last.
 
     Args:
-        dpk_path: .dpk 文件路径
-        source_file: 源文件路径（如 Source\\Unit1.pas）
-        unit_name: 单元名（如 Unit1）
+        dpk_path: .dpk file path
+        source_file: source file path (e.g. Source\\Unit1.pas)
+        unit_name: unit name (e.g. Unit1)
 
     Returns:
-        备份路径（成功时），None（已存在或失败时）
+        Backup path (on success), None (already exists or on failure)
     """
-    # 检查是否已存在
+    # Check whether it already exists
     existing = _dpk_contains_entries(dpk_path)
     norm_path = source_file.replace("/", "\\")
     for _, _, fp in existing:
@@ -362,20 +362,20 @@ def _dpk_add_contains(dpk_path: str, source_file: str, unit_name: str) -> Option
     try:
         content = Path(dpk_path).read_text(encoding="utf-8-sig")
     except (FileNotFoundError, OSError):
-        logger.warning(f".dpk 文件不存在或无法读取: {dpk_path}")
+        logger.warning(f".dpk file does not exist or cannot be read: {dpk_path}")
         return None
 
     lines = content.splitlines()
     insert_idx = -1
     in_contains = False
     has_trailing_semicolon = False
-    last_entry_idx = -1  # 跟踪最后一条类似条目的行号（即使没有分隔符）
+    last_entry_idx = -1  # Track the line number of the last entry-like line (even without a separator)
 
     for i, line in enumerate(lines):
         lower = line.strip().lower()
         if in_contains:
             if lower.startswith("requires") or lower.startswith("end"):
-                # 如果有 contains 条目但没有分隔符，退回到 end. 前插入
+                # If there are contains entries but no separator, fall back to inserting before end.
                 if insert_idx == -1 and last_entry_idx >= 0:
                     insert_idx = i
                 break
@@ -384,7 +384,7 @@ def _dpk_add_contains(dpk_path: str, source_file: str, unit_name: str) -> Option
                 continue
             if stripped.startswith("{"):
                 continue
-            # 即使没有分号/逗号，也追踪条目的位置
+            # Even without a semicolon/comma, track the position of entries
             if re.match(r"^\s*(\w+)\s+in\s+'([^']+)'", line, re.IGNORECASE):
                 last_entry_idx = i
             if stripped.endswith(";"):
@@ -397,11 +397,11 @@ def _dpk_add_contains(dpk_path: str, source_file: str, unit_name: str) -> Option
             in_contains = True
 
     if insert_idx == -1:
-        # 没有 contains 节，追加
-        # 找到 end. 前面插入
+        # No contains section, append
+        # Find end. and insert before it
         for i, line in enumerate(lines):
             if line.strip().lower() == "end.":
-                # 在 end. 前插入 requires 和 contains
+                # Insert requires and contains before end.
                 indent = "  "
                 new_lines = [
                     "",
@@ -415,18 +415,18 @@ def _dpk_add_contains(dpk_path: str, source_file: str, unit_name: str) -> Option
                     lines.insert(i, nl)
                 break
         else:
-            return backup_path  # 无法解析
+            return backup_path  # Cannot parse
     else:
         indent = "  "
         suffix = ";"
         if has_trailing_semicolon:
-            # 把前一条的分号改逗号
+            # Change the previous entry's semicolon to a comma
             prev_line = lines[insert_idx - 1].rstrip()
             if prev_line.endswith(";"):
                 lines[insert_idx - 1] = prev_line[:-1] + ","
             suffix = ";"
         elif insert_idx > 0:
-            # 在前一条末尾加逗号
+            # Add a comma at the end of the previous entry
             prev_line = lines[insert_idx - 1].rstrip()
             if not prev_line.endswith(",") and not prev_line.endswith(";"):
                 lines[insert_idx - 1] = prev_line + ","
@@ -439,24 +439,24 @@ def _dpk_add_contains(dpk_path: str, source_file: str, unit_name: str) -> Option
 
 
 def _dpk_remove_contains(dpk_path: str, source_file: str) -> Optional[str]:
-    """从 .dpk contains 移除匹配源文件的条目，并修复末尾逗号/分号
+    """Remove entries matching the source file from .dpk contains, fixing the trailing comma/semicolon
 
     Args:
-        dpk_path: .dpk 文件路径
-        source_file: 源文件名（如 Unit1.pas）或完整路径
+        dpk_path: .dpk file path
+        source_file: source file name (e.g. Unit1.pas) or full path
 
     Returns:
-        备份路径（成功时），None（未找到或失败时）
+        Backup path (on success), None (not found or on failure)
     """
     norm_path = source_file.replace("/", "\\").lower()
     try:
         content = Path(dpk_path).read_text(encoding="utf-8-sig")
     except (FileNotFoundError, OSError):
-        logger.warning(f".dpk 文件不存在或无法读取: {dpk_path}")
+        logger.warning(f".dpk file does not exist or cannot be read: {dpk_path}")
         return None
     lines = content.splitlines()
 
-    # 用解析匹配定位要删除的行，避免字符串全等问题
+    # Locate lines to delete via parsed matching to avoid string equality issues
     remove_indices: set[int] = set()
     in_contains = False
     for i, line in enumerate(lines):
@@ -478,10 +478,10 @@ def _dpk_remove_contains(dpk_path: str, source_file: str) -> Optional[str]:
 
     backup_path = _backup_file(dpk_path)
 
-    # 删除行
+    # Delete the lines
     new_lines = [line for i, line in enumerate(lines) if i not in remove_indices]
 
-    # 修复分隔符：查找 contains 中剩余的最后一个条目，确保其以 ";" 结尾
+    # Fix separators: find the last remaining entry in contains and make sure it ends with ";"
     in_contains = False
     last_contains_idx = -1
     for i, line in enumerate(new_lines):
@@ -508,18 +508,18 @@ def _dpk_remove_contains(dpk_path: str, source_file: str) -> Optional[str]:
 
 
 def _dpk_add_requires(dpk_path: str, package_name: str) -> Optional[str]:
-    """向 .dpk requires 添加包依赖
+    """Add a package dependency to .dpk requires
 
-    自动检测新条目是否是最后一条（下一行为 contains/end），
-    是则用 ";" 结尾，否则用 ","。
-    #2 已存在（同名匹配）则返回 None。
+    Automatically detects whether the new entry is the last one (next line is contains/end);
+    if so it ends with ";", otherwise with ",".
+    #2 Returns None if it already exists (same-name match).
 
     Args:
-        dpk_path: .dpk 文件路径
-        package_name: 包名（如 vcl、rtl）
+        dpk_path: .dpk file path
+        package_name: package name (e.g. vcl, rtl)
 
     Returns:
-        备份路径（成功时），None（已存在时）
+        Backup path (on success), None (if it already exists)
     """
     existing = _dpk_requires_entries(dpk_path)
     for _, name in existing:
@@ -530,7 +530,7 @@ def _dpk_add_requires(dpk_path: str, package_name: str) -> Optional[str]:
     try:
         content = Path(dpk_path).read_text(encoding="utf-8-sig")
     except (FileNotFoundError, OSError):
-        logger.warning(f".dpk 文件不存在或无法读取: {dpk_path}")
+        logger.warning(f".dpk file does not exist or cannot be read: {dpk_path}")
         return None
     lines = content.splitlines()
     insert_idx = -1
@@ -552,7 +552,7 @@ def _dpk_add_requires(dpk_path: str, package_name: str) -> Optional[str]:
             in_requires = True
 
     if insert_idx == -1:
-        # 没有 requires 节，在 end. 前插入
+        # No requires section, insert before end.
         for i, line in enumerate(lines):
             if line.strip().lower() == "end.":
                 new_lines = ["", "requires", f"  {package_name};"]
@@ -560,13 +560,13 @@ def _dpk_add_requires(dpk_path: str, package_name: str) -> Optional[str]:
                     lines.insert(i, nl)
                 break
     else:
-        # 判断新条目是否是最后一条（下一行为 contains/end）
+        # Determine whether the new entry is the last one (next line is contains/end)
         is_last = True
         if insert_idx < len(lines):
             next_line = lines[insert_idx].strip().lower()
             if not (next_line.startswith("contains") or next_line.startswith("end") or next_line == ""):
                 is_last = False
-        # 前一条改逗号（只有前一条以分号结束时需要）
+        # Change the previous entry to a comma (only needed when the previous entry ends with a semicolon)
         if insert_idx > 0:
             prev = lines[insert_idx - 1].rstrip()
             if prev.endswith(";"):
@@ -581,17 +581,18 @@ def _dpk_add_requires(dpk_path: str, package_name: str) -> Optional[str]:
 
 
 def _dpk_remove_requires(dpk_path: str, package_name: str) -> Optional[str]:
-    """从 .dpk requires 移除包依赖
+    """Remove a package dependency from .dpk requires
 
-    工具函数，当前未在 handler 中自动调用（requires 由用户手动管理，
-    不随源码文件增删自动变化）。供脚本/手动调用使用。
+    Utility function; currently not called automatically from handlers (requires is
+    managed manually by the user and does not change automatically with source file
+    additions/removals). Provided for script/manual use.
 
     Args:
-        dpk_path: .dpk 文件路径
-        package_name: 包名
+        dpk_path: .dpk file path
+        package_name: package name
 
     Returns:
-        备份路径（成功时），None（未找到时）
+        Backup path (on success), None (not found)
     """
     existing = _dpk_requires_entries(dpk_path)
     to_remove = [line for line, name in existing if name.lower() == package_name.lower()]
@@ -614,11 +615,11 @@ def _dpk_remove_requires(dpk_path: str, package_name: str) -> Optional[str]:
 
 
 # ──────────────────────────────────────────────
-# 各 action handler
+# Per-action handlers
 # ──────────────────────────────────────────────
 
 def _infer_app_type(framework_type: str, app_type: Optional[str] = None) -> str:
-    """推断 AppType，默认 Application"""
+    """Infer AppType, defaulting to Application"""
     if app_type:
         return app_type
     if framework_type == "None":
@@ -627,23 +628,23 @@ def _infer_app_type(framework_type: str, app_type: Optional[str] = None) -> str:
 
 
 def _sanitized_project_name(main_source: str) -> str:
-    """从主源文件名中提取项目名（去除扩展名）"""
+    """Extract the project name from the main source file name (removing the extension)"""
     return Path(main_source).stem
 
 
 def _default_namespace(framework_type: str) -> str:
-    """根据框架类型返回默认命名空间"""
+    """Return the default namespace based on the framework type"""
     if framework_type == "VCL":
         return "System;System.Win;Winapi;Xml;Data;Datasnap;Web;Soap;Vcl"
     elif framework_type == "FMX":
         return "System;System.Win;Winapi;Xml;Data;Datasnap;Web;Soap;FMX"
     else:
-        # None (Console / Library / Package) — 无 GUI 引用
+        # None (Console / Library / Package) — no GUI references
         return "System;Xml;Data;Datasnap;Web;Soap"
 
 
 def _is_package(app_type: str) -> bool:
-    """判断是否为组件包"""
+    """Determine whether this is a component package"""
     return app_type.lower() == "package"
 
 
@@ -658,21 +659,21 @@ def _add_property_group_hierarchy(
     unit_search_paths: Optional[List[str]] = None,
     old_format: bool = False,
 ) -> None:
-    """构建 Delphi .dproj 的 PropertyGroup 继承层次结构
+    """Build the PropertyGroup inheritance hierarchy for a Delphi .dproj
 
-    old_format=True 时跳过所有平台子 PG（适用于 ProjectVersion < 17.0 的早期项目）。
+    When old_format=True, all platform sub-PGs are skipped (suitable for older projects with ProjectVersion < 17.0).
 
-    输出 PropertyGroup 顺序：
+    Output PropertyGroup order:
       1. Base config PG
       2. Base + platform PGs (skip if old_format)
       3. Cfg_1 config PG
       4. Cfg_1 + platform PGs (skip if old_format)
       5. Cfg_2 config PG
       6. Cfg_2 + platform PGs (skip if old_format)
-      7. '$(Base)'!='' — 共享项目属性
-      8. '$(Base_{platform})'!='' — 各平台专属共享属性 (skip if old_format)
-      9. '$(Cfg_1)'!='' — Cfg_1 编译属性
-      10. '$(Cfg_2)'!='' — Cfg_2 编译属性
+      7. '$(Base)'!='' — shared project properties
+      8. '$(Base_{platform})'!='' — per-platform shared properties (skip if old_format)
+      9. '$(Cfg_1)'!='' — Cfg_1 compile properties
+      10. '$(Cfg_2)'!='' — Cfg_2 compile properties
     """
 
     is_pkg = _is_package(app_type)
@@ -750,7 +751,7 @@ def _add_property_group_hierarchy(
                 ET.SubElement(pg_cfg2p, _ns("Cfg_2")).text = "true"
                 ET.SubElement(pg_cfg2p, _ns("Base")).text = "true"
 
-    # ── 7. '$(Base)'!='' — 共享项目属性 ──
+    # ── 7. '$(Base)'!='' — shared project properties ──
     pg_base_shared = ET.SubElement(root, _ns("PropertyGroup"))
     pg_base_shared.set("Condition", "'$(Base)'!=''")
     ET.SubElement(pg_base_shared, _ns("SanitizedProjectName")).text = project_name
@@ -758,7 +759,7 @@ def _add_property_group_hierarchy(
     ET.SubElement(pg_base_shared, _ns("DCC_DcuOutput")).text = ".\\$(Platform)\\$(Config)"
     ET.SubElement(pg_base_shared, _ns("DCC_ExeOutput")).text = ".\\$(Platform)\\$(Config)"
 
-    # DCC_E/N/S/F/K — Package 与 App 不同
+    # DCC_E/N/S/F/K — differs between Package and App
     if is_pkg:
         ET.SubElement(pg_base_shared, _ns("DCC_E")).text = "false"
         ET.SubElement(pg_base_shared, _ns("DCC_N")).text = "false"
@@ -779,7 +780,7 @@ def _add_property_group_hierarchy(
         ET.SubElement(
             pg_base_shared, _ns("DCC_DcpOutput")
         ).text = ".\\$(Platform)\\$(Config)"
-        # 包签名元素
+        # Package signature elements
         ET.SubElement(pg_base_shared, _ns("GenPackage")).text = "true"
         ET.SubElement(pg_base_shared, _ns("RuntimeOnlyPackage")).text = "true"
         ET.SubElement(pg_base_shared, _ns("GenDll")).text = "true"
@@ -795,7 +796,7 @@ def _add_property_group_hierarchy(
             pg_base_shared, _ns("DCC_UnitSearchPath")
         ).text = ";".join(unit_search_paths)
 
-    # ── 8. '$(Base_{platform})'!='' — 各平台专属共享属性 ──
+    # ── 8. '$(Base_{platform})'!='' — per-platform shared properties ──
     if not old_format:
         for plat in platforms:
             pg_bp_shared = ET.SubElement(root, _ns("PropertyGroup"))
@@ -815,19 +816,19 @@ def _add_property_group_hierarchy(
                     pg_bp_shared, _ns("Manifest_File")
                 ).text = "$(BDS)\\bin\\default_app.manifest"
             elif app_type == "Library":
-                pass  # DLL 通常没有 manifest
+                pass  # DLLs usually have no manifest
 
             if app_type == "Library":
                 ET.SubElement(pg_bp_shared, _ns("GenDll")).text = "true"
 
-            # BT_BuildType: IDE 调试辅助
+            # BT_BuildType: IDE debugging aid
             ET.SubElement(pg_bp_shared, _ns("BT_BuildType")).text = "Debug"
 
-            # DCC_ConsoleTarget: Console 应用
+            # DCC_ConsoleTarget: Console application
             if is_console:
                 ET.SubElement(pg_bp_shared, _ns("DCC_ConsoleTarget")).text = "true"
 
-    # ── 9. Cfg_1 专属编译属性 (configs[0]) ──
+    # ── 9. Cfg_1 specific compile properties (configs[0]) ──
     cfg1_debug = _cfg_is_debug(cfg1_name)
     cfg1_release = _cfg_is_release(cfg1_name)
     pg_cfg1_props = ET.SubElement(root, _ns("PropertyGroup"))
@@ -852,7 +853,7 @@ def _add_property_group_hierarchy(
         ET.SubElement(pg_cfg1_props, _ns("DCC_Optimize")).text = "true"
         ET.SubElement(pg_cfg1_props, _ns("DCC_DebugInfoInExe")).text = "true"
 
-    # ── 10. Cfg_2 专属编译属性 (configs[1], if exists) ──
+    # ── 10. Cfg_2 specific compile properties (configs[1], if exists) ──
     if len(configs) > 1:
         cfg2_name = configs[1]
         cfg2_debug = _cfg_is_debug(cfg2_name)
@@ -879,10 +880,10 @@ def _add_property_group_hierarchy(
 
 
 def _form_class_name(form_name: str) -> str:
-    """根据表单短名生成标准 Form 类名。
+    """Generate the standard Form class name from a form short name.
 
     form_units=["Main"] → TMainForm
-    form_units=["Unit1"] → TForm1（兼容 Delphi IDE 惯例）
+    form_units=["Unit1"] → TForm1 (compatible with Delphi IDE conventions)
     """
     m = re.match(r'^Unit(\d+)$', form_name, re.IGNORECASE)
     if m:
@@ -891,7 +892,7 @@ def _form_class_name(form_name: str) -> str:
 
 
 def _form_var_name(form_name: str) -> str:
-    """根据表单短名生成 Form 全局变量名。
+    """Generate the Form global variable name from a form short name.
 
     form_units=["Main"] → MainForm
     form_units=["Unit1"] → Form1
@@ -902,13 +903,13 @@ def _form_var_name(form_name: str) -> str:
     return f"{form_name}Form"
 
 
-# Form 单元文件名前缀（仿 Delphi Vcl.Forms.pas 命名风格）
-# form_units=["Main"] → 文件 Form.Main.pas，单元 Form.Main
+# Form unit file name prefix (mimicking the Delphi Vcl.Forms.pas naming style)
+# form_units=["Main"] → file Form.Main.pas, unit Form.Main
 _FORM_UNIT_PREFIX: str = "Form."
 
 
 def _form_file_stem(form_name: str) -> str:
-    """将 form_units 中的短名转为带前缀的文件主干名。
+    """Convert a short name from form_units into a prefixed file stem name.
 
     Example: "Main" → "Form.Main"
     """
@@ -916,7 +917,7 @@ def _form_file_stem(form_name: str) -> str:
 
 
 def _form_var_name(form_name: str) -> str:
-    """根据表单短名生成 Form 全局变量名。
+    """Generate the Form global variable name from a form short name.
 
     form_units=["Main"] → MainForm
     form_units=["Unit1"] → Form1
@@ -928,16 +929,16 @@ def _form_var_name(form_name: str) -> str:
 
 
 def _generate_form_pas(project_dir: str, form_name: str, framework_type: str) -> str:
-    """生成最小 Form 单元 .pas 文件内容。
+    """Generate minimal Form unit .pas file content.
 
-    文件命名遵循 Form.{Name}.pas 风格，如 Form.Main.pas。
-    form_name 为表单短名（如 "Main"），类名自动为 T{Name}Form。
+    File naming follows the Form.{Name}.pas style, e.g. Form.Main.pas.
+    form_name is the form short name (e.g. "Main"); the class name is automatically T{Name}Form.
 
-    Returns: 写入的文件路径
+    Returns: the path of the written file
     """
     cls_name = _form_class_name(form_name)
     var_name = _form_var_name(form_name)
-    file_stem = _form_file_stem(form_name)   # 如 Form.Main
+    file_stem = _form_file_stem(form_name)   # e.g. Form.Main
     file_path = Path(project_dir) / f"{file_stem}.pas"
 
     if file_path.exists():
@@ -990,12 +991,10 @@ def _generate_form_pas(project_dir: str, form_name: str, framework_type: str) ->
 
     _guarded_write_text(file_path, pas_content, encoding="utf-8-sig")
     return str(file_path)
-
-
 def _generate_form_dfm(project_dir: str, form_name: str, framework_type: str) -> str:
-    """生成最小 Form 单元 .dfm/.fmx 文件内容（空 Form，不含任何组件）。
+    """Generate minimal Form unit .dfm/.fmx file content (empty Form, no components).
 
-    Returns: 写入的文件路径
+    Returns: path of the file written
     """
     cls_name = _form_class_name(form_name)
     var_name = _form_var_name(form_name)
@@ -1030,9 +1029,9 @@ def _generate_dpr(
     framework_type: str,
     app_type: str,
 ) -> str:
-    """生成最小 .dpr 文件。
+    """Generate a minimal .dpr file.
 
-    Returns: 写入的文件路径
+    Returns: path of the file written
     """
     dpr_path = Path(project_dir) / main_source
     if dpr_path.exists():
@@ -1085,16 +1084,16 @@ async def _handle_create(
     platforms: Optional[List[str]] = None,
     form_units: Optional[List[str]] = None,
 ) -> CallToolResult:
-    """创建新的 .dproj 文件（IDE 兼容格式）。
+    """Create a new .dproj file (IDE-compatible format).
 
-    若指定 form_units，还会自动生成最小桩代码：
-      - .pas（含 published TForm 子类声明 + 标准 uses）
-      - .dfm/.fmx（空 Form，不含组件，框架由 framework_type 决定）
-      - .dpr（含 uses + CreateForm 调用）
+    If form_units is specified, minimal stub code is also generated automatically:
+      - .pas (with published TForm subclass declaration + standard uses)
+      - .dfm/.fmx (empty Form, no components, framework determined by framework_type)
+      - .dpr (with uses + CreateForm calls)
     """
     if Path(project_path).exists():
         return CallToolResult(
-            content=[TextContent(type="text", text=f"文件已存在: {project_path}")],
+            content=[TextContent(type="text", text=f"File already exists: {project_path}")],
             isError=True,
         )
 
@@ -1108,7 +1107,7 @@ async def _handle_create(
         if not project_guid.endswith("}"):
             project_guid = project_guid + "}"
 
-    # 未指定 project_version 时自动检测当前 Delphi 编译器版本
+    # When project_version is not specified, auto-detect the current Delphi compiler version
     if not project_version:
         try:
             from ..services.config_manager import ConfigManager
@@ -1118,8 +1117,9 @@ async def _handle_create(
                 normalize_version_key,
                 registry_to_project_version,
             )
-            # 工作区/父目录的项目配置优先：在旧版 Delphi 工程目录下新建工程，
-            # 不应默认写成最新安装版本的 ProjectVersion。
+            # Project config of the workspace/parent directory takes priority: when creating a
+            # new project under an old Delphi project directory, it should not default to the
+            # ProjectVersion of the newest installed version.
             settings = load_project_settings(str(Path(project_path).parent))
             if settings and settings.delphi_version:
                 project_version = registry_to_project_version(settings.delphi_version)
@@ -1127,7 +1127,7 @@ async def _handle_create(
             if not project_version and settings and settings.compiler_version:
                 compiler = cm.get_compiler(settings.compiler_version)
                 if not compiler:
-                    # compiler_version 也可能是版本号/产品名
+                    # compiler_version may also be a version number/product name
                     version_hint = normalize_version_key(settings.compiler_version)
                     if version_hint:
                         compiler = cm.get_compiler_by_registry_version(version_hint)
@@ -1144,14 +1144,14 @@ async def _handle_create(
                 if registry_version:
                     project_version = registry_to_project_version(registry_version)
         except Exception as exc:
-            logger.warning(f"自动检测编译器版本失败: {exc}")
+            logger.warning(f"Failed to auto-detect compiler version: {exc}")
 
     if not project_version:
         return CallToolResult(
             content=[
                 TextContent(
                     type="text",
-                    text="未检测到 Delphi ProjectVersion，请传入 project_version 参数",
+                    text="No Delphi ProjectVersion detected, please pass the project_version parameter",
                 )
             ],
             isError=True,
@@ -1169,7 +1169,7 @@ async def _handle_create(
     project_name = _sanitized_project_name(main_source)
     is_pkg = _is_package(resolved_app_type)
 
-    # 根据 ProjectVersion 判断是否使用旧格式（< 17.0 = pre-XE3 简化格式）
+    # Determine whether to use the old format based on ProjectVersion (< 17.0 = pre-XE3 simplified format)
     try:
         project_ver = float(project_version)
     except ValueError:
@@ -1179,7 +1179,7 @@ async def _handle_create(
     ET.register_namespace("", MSBUILD_NS)
     root = ET.Element(_ns("Project"))
 
-    # ── Header PropertyGroup（项目基本信息） ──
+    # ── Header PropertyGroup (basic project info) ──
     pg = ET.SubElement(root, _ns("PropertyGroup"))
     ET.SubElement(pg, _ns("ProjectGuid")).text = project_guid
     ET.SubElement(pg, _ns("MainSource")).text = main_source
@@ -1197,17 +1197,17 @@ async def _handle_create(
     plat_elem.text = primary_plat
 
     if old_format:
-        # 旧格式：无 TargetedPlatforms，带 DCC_DCCCompiler
+        # Old format: no TargetedPlatforms, with DCC_DCCCompiler
         if primary_plat == "Win32":
             ET.SubElement(pg, _ns("DCC_DCCCompiler")).text = "DCC32"
     else:
-        # 现代格式：位掩码 — 1=Win32, 2=Win64, 4=OSX64, 8=iOSDevice64, ...
+        # Modern format: bitmask — 1=Win32, 2=Win64, 4=OSX64, 8=iOSDevice64, ...
         targeted_mask = _compute_targeted_platforms_mask(platforms)
         ET.SubElement(pg, _ns("TargetedPlatforms")).text = str(targeted_mask)
         if primary_plat == "Win32" and resolved_app_type in ("Console", "Library"):
             ET.SubElement(pg, _ns("DCC_DCCCompiler")).text = "DCC32"
 
-    # ── PropertyGroup 继承层次 ──
+    # ── PropertyGroup inheritance hierarchy ──
     _add_property_group_hierarchy(
         root=root,
         project_name=project_name,
@@ -1220,13 +1220,13 @@ async def _handle_create(
         old_format=old_format,
     )
 
-    # ── ItemGroup（源文件引用 + BuildConfiguration） ──
+    # ── ItemGroup (source file references + BuildConfiguration) ──
     ig = ET.SubElement(root, _ns("ItemGroup"))
 
-    # DelphiCompile（Package 项目也需要，参考 GR32_R.dproj）
+    # DelphiCompile (also required for Package projects, see GR32_R.dproj)
     dc = ET.SubElement(ig, _ns("DelphiCompile"))
     if old_format:
-        # 旧格式使用字面量文件名（参考 HCL D2010, FlexCel D2007）
+        # Old format uses a literal filename (see HCL D2010, FlexCel D2007)
         dc.set("Include", main_source)
     else:
         dc.set("Include", "$(MainSource)")
@@ -1237,7 +1237,7 @@ async def _handle_create(
             ref = ET.SubElement(ig, _ns("DCCReference"))
             ref.set("Include", src)
 
-    # BuildConfiguration 条目（先 Base，然后各 config）
+    # BuildConfiguration entries (Base first, then each config)
     bc_base = ET.SubElement(ig, _ns("BuildConfiguration"))
     bc_base.set("Include", "Base")
     ET.SubElement(bc_base, _ns("Key")).text = "Base"
@@ -1253,8 +1253,8 @@ async def _handle_create(
         ET.SubElement(bc, _ns("CfgParent")).text = "Base"
 
     # ── ProjectExtensions ──
-    # IDE 需要 Borland.Personality 来识别项目类型，
-    # 否则报 "Generic.Personality is not available"
+    # The IDE needs Borland.Personality to recognize the project type,
+    # otherwise it reports "Generic.Personality is not available"
     pe = ET.SubElement(root, _ns("ProjectExtensions"))
     bp = ET.SubElement(pe, _ns("Borland.Personality"))
     bp.text = "Delphi.Personality.12"
@@ -1311,12 +1311,12 @@ async def _handle_create(
     tree = ET.ElementTree(root)
     _guarded_tree_write(tree, project_path, encoding="utf-8", xml_declaration=True)
 
-    # ── 生成 Form 单元桩代码（仅在用户显式传入 form_units 时） ──
+    # ── Generate Form unit stub code (only when the user explicitly passes form_units) ──
     project_dir = str(Path(project_path).parent)
     generated_files: List[str] = []
 
     if form_units:
-        # 将 form_units 自动加入 sources（如尚未包含）
+        # Automatically add form_units to sources (if not already included)
         sources = list(sources or [])
         names_in_sources = {Path(s).name for s in sources}
         resolved_app_type = _infer_app_type(framework_type, app_type)
@@ -1327,24 +1327,24 @@ async def _handle_create(
             pas_file = f"{file_stem}.pas"
             if pas_file not in names_in_sources:
                 sources.append(pas_file)
-                # 同时更新已写入的 .dproj
+                # Also update the already-written .dproj
                 ig = root.find(f"{_ns('ItemGroup')}")
                 if ig is not None:
                     ref = ET.SubElement(ig, _ns("DCCReference"))
                     ref.set("Include", pas_file)
 
-            # 生成 .pas
+            # Generate .pas
             pas_path = _generate_form_pas(project_dir, form_name, framework_type)
             generated_files.append(pas_path)
 
-            # 生成 .dfm/.fmx（空 Form，不含组件）
+            # Generate .dfm/.fmx (empty Form, no components)
             dfm_path = _generate_form_dfm(project_dir, form_name, framework_type)
             generated_files.append(dfm_path)
 
-        # 重写 .dproj（更新 sources 后）
+        # Rewrite the .dproj (after updating sources)
         _guarded_tree_write(tree, project_path, encoding="utf-8", xml_declaration=True)
 
-        # 生成 .dpr（仅当不存在时）
+        # Generate .dpr (only when it does not exist)
         dpr_path = _generate_dpr(
             project_dir, main_source, form_units, framework_type, app_type,
         )
@@ -1352,7 +1352,7 @@ async def _handle_create(
             generated_files.append(dpr_path)
 
     generated_summary = (
-        f"\n生成 {len(generated_files)} 个桩文件:\n"
+        f"\nGenerated {len(generated_files)} stub files:\n"
         + "\n".join(f"  ⚡ {f}" for f in generated_files)
         if generated_files
         else ""
@@ -1362,13 +1362,13 @@ async def _handle_create(
         content=[
             TextContent(
                 type="text",
-                text=f"✅ 已创建 .dproj 文件: {project_path}\n"
-                f"主源文件: {main_source}\n"
-                f"项目类型: {resolved_app_type}\n"
-                f"框架: {framework_type}\n"
-                f"配置: {', '.join(configs)}\n"
-                f"平台: {', '.join(platforms)}\n"
-                f"源文件引用 ({len(sources or [])} 个): {', '.join(sources or [])}"
+                text=f"✅ Created .dproj file: {project_path}\n"
+                f"Main source: {main_source}\n"
+                f"Project type: {resolved_app_type}\n"
+                f"Framework: {framework_type}\n"
+                f"Configs: {', '.join(configs)}\n"
+                f"Platforms: {', '.join(platforms)}\n"
+                f"Source file references ({len(sources or [])}): {', '.join(sources or [])}"
                 f"{generated_summary}",
             )
         ],
@@ -1377,9 +1377,9 @@ async def _handle_create(
 
 
 def _compute_targeted_platforms_mask(platforms: List[str]) -> int:
-    """计算 TargetedPlatforms 位掩码
+    """Compute the TargetedPlatforms bitmask
 
-    Delphi/MSBuild 定义：
+    As defined by Delphi/MSBuild:
       1=Win32, 2=Win64, 4=OSX32, 8=OSX64/arm64,
       16=iOSDevice32, 32=iOSDevice64, 64=iOSSimulator,
       128=Android, 256=Linux64
@@ -1405,32 +1405,32 @@ def _compute_targeted_platforms_mask(platforms: List[str]) -> int:
 
 
 async def _handle_info(project_path: str) -> CallToolResult:
-    """读取 .dproj 文件完整信息"""
+    """Read complete .dproj file information"""
     path_obj = Path(project_path)
 
-    # .dpr/.dpk → 自动转换为对应的 .dproj 路径
+    # .dpr/.dpk → automatically convert to the corresponding .dproj path
     if path_obj.suffix.lower() in ('.dpr', '.dpk'):
         dproj_path = path_obj.with_suffix('.dproj')
         if dproj_path.exists():
             project_path = str(dproj_path)
         else:
-            # 无对应 .dproj，返回 .dpr 基础信息
+            # No corresponding .dproj; return basic .dpr information
             try:
                 content = path_obj.read_text(encoding='utf-8-sig', errors='replace')
             except Exception:
                 content = ''
             lines_out = [
-                f"📄 文件: {project_path}",
-                f"状态: 独立的 .dpr/.dpk 文件，无对应 .dproj 项目文件",
+                f"📄 File: {project_path}",
+                f"Status: standalone .dpr/.dpk file, no corresponding .dproj project file",
                 "",
             ]
-            # 提取源文件类型（program/library/package）
+            # Extract source file type (program/library/package)
             for line in content.split('\n'):
                 stripped = line.strip()
                 if stripped.startswith(('program ', 'library ', 'package ')):
-                    lines_out.append(f"类型: {stripped.split()[0]}")
+                    lines_out.append(f"Type: {stripped.split()[0]}")
                     break
-            # 提取 uses 子句
+            # Extract the uses clause
             in_uses = False
             uses_items = []
             for line in content.split('\n'):
@@ -1451,9 +1451,9 @@ async def _handle_info(project_path: str) -> CallToolResult:
             if uses_items:
                 uses_joined = ' '.join(uses_items)
                 parts = [u.strip() for u in uses_joined.split(',') if u.strip()]
-                lines_out.append(f"引用的单元 ({len(parts)} 个): {', '.join(parts[:30])}{'...' if len(parts) > 30 else ''}")
+                lines_out.append(f"Referenced units ({len(parts)}): {', '.join(parts[:30])}{'...' if len(parts) > 30 else ''}")
             lines_out.append("")
-            lines_out.append(f"💡 可通过 delphi_project(action='create', project_path='{dproj_path}', main_source='{path_obj.name}') 创建对应的 .dproj")
+            lines_out.append(f"💡 You can create the corresponding .dproj via delphi_project(action='create', project_path='{dproj_path}', main_source='{path_obj.name}')")
 
             return CallToolResult(
                 content=[TextContent(type="text", text="\n".join(lines_out))],
@@ -1463,7 +1463,7 @@ async def _handle_info(project_path: str) -> CallToolResult:
     parser = DprojParser(project_path)
     if not parser.parse():
         return CallToolResult(
-            content=[TextContent(type="text", text=f"解析 .dproj 失败: {project_path}")],
+            content=[TextContent(type="text", text=f"Failed to parse .dproj: {project_path}")],
             isError=True,
         )
 
@@ -1478,7 +1478,7 @@ async def _handle_info(project_path: str) -> CallToolResult:
     build_events = parser.get_build_events()
     resources = parser.get_resource_items()
 
-    # 读原始 XML 获取源文件列表
+    # Read the raw XML to get the source file list
     tree = _parse(project_path)
     sources: List[str] = []
     if tree is not None:
@@ -1495,7 +1495,7 @@ async def _handle_info(project_path: str) -> CallToolResult:
                     tag = " [DelphiCompile]" + (f" → {ms.text}" if ms is not None else "")
                     sources.append(f"{inc}{tag}")
 
-    # 每个配置有哪些 PropertyGroup
+    # Which PropertyGroups each configuration has
     tree2 = _parse(project_path)
     config_props: List[str] = []
     if tree2 is not None:
@@ -1512,34 +1512,34 @@ async def _handle_info(project_path: str) -> CallToolResult:
                 config_props.append(f"    {p}")
 
     lines = [
-        f"📄 项目文件: {project_path}",
-        f"主源文件: {main_source or 'N/A'}",
-        f"项目 GUID: {info.get('project_guid', 'N/A')}",
-        f"项目版本: {project_version or 'N/A'}",
-        f"框架类型: {info.get('framework_type', 'N/A')}",
-        f"目标平台: {platform or 'N/A'}",
+        f"📄 Project file: {project_path}",
+        f"Main source: {main_source or 'N/A'}",
+        f"Project GUID: {info.get('project_guid', 'N/A')}",
+        f"Project version: {project_version or 'N/A'}",
+        f"Framework type: {info.get('framework_type', 'N/A')}",
+        f"Target platform: {platform or 'N/A'}",
         "",
-        "── 编译配置 ──",
+        "── Build configurations ──",
     ]
     if config_props:
         lines.extend(config_props)
     else:
-        lines.append("  (无条件编译配置)")
+        lines.append("  (no conditional build configurations)")
 
     lines.append("")
-    lines.append(f"条件编译符号: {'; '.join(conditional_defines) if conditional_defines else '(无)'}")
+    lines.append(f"Conditional defines: {'; '.join(conditional_defines) if conditional_defines else '(none)'}")
 
     if search_paths:
-        lines.append(f"单元搜索路径 ({len(search_paths)} 个):")
+        lines.append(f"Unit search paths ({len(search_paths)}):")
         for p in search_paths:
             lines.append(f"  - {p}")
 
-    lines.append(f"命名空间: {namespaces or '(无)'}")
-    lines.append(f"调试器参数: {debugger_params or '(无)'}")
+    lines.append(f"Namespace: {namespaces or '(none)'}")
+    lines.append(f"Debugger parameters: {debugger_params or '(none)'}")
 
     if build_events and any(v for v in build_events.values()):
         lines.append("")
-        lines.append("── 编译事件 ──")
+        lines.append("── Build events ──")
         event_labels = {
             "pre_build": "PreBuildEvent",
             "pre_link": "PreLinkEvent",
@@ -1551,13 +1551,13 @@ async def _handle_info(project_path: str) -> CallToolResult:
                 lines.append(f"  {label}: {val}")
 
     lines.append("")
-    lines.append(f"── 源文件 ({len(sources)} 个) ──")
+    lines.append(f"── Source files ({len(sources)}) ──")
     for s in sources:
         lines.append(f"  {s}")
 
     if resources:
         lines.append("")
-        lines.append(f"── 资源文件 ({len(resources)} 个) ──")
+        lines.append(f"── Resource files ({len(resources)}) ──")
         for r in resources:
             lines.append(f"  {r.get('include')} → ID={r.get('resource_id')}, Type={r.get('resource_type')}")
 
@@ -1574,17 +1574,17 @@ async def _handle_set(
     config: Optional[str] = None,
     platform: Optional[str] = None,
 ) -> CallToolResult:
-    """设置 .dproj 属性值（创建元素或更新现有元素）"""
+    """Set a .dproj property value (create element or update existing element)"""
     if not Path(project_path).exists():
         return CallToolResult(
-            content=[TextContent(type="text", text=f"文件不存在: {project_path}")],
+            content=[TextContent(type="text", text=f"File does not exist: {project_path}")],
             isError=True,
         )
 
     result = _parse_tree(project_path)
     if result is None:
         return CallToolResult(
-            content=[TextContent(type="text", text=f"解析失败: {project_path}")],
+            content=[TextContent(type="text", text=f"Parse failed: {project_path}")],
             isError=True,
         )
     tree, root = result
@@ -1600,7 +1600,7 @@ async def _handle_set(
             elem.text = value
             changed = True
     else:
-        # 匹配不到现有 PropertyGroup，创建一个新的
+        # No matching existing PropertyGroup; create a new one
         cond_parts = []
         if config:
             cond_parts.append(f"'$(Config)'=='{config}'")
@@ -1613,7 +1613,7 @@ async def _handle_set(
 
     if not changed:
         return CallToolResult(
-            content=[TextContent(type="text", text="未做任何修改")],
+            content=[TextContent(type="text", text="No changes made")],
             isError=False,
         )
 
@@ -1626,7 +1626,7 @@ async def _handle_set(
         content=[
             TextContent(
                 type="text",
-                text=f"✅ 已设置 {property_name}={value}{loc}\n备份: {backup_path}",
+                text=f"✅ Set {property_name}={value}{loc}\nBackup: {backup_path}",
             )
         ],
         isError=False,
@@ -1641,24 +1641,24 @@ async def _handle_add_config(
     optimize: Optional[bool] = None,
     debug_info: Optional[bool] = None,
 ) -> CallToolResult:
-    """添加编译配置"""
+    """Add a build configuration"""
     if not Path(project_path).exists():
         return CallToolResult(
-            content=[TextContent(type="text", text=f"文件不存在: {project_path}")],
+            content=[TextContent(type="text", text=f"File does not exist: {project_path}")],
             isError=True,
         )
 
     parsed = _parse_tree(project_path)
     if parsed is None:
         return CallToolResult(
-            content=[TextContent(type="text", text=f"解析失败: {project_path}")],
+            content=[TextContent(type="text", text=f"Parse failed: {project_path}")],
             isError=True,
         )
     tree, root = parsed
 
     if _find_pg(root, config=config_name):
         return CallToolResult(
-            content=[TextContent(type="text", text=f"配置已存在: {config_name}")],
+            content=[TextContent(type="text", text=f"Configuration already exists: {config_name}")],
             isError=True,
         )
 
@@ -1669,7 +1669,7 @@ async def _handle_add_config(
 
     set_count = 0
 
-    # 如果有 base_config，复制其属性
+    # If base_config is given, copy its properties
     if base_config:
         base_groups = _find_pg(root, config=base_config)
         if base_groups:
@@ -1678,7 +1678,7 @@ async def _handle_add_config(
                 ET.SubElement(new_pg, child.tag).text = child.text
                 set_count += 1
 
-    # 显式参数覆盖 base_config 的值
+    # Explicit parameters override the values from base_config
     if defines is not None:
         _find_or_create(new_pg, "DCC_Define").text = defines
         set_count += 1
@@ -1691,12 +1691,12 @@ async def _handle_add_config(
 
     _guarded_tree_write(tree, project_path, encoding="utf-8", xml_declaration=True)
 
-    detail = f"从 {base_config} 复制" if base_config else f"默认设置"
+    detail = f"copied from {base_config}" if base_config else f"default settings"
     return CallToolResult(
         content=[
             TextContent(
                 type="text",
-                text=f"✅ 已添加配置: {config_name} ({detail}, {set_count} 个属性)\n备份: {backup_path}",
+                text=f"✅ Added configuration: {config_name} ({detail}, {set_count} properties)\nBackup: {backup_path}",
             )
         ],
         isError=False,
@@ -1704,17 +1704,17 @@ async def _handle_add_config(
 
 
 async def _handle_remove_config(project_path: str, config_name: str) -> CallToolResult:
-    """删除编译配置"""
+    """Remove a build configuration"""
     if not Path(project_path).exists():
         return CallToolResult(
-            content=[TextContent(type="text", text=f"文件不存在: {project_path}")],
+            content=[TextContent(type="text", text=f"File does not exist: {project_path}")],
             isError=True,
         )
 
     parsed = _parse_tree(project_path)
     if parsed is None:
         return CallToolResult(
-            content=[TextContent(type="text", text=f"解析失败: {project_path}")],
+            content=[TextContent(type="text", text=f"Parse failed: {project_path}")],
             isError=True,
         )
     tree, root = parsed
@@ -1722,7 +1722,7 @@ async def _handle_remove_config(project_path: str, config_name: str) -> CallTool
     groups = _find_pg(root, config=config_name)
     if not groups:
         return CallToolResult(
-            content=[TextContent(type="text", text=f"未找到配置: {config_name}")],
+            content=[TextContent(type="text", text=f"Configuration not found: {config_name}")],
             isError=True,
         )
 
@@ -1735,7 +1735,7 @@ async def _handle_remove_config(project_path: str, config_name: str) -> CallTool
         content=[
             TextContent(
                 type="text",
-                text=f"✅ 已删除配置: {config_name}\n备份: {backup_path}",
+                text=f"✅ Removed configuration: {config_name}\nBackup: {backup_path}",
             )
         ],
         isError=False,
@@ -1747,18 +1747,18 @@ async def _handle_add_source(
     source_file: str,
     main_source: bool = False,
 ) -> CallToolResult:
-    """添加源文件引用到 ItemGroup
+    """Add a source file reference to an ItemGroup
 
-    .dpr/.dpk 文件自动添加为 DelphiCompile，其他文件添加为 DCCReference。
-    可通过 main_source=True 强制添加为 DelphiCompile。
+    .dpr/.dpk files are automatically added as DelphiCompile; other files are added as DCCReference.
+    Use main_source=True to force adding as DelphiCompile.
     """
     if not Path(project_path).exists():
         return CallToolResult(
-            content=[TextContent(type="text", text=f"文件不存在: {project_path}")],
+            content=[TextContent(type="text", text=f"File does not exist: {project_path}")],
             isError=True,
         )
 
-    # 路径归一化：绝对路径 → 相对于 .dproj 目录的相对路径
+    # Path normalization: absolute path → relative path with respect to the .dproj directory
     src_path = Path(source_file)
     if src_path.is_absolute():
         try:
@@ -1767,7 +1767,7 @@ async def _handle_add_source(
                 str(Path(project_path).parent),
             ).replace("/", "\\")
         except ValueError:
-            # 不同盘符时 relpath 会抛 ValueError，保留原路径
+            # On different drive letters relpath raises ValueError; keep the original path
             pass
     else:
         source_file = str(src_path).replace("/", "\\")
@@ -1775,7 +1775,7 @@ async def _handle_add_source(
     parsed = _parse_tree(project_path)
     if parsed is None:
         return CallToolResult(
-            content=[TextContent(type="text", text=f"解析失败: {project_path}")],
+            content=[TextContent(type="text", text=f"Parse failed: {project_path}")],
             isError=True,
         )
     tree, root = parsed
@@ -1783,16 +1783,16 @@ async def _handle_add_source(
     ig = _find_or_create_item_group(root)
     backup_path = _backup_file(project_path)
 
-    # 自动判断：.dpr/.dpk → DelphiCompile，其他 → DCCReference
+    # Auto-detect: .dpr/.dpk → DelphiCompile, others → DCCReference
     ext = Path(source_file).suffix.lower()
     is_delphi_main = main_source or ext in (".dpr", ".dpk")
 
     if is_delphi_main:
-        # 检查是否已有 DelphiCompile
+        # Check whether a DelphiCompile already exists
         existing_dc = ig.findall(_ns("DelphiCompile"))
         if existing_dc:
             return CallToolResult(
-                content=[TextContent(type="text", text=f"❌ 已存在 DelphiCompile 引用。一个项目只能有一个主源文件（.dpr/.dpk）。\n现有: {existing_dc[0].get('Include', '')}")],
+                content=[TextContent(type="text", text=f"❌ DelphiCompile reference already exists. A project can only have one main source file (.dpr/.dpk).\nExisting: {existing_dc[0].get('Include', '')}")],
                 isError=True,
             )
         dc = ET.SubElement(ig, _ns("DelphiCompile"))
@@ -1801,18 +1801,18 @@ async def _handle_add_source(
         kind = "DelphiCompile"
         dpk_result = ""
     else:
-        # 检查 DCCReference 是否已存在
+        # Check whether a DCCReference already exists
         existing = _find_dcc_ref(ig, source_file)
         if existing:
             return CallToolResult(
-                content=[TextContent(type="text", text=f"源文件已存在引用: {source_file}")],
+                content=[TextContent(type="text", text=f"Source file already referenced: {source_file}")],
                 isError=True,
             )
         ref = ET.SubElement(ig, _ns("DCCReference"))
         ref.set("Include", source_file)
         kind = "DCCReference"
 
-        # 同步 .dpk contains（如果是 Package 项目且添加的是 .pas）
+        # Sync .dpk contains (if this is a Package project and a .pas was added)
         dpk_result = ""
         if ext == ".pas":
             try:
@@ -1821,18 +1821,18 @@ async def _handle_add_source(
                     unit_name = Path(source_file).stem
                     dpk_backup = _dpk_add_contains(dpk_path, source_file, unit_name)
                     if dpk_backup:
-                        dpk_result = f"\n✅ .dpk contains 已同步: {unit_name} in '{source_file}'"
+                        dpk_result = f"\n✅ .dpk contains synced: {unit_name} in '{source_file}'"
                     else:
-                        dpk_result = f"\nℹ️ .dpk contains 已存在该条目，跳过"
+                        dpk_result = f"\nℹ️ .dpk contains already has this entry, skipped"
             except Exception as e:
-                dpk_result = f"\n⚠️ .dpk contains 同步失败: {e}"
+                dpk_result = f"\n⚠️ .dpk contains sync failed: {e}"
 
     _guarded_tree_write(tree, project_path, encoding="utf-8", xml_declaration=True)
     return CallToolResult(
         content=[
             TextContent(
                 type="text",
-                text=f"✅ 已添加源文件引用 ({kind}): {source_file}\n备份: {backup_path}{dpk_result}",
+                text=f"✅ Added source file reference ({kind}): {source_file}\nBackup: {backup_path}{dpk_result}",
             )
         ],
         isError=False,
@@ -1840,17 +1840,17 @@ async def _handle_add_source(
 
 
 async def _handle_remove_source(project_path: str, source_file: str) -> CallToolResult:
-    """从 ItemGroup 删除源文件引用"""
+    """Remove a source file reference from an ItemGroup"""
     if not Path(project_path).exists():
         return CallToolResult(
-            content=[TextContent(type="text", text=f"文件不存在: {project_path}")],
+            content=[TextContent(type="text", text=f"File does not exist: {project_path}")],
             isError=True,
         )
 
     parsed = _parse_tree(project_path)
     if parsed is None:
         return CallToolResult(
-            content=[TextContent(type="text", text=f"解析失败: {project_path}")],
+            content=[TextContent(type="text", text=f"Parse failed: {project_path}")],
             isError=True,
         )
     tree, root = parsed
@@ -1864,7 +1864,7 @@ async def _handle_remove_source(project_path: str, source_file: str) -> CallTool
             ig.remove(ref)
             removed = True
 
-        # 也检查 DelphiCompile
+        # Also check DelphiCompile
         for dc in ig.findall(_ns("DelphiCompile")):
             inc = dc.get("Include", "")
             if inc and Path(inc).name.lower() == source_file.lower():
@@ -1873,13 +1873,13 @@ async def _handle_remove_source(project_path: str, source_file: str) -> CallTool
 
     if not removed:
         return CallToolResult(
-            content=[TextContent(type="text", text=f"未找到源文件引用: {source_file}")],
+            content=[TextContent(type="text", text=f"Source file reference not found: {source_file}")],
             isError=True,
         )
 
     _guarded_tree_write(tree, project_path, encoding="utf-8", xml_declaration=True)
 
-    # 同步 .dpk contains（如果是 Package 项目）
+    # Sync .dpk contains (if this is a Package project)
     dpk_result = ""
     ext = Path(source_file).suffix.lower()
     if ext == ".pas":
@@ -1888,15 +1888,15 @@ async def _handle_remove_source(project_path: str, source_file: str) -> CallTool
             if dpk_path:
                 dpk_backup = _dpk_remove_contains(dpk_path, source_file)
                 if dpk_backup:
-                    dpk_result = f"\n✅ .dpk contains 已同步移除"
+                    dpk_result = f"\n✅ .dpk contains removal synced"
         except Exception as e:
-            dpk_result = f"\n⚠️ .dpk contains 同步失败: {e}"
+            dpk_result = f"\n⚠️ .dpk contains sync failed: {e}"
 
     return CallToolResult(
         content=[
             TextContent(
                 type="text",
-                text=f"✅ 已删除源文件引用: {source_file}\n备份: {backup_path}{dpk_result}",
+                text=f"✅ Removed source file reference: {source_file}\nBackup: {backup_path}{dpk_result}",
             )
         ],
         isError=False,
@@ -1904,7 +1904,7 @@ async def _handle_remove_source(project_path: str, source_file: str) -> CallTool
 
 
 # ──────────────────────────────────────────────
-# 公开入口
+# Public entry point
 # ──────────────────────────────────────────────
 
 async def dproj_tool(
@@ -1934,16 +1934,16 @@ async def dproj_tool(
     main_source_flag: bool = False,
     form_units: Optional[List[str]] = None,
 ) -> CallToolResult:
-    """.dproj 项目文件管理工具入口"""
+    """.dproj project file management tool entry point"""
 
     if not project_path and action in ("set", "add_config", "remove_config", "add_source", "remove_source"):
         return CallToolResult(
-            content=[TextContent(type="text", text="❌ project_path 参数为必需")],
+            content=[TextContent(type="text", text="❌ project_path parameter is required")],
             isError=True,
         )
     if action == "create" and not project_path:
         return CallToolResult(
-            content=[TextContent(type="text", text="❌ create 需要 project_path 参数")],
+            content=[TextContent(type="text", text="❌ create requires the project_path parameter")],
             isError=True,
         )
 
@@ -2001,7 +2001,7 @@ async def dproj_tool(
         content=[
             TextContent(
                 type="text",
-                text=f"❌ 未知 action: {action}。可选: create, info, set, add_config, remove_config, add_source, remove_source",
+                text=f"❌ Unknown action: {action}. Available: create, info, set, add_config, remove_config, add_source, remove_source",
             )
         ],
         isError=True,

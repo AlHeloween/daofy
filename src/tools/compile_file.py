@@ -1,7 +1,7 @@
 """
-单文件编译工具
+Single-file compile tool
 
-提供 Delphi 单文件编译功能
+Provides single-file compilation for Delphi
 """
 
 import json
@@ -20,25 +20,25 @@ from ..services.delphi_edit_guard import external_edit_block_message
 
 logger = get_logger(__name__)
 
-# 全局编译服务实例
+# Global compiler service instance
 _compiler_service: Optional[CompilerService] = None
 
 
 def set_compiler_service(service: CompilerService):
-    """设置编译服务实例"""
+    """Set the compiler service instance."""
     global _compiler_service
     _compiler_service = service
 
 
 def _find_dproj_in_directory(file_dir: Path) -> Optional[str]:
     """
-    在指定目录下查找 .dproj 文件
+    Find a .dproj file in the given directory
 
     Args:
-        file_dir: 文件所在目录
+        file_dir: Directory containing the file
 
     Returns:
-        .dproj 文件路径，如果未找到则返回 None
+        Path to the .dproj file, or None when none is found
     """
     dproj_files = list(file_dir.glob("*.dproj"))
     if dproj_files:
@@ -48,14 +48,14 @@ def _find_dproj_in_directory(file_dir: Path) -> Optional[str]:
 
 def _get_search_paths_from_dproj(dproj_path: str, platform: str = "Win32") -> List[str]:
     """
-    从 .dproj 文件获取搜索路径
+    Get the search paths from a .dproj file
 
     Args:
-        dproj_path: .dproj 文件路径
-        platform: 目标平台
+        dproj_path: Path to the .dproj file
+        platform: Target platform
 
     Returns:
-        搜索路径列表
+        List of search paths
     """
     try:
         parser = DprojParser(dproj_path)
@@ -69,7 +69,7 @@ def _get_search_paths_from_dproj(dproj_path: str, platform: str = "Win32") -> Li
 
         return list(set(paths))
     except Exception as e:
-        logger.warning(f"解析 .dproj 文件失败: {e}")
+        logger.warning(f"Failed to parse the .dproj file: {e}")
         return []
 
 
@@ -80,19 +80,19 @@ def _get_delphi_default_library_paths(
     override_version: Optional[str] = None,
 ) -> List[str]:
     """
-    获取 Delphi 默认的库搜索路径
+    Get the default Delphi library search paths
 
     Args:
-        platform: 目标平台
-        compiler_version: 编译器版本名称（可选）
-        project_version: .dproj ProjectVersion（可选，用于 compiler_version 未指定时的 fallback）
-        override_version: 项目配置指定的 Delphi 版本（可选，优先于 ProjectVersion 推断）
+        platform: Target platform
+        compiler_version: Compiler version name (optional)
+        project_version: .dproj ProjectVersion (optional; used as a fallback when compiler_version is not given)
+        override_version: Delphi version named by the project settings (optional; takes priority over ProjectVersion inference)
 
     Returns:
-        库搜索路径列表
+        List of library search paths
     """
     try:
-        # 获取编译器对应的 Delphi 版本号（与编译服务一致：compiler_version 优先）
+        # Resolve the Delphi version for the compiler (same as the compile service: compiler_version first)
         registry_version = None
         if compiler_version:
             from ..services.config_manager import get_config_manager
@@ -102,17 +102,17 @@ def _get_delphi_default_library_paths(
                 if compiler_cfg:
                     registry_version = compiler_cfg.registry_version
         if not registry_version and compiler_version:
-            # compiler_version 也可能是版本号/产品名（"11.0"/"XE4"）
+            # compiler_version may also be a version number/product name ("11.0"/"XE4")
             registry_version = normalize_version_key(compiler_version)
         if not registry_version and override_version:
             registry_version = normalize_version_key(override_version)
-        # Fallback: 未指定/无法确定时，从 .dproj ProjectVersion 推断
+        # Fallback: when unspecified/undeterminable, infer from the .dproj ProjectVersion
         if not registry_version and project_version:
             from ..utils.delphi_versions import project_version_to_registry_version
             registry_version = project_version_to_registry_version(project_version)
             if registry_version:
                 logger.debug(
-                    "从 .dproj ProjectVersion=%s 推断 registry_version=%s",
+                    ".dproj ProjectVersion=%s -> registry_version=%s",
                     project_version, registry_version,
                 )
         delphi_lib_paths = get_delphi_library_paths(version=registry_version, platform=platform)
@@ -123,7 +123,7 @@ def _get_delphi_default_library_paths(
                 expanded_paths.append(expanded)
         return expanded_paths
     except Exception as e:
-        logger.warning(f"获取 Delphi 默认库路径失败: {e}")
+        logger.warning(f"Failed to get the default Delphi library paths: {e}")
         return []
 
 
@@ -137,26 +137,26 @@ async def compile_file(
     extra_args: Optional[List[str]] = None,
 ) -> CallToolResult:
     """
-    编译单个 Delphi 单元文件(仅语法检查)
+    Compile a single Delphi unit file (syntax check only)
 
     Args:
-        file_path: 单元文件路径(.pas)
-        unit_search_paths: 单元搜索路径列表(可选，为空时自动从.dproj或Delphi默认路径获取)
-        conditional_defines: 条件编译符号列表(可选)
-        warning_level: 警告级别(0-4)
-        disabled_warnings: 禁用的警告列表
-        compiler_version: 编译器版本名称（可选，不传时使用最新安装的版本）
-        extra_args: 附加编译器参数列表
+        file_path: Unit file path (.pas)
+        unit_search_paths: Unit search paths (optional; when empty, taken from the .dproj or the Delphi defaults)
+        conditional_defines: Conditional compilation symbols (optional)
+        warning_level: Warning level (0-4)
+        disabled_warnings: List of disabled warnings
+        compiler_version: Compiler version name (optional; the newest installed version is used when omitted)
+        extra_args: Extra compiler arguments
 
     Returns:
-        编译结果
+        The compile result
     """
-    logger.info(f"收到单文件编译请求: {file_path}")
+    logger.info(f"Received single-file compile request: {file_path}")
 
     if _compiler_service is None:
-        logger.error("编译服务未初始化")
+        logger.error("Compiler service is not initialized")
         return CallToolResult(
-            content=[{"type": "text", "text": "编译服务未初始化"}],
+            content=[{"type": "text", "text": "Compiler service is not initialized"}],
             isError=True
         )
 
@@ -164,7 +164,7 @@ async def compile_file(
         file_path_obj = Path(file_path)
         if not file_path_obj.exists():
             return CallToolResult(
-                content=[{"type": "text", "text": f"文件不存在: {file_path}"}],
+                content=[{"type": "text", "text": f"File not found: {file_path}"}],
                 isError=True
             )
 
@@ -181,12 +181,12 @@ async def compile_file(
 
         dproj_path = _find_dproj_in_directory(file_dir)
         if dproj_path:
-            logger.info(f"找到 .dproj 文件: {dproj_path}")
+            logger.info(f"Found .dproj file: {dproj_path}")
             project_paths = _get_search_paths_from_dproj(dproj_path)
             search_paths.extend(project_paths)
-            logger.info(f"从 .dproj 获取搜索路径: {len(project_paths)} 个")
+            logger.info(f"Search paths from .dproj: {len(project_paths)}")
         else:
-            logger.info("未找到 .dproj 文件，使用 Delphi 默认库路径")
+            logger.info("No .dproj file found; using the default Delphi library paths")
             settings = load_project_settings(file_path)
             default_paths = _get_delphi_default_library_paths(
                 compiler_version=(
@@ -198,7 +198,7 @@ async def compile_file(
                 ),
             )
             search_paths.extend(default_paths)
-            logger.info(f"从 Delphi 默认配置获取搜索路径: {len(default_paths)} 个")
+            logger.info(f"Search paths from the Delphi defaults: {len(default_paths)}")
 
         request = FileCompileRequest(
             file_path=file_path,
@@ -218,7 +218,7 @@ async def compile_file(
         )
 
     except Exception as e:
-        error_msg = f"编译过程发生异常: {str(e)}"
+        error_msg = f"Exception during compilation: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return CallToolResult(
             content=[{"type": "text", "text": error_msg}],

@@ -1,7 +1,7 @@
 """
-LPI 文件解析器
+LPI file parser
 
-解析 Lazarus/Free Pascal 项目文件(.lpi)以提取编译配置
+Parses Lazarus/Free Pascal project files (.lpi) to extract build configuration.
 """
 
 import xml.etree.ElementTree as ET
@@ -13,14 +13,14 @@ logger = get_logger(__name__)
 
 
 class LpiParser:
-    """Lazarus 项目文件解析器"""
+    """Lazarus project file parser"""
 
     def __init__(self, lpi_path: str):
         """
-        初始化解析器
+        Initialize the parser.
 
         Args:
-            lpi_path: .lpi 文件路径
+            lpi_path: .lpi file path
         """
         self.lpi_path = lpi_path
         self.tree = None
@@ -28,47 +28,47 @@ class LpiParser:
 
     def parse(self) -> bool:
         """
-        解析 .lpi 文件
+        Parse the .lpi file.
 
         Returns:
-            是否解析成功
+            Whether parsing succeeded
         """
         try:
             self.tree = ET.parse(self.lpi_path)
             self.root = self.tree.getroot()
-            logger.info(f"成功解析 .lpi 文件: {self.lpi_path}")
+            logger.info(f"Successfully parsed .lpi file: {self.lpi_path}")
             return True
         except Exception as e:
-            logger.error(f"解析 .lpi 文件失败: {str(e)}")
+            logger.error(f"Failed to parse .lpi file: {str(e)}")
             return False
 
     def get_unit_search_paths(self, config: str = None) -> List[str]:
         """
-        获取单元搜索路径
+        Get the unit search paths.
 
         Args:
-            config: 配置名称 (Default/Debug/Release)
+            config: Configuration name (Default/Debug/Release)
 
         Returns:
-            单元搜索路径列表
+            List of unit search paths
         """
         if self.root is None:
-            logger.error("未解析 .lpi 文件")
+            logger.error("The .lpi file has not been parsed")
             return []
 
         paths = set()
 
-        # 查找 PublishInfo 下的 CompilerOptions
+        # Find CompilerOptions under PublishInfo
         compiler_options = self.root.find(".//CompilerOptions")
         if compiler_options is None:
             return []
 
-        # 查找 SearchPaths
+        # Find SearchPaths
         search_paths = compiler_options.find("SearchPaths")
         if search_paths is None:
             return []
 
-        # 读取 OtherUnitFiles
+        # Read OtherUnitFiles
         other_unit_files = search_paths.find("OtherUnitFiles")
         if other_unit_files is not None and other_unit_files.text:
             for path in other_unit_files.text.split(";"):
@@ -79,7 +79,7 @@ class LpiParser:
                         path = str((project_dir / path).resolve())
                     paths.add(path)
 
-        # 读取 UnitPath
+        # Read UnitPath
         unit_path = search_paths.find("UnitPath")
         if unit_path is not None and unit_path.text:
             for path in unit_path.text.split(";"):
@@ -90,20 +90,20 @@ class LpiParser:
                         path = str((project_dir / path).resolve())
                     paths.add(path)
 
-        logger.info(f"找到 {len(paths)} 个单元搜索路径")
+        logger.info(f"Found {len(paths)} unit search paths")
         return list(paths)
 
     def get_main_source(self) -> Optional[str]:
         """
-        获取主源文件名 (.lpr)
+        Get the main source file name (.lpr).
 
         Returns:
-            主源文件名
+            Main source file name
         """
         if self.root is None:
             return None
 
-        # 查找 PublishInfo 下的 MainUnit
+        # Find MainUnit under PublishInfo
         main_unit = self.root.find(".//MainUnit")
         if main_unit is not None:
             filename = main_unit.get("Filename")
@@ -114,10 +114,10 @@ class LpiParser:
 
     def get_project_info(self) -> Dict:
         """
-        获取项目信息
+        Get project information.
 
         Returns:
-            项目信息字典
+            Project information dictionary
         """
         if self.root is None:
             return {}
@@ -128,17 +128,17 @@ class LpiParser:
             "unit_count": 0,
         }
 
-        # 查找 ProjectInfo
+        # Find ProjectInfo
         project_info = self.root.find(".//ProjectInfo")
         if project_info is not None:
             title = project_info.find("Title")
             if title is not None and title.text:
                 info["project_name"] = title.text.strip()
 
-        # 获取主源文件
+        # Get the main source file
         info["main_source"] = self.get_main_source()
 
-        # 统计单元数量
+        # Count the units
         units = self.root.findall(".//Unit")
         info["unit_count"] = len(units)
 
@@ -146,10 +146,10 @@ class LpiParser:
 
     def get_units(self) -> List[Dict[str, str]]:
         """
-        获取项目中的所有单元
+        Get every unit of the project.
 
         Returns:
-            单元列表，每个单元包含 Filename 和 IsPartOfProject
+            Unit list; each unit carries Filename and IsPartOfProject
         """
         if self.root is None:
             return []
@@ -168,10 +168,10 @@ class LpiParser:
 
     def get_compiler_options(self) -> Dict:
         """
-        获取编译器选项
+        Get the compiler options.
 
         Returns:
-            编译器选项字典
+            Compiler options dictionary
         """
         if self.root is None:
             return {}

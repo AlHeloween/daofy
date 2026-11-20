@@ -1,10 +1,11 @@
 """
-experience MCP 工具 — 经验记忆管理
+experience MCP tool — experience memory management
 
-通过 action 参数分派操作，语义搜索复用 embedding_service。
+Dispatches operations via the action parameter; semantic search reuses embedding_service.
 
-新增 suggest action: 分析最近工具调用历史，自动检测经验保存机会，
-预填 problem/solution/tags/context 草稿，供 AI 审核后 save。
+New suggest action: analyzes recent tool call history, automatically detects
+experience save opportunities, and pre-fills problem/solution/tags/context
+drafts for the AI to review and save.
 """
 
 import json
@@ -17,16 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 def experience(**kwargs) -> dict:
-    """经验记忆工具统一入口。
+    """Unified entry point for the experience memory tool.
 
-    通过 action 参数分派到具体操作。
+    Dispatches to the specific operation via the action parameter.
 
     Args:
-        action: 操作类型
-        **kwargs: 各操作的参数
+        action: the operation type
+        **kwargs: parameters for each operation
 
     Returns:
-        dict: 结果
+        dict: the result
     """
     action = kwargs.pop("action", "")
     svc = get_experience_service()
@@ -53,9 +54,9 @@ def experience(**kwargs) -> dict:
         elif action == "suggest":
             return _act_suggest(**kwargs)
         else:
-            return _err(f"未知 action: {action}，可用: save/search/get/list/update/merge/prune/delete/rebuild_embedding/suggest")
+            return _err(f"Unknown action: {action}, available: save/search/get/list/update/merge/prune/delete/rebuild_embedding/suggest")
     except Exception as e:
-        logger.exception("experience 执行失败")
+        logger.exception("experience execution failed")
         return _err(str(e))
 
 
@@ -71,7 +72,7 @@ def _err(msg: str) -> dict:
 
 
 def _fmt_experience(exp: dict) -> str:
-    """格式化单条经验为可读文本"""
+    """Format a single experience as readable text"""
     tags = exp.get("tags", [])
     tools = exp.get("tools_used", [])
     sim = exp.get("similarity")
@@ -97,33 +98,33 @@ def _act_save(svc, **kw):
     problem = kw.get("problem", "").strip()
     solution = kw.get("solution", "").strip()
     if not problem or not solution:
-        return _err("缺少必需参数: problem(问题描述) 和 solution(解决步骤)")
+        return _err("Missing required parameters: problem (problem description) and solution (solution steps)")
 
     tools_used = kw.get("tools_used")
     context = kw.get("context")
     tags = kw.get("tags")
 
-    # 保存前搜索相似经验，提醒 AI 泛化
-    # 注意：svc.save() 内部也会做 >0.85 去重合并，这里的 >0.7 检查是额外提醒层
-    # 如果用户不 force，则返回警告并终止保存（让 AI 选择 merge/update）
-    # 如果用户 force=true，则跳过提醒，让 svc.save() 的 >0.85 逻辑处理最终去重
+    # Search for similar experiences before saving, to remind the AI to generalize
+    # Note: svc.save() also does >0.85 dedup merging internally; the >0.7 check here is an extra reminder layer
+    # If the user does not force, return a warning and abort the save (let the AI choose merge/update)
+    # If the user sets force=true, skip the reminder and let svc.save()'s >0.85 logic handle final dedup
     _force = kw.get("force", False)
     if not _force:
         try:
             similar = svc.search(query=problem, top_k=3)
             high_match = [s for s in similar if s.get("similarity", 0) > 0.7]
             if high_match:
-                lines = ["⚠️ 发现高相似度经验，建议用 merge/update 合并而非另存："]
+                lines = ["⚠️ Found highly similar experiences; consider merging via merge/update instead of saving separately:"]
                 for s in high_match:
                     lines.append(f"  [{s['similarity']:.0%}] {s['id']} {s['problem'][:60]}")
-                lines.append("如需确认后合并，取消本次 save，改用:")
+                lines.append("To merge after confirming, cancel this save and use:")
                 best_id = high_match[0]['id']
                 lines.append(f'  experience(action=merge, ids=["...", "{best_id}"]')
-                lines.append(f'  或 experience(action=update, id="{best_id}", ...)')
-                lines.append("如仍需新保存，设置 force=true 跳过此检查")
+                lines.append(f'  or experience(action=update, id="{best_id}", ...)')
+                lines.append("If you still need a new save, set force=true to skip this check")
                 return _ok("\n".join(lines), data={"similar": [s["id"] for s in high_match]})
         except Exception as e:
-            logger.debug("经验去重搜索失败（不影响保存流程）: %s", e)
+            logger.debug("Experience dedup search failed (does not affect the save flow): %s", e)
 
 
     result = svc.save(
@@ -142,7 +143,7 @@ def _act_save(svc, **kw):
 def _act_search(svc, **kw):
     query = kw.get("query", "").strip()
     if not query:
-        return _err("缺少必需参数: query(搜索关键词)")
+        return _err("Missing required parameter: query (search keywords)")
 
     top_k = int(kw.get("top_k", 5))
     tags = kw.get("tags")
@@ -160,7 +161,7 @@ def _act_search(svc, **kw):
         lines.append(f"  ID: {exp['id']}")
         lines.append(f"  solution: {exp['solution'][:200]}")
         if exp.get("tags"):
-            lines.append(f"  标签: {', '.join(exp['tags'])}")
+            lines.append(f"  tags: {', '.join(exp['tags'])}")
 
     return _ok("\n".join(lines), data=results)
 
@@ -168,11 +169,11 @@ def _act_search(svc, **kw):
 def _act_get(svc, **kw):
     exp_id = kw.get("id", "").strip()
     if not exp_id:
-        return _err("缺少必需参数: id(经验ID)")
+        return _err("Missing required parameter: id (experience ID)")
 
     result = svc.get(exp_id)
     if result is None:
-        return _err(f"经验不存在: {exp_id}")
+        return _err(f"Experience not found: {exp_id}")
 
     return _ok(f"detail:\n{_fmt_experience(result)}", data=result)
 
@@ -197,7 +198,7 @@ def _act_list(svc, **kw):
 def _act_update(svc, **kw):
     exp_id = kw.get("id", "").strip()
     if not exp_id:
-        return _err("缺少必需参数: id(经验ID)")
+        return _err("Missing required parameter: id (experience ID)")
 
     solution = kw.get("solution")
     tags = kw.get("tags")
@@ -206,11 +207,11 @@ def _act_update(svc, **kw):
     context = kw.get("context")
 
     if solution is None and tags is None and problem is None and tools_used is None and context is None:
-        return _err("至少需要提供一项更新内容: solution/tags/problem/tools_used/context")
+        return _err("At least one update field must be provided: solution/tags/problem/tools_used/context")
 
     result = svc.update(exp_id=exp_id, solution=solution, tags=tags, problem=problem, tools_used=tools_used, context=context)
     if result is None:
-        return _err(f"经验不存在: {exp_id}")
+        return _err(f"Experience not found: {exp_id}")
 
     return _ok(f"updated: {exp_id}", data=result)
 
@@ -218,12 +219,12 @@ def _act_update(svc, **kw):
 def _act_merge(svc, **kw):
     ids = kw.get("ids")
     if not ids or not isinstance(ids, list) or len(ids) < 2:
-        return _err("缺少必需参数: ids(至少2个经验ID列表，如 ids=['a','b'])")
+        return _err("Missing required parameter: ids (a list of at least 2 experience IDs, e.g. ids=['a','b'])")
     ids = [i.strip() for i in ids if i.strip()]
     keep = kw.get("keep")
     result = svc.merge(ids, keep=keep)
     if result is None:
-        return _err("合并失败，请检查 IDs 是否有效")
+        return _err("Merge failed; please check whether the IDs are valid")
     return _ok(f"merged {len(ids)} records into {result['id']}", data=result)
 
 
@@ -244,11 +245,11 @@ def _act_prune(svc, **kw):
 def _act_delete(svc, **kw):
     exp_id = kw.get("id", "").strip()
     if not exp_id:
-        return _err("缺少必需参数: id(经验ID)")
+        return _err("Missing required parameter: id (experience ID)")
 
     ok = svc.delete(exp_id)
     if not ok:
-        return _err(f"经验不存在: {exp_id}")
+        return _err(f"Experience not found: {exp_id}")
 
     return _ok(f"deleted: {exp_id}")
 
@@ -257,34 +258,34 @@ def _act_rebuild_embedding(svc, **kw):
     result = svc.rebuild_embeddings()
     if "error" in result:
         return _err(result["error"])
-    lines = [f"经验 embedding 重建完成:"]
-    lines.append(f"  总记录: {result['total']}")
-    lines.append(f"  已有向量: {result['skipped']}")
-    lines.append(f"  本次重建: {result['rebuilt']}")
-    lines.append(f"  失败: {result['failed']}")
+    lines = [f"Experience embedding rebuild complete:"]
+    lines.append(f"  total records: {result['total']}")
+    lines.append(f"  existing vectors: {result['skipped']}")
+    lines.append(f"  rebuilt this run: {result['rebuilt']}")
+    lines.append(f"  failed: {result['failed']}")
     return _ok("\n".join(lines), data=result)
 
 
 def _act_suggest(**kw) -> dict:
-    """分析最近工具调用历史，自动检测经验保存机会，预填草稿。
+    """Analyze recent tool call history, automatically detect experience save opportunities, and pre-fill drafts.
 
-    返回预填的 problem/solution/tags/context，供 AI 审核后
-    调用 experience(action="save", ...) 正式保存。
+    Returns pre-filled problem/solution/tags/context for the AI to review and
+    then call experience(action="save", ...) to formally save.
     """
     tracker = get_tracker()
     draft = tracker.suggest()
     if draft is None:
         return _ok(
-            "未检测到值得保存的经验。\n"
-            "  suggest 需要 2+ 次工具调用，且检测到以下模式之一：\n"
-            "  - fix_cycle:  编译失败 → 修改代码 → 编译成功\n"
-            "  - learn_apply: 查知识库 → 修改代码 → 编译成功\n"
-            "  - clean_fix:  修改代码 → 编译成功（无前置失败）"
+            "No experience worth saving detected.\n"
+            "  suggest requires 2+ tool calls and one of the following patterns:\n"
+            "  - fix_cycle:  compile failed → modify code → compile succeeded\n"
+            "  - learn_apply: query knowledge base → modify code → compile succeeded\n"
+            "  - clean_fix:  modify code → compile succeeded (no preceding failure)"
         )
 
-    # 格式化输出
+    # Format the output
     lines = [
-        "📋 检测到经验保存机会，审核后可用以下命令保存：",
+        "📋 Experience save opportunity detected; after review, use the following command to save:",
         "",
         f"experience(action=\"save\",",
         f'  problem="""{draft["problem"]}""",',
@@ -295,11 +296,12 @@ def _act_suggest(**kw) -> dict:
         f")",
     ]
     note = (
-        "\n💡 建议：审核后泛化 problem 描述（去掉 auto 标记、"
-        "抽象通用场景），可用 force=true 跳过 >0.7 去重提醒层。"
+        "\n💡 Suggestion: after review, generalize the problem description (remove auto markers, "
+        "abstract to common scenarios); you can use force=true to skip the >0.7 dedup reminder layer."
     )
 
     return _ok(
         "\n".join(lines) + note,
         data=draft,
     )
+

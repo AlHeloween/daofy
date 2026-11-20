@@ -1,37 +1,39 @@
-<!-- @when: 触发人工介入条件，需提交完整交接信息 -->
+<!-- @when: Human intervention conditions are triggered and complete handover information must be submitted -->
 <!-- @chain: after=exception-info-collection.md -->
 
-### 8.4 人工介入交接清单
+### 8.4 Human Intervention Handover Checklist
 
-申请介入时，以下信息**缺一不可**：
+When requesting intervention, the following information is **indispensable**:
 
 ```
 ┌────────────────────────────────────────────┐
-│               人工介入申请书                  │
+│               Human Intervention Request Form │
 ├────────────────────────────────────────────┤
-│ [一] 问题摘要                               │
-│   一句话描述问题                             │
-│                                            │
-│ [二] 已尝试方案（逐条列出）                    │
-│   ① 尝试了什么 → 结果如何 → 为什么失败          │
+│ [1] Problem summary                         │
+│   Describe the problem in one sentence      │
+│                                             │
+│ [2] Attempted solutions (list one by one)   │
+│   ① What was tried → result → why it failed │
 │   ② ...                                     │
 │   ③ ...                                     │
-│                                            │
-│ [三] 异常现场（见 8.3 模板）                   │
-│   ├─ 完整异常消息 + 调用栈                    │
-│   ├─ 关键变量值                              │
-│   └─ 复现步骤（从启动到异常的最简路径）           │
-│                                            │
-│ [四] 环境信息                                │
-│   ├─ Daofy/Python/OS 版本                   │
-│   ├─ Delphi 编译器版本                       │
-│   ├─ 项目类型（VCL/FMX/Console）              │
-│   └─ 最近变更（与问题相关）                     │
-│                                            │
-│ [五] 预期结果                                │
-│   希望人工具体做什么                           │
-│                                            │
-│ [六] 最小复现示例（MRE）                       │
-│   如能剥离，附上代码                           │
+│                                             │
+│ [3] Exception scene (see 8.3 template)      │
+│   ├─ Complete exception message + call stack│
+│   ├─ Key variable values                    │
+│   └─ Reproduction steps (shortest path from startup to exception) │
+│                                             │
+│ [4] Environment information                 │
+│   ├─ Daofy/Python/OS version                │
+│   ├─ Delphi compiler version                │
+│   ├─ Project type (VCL/FMX/Console)         │
+│   └─ Recent changes (related to the problem)│
+│                                             │
+│ [5] Expected result                         │
+│   What specifically you want the human to do│
+│                                             │
+│ [6] Minimal reproducible example (MRE)      │
+│   If it can be isolated, attach the code    │
 └────────────────────────────────────────────┘
 ```
+
+

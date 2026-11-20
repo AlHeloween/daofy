@@ -1,7 +1,9 @@
-"""集中式工具路径参数绝对路径校验。
+"""Centralized absolute-path validation for tool path arguments.
 
-在 MCP 接口边界（server.call_tool）统一校验，避免相对路径导致的 CWD 不一致问题。
-仅对真正代表文件系统路径的字段做强制校验，跳过 JSONPath、项目相对（如 delphi_project.sources）等字段。
+Validated at the MCP interface boundary (server.call_tool) to avoid CWD
+inconsistencies caused by relative paths. Only fields that genuinely represent
+filesystem paths are enforced; JSONPath and project-relative fields (such as
+delphi_project.sources) are skipped.
 """
 
 from __future__ import annotations
@@ -11,10 +13,10 @@ import os
 from typing import Any, Dict, Optional, Tuple
 
 
-# 每个工具需要校验的路径字段（字段值可以是 string 或 list[str]）
-# 采用白名单方式：未列出的字段不会强制要求绝对路径。
-# 有意排除的项目相对字段：delphi_project.sources/form_units/source_file/main_source、
-# structured_content.path（JSONPath）、code_hosting.dir/files（仓库相对/当前目录）。
+# Path fields to validate per tool (a field value may be a string or a list[str])
+# Whitelist approach: fields not listed here are not required to be absolute.
+# Intentionally excluded project-relative fields: delphi_project.sources/form_units/source_file/main_source,
+# structured_content.path (JSONPath), code_hosting.dir/files (repository-relative or current directory).
 TOOL_PATH_FIELDS: Dict[str, Tuple[str, ...]] = {
     # Delphi
     "delphi_file": ("file_path", "project_path", "config_path"),
@@ -39,32 +41,32 @@ TOOL_PATH_FIELDS: Dict[str, Tuple[str, ...]] = {
 }
 
 
-# 有意排除的项目相对字段（不加入上面的白名单）：
+# Project-relative fields intentionally excluded (not added to the whitelist above):
 #   delphi_project.sources / form_units / source_file / main_source
-#   structured_content.path（JSONPath）
-#   code_hosting.dir / files（当前目录或仓库相对路径）
+#   structured_content.path (JSONPath)
+#   code_hosting.dir / files (current directory or repository-relative paths)
 
 
 def _is_path_like_string(s: str) -> bool:
-    """判断字符串是否可能是文件系统路径（而不是 JSON/脚本等）。"""
+    """Tell whether a string could be a filesystem path (rather than JSON, a script and so on)."""
     if not s:
         return False
-    # 脚本 JSON 通常以 { 或 [ 开头
+    # Script JSON usually starts with { or [
     stripped = s.lstrip()
     if stripped and stripped[0] in "{[":
         return False
-    # 明显是 JSON 字符串整体
+    # Obviously a whole JSON string
     if (stripped.startswith('"') and stripped.endswith('"')) or (
         stripped.startswith("'") and stripped.endswith("'")
     ):
-        # 可能是被转义的 JSON，先尝试解析
+        # Possibly escaped JSON; try to parse it first
         try:
             loaded = json.loads(stripped)
             if isinstance(loaded, (dict, list)):
                 return False
         except (json.JSONDecodeError, TypeError):
             pass
-    # 包含路径分隔符或常见扩展名更像路径
+    # A path separator or a common extension makes it more path-like
     lower = s.lower()
     if "\\" in s or "/" in s:
         return True
@@ -93,37 +95,37 @@ def _is_path_like_string(s: str) -> bool:
         ".txt",
     )):
         return True
-    # Windows 盘符
+    # Windows drive letter
     if len(s) >= 2 and s[1] == ":":
         return True
-    # UNC 路径
+    # UNC path
     if s.startswith("\\\\"):
         return True
     return False
 
 
 def _is_absolute_path(p: str) -> bool:
-    """判断路径是否为绝对路径（支持 Windows 盘符/UNC 与 POSIX 风格）。"""
+    """Tell whether a path is absolute (Windows drive/UNC and POSIX styles)."""
     if not isinstance(p, str):
-        return True  # 非字符串交由调用方处理
+        return True  # Non-strings are left to the caller
     p_stripped = p.strip()
     if not p_stripped:
-        return True  # 空值跳过
-    # Windows 盘符
+        return True  # Empty values are skipped
+    # Windows drive letter
     if len(p_stripped) >= 2 and p_stripped[1] == ":" and p_stripped[0].isalpha():
-        # 盘符绝对路径（C:\... 或 C:/...）
+        # Drive-absolute path (C:\... or C:/...)
         rest = p_stripped[2:]
         if rest and rest[0] in "\\/":
             return True
-        # 仅 "C:" 也视为不完整的绝对路径形式，按相对处理更安全
+        # A bare "C:" is an incomplete absolute form; treating it as relative is safer
         return False
-    # UNC 路径 \\server\share
+    # UNC path \\server\share
     if p_stripped.startswith("\\\\"):
         return True
-    # POSIX 绝对路径
+    # POSIX absolute path
     if p_stripped.startswith("/"):
         return True
-    # URL 类等不视为本地文件路径
+    # URLs and the like are not local filesystem paths
     if "://" in p_stripped:
         return False
     return False
@@ -133,39 +135,41 @@ def _validate_single_path(tool_name: str, field: str, value: Any) -> Optional[st
     if value is None:
         return None
     if isinstance(value, (list, tuple)):
-        # 列表由调用方遍历处理
+        # Lists are iterated by the caller
         return None
     if not isinstance(value, str):
         return None
     v = value.strip()
     if not v:
         return None
-    # automate_delphi.script 只有在看起来像文件路径时才校验
+    # automate_delphi.script is validated only when it looks like a file path
     if tool_name == "automate_delphi" and field == "script":
         if not _is_path_like_string(v):
             return None
     if _is_absolute_path(v):
         return None
-    # 相对路径 -> 拒绝
+    # Relative path -> reject
     if os.name == "nt":
         example = "C:\\project\\Unit1.pas"
     else:
         example = "/home/user/project/Unit1.pas"
     return (
-        f"工具 '{tool_name}' 的参数 '{field}' 必须传入绝对路径（MCP 无法获取客户端当前工作目录）。"
-        f"当前值: '{v}'。请使用形如 '{example}' 的绝对路径。"
+        f"Tool '{tool_name}' argument '{field}' must be an absolute path "
+        f"(MCP cannot obtain the client's current working directory). "
+        f"Current value: '{v}'. Use an absolute path such as '{example}'."
     )
 
 
 def validate_tool_paths(tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
-    """校验工具参数中的文件系统路径字段是否为绝对路径。
+    """Validate that filesystem path fields in a tool's arguments are absolute.
 
     Args:
-        tool_name: MCP 工具名。
-        arguments: 调用该工具时传入的参数字典。
+        tool_name: MCP tool name.
+        arguments: Dictionary of arguments passed to that tool.
 
     Returns:
-        Optional[str]: 校验失败时返回可直接展示给用户的错误信息；通过时返回 None。
+        Optional[str]: An error message ready to show the user when validation
+        fails; None when it passes.
     """
     if not isinstance(arguments, dict):
         return None
@@ -178,9 +182,9 @@ def validate_tool_paths(tool_name: str, arguments: Dict[str, Any]) -> Optional[s
         value = arguments.get(field)
         if value is None:
             continue
-        # 列表
+        # List
         if isinstance(value, (list, tuple)):
-            # automate_delphi 的 script 列表是步骤数组，不是路径列表
+            # automate_delphi's script list is a list of steps, not a list of paths
             if tool_name == "automate_delphi" and field == "script":
                 continue
             for item in value:
@@ -193,5 +197,5 @@ def validate_tool_paths(tool_name: str, arguments: Dict[str, Any]) -> Optional[s
             err = _validate_single_path(tool_name, field, value)
             if err:
                 return err
-        # 其他类型忽略
+        # Other types are ignored
     return None

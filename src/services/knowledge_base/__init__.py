@@ -1,11 +1,11 @@
 """
-知识库模块
+Knowledge base module
 
-版权所有 (C) 吉林省左右软件开发有限公司
+Copyright (C) 吉林省左右软件开发有限公司
 Copyright (C) Equilibrium Software Development Co., Ltd, Jilin
 """
 
-# 统一 schema 管理
+# Unified schema management
 from .schema import (
     SCHEMA_VERSION,
     SCHEMA_VERSION_KEY,

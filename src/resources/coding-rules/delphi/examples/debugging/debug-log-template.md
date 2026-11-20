@@ -1,30 +1,31 @@
-# 调试状态日志模板
+# Debug State Log Template
 
-AI Agent **必须维护结构化调试日志**，显式追踪已尝试方案和结果，防止同质方案重复。
+AI Agent **must maintain a structured debugging log**, explicitly tracking attempted solutions and results to prevent repeating homogeneous solutions.
 
 ```
-[调试日志] <问题摘要>
+[Debug Log] <Problem Summary>
 ═══════════════════════════════════════
-问题描述: {一句话描述}
+Problem description: {One-sentence description}
 
-已尝试的方案:
-  #1: 假设H1=... → 验证=... → 结果=证伪 → 推断=排除原因A
-  #2: 假设H2=... → 验证=... → 结果=证实 → 推断=原因B → 已修复
+Attempted solutions:
+  #1: Hypothesis H1=... → Verification=... → Result=falsified → Inference=exclude cause A
+  #2: Hypothesis H2=... → Verification=... → Result=confirmed → Inference=cause B → Fixed
   #3: ...
 
-当前范围:
-  已排除: [模块X, 模块Y, ...]
-  剩余可疑: [模块W, ...]
-  当前最可能假设: {假设 + 依据}
+Current scope:
+  Excluded: [Module X, Module Y, ...]
+  Remaining suspects: [Module W, ...]
+  Current most likely hypothesis: {Hypothesis + basis}
 
-下一步计划: {具体验证内容}
-是否触发人工介入: 是/否（原因）
+Next step plan: {Specific verification content}
+Trigger manual intervention: Yes/No (reason)
 ```
 
-## 使用规则
+## Usage Rules
 
-- 开始调试**任何问题**前创建日志
-- 每次尝试后更新（假设→验证→结果→推断）
-- 进入下轮假设前回顾，确认新假设与已证伪的本质不同
-- 日志不保存到文件，仅本轮工作记忆
-- 问题解决后经验通过 `experience(save)` 持久化
+- Create a log before starting to debug **any problem**
+- Update after each attempt (hypothesis → verification → result → inference)
+- Review before entering the next round of hypotheses to confirm the new hypothesis is fundamentally different from those falsified
+- The log is not saved to a file, only in current working memory
+- After the problem is resolved, persist experience via `experience(save)`
+

@@ -1,28 +1,28 @@
-<!-- @when: Console 程序编译通过后，需进行 stdin/stdout 交互验证 -->
+<!-- @when: After a console program compiles successfully, stdin/stdout interaction verification is required -->
 <!-- @chain: before=human-collab.md, after=ui.md -->
 
-## ⑨ 控制台程序交互验证
+## ⑨ Console Program Interaction Verification
 
-Console 类型程序通过 `automate_delphi` console 模式进行 stdin/stdout 交互。**不需 Delphi 端改造。**
+Console-type programs use `automate_delphi` console mode for stdin/stdout interaction. **No Delphi-side changes are required.**
 
-`action="auto"` 自动检测 PE 头 Subsystem；也可显式 `action="console"`。
+`action="auto"` automatically detects the PE header Subsystem; you can also explicitly use `action="console"`.
 
-### 工具调用
+### Tool Invocation
 ```python
 automate_delphi(app_path="Tool.exe", input="Y\n", expect="Continue?")
 automate_delphi(action="console", app_path="Deploy.exe", args=["--silent"], timeout=60)
 ```
 
-### 通信模式
+### Communication Mode
 ```
 Python                               Console Delphi
-  ── Popen(stdin=PIPE, stdout=PIPE) → begin..end 启动
-  ── proc.stdin.write("input\n")    → ReadLn 接收
-  ←── proc.stdout.read()            ← WriteLn 输出
+  ── Popen(stdin=PIPE, stdout=PIPE) → begin..end starts
+  ── proc.stdin.write("input\n")    → ReadLn receives
+  ←── proc.stdout.read()            ← WriteLn outputs
   ←── proc.wait(timeout=5)          ← exit
 ```
 
-### 分步交互（keep_alive）
+### Step-by-step Interaction (keep_alive)
 ```python
 proc = subprocess.Popen([exe_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 proc.stdin.write(b"Y\n"); proc.stdin.flush()
@@ -33,17 +33,17 @@ while True:
 proc.wait(timeout=5)
 ```
 
-### 注意事项
-| 注意点 | 说明 |
+### Notes
+| Note | Description |
 |--------|------|
-| 超时控制 | `communicate(timeout=...)` 必须设置 |
-| 管道缓冲 | 大量输出用 `readline()` 逐行读 |
-| stderr | 建议 `STDOUT` 合并 |
-| exit code | `proc.returncode` 判断正常退出 |
-| 编码 | Windows 控制台通常是 gbk |
+| Timeout control | `communicate(timeout=...)` must be set |
+| Pipe buffering | For large output, use `readline()` to read line by line |
+| stderr | Recommend merging into `STDOUT` |
+| exit code | Use `proc.returncode` to determine normal exit |
+| Encoding | Windows console is usually gbk |
 
 ---
 
-### 测试质量红线
+### Test Quality Red Lines
 
-6 条一票否决红线（禁止跳过式通过、断言验证具体状态、截图必须有验证、外部依赖降级路径、执行时间匹配、运行证据支撑）见 [`automation/scenarios/base.md` § 测试质量红线`](automation/scenarios/base.md#测试质量红线)。
+The 6 veto red lines (no skip-style passing, assertions verify specific state, screenshots must have verification, external dependency degradation paths, execution time matching, runtime evidence support) see [`automation/scenarios/base.md` § Test Quality Red Lines`](automation/scenarios/base.md#测试质量红线).

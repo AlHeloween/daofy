@@ -84,17 +84,17 @@ class TestCompileResult:
 
     def test_summary_success(self):
         r = CompileResult(status=CompileStatus.SUCCESS, duration=200)
-        assert "编译成功" in r.get_summary()
+        assert "Compile succeeded" in r.get_summary()
         assert "200ms" in r.get_summary()
 
     def test_summary_timeout(self):
         r = CompileResult(status=CompileStatus.TIMEOUT, duration=600000)
-        assert "编译超时" in r.get_summary()
+        assert "Compile timed out" in r.get_summary()
 
     def test_summary_failed(self):
         e = CompileMessage("A.pas", 1, 1, "msg", "error")
         r = CompileResult(status=CompileStatus.FAILED, errors=[e])
-        assert "编译失败" in r.get_summary()
+        assert "Compile failed" in r.get_summary()
         assert "1" in r.get_summary()
 
     def test_to_dict_includes_errors_and_warnings(self):
@@ -107,7 +107,7 @@ class TestCompileResult:
 
 
 # ============================================================
-# CompileOptions — __post_init__ 验证
+# CompileOptions — __post_init__ validation
 # ============================================================
 
 class TestCompileOptionsValidation:
@@ -118,19 +118,19 @@ class TestCompileOptionsValidation:
         assert opts.timeout == 600
 
     def test_invalid_warning_level_raises(self):
-        with pytest.raises(ValueError, match="警告级别"):
+        with pytest.raises(ValueError, match="Warning level"):
             CompileOptions(warning_level=5)
 
     def test_invalid_warning_level_negative(self):
-        with pytest.raises(ValueError, match="警告级别"):
+        with pytest.raises(ValueError, match="Warning level"):
             CompileOptions(warning_level=-1)
 
     def test_invalid_timeout_zero(self):
-        with pytest.raises(ValueError, match="超时时间"):
+        with pytest.raises(ValueError, match="Timeout"):
             CompileOptions(timeout=0)
 
     def test_invalid_timeout_negative(self):
-        with pytest.raises(ValueError, match="超时时间"):
+        with pytest.raises(ValueError, match="Timeout"):
             CompileOptions(timeout=-10)
 
     def test_all_output_types(self):
@@ -154,12 +154,12 @@ class TestCompileOptionsValidation:
 
     @pytest.mark.parametrize("extra_args", ["-VT", [""], ["   "], [1]])
     def test_invalid_extra_args_raise(self, extra_args):
-        with pytest.raises(ValueError, match="额外编译参数"):
+        with pytest.raises(ValueError, match="Extra compile arguments"):
             CompileOptions(extra_args=extra_args)
 
 
 # ============================================================
-# ProjectCompileRequest — __post_init__ 验证
+# ProjectCompileRequest — __post_init__ validation
 # ============================================================
 
 class TestProjectCompileRequestValidation:
@@ -177,11 +177,11 @@ class TestProjectCompileRequestValidation:
         assert req.project_path.endswith(".dpk")
 
     def test_empty_path_raises(self):
-        with pytest.raises(ValueError, match="项目路径不能为空"):
+        with pytest.raises(ValueError, match="Project path must not be empty"):
             ProjectCompileRequest(project_path="")
 
     def test_wrong_extension_raises(self):
-        with pytest.raises(ValueError, match="项目文件必须是"):
+        with pytest.raises(ValueError, match="Project file must be"):
             ProjectCompileRequest(project_path="C:\\Test\\Project.pas")
 
     def test_options_default(self):
@@ -190,7 +190,7 @@ class TestProjectCompileRequestValidation:
 
 
 # ============================================================
-# FileCompileRequest — __post_init__ 验证
+# FileCompileRequest — __post_init__ validation
 # ============================================================
 
 class TestFileCompileRequestValidation:
@@ -200,15 +200,15 @@ class TestFileCompileRequestValidation:
         assert req.file_path.endswith(".pas")
 
     def test_empty_path_raises(self):
-        with pytest.raises(ValueError, match="文件路径不能为空"):
+        with pytest.raises(ValueError, match="File path must not be empty"):
             FileCompileRequest(file_path="")
 
     def test_wrong_extension_raises(self):
-        with pytest.raises(ValueError, match="文件必须是 .pas"):
+        with pytest.raises(ValueError, match="File must be .pas"):
             FileCompileRequest(file_path="C:\\Test\\Unit.dpr")
 
     def test_invalid_warning_level(self):
-        with pytest.raises(ValueError, match="警告级别"):
+        with pytest.raises(ValueError, match="Warning level"):
             FileCompileRequest(file_path="Unit.pas", warning_level=10)
 
     def test_compiler_version_default_none(self):

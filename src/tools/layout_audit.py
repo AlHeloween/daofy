@@ -372,8 +372,8 @@ def _audit_overlap(file_path: str, siblings: list[LayoutControl]) -> list[Layout
                         rule_id="LAYOUT-001",
                         file=file_path,
                         component=f"{first.parent_name}/{first.name},{second.name}",
-                        message=f"同一容器内控件重叠: {_format_control(first)} 与 {_format_control(second)}。",
-                        recommendation="调整 Left/Top/Width/Height，或使用 Panel/Align 将两个区域分开。",
+                        message=f"Controls overlap in the same container: {_format_control(first)} and {_format_control(second)}.",
+                        recommendation="Adjust Left/Top/Width/Height, or use Panel/Align to separate the two areas.",
                     )
                 )
     return findings
@@ -406,10 +406,10 @@ def _audit_parent_bounds(
                     file=file_path,
                     component=f"{parent.name}/{control.name}",
                     message=(
-                        f"控件超出父容器边界: {_format_control(control)}，"
-                        f"父容器大小 Width={parent_rect.width}, Height={parent_rect.height}。"
+                        f"Control exceeds parent container bounds: {_format_control(control)}, "
+                        f"parent container size Width={parent_rect.width}, Height={parent_rect.height}."
                     ),
-                    recommendation="缩小控件、调整边距，或启用合适的 Align/Anchors/ScrollBox。",
+                    recommendation="Shrink the control, adjust margins, or enable appropriate Align/Anchors/ScrollBox.",
                 )
             )
     return findings
@@ -431,8 +431,8 @@ def _audit_column_alignment(file_path: str, siblings: list[LayoutControl]) -> li
                     rule_id="LAYOUT-003",
                     file=file_path,
                     component=cluster[0].parent_name,
-                    message=f"同列内容控件 Left 不一致，偏差 {spread}px: {names}。",
-                    recommendation=f"将同列内容控件 Left 统一到同一值，建议偏差不超过 {ALIGN_TOLERANCE}px。",
+                    message=f"Content controls in the same column have inconsistent Left values, deviation {spread}px: {names}.",
+                    recommendation=f"Unify Left values of content controls in the same column, recommended deviation no more than {ALIGN_TOLERANCE}px.",
                 )
             )
     return findings
@@ -460,8 +460,8 @@ def _audit_vertical_gaps(file_path: str, siblings: list[LayoutControl]) -> list[
                     rule_id="LAYOUT-004",
                     file=file_path,
                     component=ordered[0].parent_name,
-                    message=f"同列内容控件垂直间距不一致: {gaps}，偏差 {spread}px。",
-                    recommendation=f"使用统一间距，建议按 8px 基准网格组织，偏差不超过 {GAP_TOLERANCE}px。",
+                    message=f"Vertical gaps between content controls in the same column are inconsistent: {gaps}, deviation {spread}px.",
+                    recommendation=f"Use consistent spacing, recommended to organize on an 8px baseline grid, deviation no more than {GAP_TOLERANCE}px.",
                 )
             )
     return findings
@@ -502,8 +502,8 @@ def _audit_label_fields(file_path: str, siblings: list[LayoutControl]) -> list[L
                     rule_id="LAYOUT-005",
                     file=file_path,
                     component=f"{label.parent_name}/{label.name},{field.name}",
-                    message=f"文本标签与字段垂直中心未对齐，偏差 {center_delta:.1f}px。",
-                    recommendation=f"调整文本标签 Top 或字段 Top，使中心线偏差不超过 {ALIGN_TOLERANCE}px。",
+                    message=f"Text label and field vertical centers are not aligned, deviation {center_delta:.1f}px.",
+                    recommendation=f"Adjust the text label Top or field Top so the centerline deviation is no more than {ALIGN_TOLERANCE}px.",
                 )
             )
         if gap < LABEL_FIELD_MIN_GAP or gap > LABEL_FIELD_MAX_GAP:
@@ -513,8 +513,8 @@ def _audit_label_fields(file_path: str, siblings: list[LayoutControl]) -> list[L
                     rule_id="LAYOUT-006",
                     file=file_path,
                     component=f"{label.parent_name}/{label.name},{field.name}",
-                    message=f"文本标签与字段水平间距为 {gap}px，建议范围 {LABEL_FIELD_MIN_GAP}~{LABEL_FIELD_MAX_GAP}px。",
-                    recommendation="统一文本标签右边缘到字段左边缘的间距，避免过挤或断裂。",
+                    message=f"Horizontal gap between text label and field is {gap}px, recommended range {LABEL_FIELD_MIN_GAP}~{LABEL_FIELD_MAX_GAP}px.",
+                    recommendation="Unify the spacing from the text label's right edge to the field's left edge to avoid crowding or disconnect.",
                 )
             )
     return findings
@@ -543,8 +543,8 @@ def _audit_tab_order(file_path: str, siblings: list[LayoutControl]) -> list[Layo
             rule_id="LAYOUT-007",
             file=file_path,
             component=tab_controls[0].parent_name,
-            message=f"TabOrder 与视觉阅读顺序不一致。视觉顺序: {by_visual}; Tab 顺序: {by_tab}。",
-            recommendation="按从上到下、从左到右的视觉顺序重新设置 TabOrder。",
+            message=f"TabOrder is inconsistent with visual reading order. Visual order: {by_visual}; Tab order: {by_tab}.",
+            recommendation="Reset TabOrder according to the top-to-bottom, left-to-right visual order.",
         )
     ]
 
@@ -566,16 +566,16 @@ def _audit_resizable_manual_layout(
 
     missing_constraints: list[str] = []
     if resize_axes[0] and min_width < required_width:
-        missing_constraints.append(f"MinWidth={min_width}（至少需要 {required_width}）")
+        missing_constraints.append(f"MinWidth={min_width} (at least {required_width} required)")
     if resize_axes[1] and min_height < required_height:
-        missing_constraints.append(f"MinHeight={min_height}（至少需要 {required_height}）")
+        missing_constraints.append(f"MinHeight={min_height} (at least {required_height} required)")
     if not missing_constraints:
         return []
 
     control_names = ", ".join(item.name for item in manual[:8])
     if len(manual) > 8:
-        control_names += f" 等 {len(manual)} 个控件"
-    constraint_text = "，".join(missing_constraints)
+        control_names += f" and {len(manual)} controls total"
+    constraint_text = ", ".join(missing_constraints)
     return [
         LayoutFinding(
             severity="warning",
@@ -583,12 +583,12 @@ def _audit_resizable_manual_layout(
             file=file_path,
             component=parent.name,
             message=(
-                f"可调整大小的父容器内使用了绝对坐标布局: {control_names}；"
-                f"父容器最小尺寸不足，{constraint_text}，缩小窗口时内容可能溢出。"
+                f"Absolute-coordinate layout is used inside a resizable parent container: {control_names}; "
+                f"the parent container minimum size is insufficient, {constraint_text}; content may overflow when the window is shrunk."
             ),
             recommendation=(
-                "优先使用 Align 和分区容器组织布局；若必须保留绝对坐标，"
-                "请按手工布局内容边界设置父容器的 Constraints.MinWidth/MinHeight。"
+                "Prefer Align and partition containers to organize layout; if absolute coordinates must be retained, "
+                "set the parent container's Constraints.MinWidth/MinHeight according to the manual layout content bounds."
             ),
         )
     ]
@@ -610,8 +610,8 @@ def audit_dfm_layout_text(text: str, file_path: str = "<memory>") -> list[Layout
                 rule_id="LAYOUT-000",
                 file=file_path,
                 component="DFM",
-                message="无法解析 DFM 文本。",
-                recommendation="确认 DFM 为 Delphi 文本格式，或先转换二进制 DFM。",
+                message="Unable to parse DFM text.",
+                recommendation="Confirm the DFM is in Delphi text format, or convert the binary DFM first.",
             )
         ]
 
@@ -649,8 +649,8 @@ async def _audit_dfm_file(path: Path) -> list[LayoutFinding]:
                 rule_id="LAYOUT-000",
                 file=str(path),
                 component="DFM",
-                message="无法读取或转换 DFM 文件。",
-                recommendation="确认文件存在且 Delphi 编译器可用于二进制 DFM 转换。",
+                message="Unable to read or convert DFM file.",
+                recommendation="Confirm the file exists and the Delphi compiler is available for binary DFM conversion.",
             )
         ]
     text = Path(text_path).read_text(encoding="utf-8-sig", errors="replace")
@@ -666,38 +666,38 @@ def _severity_counts(findings: list[LayoutFinding]) -> dict[str, int]:
 
 def _format_layout_report(findings: list[LayoutFinding], scanned_files: list[str]) -> str:
     counts = _severity_counts(findings)
-    lines = ["# UI 布局审计报告", ""]
-    lines.append(f"**扫描 DFM 文件数**: {len(scanned_files)}")
-    lines.append(f"**发现总数**: {len(findings)}")
+    lines = ["# UI Layout Audit Report", ""]
+    lines.append(f"**Scanned DFM files**: {len(scanned_files)}")
+    lines.append(f"**Total findings**: {len(findings)}")
     lines.append("")
-    lines.append("| 级别 | 数量 |")
+    lines.append("| Severity | Count |")
     lines.append("|------|------|")
-    lines.append(f"| 严重 | {counts.get('critical', 0)} |")
-    lines.append(f"| 一般 | {counts.get('warning', 0)} |")
-    lines.append(f"| 建议 | {counts.get('suggestion', 0)} |")
+    lines.append(f"| Critical | {counts.get('critical', 0)} |")
+    lines.append(f"| Warning | {counts.get('warning', 0)} |")
+    lines.append(f"| Suggestion | {counts.get('suggestion', 0)} |")
     lines.append("")
 
     if not findings:
-        lines.append("## 结果")
+        lines.append("## Results")
         lines.append("")
-        lines.append("未发现明显的静态布局问题。建议继续用 `automate_delphi` 采集运行时 BoundsRect，并在 100%/125%/150% DPI 下做截图或 OCR 验证。")
+        lines.append("No obvious static layout issues found. It is recommended to continue using `automate_delphi` to collect runtime BoundsRect, and perform screenshot or OCR validation at 100%/125%/150% DPI.")
         return "\n".join(lines)
 
     labels = {
-        "critical": "严重",
-        "warning": "一般",
-        "suggestion": "建议",
+        "critical": "Critical",
+        "warning": "Warning",
+        "suggestion": "Suggestion",
     }
     for severity in ("critical", "warning", "suggestion"):
         items = [item for item in findings if item.severity == severity]
         if not items:
             continue
-        lines.append(f"## {labels[severity]}问题 ({len(items)} 项)")
+        lines.append(f"## {labels[severity]} Issues ({len(items)} items)")
         lines.append("")
         for item in items:
             lines.append(f"- **[{item.rule_id}] `{item.file}` `{item.component}`**")
-            lines.append(f"  - 问题: {item.message}")
-            lines.append(f"  - 建议: {item.recommendation}")
+            lines.append(f"  - Issue: {item.message}")
+            lines.append(f"  - Recommendation: {item.recommendation}")
             lines.append("")
 
     return "\n".join(lines)
@@ -715,9 +715,9 @@ async def run_layout_audit(arguments: dict[str, Any]) -> CallToolResult:
                 TextContent(
                     type="text",
                     text=(
-                        "# 参数错误\n\n"
-                        "layout 模式需要 `base_dir` 或 `file_path` 参数。\n\n"
-                        '示例: `delphi_project(action="layout", base_dir="src")`'
+                        "# Parameter error\n\n"
+                        "layout mode requires a `base_dir` or `file_path` parameter.\n\n"
+                        'Example: `delphi_project(action="layout", base_dir="src")`'
                     ),
                 )
             ],
@@ -729,7 +729,7 @@ async def run_layout_audit(arguments: dict[str, Any]) -> CallToolResult:
         candidate = Path(file_path)
         if not candidate.exists():
             return CallToolResult(
-                content=[TextContent(type="text", text=f"# 文件不存在\n\n`{file_path}` 不存在，请检查路径。")],
+                content=[TextContent(type="text", text=f"# File does not exist\n\n`{file_path}` does not exist, please check the path.")],
                 isError=True,
             )
         paths.append(candidate)
@@ -737,14 +737,14 @@ async def run_layout_audit(arguments: dict[str, Any]) -> CallToolResult:
         base = Path(base_dir)
         if not base.exists():
             return CallToolResult(
-                content=[TextContent(type="text", text=f"# 路径不存在\n\n`{base_dir}` 不存在，请检查路径。")],
+                content=[TextContent(type="text", text=f"# Path does not exist\n\n`{base_dir}` does not exist, please check the path.")],
                 isError=True,
             )
         paths.extend(sorted(base.rglob("*.dfm")))
 
     if not paths:
         return CallToolResult(
-            content=[TextContent(type="text", text=f"# UI 布局审计报告\n\n在 `{base_dir or file_path}` 中未找到 .dfm 文件。")]
+            content=[TextContent(type="text", text=f"# UI Layout Audit Report\n\nNo .dfm files found in `{base_dir or file_path}`.")]
         )
 
     findings: list[LayoutFinding] = []
@@ -766,3 +766,4 @@ async def run_layout_audit(arguments: dict[str, Any]) -> CallToolResult:
     else:
         text = _format_layout_report(findings, scanned_files)
     return CallToolResult(content=[TextContent(type="text", text=text)])
+

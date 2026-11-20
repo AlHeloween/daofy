@@ -1,4 +1,4 @@
-"""Delphi 插件工具 handlers — 从 server.py run_server() 闭包中提取。"""
+"""Delphi plugin tool handlers — extracted from the server.py run_server() closure."""
 import asyncio
 import sys
 import winreg
@@ -22,7 +22,7 @@ from src.utils.logger import init_default_logger
 
 logger = init_default_logger()
 
-# ── 工具模块导入（每个 handler 自给自足）──
+# ── Tool module imports (each handler is self-contained) ──
 from src.tools.project import handle_project as _handle_project
 from src.tools import file_tool
 from src.tools import pasfmt
@@ -41,11 +41,11 @@ from src.tools.delphi_rtti import handle_delphi_rtti as _handle_delphi_rtti
 
 
 # ============================================================
-# 辅助函数 — 仅被 Delphi handler 使用
+# Helper functions — used only by Delphi handlers
 # ============================================================
 
 def _coerce_bool(val, default: bool = False) -> bool:
-    """将任意输入安全转换为 bool。"""
+    """Safely convert any input to bool."""
     if isinstance(val, bool):
         return val
     if isinstance(val, str):
@@ -56,7 +56,7 @@ def _coerce_bool(val, default: bool = False) -> bool:
 
 
 def _auto_paths() -> list[str]:
-    """返回需要注册到 Delphi 搜索路径的目录列表。"""
+    """Return the list of directories to register in the Delphi search path."""
     root = Path(__file__).resolve().parents[3]
     return [
         str(root / "tools" / "auto"),
@@ -65,7 +65,7 @@ def _auto_paths() -> list[str]:
 
 
 def _register_path_for_platform(key, reg_path: str, path: str, platform: str, results: list[dict]):
-    """将单个路径注册到指定平台的 Delphi 搜索路径。"""
+    """Register a single path in the Delphi search path for the given platform."""
     try:
         search_path, _ = winreg.QueryValueEx(key, "Search Path")
         paths = search_path.split(";")
@@ -87,12 +87,12 @@ def _register_path_for_platform(key, reg_path: str, path: str, platform: str, re
         results.append({
             "platform": platform, "status": "error",
             "path": path,
-            "message": f"写入搜索路径失败: {e}",
+            "message": f"Failed to write search path: {e}",
         })
 
 
 def _register_daofy_auto(version: str, platforms: list[str] | None = None) -> list[dict]:
-    """将 DaofyAutomation + StackTrace 路径写入 Delphi 全局搜索路径（注册表）。"""
+    """Write the DaofyAutomation + StackTrace paths into the global Delphi search path (registry)."""
     if platforms is None:
         platforms = ["Win32", "Win64"]
 
@@ -113,7 +113,7 @@ def _register_daofy_auto(version: str, platforms: list[str] | None = None) -> li
                 results.append({
                     "platform": platform, "status": "skipped",
                     "path": p,
-                    "message": f"注册表路径不存在: HKCU\\{reg_path}",
+                    "message": f"Registry path does not exist: HKCU\\{reg_path}",
                 })
             continue
         except PermissionError:
@@ -121,7 +121,7 @@ def _register_daofy_auto(version: str, platforms: list[str] | None = None) -> li
                 results.append({
                     "platform": platform, "status": "error",
                     "path": p,
-                    "message": "权限不足，无法写入注册表",
+                    "message": "Insufficient permissions to write to the registry",
                 })
             continue
         except Exception as e:
@@ -129,7 +129,7 @@ def _register_daofy_auto(version: str, platforms: list[str] | None = None) -> li
                 results.append({
                     "platform": platform, "status": "error",
                     "path": p,
-                    "message": f"打开注册表失败: {e}",
+                    "message": f"Failed to open registry: {e}",
                 })
             continue
 
@@ -146,7 +146,7 @@ def _register_daofy_auto(version: str, platforms: list[str] | None = None) -> li
 
 
 # ============================================================
-# 工具 handler 函数
+# Tool handler functions
 # ============================================================
 
 async def _handle_project_tool(arguments: dict) -> Any:
@@ -176,16 +176,16 @@ async def _handle_delphi_kb(arguments: dict) -> Any:
             directory = arguments.get("directory")
             start_url = arguments.get("start_url")
             urls = arguments.get("urls", [])
-            # 只有当没有指定 start_url 和 urls（纯目录扫描）时才自动检测帮助目录
+            # Only auto-detect the help directory when neither start_url nor urls is specified (pure directory scan)
             if not directory and not start_url and not urls:
                 detected = _auto_detect_delphi_help_dir()
                 if detected:
                     directory = detected
-                    logger.info(f"自动检测到 Delphi 帮助目录: {directory}")
+                    logger.info(f"Auto-detected Delphi help directory: {directory}")
                 else:
-                    logger.warning("未提供 directory 且未检测到 Delphi 帮助目录")
+                    logger.warning("No directory provided and no Delphi help directory detected")
 
-            # 文档知识库重建确认：force_rebuild 会清除现有所有文档
+            # Document KB rebuild confirmation: force_rebuild clears all existing documents
             if rebuild:
                 try:
                     _scanner = doc_tools._get_scanner()
@@ -194,27 +194,27 @@ async def _handle_delphi_kb(arguments: dict) -> Any:
                     if _total > 0:
                         _confirm = _coerce_bool(arguments.get("confirm"), False)
                         if not _confirm:
-                            _msg = [f"⚠️ **确认重建文档知识库**\n\n当前知识库包含 **{_total}** 篇文档：\n"]
+                            _msg = [f"⚠️ **Confirm rebuilding the document knowledge base**\n\nThe current knowledge base contains **{_total}** documents:\n"]
                             _by_type = _stats.get('by_type', {})
                             if _by_type:
-                                _msg.append("按类型：\n")
+                                _msg.append("By type:\n")
                                 for _t, _c in sorted(_by_type.items(), key=lambda x: x[1], reverse=True):
                                     _msg.append(f"  - {_t}: {_c}\n")
                             _by_ext = _stats.get('by_extension', {})
                             if _by_ext:
-                                _msg.append("按扩展名：\n")
+                                _msg.append("By extension:\n")
                                 for _e, _c in sorted(_by_ext.items(), key=lambda x: x[1], reverse=True):
                                     _msg.append(f"  - {_e}: {_c}\n")
                             _msg.append(
-                                "\n`rebuild=True` 将 **清除以上所有文档** 后重新构建，原有内容不可恢复。\n\n"
-                                "如需保留旧内容，请：\n"
-                                "  1. 在本次构建参数中同时包含旧的文档源（如多个 URL 或目录），或\n"
-                                "  2. 移除 `rebuild=True` 改用增量添加\n\n"
-                                "**确认继续请添加参数 `confirm=True`**"
+                                "\n`rebuild=True` will **clear all the documents above** and rebuild from scratch; the original content cannot be recovered.\n\n"
+                                "To keep the old content, either:\n"
+                                "  1. Include the old document sources (e.g. multiple URLs or directories) in this build's parameters, or\n"
+                                "  2. Remove `rebuild=True` and use incremental addition instead\n\n"
+                                "**To confirm and continue, add the parameter `confirm=True`**"
                             )
                             return CallToolResult(content=[TextContent(type="text", text="".join(_msg))])
                 except Exception as _e:
-                    logger.warning(f"检查文档知识库状态失败，跳过确认: {_e}")
+                    logger.warning(f"Failed to check document knowledge base status, skipping confirmation: {_e}")
 
             task_params = {"urls": arguments.get("urls", []), "directory": directory,
                            "extensions": arguments.get("extensions", [".chm"]),
@@ -235,21 +235,21 @@ async def _handle_delphi_kb(arguments: dict) -> Any:
     elif action == "build_embedding":
         pp = _resolve_project_path(arguments.get("project_path"))
         if not pp:
-            return {"error": "未检测到项目路径"}
+            return {"error": "Project path not detected"}
         return await async_tools.start_async_task({"task_type": "build_embedding", "task_params": {"project_path": pp},
                                                      "show_progress": True,
                                                      "_on_complete": arguments.get("_on_complete")})
     elif action == "scan":
-        return await doc_tools.scan_documents(arguments) if kb_type == "document" else {"error": "action=scan 仅支持 kb_type=document"}
+        return await doc_tools.scan_documents(arguments) if kb_type == "document" else {"error": "action=scan only supports kb_type=document"}
     elif action == "web":
-        return await doc_tools.add_web_document(arguments) if kb_type == "document" else {"error": "action=web 仅支持 kb_type=document"}
+        return await doc_tools.add_web_document(arguments) if kb_type == "document" else {"error": "action=web only supports kb_type=document"}
     elif action == "read":
         if arguments.get("url") or arguments.get("doc_id"):
             return await doc_tools.read_document(arguments)
         elif arguments.get("file_path"):
             return await read_source_file(arguments)
-        return {"error": "action=read 需要 url/doc_id 或 file_path 参数"}
-    return {"error": f"未知action: {action}"}
+        return {"error": "action=read requires url/doc_id or file_path parameter"}
+    return {"error": f"Unknown action: {action}"}
 
 
 async def _handle_file_tool(arguments: dict) -> Any:
@@ -257,7 +257,7 @@ async def _handle_file_tool(arguments: dict) -> Any:
 
 
 async def _handle_manage_component(arguments: dict) -> Any:
-    # manage_component 是 async 函数，直接调用
+    # manage_component is an async function, call it directly
     return await _manage_component(
         action=arguments.get("action", "create"),
         target_dfm=arguments.get("target_dfm"),
@@ -287,7 +287,7 @@ async def _handle_check_environment(arguments: dict) -> Any:
         return await pasfmt.download_and_install_pasfmt(install_dir=arguments.get("install_dir"))
     elif action == "format_install":
         return await pasfmt.download_and_install_pasfmt_rad(delphi_version=arguments.get("delphi_version", "11"), install_dir=arguments.get("install_dir"))
-    return {"error": f"未知action: {action}"}
+    return {"error": f"Unknown action: {action}"}
 
 
 async def _handle_package(arguments: dict) -> Any:
@@ -301,14 +301,12 @@ async def _handle_get_coding_rules(arguments: dict) -> Any:
         examples=arguments.get("examples"),
         language=arguments.get("language"),
     )
-
-
 async def _handle_automate_delphi(arguments: dict) -> dict:
-    """处理 automate_delphi 工具调用（自动检测或按 action 路由）。"""
+    """Handle automate_delphi tool calls (auto-detect or route by action)."""
     requested_action = arguments.get("action", "auto")
     action = requested_action
 
-    # ── prepare：注册 DaofyAutomation 到 Delphi 全局搜索路径 ──
+    # ── prepare: register DaofyAutomation into the Delphi global search path ──
     if action == "prepare":
         try:
             version = _get_dv()
@@ -318,7 +316,7 @@ async def _handle_automate_delphi(arguments: dict) -> dict:
         if not version:
             return {
                 "action": "prepare", "status": "error",
-                "message": "未检测到已安装的 Delphi 编译器",
+                "message": "No installed Delphi compiler detected",
             }
 
         results = _register_daofy_auto(version)
@@ -334,10 +332,10 @@ async def _handle_automate_delphi(arguments: dict) -> dict:
             "results": results,
             "status": "success" if errors == 0 else "partial",
             "message": (
-                f"Delphi {version}: 新增 {added} 个平台, "
-                f"已存在 {already} 个平台"
-                + (f", {skipped} 个跳过" if skipped else "")
-                + (f", {errors} 个失败" if errors else "")
+                f"Delphi {version}: added {added} platform(s), "
+                f"{already} already present"
+                + (f", {skipped} skipped" if skipped else "")
+                + (f", {errors} failed" if errors else "")
             ),
         }
 
@@ -348,9 +346,9 @@ async def _handle_automate_delphi(arguments: dict) -> dict:
     subsystem = None
 
     if not app_path:
-        return {"status": "error", "message": "缺少必需参数: app_path"}
+        return {"status": "error", "message": "Missing required parameter: app_path"}
 
-    # auto 检测：读 PE 头 Subsystem
+    # auto detection: read the Subsystem from the PE header
     if action == "auto":
         subsystem = _detect_exe_subsystem(app_path)
         if subsystem == IMAGE_SUBSYSTEM_WINDOWS_CUI:
@@ -358,7 +356,7 @@ async def _handle_automate_delphi(arguments: dict) -> dict:
         elif subsystem == IMAGE_SUBSYSTEM_WINDOWS_GUI:
             action = "gui"
         else:
-            # 无法检测时默认 gui（保持兼容）
+            # default to gui when detection fails (keeps compatibility)
             action = "gui"
 
     if action == "gui":
@@ -367,7 +365,7 @@ async def _handle_automate_delphi(arguments: dict) -> dict:
         wait_timeout = arguments.get("wait_timeout", 10)
 
         if not script:
-            return {"status": "error", "message": "gui 模式缺少必需参数: script"}
+            return {"status": "error", "message": "gui mode missing required parameter: script"}
 
         try:
             result = await asyncio.wait_for(
@@ -389,7 +387,7 @@ async def _handle_automate_delphi(arguments: dict) -> dict:
         except asyncio.TimeoutError:
             return {
                 "status": "failed",
-                "message": "automate_delphi(gui) 执行超时（300s）",
+                "message": "automate_delphi(gui) execution timed out (300s)",
             }
         except Exception as e:
             return {"status": "failed", "message": f"automate_delphi(gui) failed: {e}"}
@@ -420,7 +418,7 @@ async def _handle_automate_delphi(arguments: dict) -> dict:
         except asyncio.TimeoutError:
             return {
                 "status": "failed",
-                "message": "automate_delphi(console) 执行超时",
+                "message": "automate_delphi(console) execution timed out",
                 "action": "console",
             }
         except Exception as e:
@@ -434,9 +432,9 @@ async def _handle_automate_delphi(arguments: dict) -> dict:
         test_timeout = arguments.get("test_timeout", 30)
 
         if not tests:
-            return {"status": "error", "message": "test 模式缺少必需参数: tests"}
+            return {"status": "error", "message": "test mode missing required parameter: tests"}
 
-        # 提交后台异步执行，避免 MCP 通道超时
+        # submit for background async execution to avoid MCP channel timeouts
         try:
             task_id = _submit_run_tests(
                 app_path=app_path,
@@ -450,12 +448,12 @@ async def _handle_automate_delphi(arguments: dict) -> dict:
             return {
                 "status": "submitted",
                 "task_id": task_id,
-                "message": "测试任务已提交后台执行",
+                "message": "Test task submitted for background execution",
                 "requested_action": requested_action,
                 "resolved_action": action,
             }
         except Exception as e:
-            return {"status": "failed", "message": f"automate_delphi(test) 提交失败: {e}"}
+            return {"status": "failed", "message": f"automate_delphi(test) submit failed: {e}"}
 
     elif action == "list_tests":
         visibility = arguments.get("visibility", "public,published")
@@ -479,23 +477,23 @@ async def _handle_automate_delphi(arguments: dict) -> dict:
         except asyncio.TimeoutError:
             return {
                 "status": "error",
-                "message": "automate_delphi(list_tests) 执行超时（30s）",
+                "message": "automate_delphi(list_tests) execution timed out (30s)",
             }
         except Exception as e:
             return {"status": "error", "message": f"automate_delphi(list_tests) failed: {e}"}
 
     else:
-        return {"status": "error", "message": f"未知 action: {action}"}
+        return {"status": "error", "message": f"Unknown action: {action}"}
 
 
 # ============================================================
-# 导出：工具名 → handler 映射
+# Export: tool name → handler mapping
 # ============================================================
 DELPHI_HANDLERS = {
     "delphi_project": _handle_project_tool,
     "delphi_kb": _handle_delphi_kb,
     "delphi_file": _handle_file_tool,
-    "file_tool": _handle_file_tool,  # 旧名兼容别名
+    "file_tool": _handle_file_tool,  # legacy alias
     "manage_component": _handle_manage_component,
     "check_environment": _handle_check_environment,
     "package": _handle_package,
@@ -504,18 +502,18 @@ DELPHI_HANDLERS = {
     "delphi_rtti": _handle_delphi_rtti,
 }
 
-# ── 工具描述 + inputSchema — list_tools() 从 registry 收取，不再硬编码在 server.py ──
+# ── Tool descriptions + inputSchema — list_tools() collects them from the registry, no longer hardcoded in server.py ──
 
 DELPHI_TOOL_DESCRIPTIONS: dict[str, str] = {
-    "delphi_project": "Delphi 项目编译、配置、审计和部署。参数随 action 变化；调用前先执行 tool_help(tool_name='delphi_project', action='<action>')。",
-    "delphi_kb": "Delphi 知识库搜索和管理。参数随 action 变化；调用前先执行 tool_help(tool_name='delphi_kb', action='<action>')。",
-    "delphi_file": "Delphi 文件统一入口：read/write/search/grep/replace/insert/delete/backup。即使只是读取 .pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx 也必须用 delphi_file，禁止用内置 Read/Edit/Write/grep/apply_patch；参数随 action 变化，调用前先执行 tool_help(tool_name='delphi_file', action='<action>')。",
-    "manage_component": "DFM 组件增删改和生成。参数随 action 变化；调用前先执行 tool_help(tool_name='manage_component', action='<action>')。",
-    "check_environment": "环境检查、RAD Studio/Delphi 编译器 detect/check/install；定位 dcc32/dcc64、PATH/BPL。参数随 action 变化；调用前先执行 tool_help(tool_name='check_environment', action='<action>')。",
-    "package": "组件包编译、安装和列出。参数随 action 变化；调用前先执行 tool_help(tool_name='package', action='<action>')。",
-    "get_coding_rules": "编码规则获取工具 — writing/compile/review/automation 前获取 Delphi 或 Lazarus/FPC 编码规范，支持按语言/章节分段获取",
-    "automate_delphi": "Delphi 自动化测试。参数随 action 变化；调用前先执行 tool_help(tool_name='automate_delphi', action='<action>')。",
-    "delphi_rtti": "RTTI 发现和调用。参数随 action 变化；调用前先执行 tool_help(tool_name='delphi_rtti', action='<action>')。",
+    "delphi_project": "Delphi project compilation, configuration, auditing and deployment. Parameters vary by action; before calling, first run tool_help(tool_name='delphi_project', action='<action>').",
+    "delphi_kb": "Delphi knowledge base search and management. Parameters vary by action; before calling, first run tool_help(tool_name='delphi_kb', action='<action>').",
+    "delphi_file": "Unified entry point for Delphi files: read/write/search/grep/replace/insert/delete/backup. Even for merely reading .pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx you must use delphi_file; using the built-in Read/Edit/Write/grep/apply_patch is forbidden; parameters vary by action, before calling first run tool_help(tool_name='delphi_file', action='<action>').",
+    "manage_component": "Adding, removing, modifying and generating DFM components. Parameters vary by action; before calling, first run tool_help(tool_name='manage_component', action='<action>').",
+    "check_environment": "Environment check, RAD Studio/Delphi compiler detect/check/install; locates dcc32/dcc64, PATH/BPL. Parameters vary by action; before calling, first run tool_help(tool_name='check_environment', action='<action>').",
+    "package": "Component package compilation, installation and listing. Parameters vary by action; before calling, first run tool_help(tool_name='package', action='<action>').",
+    "get_coding_rules": "Coding rules retrieval tool — fetch Delphi or Lazarus/FPC coding standards before writing/compile/review/automation, supports retrieving in sections by language/chapter",
+    "automate_delphi": "Delphi automated testing. Parameters vary by action; before calling, first run tool_help(tool_name='automate_delphi', action='<action>').",
+    "delphi_rtti": "RTTI discovery and invocation. Parameters vary by action; before calling, first run tool_help(tool_name='delphi_rtti', action='<action>').",
 }
 
 DELPHI_TOOL_SCHEMAS: dict[str, dict] = {
@@ -529,11 +527,11 @@ DELPHI_TOOL_SCHEMAS: dict[str, dict] = {
                          "remove_source", "audit", "ast", "runtime", "layout",
                          "devices", "deploy"],
             },
-            "project_path": {"type": "string", "description": "项目文件绝对路径 (.dproj/.dpr/.dpk/.groupproj)，如 C:\\project\\App.dproj"},
+            "project_path": {"type": "string", "description": "Absolute path to the project file (.dproj/.dpr/.dpk/.groupproj), e.g. C:\\project\\App.dproj"},
             "extra_args": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "附加编译参数（如 [\"/p:DCC_DebugInfoInTds=true\"]）；其它 action 的参数请先调用 tool_help",
+                "description": "Extra compile arguments (e.g. [\"/p:DCC_DebugInfoInTds=true\"]); for parameters of other actions, call tool_help first",
             },
         },
         "required": ["action"]
@@ -557,22 +555,22 @@ DELPHI_TOOL_SCHEMAS: dict[str, dict] = {
                     {"type": "string"},
                     {"type": "array", "items": {"type": "string"}},
                 ],
-                "description": "文件绝对路径；grep 还支持目录绝对路径或路径数组",
+                "description": "Absolute file path; grep also supports an absolute directory path or an array of paths",
             },
             "edits": {
                 "type": "array",
-                "description": "批量编辑操作（write/replace/insert/delete）",
+                "description": "Batch edit operations (write/replace/insert/delete)",
                 "items": {
                     "type": "object",
                     "properties": {
-                        "start_line": {"type": "integer", "description": "起始行号（1-indexed 闭区间）"},
-                        "end_line": {"type": "integer", "description": "结束行号（1-indexed 闭区间）"},
-                        "content": {"type": "string", "description": "新内容"},
-                        "old_content": {"type": "string", "description": "原内容（非空时作为写入前校验，防止覆盖非预期改动）"},
+                        "start_line": {"type": "integer", "description": "Start line number (1-indexed inclusive)"},
+                        "end_line": {"type": "integer", "description": "End line number (1-indexed inclusive)"},
+                        "content": {"type": "string", "description": "New content"},
+                        "old_content": {"type": "string", "description": "Original content (when non-empty, used as a pre-write check to prevent overwriting unexpected changes)"},
                         "position": {
                             "type": "string",
                             "enum": ["before", "after"],
-                            "description": "insert 相对 start_line 锚点的插入位置",
+                            "description": "Insert position relative to the start_line anchor for insert",
                         },
                     },
                     "required": ["start_line"],
@@ -580,50 +578,50 @@ DELPHI_TOOL_SCHEMAS: dict[str, dict] = {
             },
             "force": {
                 "type": "boolean",
-                "description": "跳过连续重复行检测",
+                "description": "Skip consecutive duplicate line detection",
                 "default": False,
             },
             "dry_run": {
                 "type": "boolean",
-                "description": "预览变更，不实际写入",
+                "description": "Preview changes without actually writing",
                 "default": False,
             },
-            "encoding": {"type": "string", "description": "文件编码（自动检测 BOM）"},
-            "backup": {"type": "boolean", "description": "写入前创建备份"},
-            "auto_format": {"type": "boolean", "description": "写入后自动格式化"},
-            "allow_dirty": {"type": "boolean", "description": "允许写入已标记为脏的文件"},
-            "project_path": {"type": "string", "description": "项目绝对路径，用于限定文件范围或解析相对路径"},
-            "start_line": {"type": "integer", "minimum": 1, "description": "read 起始行号（1-indexed inclusive）"},
-            "end_line": {"type": "integer", "minimum": 1, "description": "read 结束行号（1-indexed inclusive）"},
-            "limit": {"type": "integer", "minimum": 1, "description": "read 最大返回行数"},
-            "show_line_numbers": {"type": "boolean", "description": "read 输出 1-indexed 行号"},
+            "encoding": {"type": "string", "description": "File encoding (BOM auto-detected)"},
+            "backup": {"type": "boolean", "description": "Create a backup before writing"},
+            "auto_format": {"type": "boolean", "description": "Auto-format after writing"},
+            "allow_dirty": {"type": "boolean", "description": "Allow writing to files already marked as dirty"},
+            "project_path": {"type": "string", "description": "Absolute project path, used to restrict the file scope or resolve relative paths"},
+            "start_line": {"type": "integer", "minimum": 1, "description": "read start line number (1-indexed inclusive)"},
+            "end_line": {"type": "integer", "minimum": 1, "description": "read end line number (1-indexed inclusive)"},
+            "limit": {"type": "integer", "minimum": 1, "description": "read maximum number of lines returned"},
+            "show_line_numbers": {"type": "boolean", "description": "read output with 1-indexed line numbers"},
             "search_type": {"type": "string", "enum": ["path", "class", "function", "record"]},
             "search_in": {"type": "string", "enum": ["all", "delphi", "project", "thirdparty"]},
-            "type_name": {"type": "string", "description": "类名或接口名"},
-            "function_name": {"type": "string", "description": "函数或过程名"},
-            "class_name": {"type": "string", "description": "类名"},
-            "record_name": {"type": "string", "description": "record 类型名"},
-            "mode": {"type": "string", "enum": ["file", "code", "check"], "description": "format 模式"},
-            "code": {"type": "string", "description": "format mode=code 时的代码文本"},
-            "config_path": {"type": "string", "description": "pasfmt 配置文件绝对路径"},
+            "type_name": {"type": "string", "description": "Class or interface name"},
+            "function_name": {"type": "string", "description": "Function or procedure name"},
+            "class_name": {"type": "string", "description": "Class name"},
+            "record_name": {"type": "string", "description": "Record type name"},
+            "mode": {"type": "string", "enum": ["file", "code", "check"], "description": "format mode"},
+            "code": {"type": "string", "description": "Code text when format mode=code"},
+            "config_path": {"type": "string", "description": "Absolute path to the pasfmt config file"},
             "uses_style": {"type": "string", "enum": ["compact", "pasfmt_default"]},
-            "to_encoding": {"type": "string", "description": "encode 目标编码"},
-            "from_encoding": {"type": "string", "description": "encode 源编码"},
+            "to_encoding": {"type": "string", "description": "encode target encoding"},
+            "from_encoding": {"type": "string", "description": "encode source encoding"},
             "uses_action": {"type": "string", "enum": ["add", "remove"]},
-            "unit_name": {"type": "string", "description": "uses 单元名"},
+            "unit_name": {"type": "string", "description": "uses unit name"},
             "uses_section": {"type": "string", "enum": ["interface", "implementation"]},
             "backup_action": {"type": "string", "enum": ["create", "list", "restore"]},
-            "version": {"type": "integer", "minimum": 1, "description": "备份版本号"},
-            "include": {"type": "string", "description": "grep 目录包含 glob；逗号或分号分隔多个模式"},
-            "exclude": {"type": "string", "description": "grep 目录排除 glob；逗号或分号分隔多个模式"},
-            "pattern": {"type": "string", "description": "grep 单个正则模式"},
-            "patterns": {"type": "array", "items": {"type": "string"}, "description": "grep 多个 OR 正则模式"},
-            "filter_pattern": {"type": "string", "description": "grep 二级 AND 过滤模式"},
-            "exclude_pattern": {"type": "string", "description": "grep NOT 排除模式"},
-            "replace": {"type": "string", "description": "grep 替换文本"},
-            "context": {"type": "integer", "minimum": 0, "description": "grep 上下文行数"},
-            "count": {"type": "integer", "minimum": 1, "description": "grep 每文件最大返回结果数"},
-            "target_encoding": {"type": "string", "description": "fix_garbled 目标编码"},
+            "version": {"type": "integer", "minimum": 1, "description": "Backup version number"},
+            "include": {"type": "string", "description": "grep directory include glob; separate multiple patterns with commas or semicolons"},
+            "exclude": {"type": "string", "description": "grep directory exclude glob; separate multiple patterns with commas or semicolons"},
+            "pattern": {"type": "string", "description": "grep single regex pattern"},
+            "patterns": {"type": "array", "items": {"type": "string"}, "description": "grep multiple OR regex patterns"},
+            "filter_pattern": {"type": "string", "description": "grep secondary AND filter pattern"},
+            "exclude_pattern": {"type": "string", "description": "grep NOT exclusion pattern"},
+            "replace": {"type": "string", "description": "grep replacement text"},
+            "context": {"type": "integer", "minimum": 0, "description": "grep context line count"},
+            "count": {"type": "integer", "minimum": 1, "description": "grep max results returned per file"},
+            "target_encoding": {"type": "string", "description": "fix_garbled target encoding"},
         },
         "required": ["action"]
     },
@@ -655,9 +653,9 @@ DELPHI_TOOL_SCHEMAS: dict[str, dict] = {
                 "type": "string",
                 "enum": ["delphi", "lazarus"],
                 "default": "delphi",
-                "description": "编程语言：delphi（默认）或 lazarus",
+                "description": "Programming language: delphi (default) or lazarus",
             },
-            "examples": {"type": "string", "description": "示例名称，如 naming/formatting/error-handling/dirty-flag/debug-log-template。按名称加载 coding-rules/{language}/examples/ 下的示例文件"},
+            "examples": {"type": "string", "description": "Example name, e.g. naming/formatting/error-handling/dirty-flag/debug-log-template. Loads the example file under coding-rules/{language}/examples/ by name"},
         }
     },
     "automate_delphi": {

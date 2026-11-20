@@ -1,13 +1,13 @@
 """
-Delphi 源码 Chunker — 将 .pas 文件切割为语义块
+Delphi source chunker — splits .pas files into semantic chunks
 
-不依赖 ZVec 或其他外部库，纯文本处理。
-输入: .pas 文件路径
-输出: chunk 字典列表
+No dependency on ZVec or any other external library; pure text processing.
+Input: .pas file path
+Output: list of chunk dicts
 
-Chunk 策略:
-  - class / record / interface / object → 独立结构 chunk（含完整 body）
-  - 其余内容（const、type alias、enum、function 等）→ 一个文件级兜底 chunk
+Chunk strategy:
+  - class / record / interface / object → standalone structural chunk (with the complete body)
+  - everything else (const, type alias, enum, function, etc.) → one file-level fallback chunk
 """
 
 import re
@@ -18,24 +18,25 @@ from src.utils.file_backup import detect_encoding
 
 logger = logging.getLogger(__name__)
 
-# ── 常量 ──
+# ── Constants ──
 STRUCTURED_TYPES = {'class', 'record', 'interface', 'object'}
-"""需要独立结构 chunk 的类型"""
+"""Types that get their own structural chunk"""
 
 
 def _sanitize_unicode(text: str) -> str:
-    """移除无法编码为 UTF-8 的孤立代理项（lone surrogate）。
+    """Remove lone surrogates that cannot be encoded as UTF-8.
 
-    部分源文件编码被误判（如 UTF-16 截断、混合编码）时，读入的文本可能包含
-    孤立代理项（U+D800–U+DFFF）。这类字符无法编码为 UTF-8，传入 zvec 等
-    Rust 绑定集合的 Doc.insert 会抛 ``expected STRING, got str``，导致索引崩溃。
-    这里统一替换为 U+FFFD（替换符），保证 chunk 输出始终可安全编码。
+    When a source file's encoding is misdetected (e.g. truncated UTF-16, mixed encodings),
+    the text read in may contain lone surrogates (U+D800–U+DFFF). Such characters cannot be
+    encoded as UTF-8, and Doc.insert on Rust-bound collections such as zvec raises
+    ``expected STRING, got str``, crashing the index. They are replaced here with U+FFFD
+    (the replacement character), so the chunk output is always safely encodable.
 
     Args:
-        text: 原始文本
+        text: the original text
 
     Returns:
-        已清理的文本（UTF-8 可编码）
+        The cleaned text (UTF-8 encodable)
     """
     try:
         text.encode('utf-8')
@@ -45,16 +46,16 @@ def _sanitize_unicode(text: str) -> str:
 
 
 # ═══════════════════════════════════════════
-# 文本预处理
+# Text preprocessing
 # ═══════════════════════════════════════════
 
 def _strip_comments(text: str) -> str:
-    """移除 Delphi 注释，保留行结构不变"""
-    # 花括号注释 { ... }
+    """Remove Delphi comments, leaving the line structure unchanged"""
+    # Brace comments { ... }
     text = re.sub(r'\{[^}]*\}', ' ', text)
-    # 星号括号注释 (* ... *)
+    # Star-paren comments (* ... *)
     text = re.sub(r'\(\*[^*]*\*\)', ' ', text)
-    # 双斜杠注释 //（需要避开字符串内的 //）
+    # Double-slash comments // (must skip // inside strings)
     lines = text.split('\n')
     result = []
     for line in lines:
@@ -69,13 +70,13 @@ def _strip_comments(text: str) -> str:
     return '\n'.join(result)
 
 
-# ── 声明行正则（一行搞定） ──
+# ── Declaration regexes (one line each) ──
 _RE_CLASS_DECL = re.compile(
     r'^\s*(\w[\w.]*)\s*=\s*'
     r'(class|record|interface|object)\s*'
-    r'(?:\(\s*([\w.,\s]+?)\s*\))?'      # 基类（可选）
+    r'(?:\(\s*([\w.,\s]+?)\s*\))?'      # base class (optional)
     r'(?:\s+class\s+)?'                  # class helper / class of
-    r'(?:of\s+\w[\w.]*)?'                # 枚举基类型
+    r'(?:of\s+\w[\w.]*)?'                # enum base type
     r'(?:\s*;)?',
     re.IGNORECASE
 )
@@ -86,45 +87,45 @@ _RE_USES_IN = re.compile(r'\s+in\s+[\'"][^\'"]+[\'"]')
 
 
 # ═══════════════════════════════════════════
-# 核心 chunker
+# Core chunker
 # ═══════════════════════════════════════════
 
 def chunk_delphi_file(file_path: str) -> List[Dict]:
     """
-    将单个 .pas 文件切割为语义块。
+    Split a single .pas file into semantic chunks.
 
     Args:
-        file_path: .pas 文件路径
+        file_path: .pas file path
 
     Returns:
-        chunk 字典列表，每个 chunk 包含:
-          - entity_name: 实体名
+        A list of chunk dicts, each chunk containing:
+          - entity_name: entity name
           - chunk_type: class/record/interface/object/unit
-          - base_class: 基类名（仅结构化 chunk）
-          - unit_name: 单元名
-          - uses_list: uses 列表
-          - chunk_text: 代码文本
-          - start_line: 起始行号（1-indexed）
-          - end_line: 结束行号
-          - file_path: 原始文件路径
+          - base_class: base class name (structural chunks only)
+          - unit_name: unit name
+          - uses_list: uses list
+          - chunk_text: code text
+          - start_line: start line number (1-indexed)
+          - end_line: end line number
+          - file_path: original file path
     """
-    # ── 读取文件（自动检测编码） ──
+    # ── Read the file (encoding detected automatically) ──
     try:
         enc = detect_encoding(file_path)
         with open(file_path, 'r', encoding=enc, errors='replace') as f:
             raw_text = f.read()
     except Exception as e:
-        logger.warning(f"读取文件失败: {file_path}: {e}")
+        logger.warning(f"Failed to read file: {file_path}: {e}")
         return []
 
-    # 清理编码误判可能引入的孤立代理项，防止下游 zvec 插入崩溃
+    # Clean up lone surrogates an encoding misdetection may have introduced, to prevent downstream zvec insert crashes
     raw_text = _sanitize_unicode(raw_text)
 
     lines = raw_text.split('\n')
     text = _strip_comments(raw_text)
     tlines = text.split('\n')
 
-    # ── 提取单元名 ──
+    # ── Extract the unit name ──
     unit_name = ''
     for line in tlines:
         m = _RE_UNIT.match(line)
@@ -132,7 +133,7 @@ def chunk_delphi_file(file_path: str) -> List[Dict]:
             unit_name = m.group(1)
             break
 
-    # ── 提取 uses 列表 ──
+    # ── Extract the uses list ──
     uses_list: List[str] = []
     in_uses = False
     ubuf = ''
@@ -147,23 +148,23 @@ def chunk_delphi_file(file_path: str) -> List[Dict]:
                 if u:
                     for p in u.group(1).split(','):
                         p = p.strip()
-                        p = _RE_USES_IN.sub('', p)  # 去掉 'in filename' 部分
+                        # strip the 'in filename' part
                         p = p.split()[0] if p.split() else p
                         if p and not p.startswith('//'):
                             uses_list.append(p)
                 in_uses = False
                 ubuf = ''
 
-    # ── 解析 type 段 ──
+    # ── Parse the type section ──
     chunks: List[Dict] = []
     section: Optional[str] = None  # 'interface' | 'implementation' | None
-    type_start = -1  # 'type' 关键字所在行
+    type_start = -1  # line where the 'type' keyword appears
 
     i = 0
     while i < len(tlines):
         s = tlines[i].strip()
 
-        # 段落标记
+        # Section markers
         if re.match(r'^\s*interface\s*$', s, re.IGNORECASE) and section is None:
             section = 'interface'
             i += 1
@@ -173,7 +174,7 @@ def chunk_delphi_file(file_path: str) -> List[Dict]:
             i += 1
             continue
 
-        # interface 段内：识别 type/var/const 边界
+        # Inside the interface section: recognise type/var/const boundaries
         if section == 'interface' and type_start < 0:
             if re.match(r'^\s*type\s*$', s, re.IGNORECASE):
                 type_start = i
@@ -183,7 +184,7 @@ def chunk_delphi_file(file_path: str) -> List[Dict]:
                 i += 1
                 continue
 
-        # type 段内：识别结构化声明
+        # Inside the type section: recognise structural declarations
         if type_start >= 0 and i >= type_start:
             m = _RE_CLASS_DECL.match(s)
             if m:
@@ -191,12 +192,12 @@ def chunk_delphi_file(file_path: str) -> List[Dict]:
                 kind = m.group(2).lower()
                 base = (m.group(3) or '').split(',')[0].strip()
 
-                # 捕获 body（匹配 begin/end 深度）
+                # Capture the body (tracking begin/end depth)
                 body: List[str] = []
                 depth = 0
                 j = i
                 while j < len(tlines):
-                    body.append(lines[j])  # 用原文本保留格式
+                    body.append(lines[j])  # use the original text to preserve formatting
                     tl = tlines[j].strip()
                     if tl.startswith('begin'):
                         depth += 1
@@ -224,7 +225,7 @@ def chunk_delphi_file(file_path: str) -> List[Dict]:
 
         i += 1
 
-    # ── 兜底：无结构化 chunk 时建文件级 chunk ──
+    # ── Fallback: build a file-level chunk when no structural chunk exists ──
     if not chunks:
         name = unit_name or Path(file_path).stem
         chunks.append({
@@ -246,15 +247,15 @@ def chunk_directory(source_dir: str,
                     extensions: set = None,
                     progress_callback=None) -> List[Dict]:
     """
-    批量 chunk 一个目录下的所有源文件。
+    Chunk all source files under a directory in batch.
 
     Args:
-        source_dir: 源码目录
-        extensions: 文件扩展名集合（默认 {'.pas'}）
-        progress_callback: 进度回调 (percent, message, extra_dict)
+        source_dir: source directory
+        extensions: set of file extensions (default {'.pas'})
+        progress_callback: progress callback (percent, message, extra_dict)
 
     Returns:
-        所有 chunk 的列表
+        A list of all chunks
     """
     if extensions is None:
         extensions = {'.pas'}
@@ -269,7 +270,7 @@ def chunk_directory(source_dir: str,
             chunks = chunk_delphi_file(str(f))
             all_chunks.extend(chunks)
         except Exception as e:
-            logger.warning(f"Chunk 失败: {f}: {e}")
+            logger.warning(f"Chunking failed: {f}: {e}")
 
         if progress_callback and (i + 1) % 100 == 0:
             pct = ((i + 1) / len(files) * 100) if files else 0
@@ -281,14 +282,14 @@ def chunk_directory(source_dir: str,
 def chunk_file_list(file_paths: List[str],
                     progress_callback=None) -> List[Dict]:
     """
-    批量 chunk 一个文件列表。
+    Chunk a list of files in batch.
 
     Args:
-        file_paths: 文件路径列表
-        progress_callback: 进度回调 (percent, message, extra_dict)
+        file_paths: list of file paths
+        progress_callback: progress callback (percent, message, extra_dict)
 
     Returns:
-        所有 chunk 的列表
+        A list of all chunks
     """
     all_chunks: List[Dict] = []
     for i, fp in enumerate(file_paths):
@@ -296,7 +297,7 @@ def chunk_file_list(file_paths: List[str],
             chunks = chunk_delphi_file(fp)
             all_chunks.extend(chunks)
         except Exception as e:
-            logger.warning(f"Chunk 失败: {fp}: {e}")
+            logger.warning(f"Chunking failed: {fp}: {e}")
 
         if progress_callback and (i + 1) % 100 == 0:
             pct = ((i + 1) / len(file_paths) * 100) if file_paths else 0

@@ -1,23 +1,23 @@
-<!-- @when: 需要对白盒/灰盒 Delphi 方法执行参数化测试，或替代 DUnitX 的运行与报告能力时 -->
+<!-- @when: When you need to execute parameterized tests on white-box/gray-box Delphi methods, or replace DUnitX's execution and reporting capabilities -->
 <!-- @chain: after=workflow.md, before=report-schema.md -->
 
-# RTTI 单元测试运行器
+# RTTI Unit Test Runner
 
-MCP resource URI: `delphi://automation/rtti-test-runner`。
+MCP resource URI: `delphi://automation/rtti-test-runner`.
 
-`automate_delphi(action="test")` 用于直接测试 Delphi 类方法。它面向白盒/灰盒测试，
-通过 RTTI 完成实例创建、参数绑定、方法调用、断言、fixture 生命周期和结构化报告；
-UI 用户路径仍应使用 `action="gui"`，不要用 RTTI 调用冒充黑盒测试。
+`automate_delphi(action="test")` is used to directly test Delphi class methods. It targets white-box/gray-box testing,
+using RTTI to complete instance creation, parameter binding, method invocation, assertions, fixture lifecycle, and structured reports;
+UI user paths should still use `action="gui"`, and do not use RTTI calls to impersonate black-box tests.
 
-## 1. TestHost 接入
+## 1. TestHost Integration
 
-项目需引用 `DaofyAutomation.Base` 以及对应的 VCL/FMX 自动化单元，并在进程启动时调用
-`AutoStart`。运行器按 fixture、显式注册类、`TRttiContext.FindType`、`FindClass` 的顺序解析
-`className`。已进入 RTTI 类型池且有兼容构造器的类可直接使用，无需调用
-`RegisterTestClass`；此时 `className` 使用 RTTI 全限定名，例如 `Tests.TCalculator`。
+The project must reference `DaofyAutomation.Base` and the corresponding VCL/FMX automation units, and call
+`AutoStart` when the process starts. The runner resolves `className` in the order: fixture, explicitly registered class,
+`TRttiContext.FindType`, `FindClass`. Classes already in the RTTI type pool with compatible constructors can be used directly without calling
+`RegisterTestClass`; in this case `className` uses the RTTI fully qualified name, e.g. `Tests.TCalculator`.
 
-仅通过测试 JSON 字符串引用的类可能被 Delphi 智能链接器从可执行文件中裁掉。类型无法由 RTTI
-发现、需要显式保活或需要自定义别名时，才使用 `RegisterTestClass`：
+Classes referenced only by test JSON strings may be trimmed from the executable by the Delphi smart linker. Use `RegisterTestClass` only when
+the type cannot be discovered by RTTI, needs explicit keeping alive, or needs a custom alias:
 
 ```pascal
 initialization
@@ -29,7 +29,7 @@ finalization
   TAutomationProcessorBase.UnregisterTestClass('Tests.TCalculator');
 ```
 
-需要每例 setup/teardown 时注册 fixture：
+Register a fixture when per-case setup/teardown is required:
 
 ```pascal
 function SetupCalculator: TValue;
@@ -51,12 +51,12 @@ finalization
   TAutomationProcessorBase.UnregisterFixture('Tests.TCalculator');
 ```
 
-直接发现类和显式注册类都由运行器选择并调用构造器；fixture 则由 setup 返回对象或值，
-teardown 总是在测试结束后独立执行。setup、构造、test、teardown 的异常阶段会分别记录。
+Both directly discovered classes and explicitly registered classes are selected by the runner, which calls the constructor; for fixtures, setup returns an object or value,
+and teardown always executes independently after the test ends. Exceptions in the setup, construction, test, and teardown phases are recorded separately.
 
-## 2. MCP 调用
+## 2. MCP Invocation
 
-`test` action 会提交后台任务，避免长测试占满 MCP 请求通道：
+The `test` action submits a background task to avoid long tests filling up the MCP request channel:
 
 ```python
 submitted = automate_delphi(
@@ -87,82 +87,82 @@ async_task(action="status", task_id=submitted["task_id"], long_poll_seconds=10)
 result = async_task(action="result", task_id=submitted["task_id"])
 ```
 
-> **⚠️ 轮询建议**：对于慢任务（如自动化测试），推荐用 `action="result"` 轮询而非 `action="status"` + `long_poll_seconds`。
-> `action="result"` 立即返回当前状态（零等待），不会阻塞 MCP 通道。
-> `action="status"` + `long_poll_seconds` 会阻塞等待进度变化，如果任务长时间未完成，可能导致客户端超时。
+> **⚠️ Polling recommendation**: For slow tasks (such as automated tests), prefer polling with `action="result"` instead of `action="status"` + `long_poll_seconds`.
+> `action="result"` immediately returns the current status (zero wait) and does not block the MCP channel.
+> `action="status"` + `long_poll_seconds` blocks waiting for a progress change; if the task does not complete for a long time, it may cause the client to time out.
 
-## 3. 用例字段
+## 3. Test Case Fields
 
-| 字段 | 必需 | 说明 |
+| Field | Required | Description |
 |------|------|------|
-| `id` / `name` | 否 | 稳定标识和显示名称，原样进入结果 |
-| `target` | 二选一 | GUI 控件名；与 `className` 互斥 |
-| `className` | 二选一 | 类名（见下方查找顺序）；与 `target` 互斥 |
-| `method` | 是 | RTTI 方法名 |
-| `params` | 否 | 方法参数 JSON 数组，也接受可解析为数组的 JSON 字符串 |
-| `constructor_params` | 否 | 直接发现类或显式注册类的构造参数 JSON 数组；省略时绑定无参数构造器 |
-| `expected` | 否 | 返回值的精确字符串断言，允许空字符串 |
-| `expected_exception` | 否 | 测试阶段应抛出的异常类名，与 `expected` 互斥 |
-| `expected_message` | 否 | 异常消息应包含的文本，不区分大小写；需配合 `expected_exception` |
-| `assert_expr` | 否 | Python 表达式，变量 `actual` 为返回值字符串；与 `expected`/`expected_exception` 互斥 |
-| `visibility` | 否 | 覆盖全局 RTTI 可见度，如 `private,protected,public,published` |
-| `timeout` | 否 | 覆盖该例的超时秒数，必须为有限正数 |
+| `id` / `name` | No | Stable identifier and display name, passed through to the result unchanged |
+| `target` | Choose one of two | GUI control name; mutually exclusive with `className` |
+| `className` | Choose one of two | Class name (see lookup order below); mutually exclusive with `target` |
+| `method` | Yes | RTTI method name |
+| `params` | No | JSON array of method parameters; also accepts a JSON string parsable as an array |
+| `constructor_params` | No | JSON array of constructor parameters for directly discovered or explicitly registered classes; when omitted, binds the parameterless constructor |
+| `expected` | No | Exact string assertion on the return value; empty string is allowed |
+| `expected_exception` | No | Exception class name that should be thrown during the test phase; mutually exclusive with `expected` |
+| `expected_message` | No | Text that the exception message should contain, case-insensitive; requires `expected_exception` |
+| `assert_expr` | No | Python expression; the variable `actual` is the return value string; mutually exclusive with `expected`/`expected_exception` |
+| `visibility` | No | Overrides global RTTI visibility, e.g. `private,protected,public,published` |
+| `timeout` | No | Overrides the timeout in seconds for this case; must be a finite positive number |
 
-### className 查找顺序（优先级从高到低）
+### className Lookup Order (Highest to Lowest Priority)
 
-1. **RegisterTestClass 注册名**（如 `'Agent.EditEngineV3Test'`）— 通过 `GetTestClass` 查字典，最稳定，不会被链接器裁剪
-2. **TRttiContext.FindType 全限定名**（如 `'Tests.TCalculator'`）— RTTI 必须可发现，且类必须是 instance type
-3. **FindClass**（Delphi VCL 类名）— 仅限 `TComponent` 派生类
+1. **RegisterTestClass registration name** (e.g. `'Agent.EditEngineV3Test'`) — looks up the dictionary via `GetTestClass`; most stable and will not be trimmed by the linker
+2. **TRttiContext.FindType fully qualified name** (e.g. `'Tests.TCalculator'`) — must be discoverable by RTTI, and the class must be an instance type
+3. **FindClass** (Delphi VCL class name) — limited to classes derived from `TComponent`
 
-> ⚠️ **不要传 Delphi 源码中的裸类名**（如 `TEditEngineV3Test`）。必须传上述三种之一。
-> 推荐优先使用 `RegisterTestClass` 注册名，因为它不依赖 RTTI 链接且不会被智能链接器裁掉。
+> ⚠️ **Do not pass the bare class name from Delphi source code** (e.g. `TEditEngineV3Test`). You must pass one of the three forms above.
+> Prefer using the `RegisterTestClass` registration name, because it does not depend on RTTI linking and will not be trimmed by the smart linker.
 
-### 断言模式互斥规则
+### Assertion Mode Mutual Exclusion Rules
 
-三种断言模式**互斥**，每例只能选一种：
+The three assertion modes are **mutually exclusive**; each case can select only one:
 
-| 模式 | 字段 | 执行方 | 语义 |
+| Mode | Field | Executed by | Semantics |
 |------|------|--------|------|
-| 精确匹配 | `expected` | Delphi | `result.ToString = expected` |
-| 异常匹配 | `expected_exception` | Delphi | `phase=test` 时异常类名 + 消息匹配 |
-| Python 表达式 | `assert_expr` | Python | `eval(assert_expr, actual=返回值)` |
+| Exact match | `expected` | Delphi | `result.ToString = expected` |
+| Exception match | `expected_exception` | Delphi | When `phase=test`, exception class name + message match |
+| Python expression | `assert_expr` | Python | `eval(assert_expr, actual=return_value)` |
 
-> ❌ **禁止组合**：`assert_expr` 会覆盖 Delphi 侧的 `assert` 字段。如果同时设置
-> `expected` 和 `assert_expr`，Delphi 的精确匹配结果会被 Python 表达式静默覆盖，
-> 导致 `result=PASS` + `assert=fail` 的困惑。验证层会拒绝这种组合。
+> ❌ **Forbidden combination**: `assert_expr` overrides the `assert` field on the Delphi side. If
+> `expected` and `assert_expr` are set at the same time, the Delphi exact-match result will be silently overridden by the Python expression,
+> causing the confusing `result=PASS` + `assert=fail`. The validation layer rejects this combination.
 
-`assert_expr` 在 MCP 服务进程中按标准 Python 表达式执行，可使用 Python 内建能力；
-只运行可信测试定义。自然语言说明应放在 `name` 或外部测试说明中，不要写进表达式。
+`assert_expr` executes as a standard Python expression in the MCP service process and can use Python built-in capabilities;
+only run trusted test definitions. Natural-language descriptions should be placed in `name` or external test descriptions, not written into the expression.
 
-## 4. RTTI 绑定规则
+## 4. RTTI Binding Rules
 
-- 支持整数、Int64、布尔/枚举、浮点、字符串、字符和 class `nil` 参数。
-- `var/out`、record、动态数组、接口等尚未支持的参数会明确报错，不会猜测绑定。
-- 重载按参数数量和类型选择；多个兼容重载会返回 `ambiguous overload`。
-- RTTI 返回的继承链同签名方法会去重，构造器优先选择声明在最派生类型上的版本。
-- `expected` 当前按 Delphi `TValue.ToString` 结果精确比较；复杂比较和容差使用
-  `assert_expr`。
+- Supports integer, Int64, Boolean/enum, floating-point, string, character, and class `nil` parameters.
+- Parameters not yet supported, such as `var/out`, record, dynamic array, and interface, will report an explicit error and will not guess the binding.
+- Overloads are selected by parameter count and type; multiple compatible overloads return `ambiguous overload`.
+- Same-signature methods in the inheritance chain returned by RTTI are de-duplicated; constructors prefer the version declared on the most derived type.
+- `expected` currently performs an exact comparison against the Delphi `TValue.ToString` result; use
+  `assert_expr` for complex comparisons and tolerances.
 
-## 5. 生命周期与超时
+## 5. Lifecycle and Timeout
 
-每个测试通过独立 `run_tests` 请求执行：
+Each test executes through an independent `run_tests` request:
 
-1. 校验完整 suite，非法输入不会启动 TestHost。
-2. 启动或复用进程，等待 PID 派生的自动化端点（Windows NamedPipe；POSIX Unix Domain Socket）。
-3. setup/构造实例，绑定并调用方法。
-4. 执行 Delphi 侧 `expected` / expected-exception 断言。
-5. 独立执行 teardown；teardown 失败不会覆盖原始测试异常。
-6. Python 侧执行 `assert_expr` 并汇总稳定统计。
+1. Validate the complete suite; invalid input will not start TestHost.
+2. Start or reuse the process, and wait for the automation endpoint derived from the PID (Windows NamedPipe; POSIX Unix Domain Socket).
+3. setup/construct the instance, bind and invoke the method.
+4. Execute the Delphi-side `expected` / expected-exception assertions.
+5. Execute teardown independently; a teardown failure will not override the original test exception.
+6. Execute `assert_expr` on the Python side and aggregate stable statistics.
 
-默认 `test_timeout=30` 秒，可由每例 `timeout` 覆盖。传输读取达到 deadline 后会终止
-TestHost，下一例自动启动新进程。超时结果包含 `ms` 字段（实际耗时）和 `timeout_sec`
-字段（超时阈值），便于区分"卡死"和"真慢"。`keep_alive=true` 是 test action 默认值；
-传 false 时 suite 完成后关闭传输连接并终止 TestHost。
+The default `test_timeout=30` seconds can be overridden by each case's `timeout`. When a transport read reaches the deadline, TestHost is terminated,
+and the next case automatically starts a new process. Timeout results include an `ms` field (actual elapsed time) and a `timeout_sec`
+field (timeout threshold), making it easy to distinguish "stuck" from "genuinely slow". `keep_alive=true` is the default for the test action;
+when false is passed, the transport connection is closed and TestHost is terminated after the suite completes.
 
-只有 `phase=test` 的异常能满足 `expected_exception`。setup、构造和 teardown 异常始终是
-error；异常类型错误、消息不匹配或没有抛出预期异常属于 assertion failure。
+Only exceptions with `phase=test` can satisfy `expected_exception`. setup, construction, and teardown exceptions are always
+errors; wrong exception type, message mismatch, or no expected exception thrown count as assertion failure.
 
-## 6. 结果结构
+## 6. Result Structure
 
 ```json
 {
@@ -186,18 +186,19 @@ error；异常类型错误、消息不匹配或没有抛出预期异常属于 as
 }
 ```
 
-- `passed`：方法完成且所有声明的断言通过。
-- `failed`：方法执行完成，但返回值、Python 表达式或预期异常断言失败。
-- `errors`：启动、传输、setup/构造、未预期 test 异常或 teardown 错误。
-- `status`：全部测试通过时为 `ok`，否则为 `failed`。
-- `raw_responses`：保留 Delphi 原始协议响应，供诊断统计或编码问题。
+- `passed`: The method completed and all declared assertions passed.
+- `failed`: The method completed execution, but the return value, Python expression, or expected-exception assertion failed.
+- `errors`: Startup, transport, setup/construction, unexpected test exception, or teardown error.
+- `status`: `ok` when all tests pass; otherwise `failed`.
+- `raw_responses`: Retains the original Delphi protocol responses for diagnosing statistics or encoding issues.
 
-## 7. 面向模型的生成流程
+## 7. Model-Oriented Generation Workflow
 
-1. 读取目标类源码，枚举正常、边界和异常路径。
-2. 为纯业务方法优先生成 `action="test"` 用例；用户可见流程生成 GUI 黑盒脚本。
-3. RTTI 可发现且有兼容构造器的类直接使用；需要保活/别名时用 `RegisterTestClass`，需要
-   setup/teardown 时用 `RegisterFixture`。
-4. 用 JSON primitive 构造参数化数据；对异常路径声明 `expected_exception`。
-5. 编译 TestHost，提交任务并轮询 `async_task`。
-6. 首先修复 error，再处理 assertion failure；修复后重跑完整 suite。
+1. Read the target class source code and enumerate normal, boundary, and exception paths.
+2. For pure business methods, prioritize generating `action="test"` cases; for user-visible flows, generate GUI black-box scripts.
+3. Classes discoverable by RTTI and having a compatible constructor can be used directly; use `RegisterTestClass` when keeping alive/aliasing is needed, and use
+   `RegisterFixture` when setup/teardown is needed.
+4. Use JSON primitives to construct parameterized data; declare `expected_exception` for exception paths.
+5. Compile TestHost, submit the task, and poll `async_task`.
+6. Fix errors first, then handle assertion failures; after fixing, rerun the complete suite.
+

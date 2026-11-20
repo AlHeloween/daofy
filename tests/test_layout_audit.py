@@ -247,8 +247,8 @@ def test_resizable_nested_container_requires_adequate_minimum_size() -> None:
     layout_findings = [item for item in findings if item.rule_id == "LAYOUT-008"]
 
     assert [item.component for item in layout_findings] == ["ContentPanel"]
-    assert "至少需要 252" in layout_findings[0].message
-    assert "至少需要 33" in layout_findings[0].message
+    assert "at least 252" in layout_findings[0].message
+    assert "at least 33" in layout_findings[0].message
 
 
 def test_audit_dfm_layout_text_uses_geometry_for_custom_classes() -> None:

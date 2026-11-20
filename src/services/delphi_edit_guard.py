@@ -239,34 +239,34 @@ def external_edit_block_message(
     if not events:
         return None
 
-    scope = _scope_root(scope_path) or "<全部>"
+    scope = _scope_root(scope_path) or "<all>"
     lines = [
-        "Delphi 编辑保护已阻止本次操作。",
+        "Delphi edit guard blocked this operation.",
         "",
-        "原因：检测到最近有 Delphi 源码文件绕过 Daofy 工具被修改。",
-        f"检查范围：{scope}",
+        "Reason: Recent modifications to Delphi source files bypassed Daofy tools.",
+        f"Inspection scope: {scope}",
         "",
-        "检测到的文件：",
+        "Detected files:",
     ]
     event_names = {
-        "created": "已创建",
-        "deleted": "已删除",
-        "modified": "已修改",
-        "moved": "已移动",
+        "created": "created",
+        "deleted": "deleted",
+        "modified": "modified",
+        "moved": "moved",
     }
     for event in events[:10]:
         age_ms = event.get("age_ms")
-        age = f"，距今 {age_ms}ms" if age_ms is not None else ""
+        age = f", {age_ms}ms ago" if age_ms is not None else ""
         event_type = str(event.get("event_type", "modified"))
         event_name = event_names.get(event_type, event_type)
-        lines.append(f"- {event['path']}（{event_name}{age}）")
+        lines.append(f"- {event['path']} ({event_name}{age})")
     if len(events) > 10:
-        lines.append(f"- ... 还有 {len(events) - 10} 个文件")
+        lines.append(f"- ... and {len(events) - 10} more files")
     lines.extend([
         "",
-        "请使用 `delphi_file` 或 Daofy 已登记的 Delphi 工具读写 .pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx/.groupproj 文件。",
-        "如果这次外部修改是有意为之，请先检查或回退这些改动；确认工作区干净后重启 MCP Server。",
-        "如只需记录告警而不阻断，请设置 `DAOFY_EDIT_GUARD=warn`；如需关闭检测，请设置 `DAOFY_EDIT_GUARD=off`。",
+        "Please use `delphi_file` or Delphi tools registered with Daofy to read/write .pas/.dfm/.dproj/.dpk/.dpr/.inc/.fmx/.groupproj files.",
+        "If this external modification was intentional, inspect or revert these changes first; after confirming the workspace is clean, restart the MCP Server.",
+        "If you only want to log warnings without blocking, set `DAOFY_EDIT_GUARD=warn`; to disable detection, set `DAOFY_EDIT_GUARD=off`.",
     ])
     return "\n".join(lines)
 
@@ -276,3 +276,4 @@ def reset_guard_state() -> None:
     with _LOCK:
         _AUTHORIZED_WRITES.clear()
         _UNAUTHORIZED_EVENTS.clear()
+

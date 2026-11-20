@@ -1,19 +1,19 @@
-"""MCP Tool: ocr — 图像分析（文字识别 + 视觉分析）
+"""MCP Tool: ocr — image analysis (text recognition + visual analysis)
 
-使用 PP-OCRv6 medium 模型进行图像文字检测和识别。
-纯 ONNX Runtime 实现，零 PaddlePaddle 依赖。
-模型首次使用时自动下载到 data/ocr-models/。
+Uses PP-OCRv6 medium model for image text detection and recognition.
+Pure ONNX Runtime implementation, zero PaddlePaddle dependency.
+Models are automatically downloaded to data/ocr-models/ on first use.
 
 Actions:
-  recognize  — 完整 OCR：检测 + 识别，返回 [{text, confidence, box}]
-  detect     — 仅文本框检测，返回 [{box, score}]
-  status     — 模型加载状态
-  diff       — 截图差异对比：比较两张截图，返回视觉变化区域
-  color      — 区域颜色分析：分析指定区域的平均色/主色/亮度
-  match      — 图标模板匹配：在截图中查找指定图标/图案
-  analyze    — [统一截图分析] 串联 OCR + OpenCV 检测 + 布局 + 颜色，
-               返回结构化元素列表（含 type/text/rect/state/paired_label），
-               供 LLM 直接从文本推理 UI 结构，不需要多模态模型。
+  recognize  — full OCR: detection + recognition, returns [{text, confidence, box}]
+  detect     — text box detection only, returns [{box, score}]
+  status     — model loading status
+  diff       — screenshot difference comparison: compares two screenshots, returns visually changed regions
+  color      — region color analysis: analyzes average color / dominant color / brightness of a specified region
+  match      — icon template matching: finds a specified icon/pattern in a screenshot
+  analyze    — [unified screenshot analysis] chains OCR + OpenCV detection + layout + color,
+               returns structured element list (with type/text/rect/state/paired_label),
+               for the LLM to infer UI structure directly from text without a multimodal model.
 """
 
 import logging
@@ -25,19 +25,19 @@ logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════
-# 视觉分析函数（纯 Pillow/OpenCV，不依赖 PP-OCR 模型）
+# Visual analysis functions (pure Pillow/OpenCV, no PP-OCR model dependency)
 # ═══════════════════════════════════════════════════════════════
 
 
 def _image_diff(baseline_path: str, current_path: str,
                 threshold: int = 10, output_dir: str = "") -> dict:
-    """比较两张截图，找出视觉差异区域。
+    """Compare two screenshots and find visually different regions.
 
     Args:
-        baseline_path: 基线截图路径
-        current_path: 当前截图路径
-        threshold: 像素差异阈值（0-255，默认 10）
-        output_dir: 差异图输出目录（空则不保存）
+        baseline_path: baseline screenshot path
+        current_path: current screenshot path
+        threshold: pixel difference threshold (0-255, default 10)
+        output_dir: difference image output directory (empty means do not save)
 
     Returns:
         dict: {changed, diff_pixels, diff_percent, regions, diff_image?}
@@ -49,11 +49,11 @@ def _image_diff(baseline_path: str, current_path: str,
     img2 = cv2.imread(current_path)
 
     if img1 is None:
-        raise FileNotFoundError(f"无法读取基线图片: {baseline_path}")
+        raise FileNotFoundError(f"Cannot read baseline image: {baseline_path}")
     if img2 is None:
-        raise FileNotFoundError(f"无法读取当前图片: {current_path}")
+        raise FileNotFoundError(f"Cannot read current image: {current_path}")
 
-    # 尺寸不一致时 resize 当前图匹配基线
+    # When sizes differ, resize current image to match baseline
     if img1.shape != img2.shape:
         img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
 
@@ -65,14 +65,14 @@ def _image_diff(baseline_path: str, current_path: str,
     total_pixels = thresh.size
     diff_percent = round(diff_pixels / total_pixels * 100, 4)
 
-    # 连通域分析找出变化区域
+    # Connected component analysis to find changed regions
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
                                     cv2.CHAIN_APPROX_SIMPLE)
 
     regions = []
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
-        if w * h < 16:  # 过滤微小噪点
+        if w * h < 16:  # Filter tiny noise points
             continue
         area_pct = round((w * h) / total_pixels * 100, 4)
         mean_diff = float(np.mean(gray[y:y + h, x:x + w]))
@@ -104,13 +104,13 @@ def _image_diff(baseline_path: str, current_path: str,
 def _region_color(image_path: str,
                   region: list | None = None,
                   threshold: float | None = None) -> dict:
-    """分析图片指定区域的颜色特征。
+    """Analyze color characteristics of a specified image region.
 
     Args:
-        image_path: 图片路径
-        region: [x, y, w, h] 分析区域，不传则分析全图
-        threshold: 亮度阈值(0~1)。设置后将像素按亮度分为暗/亮两组，
-                   分别计算 avg_color，便于分离文字色和背景色。
+        image_path: image path
+        region: [x, y, w, h] analysis region; analyzes full image when not passed
+        threshold: brightness threshold (0~1). When set, splits pixels into dark/light groups by brightness,
+                   computes avg_color separately, to separate text color and background color.
 
     Returns:
         dict: {avg_color, median_color, brightness, is_grayscale,
@@ -127,7 +127,7 @@ def _region_color(image_path: str,
 
     pixels = np.array(img, dtype=np.float32)
 
-    # 亮度加权公式: 0.299 R + 0.587 G + 0.114 B
+    # Brightness weighted formula: 0.299 R + 0.587 G + 0.114 B
     brightness_map = (pixels[:, :, 0] * 0.299 +
                       pixels[:, :, 1] * 0.587 +
                       pixels[:, :, 2] * 0.114) / 255.0
@@ -148,7 +148,7 @@ def _region_color(image_path: str,
         "region": {"w": img.width, "h": img.height},
     }
 
-    # 亮度阈值分离：将像素按亮度分为暗组(文字/前景)和亮组(背景/高亮)
+    # Brightness threshold separation: split pixels by brightness into dark group (text/foreground) and light group (background/highlight)
     if threshold is not None:
         dark_mask = brightness_map < threshold
         light_mask = ~dark_mask
@@ -179,12 +179,12 @@ def _region_color(image_path: str,
 
 def _template_match(image_path: str, template_path: str,
                     threshold: float = 0.8) -> dict:
-    """在截图中查找模板图标/图案。
+    """Find a template icon/pattern in a screenshot.
 
     Args:
-        image_path: 截图路径
-        template_path: 模板图片路径
-        threshold: 匹配阈值（0-1，默认 0.8）
+        image_path: screenshot path
+        template_path: template image path
+        threshold: matching threshold (0-1, default 0.8)
 
     Returns:
         dict: {found, match_count, matches[{bbox, confidence}]}
@@ -196,13 +196,13 @@ def _template_match(image_path: str, template_path: str,
     tpl = cv2.imread(template_path)
 
     if img is None:
-        raise FileNotFoundError(f"无法读取图片: {image_path}")
+        raise FileNotFoundError(f"Cannot read image: {image_path}")
     if tpl is None:
-        raise FileNotFoundError(f"无法读取模板: {template_path}")
+        raise FileNotFoundError(f"Cannot read template: {template_path}")
 
     if img.shape[0] < tpl.shape[0] or img.shape[1] < tpl.shape[1]:
         return {"found": False, "match_count": 0, "matches": [],
-                "error": "模板尺寸大于截图"}
+                "error": "Template size is larger than screenshot"}
 
     result_mat = cv2.matchTemplate(img, tpl, cv2.TM_CCOEFF_NORMED)
     locations = np.where(result_mat >= threshold)
@@ -216,7 +216,7 @@ def _template_match(image_path: str, template_path: str,
             "confidence": round(float(result_mat[y, x]), 3),
         })
 
-    # 非极大值抑制（NMS）去重
+    # Non-maximum suppression (NMS) deduplication
     raw_matches.sort(key=lambda m: m["confidence"], reverse=True)
     kept = []
     for m in raw_matches:
@@ -237,7 +237,7 @@ def _template_match(image_path: str, template_path: str,
 
 
 def _bbox_overlap(a: list, b: list) -> float:
-    """计算两个 bbox 的 IoU。"""
+    """Calculate the IoU of two bboxes."""
     ax1, ay1, ax2, ay2 = a
     bx1, by1, bx2, by2 = b
     xi1, yi1 = max(ax1, bx1), max(ay1, by1)
@@ -250,13 +250,13 @@ def _bbox_overlap(a: list, b: list) -> float:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 统一截图分析（串联 OCR + Detection + 布局 + 颜色）
+# Unified screenshot analysis (chains OCR + Detection + Layout + Color)
 # ═══════════════════════════════════════════════════════════════
 
 
 def _bbox_iou(a_box: list, b_box: list) -> float:
-    """计算两个 bbox 的 IoU，兼容 OCR 四点格式 [[x1,y1],[x2,y2],...]。"""
-    # 兼容四点格式 → [x1,y1,x2,y2]
+    """Calculate the IoU of two bboxes, compatible with OCR four-point format [[x1,y1],[x2,y2],...]."""
+    # Compatible with four-point format → [x1,y1,x2,y2]
     def _to_xyxy(box):
         if isinstance(box[0], list):
             xs = [p[0] for p in box]
@@ -280,9 +280,9 @@ def _bbox_iou(a_box: list, b_box: list) -> float:
 
 
 def _infer_element_state(img, x: int, y: int, w: int, h: int) -> str:
-    """基于颜色分析推断 UI 元素状态（enabled/disabled）。
+    """Infer UI element state (enabled/disabled) based on color analysis.
     
-    简单启发式：平均亮度低 + 低标准偏差 + 低饱和度 → disabled。
+    Simple heuristic: low average brightness + low standard deviation + low saturation → disabled.
     """
     import numpy as np
 
@@ -299,24 +299,24 @@ def _infer_element_state(img, x: int, y: int, w: int, h: int) -> str:
     avg_b = float(np.mean(brightness))
     std_b = float(np.std(brightness))
 
-    # 饱和度
+    # Saturation
     r, g, b = roi[:, :, 0], roi[:, :, 1], roi[:, :, 2]
     max_rgb = np.maximum(np.maximum(r, g), b).astype(float)
     min_rgb = np.minimum(np.minimum(r, g), b).astype(float)
     sat = float(np.mean((max_rgb - min_rgb) / (max_rgb + 1e-6)))
 
-    # 灰暗 + 低对比度 → disabled
+    # Dark + low contrast → disabled
     if avg_b < 0.45 and std_b < 20 and sat < 0.15:
         return "disabled"
     return "enabled"
 
 
 def _pair_labels_with_inputs(elements: list[dict]):
-    """将标签文字与相邻输入框配对（就地修改）。
+    """Pair label text with adjacent input boxes (in-place modification).
     
-    规则：
-    - 标签检测：以 ':'/':'/':' 结尾的文字
-    - 输入框在标签右侧，垂直对齐相近
+    Rules:
+    - Label detection: text ending with ':'/'：'/':'
+    - Input box is to the right of the label, with similar vertical alignment
     """
     labels = []
     inputs = []
@@ -354,14 +354,14 @@ def _pair_labels_with_inputs(elements: list[dict]):
 
 
 def _get_detector():
-    """自动选择检测后端：自定义训练模型 → 通用 YOLO → OpenCV（回退）。
+    """Automatically select detection backend: custom-trained model → general YOLO → OpenCV (fallback).
     
     Returns:
         (detector, backend_name) 
     """
     base = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     
-    # 1. 优先使用自定义训练的 Delphi 模型
+    # 1. Prefer custom-trained Delphi model
     custom_path = os.path.join(base, "data", "yolo_models", "daofy_train.onnx")
     if os.path.isfile(custom_path):
         try:
@@ -375,9 +375,9 @@ def _get_detector():
             }
             return YOLOONNXDetector(custom_path, conf_thresh=0.3, class_names=class_names), "yolo+custom"
         except Exception as e:
-            logger.warning(f"自定义模型加载失败，尝试通用模型: {e}")
+            logger.warning(f"Failed to load custom model, trying general model: {e}")
 
-    # 2. 回退到通用 Windows UI 模型
+    # 2. Fall back to general Windows UI model
     yolo_path = os.path.join(base, "data", "yolo_models", "windows-ui-locator.onnx")
     if os.path.isfile(yolo_path):
         try:
@@ -388,23 +388,23 @@ def _get_detector():
             }
             return YOLOONNXDetector(yolo_path, conf_thresh=0.3, class_names=class_names), "yolo"
         except Exception as e:
-            logger.warning(f"通用 YOLO 加载失败，回退 OpenCV: {e}")
+            logger.warning(f"Failed to load general YOLO, falling back to OpenCV: {e}")
 
     from src.detection.opencv_detector import OpenCVDetector
     return OpenCVDetector(), "opencv"
 
 
 def _analyze_screenshot(image_path: str) -> dict:
-    """统一截图分析：串联 OCR + YOLO/OpenCV 检测 + 布局 + 颜色。
+    """Unified screenshot analysis: chains OCR + YOLO/OpenCV detection + layout + color.
     
     Args:
-        image_path: 截图路径
+        image_path: screenshot path
         
     Returns:
         {
             elements: [{type, class_hint, text, rect, state, paired_label?}],
-            layout: {树形布局},
-            summary: "共N个元素: ...",
+            layout: {tree layout},
+            summary: "N elements in total: ...",
             ...
         }
     """
@@ -412,21 +412,21 @@ def _analyze_screenshot(image_path: str) -> dict:
 
     img = cv2.imread(image_path)
     if img is None:
-        raise FileNotFoundError(f"无法读取图片: {image_path}")
+        raise FileNotFoundError(f"Cannot read image: {image_path}")
 
     h, w = img.shape[:2]
 
-    # 1. OCR 识别文字
+    # 1. OCR text recognition
     svc = get_ocr_service()
     ocr_results = svc.recognize(image_path)
 
-    # 2. UI 元素检测（YOLO → OpenCV 回退）
+    # 2. UI element detection (YOLO → OpenCV fallback)
     from src.detection.layout_parser import LayoutParser
 
     detector, backend = _get_detector()
     detections = detector.detect(image_path)
 
-    # 3. 合并 OCR → 检测结果
+    # 3. Merge OCR → detection results
     elements = []
     for det in detections:
         det_box = [det.x, det.y, det.x + det.w, det.y + det.h]
@@ -445,15 +445,15 @@ def _analyze_screenshot(image_path: str) -> dict:
             "state": state,
         })
 
-    # 4. Label-Input 配对
+    # 4. Label-Input pairing
     _pair_labels_with_inputs(elements)
 
-    # 5. 布局树
+    # 5. Layout tree
     parser = LayoutParser()
     layout_roots = parser.build_hierarchy(detections)
     layout_json = parser.to_json(layout_roots, image_path) if layout_roots else {}
 
-    # 6. 摘要
+    # 6. Summary
     type_counts: dict[str, int] = {}
     enabled = disabled = 0
     for el in elements:
@@ -464,7 +464,7 @@ def _analyze_screenshot(image_path: str) -> dict:
         else:
             enabled += 1
 
-    parts = [f"{c}个{t}" for t, c in sorted(type_counts.items(), key=lambda x: x[1], reverse=True)]
+    parts = [f"{c} {t}" for t, c in sorted(type_counts.items(), key=lambda x: x[1], reverse=True)]
 
     return {
         "status": "ok",
@@ -475,8 +475,8 @@ def _analyze_screenshot(image_path: str) -> dict:
         "element_count": len(elements),
         "elements": elements,
         "layout": layout_json,
-        "state_summary": f"{enabled}个enabled / {disabled}个disabled",
-        "summary": f"共{len(elements)}个元素: {', '.join(parts)}",
+        "state_summary": f"{enabled} enabled / {disabled} disabled",
+        "summary": f"{len(elements)} elements in total: {', '.join(parts)}",
     }
 
 
@@ -486,33 +486,33 @@ def _analyze_screenshot(image_path: str) -> dict:
 
 
 def handle_ocr(arguments: dict) -> dict:
-    """处理 OCR 工具调用。
+    """Handle OCR tool calls.
 
     Args:
-        arguments: 工具参数
+        arguments: tool parameters
             action: "recognize"|"detect"|"status"|"diff"|"color"|"match"|"analyze"
-            image_path: 图片路径
-            baseline/current: diff 的两张图片
-            template_path: match 的模板图片
-            region: color 的分析区域 [x,y,w,h]
-            threshold: diff 阈值(默认10) / match 阈值(默认0.8)
-            output_dir: diff 差异图输出目录
+            image_path: image path
+            baseline/current: the two images for diff
+            template_path: template image for match
+            region: analysis region for color [x,y,w,h]
+            threshold: diff threshold (default 10) / match threshold (default 0.8)
+            output_dir: diff image output directory
 
     Returns:
-        dict: 处理结果
+        dict: processing result
     """
     action = arguments.get("action", "recognize")
     image_path = arguments.get("image_path", "")
 
     try:
-        # === 视觉分析 action（不依赖 PP-OCR 模型）===
+        # === Visual analysis actions (do not depend on PP-OCR model) ===
 
         if action == "diff":
             baseline = arguments.get("baseline", "")
             current = arguments.get("current", "")
             if not baseline or not current:
                 return {"status": "failed",
-                        "error": "diff 需要 baseline 和 current 参数"}
+                        "error": "diff requires baseline and current parameters"}
             threshold = int(arguments.get("threshold", 10))
             output_dir = arguments.get("output_dir", "")
             result = _image_diff(baseline, current, threshold, output_dir)
@@ -522,7 +522,7 @@ def handle_ocr(arguments: dict) -> dict:
         if action == "color":
             if not image_path or not os.path.isfile(image_path):
                 return {"status": "failed",
-                        "error": "color 需要有效的 image_path"}
+                        "error": "color requires a valid image_path"}
             region = arguments.get("region")
             threshold = arguments.get("threshold")
             if threshold is not None:
@@ -535,13 +535,13 @@ def handle_ocr(arguments: dict) -> dict:
             template_path = arguments.get("template_path", "")
             if not image_path or not template_path:
                 return {"status": "failed",
-                        "error": "match 需要 image_path 和 template_path"}
+                        "error": "match requires image_path and template_path"}
             threshold = float(arguments.get("threshold", 0.8))
             result = _template_match(image_path, template_path, threshold)
             result.update({"status": "ok", "action": "match"})
             return result
 
-        # === 原有 OCR action（依赖 PP-OCR 模型）===
+        # === Original OCR actions (depend on PP-OCR model) ===
 
         svc = get_ocr_service()
 
@@ -549,10 +549,10 @@ def handle_ocr(arguments: dict) -> dict:
             return svc.status()
 
         if not image_path:
-            return {"status": "failed", "error": "缺少必需参数: image_path"}
+            return {"status": "failed", "error": "Missing required parameter: image_path"}
 
         if not os.path.isfile(image_path):
-            return {"status": "failed", "error": f"文件不存在: {image_path}"}
+            return {"status": "failed", "error": f"File does not exist: {image_path}"}
 
         if action == "recognize":
             results = svc.recognize(image_path)
@@ -569,13 +569,14 @@ def handle_ocr(arguments: dict) -> dict:
 
         else:
             return {"status": "failed",
-                    "error": "未知 action，支持: recognize/detect/status/diff/color/match/analyze"}
+                    "error": "Unknown action, supported: recognize/detect/status/diff/color/match/analyze"}
 
     except FileNotFoundError as e:
         return {"status": "failed", "error": str(e)}
     except ImportError as e:
         return {"status": "failed",
-                "error": f"缺少依赖: {e}。请安装: pip install daofy-for-delphi[ocr]"}
+                "error": f"Missing dependency: {e}. Please install: pip install daofy-for-delphi[ocr]"}
     except Exception as e:
-        logger.error(f"OCR 处理失败: {e}", exc_info=True)
-        return {"status": "failed", "error": f"OCR 处理失败: {e}"}
+        logger.error(f"OCR processing failed: {e}", exc_info=True)
+        return {"status": "failed", "error": f"OCR processing failed: {e}"}
+

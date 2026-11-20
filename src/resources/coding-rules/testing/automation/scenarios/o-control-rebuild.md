@@ -1,56 +1,56 @@
-<!-- @when: 操作过程中控件被销毁重建（rescan/reload/theme switch），需安全等待重建 -->
+<!-- @when: Controls are destroyed and rebuilt during an operation (rescan/reload/theme switch), requiring safe waiting for rebuild -->
 <!-- @part-of: ui-testing -->
 
-#### O. 控件重建安全 — Rescan/Reload 后等待重建
+#### O. Control Rebuild Safety — Wait for Rebuild After Rescan/Reload
 
-| 要素 | 内容 |
+| Element | Content |
 |------|------|
-| **目标** | 处理操作过程中控件被销毁重建（rescan、reload、theme switch）后的安全访问 |
-| **策略** | 操作后不要立即 rget → 先用 goto 等待控件重建 → 验证关键控件存在 → 再继续 |
-| **关键命令** | `goto`, `waitfor`, `rget`（重建后验证） |
+| **Goal** | Handle safe access after controls are destroyed and rebuilt during operations (rescan, reload, theme switch) |
+| **Strategy** | Do not immediately rget after the operation → first use goto to wait for control rebuild → verify key controls exist → then continue |
+| **Key commands** | `goto`, `waitfor`, `rget` (verification after rebuild) |
 
-**背景**：某些 Delphi 操作会销毁并重建整个窗体或控件树。典型情况：
+**Background**: Some Delphi operations destroy and rebuild the entire form or control tree. Typical cases:
 
-| 操作 | 行为 | 影响 |
+| Operation | Behavior | Impact |
 |------|------|------|
-| Rescan/重新扫描 | 关闭项目 → 重新加载 → 重建树视图 | `TfrmMain` 及其所有子控件被重建 |
-| 切换 VCL Style | 全局资源释放 → 重建所有窗体 | 所有控件句柄失效 |
-| 项目 Close/Open | 关闭当前 → 打开新项目 → 重置状态 | 树、菜单、动作全部重建 |
-| 重建索引 | 清空数据 → 重新加载 → 更新界面 | 数据集关联控件更新 |
-| 语言切换 | 释放资源 → 加载新语言包 → 重建菜单 | 菜单项可能重新创建 |
+| Rescan/Re-scan | Close project → reload → rebuild tree view | `TfrmMain` and all its child controls are rebuilt |
+| Switch VCL Style | Global resources released → rebuild all forms | All control handles become invalid |
+| Project Close/Open | Close current → open new project → reset state | Tree, menus, actions all rebuilt |
+| Rebuild index | Clear data → reload → update UI | Dataset-associated controls update |
+| Language switch | Release resources → load new language pack → rebuild menu | Menu items may be recreated |
 
-##### O1. 重建后安全访问模式（强制）
+##### O1. Safe Access Pattern After Rebuild (Mandatory)
 
 ```
-操作触发了控件重建
+Operation triggered control rebuild
    │
-   ├── ① goto T目标窗体
-   │     （等待窗体重新出现，默认超时 5s，重建场景设 10-15s）
+   ├── ① goto TTargetForm
+   │     (wait for the form to reappear; default timeout 5s, set 10-15s for rebuild scenarios)
    │
-   ├── ② rget 关键控件名称
-   │     （验证控件已在内存中重建，不仅窗口可见）
-   │     assert_expr: "actual in ('True','False')" 不关心值，只关心控件存在
+   ├── ② rget key control name
+   │     (verify the control has been rebuilt in memory, not just that the window is visible)
+   │     assert_expr: "actual in ('True','False')" does not care about value, only that the control exists
    │
-   └── ③ 继续后续测试步骤
-         （树节点坐标已变化，需重新计算偏移量）
+   └── ③ Continue subsequent test steps
+         (tree node coordinates have changed; offsets need to be recalculated)
 ```
 
 ```json
 [
-  {"cmd":"click","target":"RescanMenu","note":"触发 rescan 操作"},
+  {"cmd":"click","target":"RescanMenu","note":"Trigger rescan operation"},
   {"phase":"wait","cmd":"waitfor","target":"ProgressBar","prop":"Visible","value":"True","timeout":5000,
-   "note":"等 Rescan 进度条出现"},
+   "note":"Wait for Rescan progress bar to appear"},
 
   {"phase":"wait","cmd":"waitfor","target":"ProgressBar","prop":"Visible","value":"False","timeout":30000,
-   "note":"等 Rescan 进度条消失 = 操作完成"},
+   "note":"Wait for Rescan progress bar to disappear = operation complete"},
 
   {"phase":"rebuild","cmd":"goto","target":"TfrmMain","timeout":15000,
-   "note":"【关键】等待主窗体控件重建（而非仅窗口可见）"},
+   "note":"[Key] Wait for main form controls to rebuild (not just window visibility)"},
 
-  {"phase":"rebuild","cmd":"rget","target":"vstProject.RootNodeCount","note":"验证树控件已重建",
+  {"phase":"rebuild","cmd":"rget","target":"vstProject.RootNodeCount","note":"Verify tree control has been rebuilt",
    "assert_expr":"actual != ''"},
 
-  {"phase":"rebuild","cmd":"rget","target":"actRescan.Enabled","note":"验证动作已重建",
+  {"phase":"rebuild","cmd":"rget","target":"actRescan.Enabled","note":"Verify action has been rebuilt",
    "assert_expr":"actual in ('True','False')"},
 
   {"phase":"verify","cmd":"capture","target":"rescan_done"},
@@ -58,36 +58,37 @@
 ]
 ```
 
-##### O2. `phase: rebuild` 标记
+##### O2. `phase: rebuild` Marker
 
-所有控件重建后的等待步骤必须标记 `"phase": "rebuild"`。此标记的意义：
-- **审计工具**识别 `rebuild` 阶段步骤，检查是否包含 `goto` 重建等待
-- 如果 `rebuild` 阶段步骤失败，**不应**判定为测试失败，而是环境/时序问题
-- 重建后需要比常规 `waitfor` 更长的超时（最小 10s）
+All wait steps after control rebuild must be marked `"phase": "rebuild"`. The meaning of this marker:
+- **Audit tool** identifies `rebuild` phase steps and checks whether they contain a `goto` rebuild wait
+- If a `rebuild` phase step fails, it **should not** be judged as a test failure, but as an environment/timing issue
+- After rebuild, a longer timeout is required than for regular `waitfor` (minimum 10s)
 
-##### O3. 重建前后的快照对比
+##### O3. Snapshot Comparison Before and After Rebuild
 
 ```json
 [
-  {"phase":"verify","cmd":"capture","target":"before_rescan","note":"重建前截图"},
+  {"phase":"verify","cmd":"capture","target":"before_rescan","note":"Screenshot before rebuild"},
   {"phase":"execute","cmd":"click","target":"BtnRescan"},
   {"phase":"wait","cmd":"waitfor","target":"ProgressBar","prop":"Visible","value":"False","timeout":30000},
   {"phase":"rebuild","cmd":"goto","target":"TfrmMain","timeout":15000},
-  {"phase":"verify","cmd":"capture","target":"after_rescan","note":"重建后截图"},
+  {"phase":"verify","cmd":"capture","target":"after_rescan","note":"Screenshot after rebuild"},
   {"cmd":"exit"}
 ]
 ```
 
-Python 侧：
+Python side:
 ```python
-# 用 daofy_ocr diff 对比重建前后画面
+# Use daofy_ocr diff to compare the screen before and after rebuild
 diff = daofy_ocr(action="diff", baseline="before_rescan.png", current="after_rescan.png")
 
-# 如果有显著变化（diff_pixels > 阈值），说明重建成功
+# If there is a significant change (diff_pixels > threshold), the rebuild was successful
 if diff["diff_pixels"] > 500:
-    print(f"✅ 重建成功: {diff['diff_pixels']} pixels 变化")
+    print(f"✅ Rebuild successful: {diff['diff_pixels']} pixels changed")
 else:
-    print(f"⚠️ 重建后画面无明显变化: {diff['diff_pixels']} pixels")
+    print(f"⚠️ No significant screen change after rebuild: {diff['diff_pixels']} pixels")
 ```
 
-**陷阱**：重建后 `rget` 返回 `NF:xxxx` 意味控件尚未重建 → 增加 `goto` 等待时间，或分多次重试；重建后前一步获取的控件引用全部失效 → 任何 `rget` 结果不可缓存；不要在主线程 busy-waiting 时发管道命令 → 先 `waitfor` 等异步操作完成。
+**Pitfalls**: If `rget` after rebuild returns `NF:xxxx`, it means the control has not been rebuilt yet → increase the `goto` wait time, or retry multiple times; all control references obtained before rebuild become invalid → any `rget` result must not be cached; do not send pipeline commands while the main thread is busy-waiting → first use `waitfor` to wait for async operations to complete.
+

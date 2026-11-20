@@ -69,7 +69,7 @@ def install_daofy_agent_skills(
         return AgentSkillInstallResult(
             status="disabled",
             destination=str(destination_root or default_agents_skills_dir()),
-            message="Daofy Agent Skill 自动同步已关闭",
+            message="Daofy Agent Skill auto-sync is disabled",
         )
 
     source_base = source_root or SOURCE_SKILLS_ROOT
@@ -78,7 +78,7 @@ def install_daofy_agent_skills(
     destination_dir = destination_base / SKILL_NAME
 
     if not source_dir.is_dir():
-        message = f"Daofy Agent Skill 源目录不存在: {source_dir}"
+        message = f"Daofy Agent Skill source directory does not exist: {source_dir}"
         logger.warning(message)
         return AgentSkillInstallResult(
             status="missing_source",
@@ -89,7 +89,7 @@ def install_daofy_agent_skills(
     try:
         result = _sync_skill_directory(source_dir, destination_dir)
     except OSError as exc:
-        message = f"同步 Daofy Agent Skill 失败: {exc}"
+        message = f"Failed to sync Daofy Agent Skill: {exc}"
         logger.warning(message, exc_info=True)
         return AgentSkillInstallResult(
             status="error",
@@ -98,7 +98,7 @@ def install_daofy_agent_skills(
         )
 
     if result.status == "current":
-        logger.debug("Daofy Agent Skill 已是最新: %s", result.destination)
+        logger.debug("Daofy Agent Skill is up to date: %s", result.destination)
     elif result.status == "partial":
         logger.warning(result.message)
     else:
@@ -162,18 +162,18 @@ def _sync_skill_directory(source_dir: Path, destination_dir: Path) -> AgentSkill
     if skipped:
         status = "partial"
         message = (
-            "Daofy Agent Skill 部分更新完成；以下文件存在用户改动，已跳过: "
+            "Daofy Agent Skill partial update complete; the following files have user changes and were skipped: "
             + ", ".join(skipped)
         )
     elif updated:
         status = "updated"
-        message = f"Daofy Agent Skill 已更新: {destination_dir}"
+        message = f"Daofy Agent Skill updated: {destination_dir}"
     elif installed:
         status = "installed"
-        message = f"Daofy Agent Skill 已安装: {destination_dir}"
+        message = f"Daofy Agent Skill installed: {destination_dir}"
     else:
         status = "current"
-        message = f"Daofy Agent Skill 已是最新: {destination_dir}"
+        message = f"Daofy Agent Skill is up to date: {destination_dir}"
 
     return AgentSkillInstallResult(
         status=status,
@@ -202,7 +202,7 @@ def _load_manifest(manifest_path: Path) -> dict[str, Any]:
     try:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        logger.warning("Daofy Agent Skill manifest 无法读取，将按首次安装处理: %s", manifest_path)
+        logger.warning("Unable to read Daofy Agent Skill manifest; treating as first install: %s", manifest_path)
         return {}
     if isinstance(data, dict):
         return data

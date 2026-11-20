@@ -1,13 +1,13 @@
-<!-- @when: 分析 automate_delphi 返回的测试报告时 -->
+<!-- @when: When analyzing the test report returned by automate_delphi -->
 <!-- @chain: after=script-schema.md, before=repair-loop.md -->
 
-# 自动化测试报告结构
+# Automated Test Report Structure
 
-`automate_delphi(action="gui", ...)` 返回的 `report` 结构足以驱动修复循环。
+The `report` structure returned by `automate_delphi(action="gui", ...)` is sufficient to drive the repair loop.
 
-MCP resource URI: `delphi://automation/report-schema`。
+MCP resource URI: `delphi://automation/report-schema`.
 
-## 重要字段
+## Important Fields
 
 ```json
 {
@@ -30,7 +30,7 @@ MCP resource URI: `delphi://automation/report-schema`。
       "cmd": "rget",
       "target": "BtnSave.Caption",
       "signal": "assertion_failed",
-      "expected": "保存按钮标题正确",
+      "expected": "Save button caption is correct",
       "diagnostics": {
         "callgraph": {
           "target": "main.TfrmMain.SaveIfModified",
@@ -42,17 +42,17 @@ MCP resource URI: `delphi://automation/report-schema`。
         }
       },
       "assertion": {
-        "expression": "actual == '保存'",
+        "expression": "actual == 'Save'",
         "source": "assert_expr",
-        "actual": "取消",
-        "message": "assert failed: actual == '保存'  (actual='取消')"
+        "actual": "Cancel",
+        "message": "assert failed: actual == 'Save'  (actual='Cancel')"
       },
       "recommendations": []
     },
     "solution": {
       "status": "requires_fix",
       "next_mode": "coding",
-      "summary": "修复首个确定性失败，然后从失败步骤重跑此脚本。",
+      "summary": "Fix the first deterministic failure, then rerun this script from the failed step.",
       "recommendations": []
     },
     "steps": [
@@ -64,10 +64,10 @@ MCP resource URI: `delphi://automation/report-schema`。
 }
 ```
 
-## RTTI 测试任务结果
+## RTTI Test Task Results
 
-`automate_delphi(action="test", ...)` 先返回 `status="submitted"` 和 `task_id`。通过
-`async_task(action="result")` 取得的任务结果不使用 GUI `report` 包装，其稳定字段如下：
+`automate_delphi(action="test", ...)` first returns `status="submitted"` and `task_id`. The task result obtained through
+`async_task(action="result")` does not use the GUI `report` wrapper; its stable fields are as follows:
 
 ```json
 {
@@ -95,32 +95,32 @@ MCP resource URI: `delphi://automation/report-schema`。
 }
 ```
 
-- `passed`：方法完成且全部 Delphi/Python 断言通过。
-- `failed`：返回值、`assert_expr` 或预期异常断言失败。
-- `errors`：启动、传输、setup/构造、未预期 test 异常或 teardown 失败。
-- `phase`：错误发生阶段，取 `prepare`、`setup`、`constructor`、`test` 或 `teardown`。
-- `raw_responses`：逐例 Delphi 原始协议响应，仅用于诊断，不应替代稳定统计字段。
+- `passed`: The method completed and all Delphi/Python assertions passed.
+- `failed`: The return value, `assert_expr`, or expected-exception assertion failed.
+- `errors`: Startup, transport, setup/construction, unexpected test exception, or teardown failure.
+- `phase`: The phase where the error occurred; one of `prepare`, `setup`, `constructor`, `test`, or `teardown`.
+- `raw_responses`: Per-case original Delphi protocol responses, for diagnostics only; should not replace the stable statistics fields.
 
-## 失败信号
+## Failure Signals
 
-| 信号 | 应对策略 |
+| Signal | Response Strategy |
 |------|---------|
-| `assertion_failed` | 对比源码推导的预期行为与实际 UI 状态 |
-| `capture_failed` | 检查窗口可见性和截图目录 |
-| `timeout` | 截取当前 UI，检查 `msgscan/formsum`，避免盲目重试 |
-| `target_not_found` | 执行 `formsum/dumpstate`，更新目标名或修复缺失控件 |
-| `property_not_found` | 执行 `rinspect`，更新属性路径 |
-| `command_error` | 检查 `response_data`，截取状态，再决定修复代码还是脚本 |
-| `skipped` | 前置步骤失败；修复首个失败后重跑 |
+| `assertion_failed` | Compare the expected behavior derived from source code with the actual UI state |
+| `capture_failed` | Check window visibility and the screenshot directory |
+| `timeout` | Capture the current UI, check `msgscan/formsum`, and avoid blind retries |
+| `target_not_found` | Run `formsum/dumpstate`, update the target name, or fix the missing control |
+| `property_not_found` | Run `rinspect` and update the property path |
+| `command_error` | Check `response_data`, capture the state, then decide whether to fix the code or the script |
+| `skipped` | A preceding step failed; rerun after fixing the first failure |
 
-## 报告输出规范
+## Report Output Specification
 
-呈现结果时需包含：
+When presenting results, include:
 
-- 执行的 app 路径和 `resolved_action`。
-- 通过/失败总数和耗时。
-- `skipped` 数量（`stop_on_failure=true` 阻止了依赖步骤时）。
-- 首个失败：`cmd`、`target`、`signal`、实际值、证据。
-- 如果脚本启用了 `callgraph_diagnostics`：列出 `diagnostics.callgraph.target`、`direction`、`status`、`edge_count`、`truncated`。callgraph 查询失败只能作为 warning/secondary diagnostic，不得覆盖原始失败原因。
-- 修复方案：调整自动化脚本还是修复代码。
-- 精确的下个命令：重跑脚本、编译项目、或切换到编码规则。
+- The executed app path and `resolved_action`.
+- Total passed/failed counts and elapsed time.
+- The number of `skipped` (when `stop_on_failure=true` prevented dependent steps).
+- The first failure: `cmd`, `target`, `signal`, actual value, evidence.
+- If the script enabled `callgraph_diagnostics`: list `diagnostics.callgraph.target`, `direction`, `status`, `edge_count`, `truncated`. A callgraph query failure can only be a warning/secondary diagnostic and must not override the original failure cause.
+- Fix plan: adjust the automation script or fix the code.
+- The exact next command: rerun the script, compile the project, or switch to the coding rules.

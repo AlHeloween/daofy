@@ -1,12 +1,12 @@
-# 格式化示例
+# Formatting Examples
 
-## 核心规则
+## Core Rules
 
-- 缩进 2 空格，行宽 ≤120
-- `begin` 独占一行；运算符/逗号后加空格，括号内侧不加
-- `uses` 分组 + 组尾注释 + 组内字母序
+- Indent with 2 spaces, line width ≤120
+- `begin` on its own line; add spaces after operators/commas, but not inside parentheses
+- `uses` grouping + end-of-group comments + alphabetical order within each group
 
-## 正确示例
+## Correct Example
 
 ```pascal
 unit CustomerUnit;
@@ -14,9 +14,9 @@ unit CustomerUnit;
 interface
 
 uses
-  System.SysUtils,        // 系统单元
+  System.SysUtils,        // System units
   System.Classes,
-  Vcl.Dialogs,            // VCL 单元
+  Vcl.Dialogs,            // VCL units
   Vcl.Forms;
 
 type
@@ -37,17 +37,17 @@ end;
 end.
 ```
 
-## 常见错误与修正
+## Common Mistakes and Fixes
 
 ```pascal
-// ❌ begin 不独占一行；括号内侧加空格；运算符两侧无空格
+// ❌ begin is not on its own line; spaces inside parentheses; no spaces around operators
 procedure DoSomething( AValue :Integer);
 begin
   if( AValue>0 )then
     ShowMessage(IntToStr( AValue ));
 end;
 
-// ✅ 修正后
+// ✅ After correction
 procedure DoSomething(AValue: Integer);
 begin
   if AValue > 0 then
@@ -55,18 +55,19 @@ begin
 end;
 ```
 
-## 格式化工具
+## Formatting Tool
 
 ```python
-# 用 delphi_file 格式化（自动备份到 __history）
+# Format with delphi_file (automatically backs up to __history)
 delphi_file(action="format", file_path="Unit1.pas")
 
-# 只检查不修改
+# Check only, do not modify
 delphi_file(action="format", file_path="Unit1.pas", dry_run=True)
 ```
 
-## 注意事项
+## Notes
 
-- 格式化后文件标记为**脏**，再次 write 前必须先 read 或提供 old_content
-- `uses` 用 `delphi_file(action="uses", ...)` 增删，不要手动算行号
-- 写入时保持原始编码（`delphi_file` 自动检测 BOM/GBK）
+- After formatting, the file is marked **dirty**; before writing again, you must first read or provide old_content
+- Use `delphi_file(action="uses", ...)` to add/remove `uses` entries; do not manually calculate line numbers
+- Preserve the original encoding when writing (`delphi_file` automatically detects BOM/GBK)
+

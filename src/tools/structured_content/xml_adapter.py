@@ -1,11 +1,11 @@
 """
-XML 格式适配器 — 读写 XML 文件 ↔ StructuredNode。
+XML format adapter — reads and writes XML files ↔ StructuredNode.
 
-使用 xml.etree.ElementTree（标准库），将 XML 元素映射为：
+Uses xml.etree.ElementTree (standard library) and maps XML elements as:
   element → StructuredNode(kind="object", key=tag)
   attribute → StructuredNode(key="@<name>", kind="string")
   text → StructuredNode(key="#text", kind="string")
-  同标签多子元素 → StructuredNode(kind="array", key=tag)
+  multiple child elements sharing a tag → StructuredNode(kind="array", key=tag)
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Any, Optional
 
 from .schema import StructuredNode
 
-# 注册命名空间避免输出 ns0 前缀
+# Register the namespace so the output avoids the ns0 prefix
 try:
     ET.register_namespace("", "")
 except Exception:
@@ -23,13 +23,13 @@ except Exception:
 
 
 def parse(text: str) -> StructuredNode:
-    """解析 XML 文本为 StructuredNode。"""
+    """Parse XML text into a StructuredNode."""
     root = ET.fromstring(text)
     return _element_to_node(root)
 
 
 def _element_to_node(elem: ET.Element) -> StructuredNode:
-    """ET.Element → StructuredNode。"""
+    """ET.Element → StructuredNode."""
     tag = _clean_tag(elem.tag)
     node = StructuredNode(key=tag, kind="object")
 
@@ -37,7 +37,7 @@ def _element_to_node(elem: ET.Element) -> StructuredNode:
     for k, v in elem.attrib.items():
         node.children.append(StructuredNode(key=f"@{k}", kind="string", value=v))
 
-    # children — 按 tag 分组，同 tag 聚合为数组
+    # children — group by tag; elements sharing a tag aggregate into an array
     child_tags: dict[str, list[ET.Element]] = {}
     for child in elem:
         t = _clean_tag(child.tag)
@@ -55,7 +55,7 @@ def _element_to_node(elem: ET.Element) -> StructuredNode:
     # text content — collapse simple text-only element to leaf
     text = (elem.text or "").strip()
     if text and not child_tags and not elem.attrib:
-        # <!-- 纯文本叶子节点: <tag>text</tag> → kind="string", value="text" -->
+        # <!-- text-only leaf: <tag>text</tag> → kind="string", value="text" -->
         node.kind = "string"
         node.value = text
         node.children = []
@@ -73,7 +73,7 @@ def _element_to_node(elem: ET.Element) -> StructuredNode:
 
 
 def serialize(node: StructuredNode, indent: int = 2) -> str:
-    """将 StructuredNode 序列化为 XML 文本。"""
+    """Serialize a StructuredNode into XML text."""
     root = _node_to_element(node)
     ET.indent(root, space=" " * indent)
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
@@ -104,14 +104,14 @@ def _node_to_element(node: StructuredNode) -> ET.Element:
 
 
 def _clean_tag(tag: str) -> str:
-    """去除命名空间前缀。"""
+    """Strip the namespace prefix."""
     if "}" in tag:
         return tag.split("}", 1)[1]
     return tag
 
 
 def can_parse(text: str) -> bool:
-    """检测是否为合法 XML。"""
+    """Check whether the text is valid XML."""
     text = text.strip()
     if not text.startswith("<"):
         return False

@@ -1,13 +1,13 @@
-<!-- @when: 测试搜索/筛选功能，包括命中、未命中和结果列表更新 -->
+<!-- @when: Test search/filter functionality, including hits, misses, and result list updates -->
 <!-- @part-of: ui-testing -->
 
-#### F. 搜索/筛选
+#### F. Search/Filter
 
-| 要素 | 内容 |
+| Element | Content |
 |------|------|
-| **目标** | 输入搜索条件，验证结果列表/状态变化 |
-| **策略** | type 搜索关键词 → waitfor 结果更新 → rget 结果数 → capture |
-| **关键命令** | `type`, `waitfor`, `rget`, `capture` |
+| **Goal** | Enter search criteria and verify result list/status changes |
+| **Strategy** | type search keyword → waitfor result update → rget result count → capture |
+| **Key commands** | `type`, `waitfor`, `rget`, `capture` |
 
 ```json
 [
@@ -23,4 +23,4 @@
 ]
 ```
 
-**陷阱**：搜索输入有 debounce（300ms-1s）→ waitfor 超时设 5s 以上；清除搜索后需等数据恢复。
+**Pitfall**: Search input has debounce (300ms–1s) → set waitfor timeout to 5s or more; after clearing the search, wait for the data to recover.
